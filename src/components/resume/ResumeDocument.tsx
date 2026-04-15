@@ -10,6 +10,7 @@
  */
 
 import type { ResumeData } from '@/lib/resumes/resume-data'
+import { toHref } from '@/lib/resumes/resume-dom-builder'
 
 interface ResumeDocumentProps {
   data: ResumeData
@@ -42,13 +43,13 @@ export function ResumeDocument({ data }: ResumeDocumentProps) {
           <div className="mt-3 flex flex-wrap items-center gap-x-2 text-[10px] text-zinc-600">
             <span>{profile.location}</span>
             <span className="text-zinc-300">|</span>
-            <span>{profile.email}</span>
+            <a href={toHref(profile.email)} target="_blank" rel="noopener noreferrer" className="hover:underline">{profile.email}</a>
             <span className="text-zinc-300">|</span>
-            <span>{profile.linkedin}</span>
+            <a href={toHref(profile.linkedin)} target="_blank" rel="noopener noreferrer" className="hover:underline">{profile.linkedin}</a>
             <span className="text-zinc-300">|</span>
-            <span>{profile.github}</span>
+            <a href={toHref(profile.github)} target="_blank" rel="noopener noreferrer" className="hover:underline">{profile.github}</a>
             <span className="text-zinc-300">|</span>
-            <span>{profile.website}</span>
+            <a href={toHref(profile.website)} target="_blank" rel="noopener noreferrer" className="hover:underline">{profile.website}</a>
           </div>
         </header>
 
@@ -140,9 +141,9 @@ export function ResumeDocument({ data }: ResumeDocumentProps) {
                       <h3 className="text-[10.5px] font-bold text-zinc-900">
                         {proj.name}
                       </h3>
-                      <span className="text-[9px] text-zinc-500 shrink-0 ml-4">
+                      <a href={toHref(proj.github)} target="_blank" rel="noopener noreferrer" className="text-[9px] text-zinc-500 shrink-0 ml-4 hover:underline">
                         {proj.github}
-                      </span>
+                      </a>
                     </div>
                     <p className="mt-1 text-[9.5px] leading-[1.6] text-zinc-700">
                       {proj.description}
