@@ -64,10 +64,9 @@ export function GitHubAccountSection({ installation, isLoading }: GitHubAccountS
           <span className="text-xs text-zinc-500">No installation found</span>
           <Button
             variant="secondary"
+            disabled={!appSlug}
             onClick={() => {
-              if (appSlug) {
-                window.location.href = `https://github.com/apps/${appSlug}/installations/new`
-              }
+              window.location.href = `https://github.com/apps/${appSlug!}/installations/new`
             }}
             className="flex items-center gap-2"
           >
