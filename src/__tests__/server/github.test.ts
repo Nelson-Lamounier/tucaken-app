@@ -49,11 +49,11 @@ describe('github server functions', () => {
     vi.resetAllMocks()
   })
 
-  const mockResponse = (data: unknown, ok = true, status = 200) => {
+  const mockResponse = (data: unknown, ok = true, status = 200, statusText = ok ? 'OK' : 'Error') => {
     fetchMock.mockResolvedValueOnce({
       ok,
       status,
-      statusText: ok ? 'OK' : 'Error',
+      statusText,
       json: async () => data,
       text: async () => JSON.stringify(data),
     })
