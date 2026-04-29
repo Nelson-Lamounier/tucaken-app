@@ -72,4 +72,16 @@ export const adminKeys = {
     detail: (slug: string) =>
       ['admin', 'applications', 'detail', slug] as const,
   },
+
+  /** GitHub integration query keys */
+  github: {
+    /** All GitHub queries */
+    all: ['admin', 'github'] as const,
+    /** GitHub App installation status */
+    installation: () => ['admin', 'github', 'installation'] as const,
+    /** Repos accessible via the GitHub App */
+    accessibleRepos: () => ['admin', 'github', 'accessible-repos'] as const,
+    /** Repos connected (indexed) to the KB */
+    connectedRepos: () => ['admin', 'github', 'connected-repos'] as const,
+  },
 } as const
