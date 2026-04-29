@@ -158,6 +158,8 @@ export interface ApplicationSummary {
   readonly createdAt: string
   /** ISO 8601 last-updated timestamp */
   readonly updatedAt: string
+  /** Linked GitHub repository (optional) */
+  readonly githubRepo?: GitHubRepo
 }
 
 // =============================================================================
@@ -374,6 +376,31 @@ export interface ApplicationDetail {
   readonly analysis: AnalysisOutput | null
   /** Coach Agent output (may be null if no interview prep yet) */
   readonly interviewPrep: InterviewPrepOutput | null
+  /** Linked GitHub repository (optional) */
+  readonly githubRepo?: GitHubRepo
+}
+
+// =============================================================================
+// GITHUB REPOSITORY LINK
+// =============================================================================
+
+/**
+ * A GitHub repository linked to a job application.
+ * Stored as part of ApplicationSummary and ApplicationDetail.
+ */
+export interface GitHubRepo {
+  /** Full HTTPS clone URL (e.g. "https://github.com/owner/repo") */
+  readonly url: string
+  /** Repository owner / org */
+  readonly owner: string
+  /** Repository name */
+  readonly name: string
+  /** Target branch (defaults to "main") */
+  readonly branch?: string
+  /** Optional note explaining the repo's relevance */
+  readonly note?: string
+  /** ISO 8601 timestamp when the repo was linked */
+  readonly linkedAt: string
 }
 
 // =============================================================================

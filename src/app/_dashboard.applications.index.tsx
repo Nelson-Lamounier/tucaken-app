@@ -4,7 +4,7 @@ import {
   QueueListIcon,
   AcademicCapIcon,
 } from '@heroicons/react/24/outline'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, Github } from 'lucide-react'
 import { GridListActions, type GridListAction } from '../components/ui/GridListActions'
 import { DashboardPage } from '../components/layouts/DashboardPage'
 
@@ -32,6 +32,14 @@ const actions: GridListAction[] = [
     iconForeground: 'text-indigo-400',
     iconBackground: 'bg-indigo-500/10',
     description: 'Focus on applications currently in the interview stage to prep and practice.',
+  },
+  {
+    title: 'GitHub Repositories',
+    href: '/applications/github',
+    icon: Github,
+    iconForeground: 'text-zinc-300',
+    iconBackground: 'bg-zinc-700/50',
+    description: 'Link and manage GitHub repositories for your job applications.',
   },
   {
     title: 'Create Article',

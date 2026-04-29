@@ -35,7 +35,7 @@ export function ApplicationReviewDetail({ detail }: ApplicationReviewDetailProps
   const [isCoverLetterPreviewOpen, setIsCoverLetterPreviewOpen] = useState(false)
   const [isEditResumeOpen, setIsEditResumeOpen] = useState(false)
   const [isEditCoverLetterOpen, setIsEditCoverLetterOpen] = useState(false)
-  const { downloading: isDownloading, generatePdf } = usePdfDownload()
+const { downloading: isDownloading, generatePdf } = usePdfDownload()
 
   const handleDownloadResume = useCallback(() => {
     if (!detail.analysis?.tailoredResume) return
