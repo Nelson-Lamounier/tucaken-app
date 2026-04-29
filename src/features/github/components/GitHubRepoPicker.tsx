@@ -118,7 +118,7 @@ export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos }:
                   <Button
                     variant="secondary"
                     onClick={() => handleAdd(repo.fullName)}
-                    disabled={ingestion.isPending}
+                    disabled={isQueuing}
                     className="py-1 px-2.5 text-[10px]"
                   >
                     + Add
