@@ -251,7 +251,7 @@ export const triggerStrategistCoachFn = createServerFn({ method: 'POST' })
     await requireAuth()
 
     const body = await apiFetch<Record<string, object>>(
-      '/api/admin/pipelines/strategist',
+      '/api/admin/pipelines/strategist-job',
       {
         method: 'POST',
         body: JSON.stringify({
@@ -326,7 +326,7 @@ export const triggerApplicationsAnalysisFn = createServerFn({ method: 'POST' })
     }
 
     const body = await apiFetch<TriggerResponse>(
-      '/api/admin/pipelines/strategist',
+      '/api/admin/pipelines/strategist-job',
       {
         method: 'POST',
         body: JSON.stringify(lambdaPayload),

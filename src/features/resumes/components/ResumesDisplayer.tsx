@@ -21,7 +21,7 @@ import {
 } from '../../../server/resumes'
 import { getTailoredResumesFn } from '../../../server/applications'
 import type { TailoredResumeSummary } from '../../../server/applications'
-import type { ResumeSummary } from '@/lib/resumes/dynamodb-resumes'
+import type { ResumeSummary } from '../../../server/resumes'
 import type { ResumeData } from '@/lib/resumes/resume-data'
 import { useToastStore } from '@/lib/stores/toast-store'
 import { buildResumeDomForPdf, A4_WIDTH, A4_HEIGHT, PDF_BG } from '@/lib/resumes/resume-dom-builder'

@@ -118,7 +118,7 @@ const updateResumeSchema = z.object({
 // Response shapes from admin-api
 // =============================================================================
 
-interface ResumeSummary {
+export interface ResumeSummary {
   resumeId: string
   label: string
   isActive: boolean
@@ -126,7 +126,7 @@ interface ResumeSummary {
   updatedAt: string
 }
 
-interface ResumeWithData extends ResumeSummary {
+export interface ResumeWithData extends ResumeSummary {
   data: Record<string, JsonValue>
 }
 
