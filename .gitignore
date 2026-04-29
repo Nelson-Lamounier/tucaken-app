@@ -39,3 +39,4 @@ build_output*.log
 !.yarn/sdks
 !.yarn/versions
 .pnp.*
+.superpowers/
