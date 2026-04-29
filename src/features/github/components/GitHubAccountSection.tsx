@@ -111,7 +111,7 @@ export function GitHubAccountSection({ installation, isLoading }: GitHubAccountS
       </div>
       <div className="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-4">
         <span className="text-xs text-zinc-500">
-          Installed · github.com/apps/{appSlug ?? 'tucaken'}
+          {appSlug ? `Installed · github.com/apps/${appSlug}` : 'Installed'}
         </span>
         <Button
           variant="danger"
