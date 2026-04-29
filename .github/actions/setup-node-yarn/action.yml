@@ -1,0 +1,98 @@
+# @format
+
+name: "Setup Environment and Dependencies"
+description: "Install Node.js and Yarn, restore dependency cache, run yarn install."
+
+inputs:
+  node-version:
+    description: "Node.js version (default: reads from .nvmrc, fallback 22)"
+    required: false
+    default: "auto"
+  install-dependencies:
+    description: "Whether to install dependencies"
+    required: false
+    default: "true"
+
+outputs:
+  cache-hit:
+    description: "Whether dependency cache was hit"
+    value: ${{ steps.cache-deps.outputs.cache-hit }}
+  node-version:
+    description: "Node.js version installed"
+    value: ${{ steps.resolve-node.outputs.version }}
+
+runs:
+  using: "composite"
+  steps:
+    # ─── Resolve Node version ──────────────────────────────────────────
+    - name: Resolve Node.js Version
+      id: resolve-node
+      shell: bash
+      run: |
+        INPUT="${{ inputs.node-version }}"
+        if [ "$INPUT" = "auto" ]; then
+          if [ -f .nvmrc ]; then
+            VERSION=$(cat .nvmrc | tr -d '[:space:]')
+          else
+            VERSION="22"
+          fi
+        else
+          VERSION="$INPUT"
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Node.js version: $VERSION"
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ steps.resolve-node.outputs.version }}
+
+    - name: Enable Corepack (Yarn v4)
+      shell: bash
+      run: corepack enable
+
+    # ─── Dependency cache ──────────────────────────────────────────────
+    - name: Generate Cache Key
+      id: cache-key
+      shell: bash
+      run: |
+        if [ -f yarn.lock ]; then
+          HASH=$(cat yarn.lock package.json $(find apps packages -name 'package.json' 2>/dev/null | sort) \
+            2>/dev/null | sha256sum | cut -d' ' -f1)
+        else
+          HASH="${{ github.sha }}"
+        fi
+        KEY="deps-${{ runner.os }}-node${{ steps.resolve-node.outputs.version }}-${HASH}"
+        echo "key=$KEY" >> $GITHUB_OUTPUT
+        echo "Cache key: $KEY"
+
+    - name: Cache Dependencies
+      id: cache-deps
+      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+      with:
+        path: |
+          node_modules
+          .yarn/cache
+          .yarn/unplugged
+          .yarn/install-state.gz
+        key: ${{ steps.cache-key.outputs.key }}
+        restore-keys: |
+          deps-${{ runner.os }}-node${{ steps.resolve-node.outputs.version }}-
+
+    # ─── Install ───────────────────────────────────────────────────────
+    - name: Install Dependencies
+      if: inputs.install-dependencies == 'true'
+      shell: bash
+      run: |
+        MAX=3
+        ATTEMPT=1
+        while [ $ATTEMPT -le $MAX ]; do
+          echo "yarn install attempt $ATTEMPT/$MAX..."
+          if yarn install --immutable; then
+            echo "✓ Dependencies installed"
+            break
+          fi
+          [ $ATTEMPT -eq $MAX ] && exit 1
+          ATTEMPT=$((ATTEMPT + 1))
+          sleep 10
+        done

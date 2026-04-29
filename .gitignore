@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# TanStack Start / Vinxi
+.tanstack/
+.vinxi/
+.nitro/
+.output/
+
+# Build outputs
+dist/
+dist-ssr/
+server.js
+*.tsbuildinfo
+
+# IDE & OS
+.vscode/
+.DS_Store
+*.local
+
+# Test coverage
+coverage/
+
+# Debug & temporary files
+ts_errors*.txt
+tsc_errors*.txt
+build_output*.log
+
+# Yarn
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnp.*

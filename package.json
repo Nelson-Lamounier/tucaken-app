@@ -1,7 +1,8 @@
 {
-  "name": "start-admin",
+  "name": "tucaken-app",
   "private": true,
   "type": "module",
+  "packageManager": "yarn@4.12.0",
   "imports": {
     "#/*": "./src/*"
   },
