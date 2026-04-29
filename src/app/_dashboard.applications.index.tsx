@@ -35,11 +35,11 @@ const actions: GridListAction[] = [
   },
   {
     title: 'GitHub Repositories',
-    href: '/applications/github',
+    href: '/settings/github',
     icon: Github,
     iconForeground: 'text-zinc-300',
     iconBackground: 'bg-zinc-700/50',
-    description: 'Link and manage GitHub repositories for your job applications.',
+    description: 'Connect and manage GitHub repositories indexed into the knowledge base.',
   },
   {
     title: 'Create Article',

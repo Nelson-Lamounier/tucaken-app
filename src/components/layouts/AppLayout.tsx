@@ -23,6 +23,7 @@ import {
   MessageSquareText,
   ExternalLink,
   LogOut,
+  Github,
 } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { HeaderNav } from '../ui/HeaderNav'
@@ -50,6 +51,10 @@ const observabilityLinks = [
   { id: 4, name: 'ArgoCD', href: 'https://ops.nelsonlamounier.com/argocd/', icon: GitBranch },
   { id: 5, name: 'Google Analytics', href: 'https://analytics.google.com', icon: LineChart },
   { id: 6, name: 'Health Check', href: 'https://nelsonlamounier.com/api/health', icon: HeartPulse },
+] as const
+
+const settingsNavigation = [
+  { name: 'GitHub', href: '/settings/github', icon: Github },
 ] as const
 
 /**
@@ -238,6 +243,38 @@ function SidebarNavList() {
       <li>
         <ul role="list" className="-mx-2 space-y-1">
           {navigation.map((item) => (
+            <li key={item.name}>
+              <Link
+                to={item.href as string}
+                activeProps={{ className: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white' }}
+                inactiveProps={{
+                  className: 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white',
+                }}
+                className="group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold transition-colors"
+              >
+                {({ isActive }) => (
+                  <>
+                    <item.icon
+                      aria-hidden="true"
+                      className={classNames(
+                        isActive ? 'text-teal-600 dark:text-teal-400' : 'text-zinc-400 dark:text-zinc-400 group-hover:text-teal-600 dark:group-hover:text-teal-400',
+                        'size-6 shrink-0 transition-colors',
+                      )}
+                    />
+                    {item.name}
+                  </>
+                )}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </li>
+      <li>
+        <div className="text-xs/6 font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-2">
+          Settings
+        </div>
+        <ul role="list" className="-mx-2 space-y-1">
+          {settingsNavigation.map((item) => (
             <li key={item.name}>
               <Link
                 to={item.href as string}
