@@ -119,7 +119,7 @@ const uploadUrlSchema = z.object({
     'application/pdf',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   ]),
-  fileSizeBytes: z.number().int().min(1).max(20 * 1024 * 1024),
+  fileSizeBytes: z.number().int().min(1).max(50 * 1024 * 1024),
 })
 
 const importIdSchema = z.string().uuid()
