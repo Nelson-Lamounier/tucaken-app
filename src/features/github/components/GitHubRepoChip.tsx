@@ -4,7 +4,7 @@ export function GitHubRepoChip({ fullName }: { readonly fullName: string }) {
   return (
     <span className="inline-flex items-center gap-1 rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-xs font-mono text-zinc-400">
       <Github className="h-3 w-3 shrink-0" />
-      <span className="max-w-[160px] truncate">{fullName}</span>
+      <span className="max-w-[160px] truncate">{fullName.split('/')[1] ?? fullName}</span>
     </span>
   )
 }

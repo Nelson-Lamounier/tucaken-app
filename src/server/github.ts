@@ -73,19 +73,26 @@ export const getGitHubConnectedReposFn = createServerFn({ method: 'GET' }).handl
 })
 
 const ingestionSchema = z.object({
-  repoFullName: z.string().min(1),
-  forceReindex: z.boolean().optional(),
+  repoFullName:  z.string().min(1),
+  defaultBranch: z.string().optional(),
+  forceReindex:  z.boolean().optional(),
 })
 
 export const triggerGitHubIngestionFn = createServerFn({ method: 'POST' })
   .inputValidator(ingestionSchema)
   .handler(async ({ data }) => {
     await requireAuth()
-    return apiFetch<{ status: string; pipelineRunId: string; jobName: string }>(
-      '/ingestion/trigger',
+    // /github/connected-repos: inserts repo + sync state, quota-checks, dispatches K8s Job.
+    // /ingestion/trigger is admin-only and bypasses quota/repo-state management.
+    return apiFetch<{ status: string; repoFullName: string; jobName: string }>(
+      '/github/connected-repos',
       {
         method: 'POST',
-        body: JSON.stringify({ repoFullName: data.repoFullName, forceReindex: data.forceReindex }),
+        body: JSON.stringify({
+          repoFullName:  data.repoFullName,
+          defaultBranch: data.defaultBranch,
+          forceReindex:  data.forceReindex,
+        }),
       },
     )
   })

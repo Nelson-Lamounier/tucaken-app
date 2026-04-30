@@ -4,7 +4,8 @@ import { triggerGitHubIngestionFn } from '@/server/github'
 import { useToastStore } from '@/lib/stores/toast-store'
 
 interface IngestionVariables {
-  readonly repoFullName: string
+  readonly repoFullName:  string
+  readonly defaultBranch?: string
   readonly forceReindex?: boolean
 }
 
@@ -12,7 +13,7 @@ export function useGitHubIngestion() {
   const queryClient = useQueryClient()
   const { addToast } = useToastStore()
 
-  return useMutation<{ status: string; pipelineRunId: string; jobName: string }, Error, IngestionVariables>({
+  return useMutation<{ status: string; repoFullName: string; jobName: string }, Error, IngestionVariables>({
     mutationFn: (data) => triggerGitHubIngestionFn({ data }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: adminKeys.github.connectedRepos() })

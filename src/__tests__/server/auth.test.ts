@@ -139,7 +139,7 @@ describe('getLoginUrlFn', () => {
     mockGenerateRandomString.mockReturnValueOnce('mock-state-32')
     mockGenerateCodeChallenge.mockResolvedValue('mock-challenge')
 
-    const url = await (getLoginUrlFn as () => Promise<string>)()
+    const url = await (getLoginUrlFn as (input: { data: { provider?: 'Google' | 'GitHub' } }) => Promise<string>)({ data: {} })
 
     expect(url).toContain(`https://${COGNITO_DOMAIN}/oauth2/authorize`)
     expect(url).toContain(`client_id=${COGNITO_CLIENT_ID}`)
@@ -154,7 +154,7 @@ describe('getLoginUrlFn', () => {
     mockGenerateRandomString.mockReturnValueOnce('mock-state')
     mockGenerateCodeChallenge.mockResolvedValue('mock-challenge')
 
-    await (getLoginUrlFn as () => Promise<string>)()
+    await (getLoginUrlFn as (input: { data: { provider?: 'Google' | 'GitHub' } }) => Promise<string>)({ data: {} })
 
     expect(mockSetCookie).toHaveBeenCalledWith(
       'pkce_verifier',
@@ -175,7 +175,7 @@ describe('getLoginUrlFn', () => {
     mockGenerateCodeChallenge.mockResolvedValue('mock')
 
     await expect(
-      (getLoginUrlFn as () => Promise<string>)(),
+      (getLoginUrlFn as (input: { data: { provider?: 'Google' | 'GitHub' } }) => Promise<string>)({ data: {} }),
     ).rejects.toThrow('Missing AUTH_COGNITO_DOMAIN')
   })
 })

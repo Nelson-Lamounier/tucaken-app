@@ -84,4 +84,16 @@ export const adminKeys = {
     /** Repos connected (indexed) to the KB */
     connectedRepos: () => ['admin', 'github', 'connected-repos'] as const,
   },
+
+  /** Resume import pipeline query keys */
+  resumeImports: {
+    /** All resume import queries */
+    all: ['admin', 'resumeImports'] as const,
+    /** Import status polling for a specific import */
+    status: (importId: string) => ['admin', 'resumeImports', 'status', importId] as const,
+    /** Career entries list (optional type filter) */
+    entries: (type?: string) => ['admin', 'resumeImports', 'entries', type ?? 'all'] as const,
+    /** Past imports list */
+    list: () => ['admin', 'resumeImports', 'list'] as const,
+  },
 } as const

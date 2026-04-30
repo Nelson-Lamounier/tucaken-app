@@ -34,10 +34,10 @@ export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos }:
   const visible = filtered.slice(0, visibleCount)
   const remaining = filtered.length - visibleCount
 
-  const handleAdd = (fullName: string) => {
+  const handleAdd = (fullName: string, defaultBranch: string) => {
     setQueuingRepos((prev) => new Set(prev).add(fullName))
     ingestion.mutate(
-      { repoFullName: fullName },
+      { repoFullName: fullName, defaultBranch },
       {
         onSettled: () => {
           setQueuingRepos((prev) => {
@@ -117,7 +117,7 @@ export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos }:
                 ) : (
                   <Button
                     variant="secondary"
-                    onClick={() => handleAdd(repo.fullName)}
+                    onClick={() => handleAdd(repo.fullName, repo.defaultBranch)}
                     disabled={isQueuing}
                     className="py-1 px-2.5 text-[10px]"
                   >

@@ -1,6 +1,7 @@
 import { queryOptions } from '@tanstack/react-query'
 import { getRealtimeUsageFn, getBilledCostsFn, getChatbotUsageFn, getSelfHealingUsageFn } from '../../server/finops'
 import { getArticlesFn } from '../../server/articles'
+import { getPromptQualityStatsFn } from '../../server/prompt-feedback'
 
 export const finopsQueries = {
   realtimeUsage: (days: number) =>
@@ -35,5 +36,14 @@ export const articlePipelineQueries = {
       queryKey: ['articles', 'pipeline', 'all'],
       queryFn: () => getArticlesFn({ data: { status: 'all' } }),
       staleTime: 60 * 1000,
+    }),
+}
+
+export const promptQualityQueries = {
+  stats: (days: number) =>
+    queryOptions({
+      queryKey: ['promptQuality', 'stats', days],
+      queryFn: () => getPromptQualityStatsFn({ data: { days } }),
+      staleTime: 5 * 60 * 1000,
     }),
 }

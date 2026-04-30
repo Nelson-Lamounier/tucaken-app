@@ -7,6 +7,7 @@ import { Button } from '../../../components/ui/Button'
 import type { AdminResumeWithData } from '../../applications/hooks/use-resume-versions'
 import { DashboardDrawer } from '../../../components/ui/DashboardDrawer'
 import type { ResumeData, ResumeProfile } from '@/lib/resumes/resume-data'
+import { ResumeFeedbackWidget } from './ResumeFeedbackWidget'
 
 interface ResumePreviewDrawerProps {
   readonly isOpen: boolean
@@ -18,6 +19,8 @@ interface ResumePreviewDrawerProps {
   readonly coverLetterRole?: string
   readonly onDownload: () => void
   readonly isDownloading: boolean
+  /** Optional prompt invocation ID for feedback tracking */
+  readonly invocationId?: string
 }
 
 export function ResumePreviewDrawer({
@@ -30,6 +33,7 @@ export function ResumePreviewDrawer({
   coverLetterRole,
   onDownload,
   isDownloading,
+  invocationId,
 }: ResumePreviewDrawerProps) {
   const hasContent = !!resume || !!coverLetter
   const description = resume ? (resume.label ?? 'Resume') : (coverLetter ? 'Cover Letter' : 'Loading...')
@@ -43,15 +47,21 @@ export function ResumePreviewDrawer({
       unstyledContent
       actions={
         hasContent && (
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={onDownload}
-            disabled={isDownloading}
-          >
-            <Download className="mr-2 size-4" />
-            {isDownloading ? 'Generating…' : 'Download PDF'}
-          </Button>
+          <div className="flex items-center gap-3">
+            <ResumeFeedbackWidget
+              invocationId={invocationId}
+              label="Rate this resume"
+            />
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={onDownload}
+              disabled={isDownloading}
+            >
+              <Download className="mr-2 size-4" />
+              {isDownloading ? 'Generating…' : 'Download PDF'}
+            </Button>
+          </div>
         )
       }
     >

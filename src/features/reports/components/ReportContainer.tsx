@@ -10,9 +10,10 @@ import {
 } from '@heroicons/react/20/solid'
 import { Stats } from '../../../components/ui/Stats'
 import { useQuery } from '@tanstack/react-query'
-import { finopsQueries, articlePipelineQueries } from '../queries'
+import { finopsQueries, articlePipelineQueries, promptQualityQueries } from '../queries'
 import type { ArticleSummary } from '../../../server/articles'
 import type { RealtimeUsageStats, ChatbotUsageStats, SelfHealingStats } from '../../../server/finops'
+import type { PromptQualityStats } from '../../../server/prompt-feedback'
 
 const secondaryNavigation = [
   { name: 'Last 7 days', days: 7 },
@@ -32,13 +33,14 @@ function classNames(...classes: (string | undefined | null | false)[]) {
 
 export default function ReportContainer() {
   const [period, setPeriod] = useState(7)
-  const [activeTab, setActiveTab] = useState<'all' | 'pipelines' | 'chatbot' | 'selfhealing'>('all')
+  const [activeTab, setActiveTab] = useState<'all' | 'pipelines' | 'chatbot' | 'selfhealing' | 'prompt-quality'>('all')
 
   const tabs = [
     { id: 'all', name: 'Combined Overview' },
     { id: 'pipelines', name: 'Content Pipelines' },
     { id: 'chatbot', name: 'Chatbot Application' },
     { id: 'selfhealing', name: 'Self-Healing Automation' },
+    { id: 'prompt-quality', name: 'Prompt Quality' },
   ]
 
   // Fetch real data
@@ -47,6 +49,7 @@ export default function ReportContainer() {
   const { data: articles, isLoading: isArticlesLoading } = useQuery(articlePipelineQueries.all())
   const { data: chatbotUsage, isLoading: isChatbotLoading } = useQuery(finopsQueries.chatbotUsage(period))
   const { data: selfHealingUsage, isLoading: isSelfHealingLoading } = useQuery(finopsQueries.selfHealingUsage(period))
+  const { data: promptQualityStats, isLoading: isPromptQualityLoading } = useQuery(promptQualityQueries.stats(period))
 
   // ── Pricing constants (Claude Sonnet — Bedrock on-demand rates) ──────────────
   const inputCostPer1M = 3    // $ per 1M input tokens
@@ -397,6 +400,71 @@ export default function ReportContainer() {
                   <h2 className="text-base/7 font-semibold text-indigo-400">Self-Healing Automation</h2>
                 </div>
                 <Stats stats={selfHealingStats} />
+              </div>
+            )}
+
+            {/* Prompt Quality */}
+            {activeTab === 'prompt-quality' && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-base/7 font-semibold text-indigo-400">Prompt Quality</h2>
+                  <p className="mt-1 text-sm text-zinc-500">
+                    Per-agent quality metrics derived from user thumbs-up/down feedback and Bedrock invocation logs.
+                    Bad rate = thumbs-down ÷ total rated. Cache hit rate = invocations served from Bedrock prompt cache.
+                  </p>
+                </div>
+                {isPromptQualityLoading ? (
+                  <div className="text-sm text-zinc-500">Loading prompt quality data...</div>
+                ) : !promptQualityStats || promptQualityStats.length === 0 ? (
+                  <div className="rounded-lg border border-white/10 bg-white/2.5 px-6 py-8 text-center text-sm text-zinc-500">
+                    No invocation data yet — prompt quality metrics will appear once pipeline jobs have run with the observability callback enabled.
+                  </div>
+                ) : (
+                  <div className="overflow-hidden rounded-xl outline outline-white/10 -outline-offset-1">
+                    <table className="w-full text-sm text-left">
+                      <thead>
+                        <tr className="border-b border-white/10 bg-white/2.5">
+                          <th className="px-4 py-3 text-xs font-semibold text-zinc-400 uppercase tracking-wide">Pipeline / Agent</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-zinc-400 uppercase tracking-wide text-right">Invocations</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-zinc-400 uppercase tracking-wide text-right">👍</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-zinc-400 uppercase tracking-wide text-right">👎</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-zinc-400 uppercase tracking-wide text-right">Bad Rate</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-zinc-400 uppercase tracking-wide text-right">Avg Latency</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-zinc-400 uppercase tracking-wide text-right">Cache Hit</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-zinc-400 uppercase tracking-wide text-right">Avg Cost</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {(promptQualityStats as PromptQualityStats[]).map((row) => (
+                          <tr key={`${row.pipeline}-${row.agent}`} className="hover:bg-white/2.5 transition-colors">
+                            <td className="px-4 py-3">
+                              <div className="font-medium text-white">{row.agent}</div>
+                              <div className="text-xs text-zinc-500">{row.pipeline}</div>
+                            </td>
+                            <td className="px-4 py-3 text-right text-zinc-300">{row.totalInvocations.toLocaleString()}</td>
+                            <td className="px-4 py-3 text-right text-green-400">{row.thumbsUp}</td>
+                            <td className="px-4 py-3 text-right text-red-400">{row.thumbsDown}</td>
+                            <td className="px-4 py-3 text-right">
+                              <span className={[
+                                'rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset',
+                                row.badRate > 20
+                                  ? 'bg-red-500/10 text-red-400 ring-red-500/20'
+                                  : row.badRate > 10
+                                  ? 'bg-yellow-500/10 text-yellow-400 ring-yellow-500/20'
+                                  : 'bg-green-500/10 text-green-400 ring-green-500/20',
+                              ].join(' ')}>
+                                {row.badRate}%
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right text-zinc-300">{(row.avgLatencyMs / 1000).toFixed(1)}s</td>
+                            <td className="px-4 py-3 text-right text-zinc-300">{row.cacheHitRate}%</td>
+                            <td className="px-4 py-3 text-right text-zinc-300">${(row.avgTotalCostCents / 100).toFixed(3)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
 

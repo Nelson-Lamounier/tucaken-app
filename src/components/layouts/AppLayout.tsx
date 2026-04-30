@@ -32,7 +32,7 @@ import avatarImage from '@/images/avatar.jpg'
 
 /** Primary sidebar navigation links. */
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: HomeIcon },
+  { name: 'Dashboard', href: '/overview', icon: HomeIcon },
   { name: 'Comments', href: '/comments', icon: MessageSquareText },
   { name: 'Applications', href: '/applications', icon: BriefcaseIcon },
   { name: 'Articles', href: '/articles', icon: DocumentDuplicateIcon },
@@ -103,7 +103,7 @@ export default function AppLayout({ children, disableMainWrapper = false }: AppL
    * Falls back to `/login` if the server returns no redirect URL.
    */
   const handleSignOut = async () => {
-    let targetUrl = '/login'
+    let targetUrl = '/admin/auth'
     try {
       const { logoutFn } = await import('@/server/auth')
       const res = await logoutFn()

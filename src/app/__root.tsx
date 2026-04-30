@@ -92,7 +92,7 @@ function NotFoundComponent() {
         <p className="text-5xl font-bold text-zinc-200 dark:text-zinc-700">404</p>
         <h1 className="mt-4 text-xl font-bold">Page not found</h1>
         <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">The page you are looking for does not exist or has been moved.</p>
-        <Link to="/" className="mt-8 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-lg font-medium transition-colors">
+        <Link to="/overview" className="mt-8 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-lg font-medium transition-colors">
           Return to Dashboard
         </Link>
       </div>
