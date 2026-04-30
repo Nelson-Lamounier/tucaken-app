@@ -89,10 +89,10 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
 
   // ── Upload flow ───────────────────────────────────────────────────────────
   async function handleFile(f: File) {
-    const MAX_BYTES = 20 * 1024 * 1024
+    const MAX_BYTES = 50 * 1024 * 1024
     if (f.size > MAX_BYTES) {
       setFile(f)
-      setErrorMsg(`File is too large (${(f.size / 1024 / 1024).toFixed(1)} MB). Maximum allowed size is 20 MB.`)
+      setErrorMsg(`File is too large (${(f.size / 1024 / 1024).toFixed(1)} MB). Maximum allowed size is 50 MB.`)
       setPhase('error')
       return
     }
