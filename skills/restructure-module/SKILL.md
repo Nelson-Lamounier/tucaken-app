@@ -1,6 +1,6 @@
 ---
 name: restructure-module
-description: Move or rename Tucaken files and directories without breaking @/ imports, TanStack Router route derivation, AppLayout navigation, or CI. Covers the post-move verification sequence: tsc --noEmit → vitest run → nav update.
+description: "Move or rename Tucaken files and directories without breaking @/ imports, TanStack Router route derivation, AppLayout navigation, or CI. Covers the post-move verification sequence: tsc --noEmit → vitest run → nav update."
 type: core
 library: tucaken-app
 library_version: initial-development

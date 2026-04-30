@@ -1,6 +1,6 @@
 ---
 name: ship-feature
-description: End-to-end checklist for shipping a Tucaken feature: component reuse audit → server fn tests → typecheck → lint → vitest → smoke test → conventional commit → CI green → merge to main → ArgoCD deploy.
+description: "End-to-end checklist for shipping a Tucaken feature: component reuse audit → server fn tests → typecheck → lint → vitest → smoke test → conventional commit → CI green → merge to main → ArgoCD deploy."
 type: lifecycle
 library: tucaken-app
 library_version: initial-development

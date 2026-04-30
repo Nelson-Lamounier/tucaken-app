@@ -1,6 +1,6 @@
 ---
 name: getting-started
-description: Onboard to Tucaken: Yarn 4 setup, @/ path alias, local dev (admin-api runs live in K8s cluster via cdk-monitoring repo), BFF boundary (tucaken-app owns UI + server fns; admin-api owns DB + K8s jobs), TanStack devtools, and the canonical src/ directory map.
+description: "Onboard to Tucaken: Yarn 4 setup, @/ path alias, local dev (admin-api runs live in K8s cluster via cdk-monitoring repo), BFF boundary (tucaken-app owns UI + server fns; admin-api owns DB + K8s jobs), TanStack devtools, and the canonical src/ directory map."
 type: lifecycle
 library: tucaken-app
 library_version: initial-development

@@ -298,7 +298,7 @@ skills:
       validation, method selection, error propagation, and testing with Vitest.
     type: core
     covers:
-      - createServerFn({ method: 'GET' | 'POST' }) from @tanstack/react-start
+      - "createServerFn({ method: 'GET' | 'POST' }) from @tanstack/react-start"
       - requireAuth() from src/server/auth-guard.ts
       - getSessionToken() pattern (getCookie + null guard)
       - apiFetch<T>() generic BFF helper
@@ -858,7 +858,7 @@ skills:
       TanStack Router route derivation, or CI.
     type: lifecycle
     covers:
-      - @/ alias import updates across moved files
+      - "@/ alias import updates across moved files"
       - TanStack Router filename → URL mapping during moves
       - Updating AppLayout navigation after route path changes
       - Running tsc --noEmit + vitest run after every structural change
@@ -910,7 +910,7 @@ skills:
       - Component reuse audit before any new UI
       - Vitest tests for all server functions (src/__tests__/server/)
       - yarn typecheck + yarn lint before commit
-      - Conventional commit format (feat(scope): ..., fix(scope): ...)
+      - "Conventional commit format (feat(scope): ..., fix(scope): ...)"
       - GitHub Actions CI pipeline gates
       - ArgoCD rollout promotion sequence
     tasks:
