@@ -1,21 +1,33 @@
 import { createFileRoute, Outlet, redirect, useMatches } from '@tanstack/react-router'
 import AppLayout from '../components/layouts/AppLayout'
 import { getMeFn } from '../server/me'
+import type { MeResponse } from '../server/me'
 
 export const Route = createFileRoute('/_dashboard')({
-  beforeLoad: ({ context, location }) => {
+  beforeLoad: async ({ context, location }) => {
+    // Gate 1: valid Cognito session
     if (!context.auth.user) {
       throw redirect({
         to: '/auth',
-        search: {
-          callbackUrl: location.href,
-        },
+        search: { callbackUrl: location.href },
       })
     }
-  },
-  // Triggers userProvisionMiddleware on first sign-in and hydrates plan state.
-  loader: async () => {
-    const me = await getMeFn()
+
+    // Gate 2: user must exist in the database.
+    // getMeFn() calls /api/admin/me which runs userProvisionMiddleware —
+    // the upsert happens here on first sign-in. If provisioning fails
+    // (DB unreachable, 503) we redirect back to /auth rather than letting
+    // the user into an unusable dashboard.
+    let me: MeResponse
+    try {
+      me = await getMeFn()
+    } catch {
+      throw redirect({
+        to: '/auth',
+        search: { callbackUrl: location.href },
+      })
+    }
+
     return { me }
   },
   component: DashboardLayout,
