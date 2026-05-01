@@ -151,10 +151,10 @@ describe('github server functions', () => {
       const result = await handler({ data: { repoFullName: 'owner/repo', forceReindex: true } })
 
       expect(fetchMock).toHaveBeenCalledWith(
-        `${BASE}/ingestion/trigger`,
+        `${BASE}/github/connected-repos`,
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ repoFullName: 'owner/repo', forceReindex: true }),
+          body: JSON.stringify({ repoFullName: 'owner/repo', defaultBranch: undefined, forceReindex: true }),
         }),
       )
       expect(result).toEqual(response)
