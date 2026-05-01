@@ -12,25 +12,23 @@ import {
   FAQSection,
   FooterSection,
 } from './sections/Sections'
+import logo from '@/images/logo.png'
 
 function Header() {
   const navigate = useNavigate()
   return (
-    <header className="sticky top-0 z-30 border-b border-white/5 bg-zinc-950/60 px-6 py-3 backdrop-blur-md md:px-12">
+    <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/95 px-6 py-3 backdrop-blur-md md:px-12">
       <div className="mx-auto flex max-w-6xl items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-teal-400 to-emerald-600 font-mono text-xs font-bold text-white">
-            t
-          </div>
-          <span className="font-mono text-sm font-semibold text-white">tucaken</span>
+        <div className="flex items-center">
+          <img src={logo} alt="Tucaken" className="h-18 w-auto" />
         </div>
-        <nav className="hidden items-center gap-6 font-mono text-xs text-zinc-400 md:flex">
-          <a href="#how" className="hover:text-white">How it works</a>
-          <a href="#pricing" className="hover:text-white">Pricing</a>
-          <a href="#faq" className="hover:text-white">FAQ</a>
+        <nav className="hidden items-center gap-6 font-mono text-xs text-zinc-500 md:flex">
+          <a href="#how" className="hover:text-zinc-900">How it works</a>
+          <a href="#pricing" className="hover:text-zinc-900">Pricing</a>
+          <a href="#faq" className="hover:text-zinc-900">FAQ</a>
         </nav>
         <div className="flex items-center gap-2">
-          <Link to="/auth" className="hidden font-mono text-xs text-zinc-400 hover:text-white md:block">
+          <Link to="/auth" className="hidden font-mono text-xs text-zinc-500 hover:text-zinc-900 md:block">
             Sign in
           </Link>
           <MagneticButton primary onClick={() => navigate({ to: '/auth' })}>Try free</MagneticButton>

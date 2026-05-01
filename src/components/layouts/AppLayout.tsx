@@ -1,7 +1,14 @@
-'use client'
+/** @format */
 
-import { useState } from 'react'
-import { Dialog, DialogBackdrop, DialogPanel, TransitionChild } from '@headlessui/react'
+"use client";
+
+import { useState } from "react";
+import {
+  Dialog,
+  DialogBackdrop,
+  DialogPanel,
+  TransitionChild,
+} from "@headlessui/react";
 import {
   CalendarIcon,
   ChartPieIcon,
@@ -12,7 +19,7 @@ import {
   XMarkIcon,
   BriefcaseIcon,
   BeakerIcon,
-} from '@heroicons/react/24/outline'
+} from "@heroicons/react/24/outline";
 import {
   BarChart3,
   Activity,
@@ -24,38 +31,69 @@ import {
   ExternalLink,
   LogOut,
   Github,
-} from 'lucide-react'
-import { Link } from '@tanstack/react-router'
-import { HeaderNav } from '../ui/HeaderNav'
-import { PipelineNotificationWatcher } from '../ui/PipelineNotificationWatcher'
-import avatarImage from '@/images/avatar.jpg'
+} from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { HeaderNav } from "../ui/HeaderNav";
+import { PipelineNotificationWatcher } from "../ui/PipelineNotificationWatcher";
+import avatarImage from "@/images/avatar.jpg";
+import logo from "@/images/logo.png";
 
 /** Primary sidebar navigation links. */
 const navigation = [
-  { name: 'Dashboard', href: '/overview', icon: HomeIcon },
-  { name: 'Comments', href: '/comments', icon: MessageSquareText },
-  { name: 'Applications', href: '/applications', icon: BriefcaseIcon },
-  { name: 'Articles', href: '/articles', icon: DocumentDuplicateIcon },
-  { name: 'Resumes', href: '/resumes', icon: DocumentTextIcon },
-  { name: 'Projects', href: '/projects', icon: FolderIcon },
-  { name: 'Calendar', href: '/calendar', icon: CalendarIcon },
-  { name: 'Reports', href: '/reports', icon: ChartPieIcon },
-  { name: 'Test Components', href: '/test', icon: BeakerIcon },
-] as const
+  { name: "Dashboard", href: "/overview", icon: HomeIcon },
+  { name: "Comments", href: "/comments", icon: MessageSquareText },
+  { name: "Applications", href: "/applications", icon: BriefcaseIcon },
+  { name: "Articles", href: "/articles", icon: DocumentDuplicateIcon },
+  { name: "Resumes", href: "/resumes", icon: DocumentTextIcon },
+  { name: "Projects", href: "/projects", icon: FolderIcon },
+  { name: "Calendar", href: "/calendar", icon: CalendarIcon },
+  { name: "Reports", href: "/reports", icon: ChartPieIcon },
+  { name: "Test Components", href: "/test", icon: BeakerIcon },
+] as const;
 
 /** External observability tool links rendered in the sidebar secondary section. */
 const observabilityLinks = [
-  { id: 1, name: 'Grafana', href: 'https://ops.nelsonlamounier.com/grafana', icon: BarChart3 },
-  { id: 2, name: 'Prometheus', href: 'https://ops.nelsonlamounier.com/prometheus', icon: Activity },
-  { id: 3, name: 'Prometheus Metrics', href: 'https://ops.nelsonlamounier.com/prometheus/metrics', icon: Gauge },
-  { id: 4, name: 'ArgoCD', href: 'https://ops.nelsonlamounier.com/argocd/', icon: GitBranch },
-  { id: 5, name: 'Google Analytics', href: 'https://analytics.google.com', icon: LineChart },
-  { id: 6, name: 'Health Check', href: 'https://nelsonlamounier.com/api/health', icon: HeartPulse },
-] as const
+  {
+    id: 1,
+    name: "Grafana",
+    href: "https://ops.nelsonlamounier.com/grafana",
+    icon: BarChart3,
+  },
+  {
+    id: 2,
+    name: "Prometheus",
+    href: "https://ops.nelsonlamounier.com/prometheus",
+    icon: Activity,
+  },
+  {
+    id: 3,
+    name: "Prometheus Metrics",
+    href: "https://ops.nelsonlamounier.com/prometheus/metrics",
+    icon: Gauge,
+  },
+  {
+    id: 4,
+    name: "ArgoCD",
+    href: "https://ops.nelsonlamounier.com/argocd/",
+    icon: GitBranch,
+  },
+  {
+    id: 5,
+    name: "Google Analytics",
+    href: "https://analytics.google.com",
+    icon: LineChart,
+  },
+  {
+    id: 6,
+    name: "Health Check",
+    href: "https://nelsonlamounier.com/api/health",
+    icon: HeartPulse,
+  },
+] as const;
 
 const settingsNavigation = [
-  { name: 'GitHub', href: '/settings/github', icon: Github },
-] as const
+  { name: "GitHub", href: "/settings/github", icon: Github },
+] as const;
 
 /**
  * Merges conditional class strings, filtering out falsy values.
@@ -64,7 +102,7 @@ const settingsNavigation = [
  * @returns A single space-joined class string.
  */
 function classNames(...classes: (string | undefined | null | false)[]): string {
-  return classes.filter(Boolean).join(' ')
+  return classes.filter(Boolean).join(" ");
 }
 
 /**
@@ -72,13 +110,13 @@ function classNames(...classes: (string | undefined | null | false)[]): string {
  */
 interface AppLayoutProps {
   /** Page content rendered in the main area. */
-  children: React.ReactNode
+  children: React.ReactNode;
   /**
    * When `true`, skips wrapping `children` in the default `<main>` padding shell.
    * Useful for full-bleed pages (e.g. data-table views).
    * @default false
    */
-  disableMainWrapper?: boolean
+  disableMainWrapper?: boolean;
 }
 
 /**
@@ -95,26 +133,29 @@ interface AppLayoutProps {
  *
  * @param props - {@link AppLayoutProps}
  */
-export default function AppLayout({ children, disableMainWrapper = false }: AppLayoutProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+export default function AppLayout({
+  children,
+  disableMainWrapper = false,
+}: AppLayoutProps) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   /**
    * Handles sign-out, delegating to the server-side logout function.
    * Falls back to `/login` if the server returns no redirect URL.
    */
   const handleSignOut = async () => {
-    let targetUrl = '/admin/auth'
+    let targetUrl = "/admin/auth";
     try {
-      const { logoutFn } = await import('@/server/auth')
-      const res = await logoutFn()
+      const { logoutFn } = await import("@/server/auth");
+      const res = await logoutFn();
       if (res?.logoutUrl) {
-        targetUrl = res.logoutUrl
+        targetUrl = res.logoutUrl;
       }
     } catch {
       // Ignore errors — navigate to login as fallback.
     }
-    globalThis.location.href = targetUrl
-  }
+    globalThis.location.href = targetUrl;
+  };
 
   return (
     <>
@@ -125,7 +166,11 @@ export default function AppLayout({ children, disableMainWrapper = false }: AppL
           Mobile Off-Canvas Sidebar
          ========================================================= */}
       <div>
-        <Dialog open={sidebarOpen} onClose={setSidebarOpen} className="relative z-50 lg:hidden">
+        <Dialog
+          open={sidebarOpen}
+          onClose={setSidebarOpen}
+          className="relative z-50 lg:hidden"
+        >
           {/* Backdrop */}
           <DialogBackdrop
             transition
@@ -146,7 +191,10 @@ export default function AppLayout({ children, disableMainWrapper = false }: AppL
                     className="-m-2.5 p-2.5"
                   >
                     <span className="sr-only">Close sidebar</span>
-                    <XMarkIcon aria-hidden="true" className="size-6 text-white" />
+                    <XMarkIcon
+                      aria-hidden="true"
+                      className="size-6 text-white"
+                    />
                   </button>
                 </div>
               </TransitionChild>
@@ -209,46 +257,47 @@ export default function AppLayout({ children, disableMainWrapper = false }: AppL
         </div>
       </div>
     </>
-  )
+  );
 }
 
 /* --------------------------------------------------------------------------
    Sub-components extracted to reduce render-tree depth
    -------------------------------------------------------------------------- */
 
-/** Teal brand monogram logo mark used in both mobile and desktop sidebars. */
+/** Tucaken logo mark used in both mobile and desktop sidebars. */
 function SidebarLogo() {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" width="32" height="32" className="h-8 w-8" aria-label="NL Admin">
-      <circle cx="18" cy="18" r="18" fill="#0d9488" />
-      <text
-        x="18"
-        y="23"
-        textAnchor="middle"
-        fill="white"
-        fontSize="14"
-        fontWeight="bold"
-        fontFamily="system-ui, sans-serif"
-      >
-        NL
-      </text>
-    </svg>
-  )
+    <img
+      src={logo}
+      alt="Tucaken"
+      className="h-18 w-auto"
+    />
+  );
 }
 
 /** Primary navigation link list rendered inside sidebar `<nav>`. */
 function SidebarNavList() {
   return (
-    <ul role="list" className="flex flex-1 flex-col gap-y-7">
+    <ul
+      role="list"
+      className="flex flex-1 flex-col gap-y-7"
+    >
       <li>
-        <ul role="list" className="-mx-2 space-y-1">
+        <ul
+          role="list"
+          className="-mx-2 space-y-1"
+        >
           {navigation.map((item) => (
             <li key={item.name}>
               <Link
                 to={item.href as string}
-                activeProps={{ className: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white' }}
+                activeProps={{
+                  className:
+                    "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white",
+                }}
                 inactiveProps={{
-                  className: 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white',
+                  className:
+                    "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white",
                 }}
                 className="group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold transition-colors"
               >
@@ -257,8 +306,10 @@ function SidebarNavList() {
                     <item.icon
                       aria-hidden="true"
                       className={classNames(
-                        isActive ? 'text-teal-600 dark:text-teal-400' : 'text-zinc-400 dark:text-zinc-400 group-hover:text-teal-600 dark:group-hover:text-teal-400',
-                        'size-6 shrink-0 transition-colors',
+                        isActive
+                          ? "text-teal-600 dark:text-teal-400"
+                          : "text-zinc-400 dark:text-zinc-400 group-hover:text-teal-600 dark:group-hover:text-teal-400",
+                        "size-6 shrink-0 transition-colors",
                       )}
                     />
                     {item.name}
@@ -273,14 +324,21 @@ function SidebarNavList() {
         <div className="text-xs/6 font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-2">
           Settings
         </div>
-        <ul role="list" className="-mx-2 space-y-1">
+        <ul
+          role="list"
+          className="-mx-2 space-y-1"
+        >
           {settingsNavigation.map((item) => (
             <li key={item.name}>
               <Link
                 to={item.href as string}
-                activeProps={{ className: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white' }}
+                activeProps={{
+                  className:
+                    "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white",
+                }}
                 inactiveProps={{
-                  className: 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white',
+                  className:
+                    "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white",
                 }}
                 className="group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold transition-colors"
               >
@@ -289,8 +347,10 @@ function SidebarNavList() {
                     <item.icon
                       aria-hidden="true"
                       className={classNames(
-                        isActive ? 'text-teal-600 dark:text-teal-400' : 'text-zinc-400 dark:text-zinc-400 group-hover:text-teal-600 dark:group-hover:text-teal-400',
-                        'size-6 shrink-0 transition-colors',
+                        isActive
+                          ? "text-teal-600 dark:text-teal-400"
+                          : "text-zinc-400 dark:text-zinc-400 group-hover:text-teal-600 dark:group-hover:text-teal-400",
+                        "size-6 shrink-0 transition-colors",
                       )}
                     />
                     {item.name}
@@ -302,15 +362,20 @@ function SidebarNavList() {
         </ul>
       </li>
     </ul>
-  )
+  );
 }
 
 /** Observability external links section rendered below primary navigation. */
 function SidebarObservability() {
   return (
     <li className="mt-auto">
-      <div className="text-xs/6 font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-2">Observability</div>
-      <ul role="list" className="-mx-2 space-y-1">
+      <div className="text-xs/6 font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-2">
+        Observability
+      </div>
+      <ul
+        role="list"
+        className="-mx-2 space-y-1"
+      >
         {observabilityLinks.map((link) => (
           <li key={link.name}>
             <a
@@ -318,17 +383,20 @@ function SidebarObservability() {
               target="_blank"
               rel="noopener noreferrer"
               className={classNames(
-                'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white',
-                'group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold transition-colors',
+                "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white",
+                "group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold transition-colors",
               )}
             >
               <span
                 className={classNames(
-                  'border-zinc-200 dark:border-zinc-700 text-zinc-400 group-hover:border-zinc-300 dark:group-hover:border-zinc-600 group-hover:text-teal-600 dark:group-hover:text-teal-400',
-                  'flex size-6 shrink-0 items-center justify-center rounded-lg border bg-zinc-100 dark:bg-zinc-800 text-[0.625rem] font-medium transition-colors',
+                  "border-zinc-200 dark:border-zinc-700 text-zinc-400 group-hover:border-zinc-300 dark:group-hover:border-zinc-600 group-hover:text-teal-600 dark:group-hover:text-teal-400",
+                  "flex size-6 shrink-0 items-center justify-center rounded-lg border bg-zinc-100 dark:bg-zinc-800 text-[0.625rem] font-medium transition-colors",
                 )}
               >
-                <link.icon aria-hidden="true" className="size-4 shrink-0" />
+                <link.icon
+                  aria-hidden="true"
+                  className="size-4 shrink-0"
+                />
               </span>
               <span className="truncate">{link.name}</span>
             </a>
@@ -336,7 +404,7 @@ function SidebarObservability() {
         ))}
       </ul>
     </li>
-  )
+  );
 }
 
 /**
@@ -355,7 +423,10 @@ function SidebarFooter({ onSignOut }: { onSignOut: () => void }) {
         rel="noopener noreferrer"
         className="flex items-center gap-x-4 px-6 py-3 text-sm/6 font-semibold text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white transition-colors"
       >
-        <ExternalLink aria-hidden="true" className="size-5 shrink-0" />
+        <ExternalLink
+          aria-hidden="true"
+          className="size-5 shrink-0"
+        />
         Back to Site
       </a>
 
@@ -367,8 +438,12 @@ function SidebarFooter({ onSignOut }: { onSignOut: () => void }) {
           className="size-8 shrink-0 rounded-full bg-zinc-100 dark:bg-zinc-800 ring-1 ring-zinc-200 dark:ring-zinc-700"
         />
         <div className="flex-1 min-w-0">
-          <p className="truncate text-sm/6 font-medium text-zinc-900 dark:text-white">Admin</p>
-          <p className="truncate text-xs text-zinc-500 dark:text-zinc-500">admin@nelsonlamounier.com</p>
+          <p className="truncate text-sm/6 font-medium text-zinc-900 dark:text-white">
+            Admin
+          </p>
+          <p className="truncate text-xs text-zinc-500 dark:text-zinc-500">
+            admin@nelsonlamounier.com
+          </p>
         </div>
         <button
           type="button"
@@ -380,5 +455,5 @@ function SidebarFooter({ onSignOut }: { onSignOut: () => void }) {
         </button>
       </div>
     </li>
-  )
+  );
 }
