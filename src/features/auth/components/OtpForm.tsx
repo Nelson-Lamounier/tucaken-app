@@ -75,7 +75,6 @@ export function OtpForm({ onBack, onSubmit, length = 6 }: OtpFormProps) {
 
   useEffect(() => {
     if (complete) submit()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code])
 
   return (

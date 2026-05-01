@@ -64,7 +64,7 @@ export function ForgotPasswordForm({ onBack, onRequestCode, onConfirm }: ForgotP
             error={error}
             onResend={async () => {
               setError(null)
-              try { await onRequestCode?.(email) } catch {}
+              try { await onRequestCode?.(email) } catch { /* ignore */ }
             }}
             onSubmit={async (code, newPassword) => {
               setError(null)
