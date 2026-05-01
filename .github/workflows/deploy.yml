@@ -174,14 +174,14 @@ jobs:
           IMAGE_URI: ${{ steps.resolve.outputs.image-uri }}
         run: |
           aws ssm put-parameter \
-            --name "/start-admin/${ENVIRONMENT}/image-uri" \
+            --name "/tucaken-app/${ENVIRONMENT}/image-uri" \
             --value "$IMAGE_URI" \
             --type String --overwrite
 
   promote:
     name: Promote Rollout
     needs: [deploy]
-    runs-on: ubuntu-latest
+    runs-on: k8s-runner
     timeout-minutes: 15
     environment: development
     permissions:
@@ -196,46 +196,31 @@ jobs:
           role-to-assume: ${{ secrets.AWS_OIDC_ROLE }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Resolve Control-Plane Instance ID
-        id: resolve-instance
+      - name: Set up in-cluster kubeconfig
         run: |
-          INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters \
-              "Name=tag:k8s:bootstrap-role,Values=control-plane" \
-              "Name=instance-state-name,Values=running" \
-            --query "Reservations[0].Instances[0].InstanceId" \
-            --region "${AWS_REGION}" --output text 2>/dev/null || echo "")
-          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
-            echo "::error::Could not resolve control-plane instance ID"
-            exit 1
-          fi
-          echo "::add-mask::$INSTANCE_ID"
-          echo "instance-id=$INSTANCE_ID" >> "$GITHUB_OUTPUT"
+          aws ssm get-parameter \
+            --name "/k8s/${ENVIRONMENT}/kubeconfig" \
+            --with-decryption \
+            --region "${AWS_REGION}" \
+            --query 'Parameter.Value' \
+            --output text \
+            | sed 's|https://127.0.0.1:6443|https://kubernetes.default.svc:443|g' \
+            > /tmp/kubeconfig
+          chmod 600 /tmp/kubeconfig
 
-      - name: Wait for Rollout Paused + Promote (via SSM)
+      - name: Wait for ArgoCD Sync + Promote Rollout
         env:
-          INSTANCE_ID: ${{ steps.resolve-instance.outputs.instance-id }}
+          KUBECONFIG: /tmp/kubeconfig
           IMAGE_TAG_ENV: ${{ env.IMAGE_TAG }}
         run: |
-          REGION="${AWS_REGION}"
-
-          SCRIPT=$(cat <<'REMOTE_SCRIPT'
           set -euo pipefail
-          ROLLOUT="start-admin"
-          NAMESPACE="start-admin"
-          PLUGIN="/usr/local/bin/kubectl-argo-rollouts"
-          EXPECTED_TAG="__IMAGE_TAG__"
-
-          if ! sudo test -f "$PLUGIN"; then
-            sudo curl -sSLo "$PLUGIN" \
-              https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
-            sudo chmod +x "$PLUGIN"
-          fi
+          ROLLOUT="tucaken-app"
+          NAMESPACE="tucaken-app"
 
           for i in $(seq 1 20); do
-            SPEC_IMAGE=$(sudo kubectl get rollout "$ROLLOUT" -n "$NAMESPACE" \
+            SPEC_IMAGE=$(kubectl get rollout "$ROLLOUT" -n "$NAMESPACE" \
               -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "")
-            if [[ "$SPEC_IMAGE" == *"$EXPECTED_TAG"* ]]; then
+            if [[ "$SPEC_IMAGE" == *"$IMAGE_TAG_ENV"* ]]; then
               echo "[PASS] ArgoCD synced new image: $SPEC_IMAGE"
               break
             fi
@@ -244,60 +229,29 @@ jobs:
           done
 
           for i in $(seq 1 24); do
-            PHASE=$(sudo kubectl argo rollouts get rollout "$ROLLOUT" -n "$NAMESPACE" --no-color 2>/dev/null \
+            PHASE=$(kubectl argo rollouts get rollout "$ROLLOUT" -n "$NAMESPACE" --no-color 2>/dev/null \
               | grep -E "^Status" | awk '{print $NF}' || true)
             [[ "$PHASE" == "Paused" ]] && { echo "[PASS] Rollout Paused"; break; }
-            [[ "$PHASE" == "Healthy" ]] && { echo "[INFO] Already Healthy"; exit 0; }
+            [[ "$PHASE" == "Healthy" ]] && { echo "[INFO] Already Healthy — no promotion needed"; exit 0; }
             [[ "$PHASE" == "Degraded" || "$PHASE" == "Error" ]] && {
-              echo "[FAIL] Rollout $PHASE"; exit 1;
+              echo "[FAIL] Rollout ${PHASE} — pre-promotion analysis likely failed"; exit 1;
             }
+            [[ "$i" -eq 24 ]] && { echo "[FAIL] Rollout did not pause within 6 min (phase: ${PHASE:-unknown})"; exit 1; }
             sleep 15
           done
 
-          sudo kubectl argo rollouts promote "$ROLLOUT" -n "$NAMESPACE"
+          kubectl argo rollouts promote "$ROLLOUT" -n "$NAMESPACE"
 
           for i in $(seq 1 12); do
-            PHASE=$(sudo kubectl argo rollouts get rollout "$ROLLOUT" -n "$NAMESPACE" --no-color 2>/dev/null \
+            PHASE=$(kubectl argo rollouts get rollout "$ROLLOUT" -n "$NAMESPACE" --no-color 2>/dev/null \
               | grep -E "^Status" | awk '{print $NF}' || true)
             [[ "$PHASE" == "Healthy" ]] && { echo "[PASS] Healthy"; exit 0; }
+            [[ "$PHASE" == "Degraded" || "$PHASE" == "Error" ]] && {
+              echo "[FAIL] Rollout ${PHASE} after promotion"; exit 1;
+            }
             sleep 10
           done
-          echo "[WARN] Rollout still converging"
-          REMOTE_SCRIPT
-          )
-
-          SCRIPT="${SCRIPT//__IMAGE_TAG__/$IMAGE_TAG_ENV}"
-
-          PARAMS_FILE=$(mktemp)
-          printf '{"commands":[%s]}' "$(printf '%s' "$SCRIPT" | jq -Rs .)" > "$PARAMS_FILE"
-
-          CMD_ID=$(aws ssm send-command \
-            --instance-ids "$INSTANCE_ID" \
-            --document-name "AWS-RunShellScript" \
-            --parameters "file://$PARAMS_FILE" \
-            --region "$REGION" \
-            --query "Command.CommandId" --output text)
-          rm -f "$PARAMS_FILE"
-
-          for i in $(seq 1 37); do
-            sleep 10
-            STATUS=$(aws ssm get-command-invocation \
-              --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" \
-              --region "$REGION" --query "Status" --output text 2>/dev/null || echo "Pending")
-            echo "  [$i] SSM status: $STATUS"
-            [[ "$STATUS" == "Success" || "$STATUS" == "Failed" || "$STATUS" == "TimedOut" || "$STATUS" == "Cancelled" ]] && break
-          done
-
-          OUTPUT=$(aws ssm get-command-invocation \
-            --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" \
-            --region "$REGION" --query "StandardOutputContent" --output text 2>/dev/null || echo "")
-          STDERR=$(aws ssm get-command-invocation \
-            --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" \
-            --region "$REGION" --query "StandardErrorContent" --output text 2>/dev/null || echo "")
-
-          echo "--- Remote stdout ---"; echo "$OUTPUT"
-          [ -n "$STDERR" ] && { echo "--- Remote stderr ---"; echo "$STDERR"; }
-          [[ "$STATUS" != "Success" ]] && { echo "::error::SSM status: $STATUS"; exit 1; }
+          echo "[WARN] Rollout still converging after promotion — ArgoCD will continue managing it"
 
   invalidate:
     name: Invalidate CloudFront /admin/*

@@ -30,7 +30,15 @@ const queryClient = new QueryClient({
 const ANTI_FLASH_SCRIPT = `
 (function() {
   var stored = null;
-  try { stored = localStorage.getItem('start-admin-theme'); } catch (e) {}
+  try {
+    stored = localStorage.getItem('tucaken-app-theme');
+    // Fall back to legacy key from the start-admin era so the first paint
+    // still respects an existing preference. ThemeContext migrates on next
+    // mount; this script stays read-only to avoid races.
+    if (stored === null) {
+      stored = localStorage.getItem('start-admin-theme');
+    }
+  } catch (e) {}
   var isDark = stored === null ? true : stored !== 'light';
   if (isDark) {
     document.documentElement.classList.add('dark');

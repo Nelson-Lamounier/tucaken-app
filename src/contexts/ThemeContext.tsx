@@ -3,7 +3,11 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 /** Supported theme values. */
 export type Theme = 'dark' | 'light'
 
-const STORAGE_KEY = 'start-admin-theme'
+const STORAGE_KEY = 'tucaken-app-theme'
+// Legacy key written by the app prior to the start-admin → tucaken-app rename.
+// Read once on first load to migrate the user's theme without forcing a reset,
+// then deleted to free the slot. Safe to drop after one release cycle.
+const LEGACY_STORAGE_KEY = 'start-admin-theme'
 const DEFAULT_THEME: Theme = 'dark'
 
 interface ThemeContextValue {
@@ -27,6 +31,13 @@ function readStoredTheme(): Theme {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw === 'light' || raw === 'dark') return raw
+    // Migrate legacy key from the start-admin era (one-time, then cleared).
+    const legacy = localStorage.getItem(LEGACY_STORAGE_KEY)
+    if (legacy === 'light' || legacy === 'dark') {
+      localStorage.setItem(STORAGE_KEY, legacy)
+      localStorage.removeItem(LEGACY_STORAGE_KEY)
+      return legacy
+    }
   } catch {
     // localStorage unavailable (private browsing, etc.)
   }
