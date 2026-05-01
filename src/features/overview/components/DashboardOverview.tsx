@@ -199,7 +199,9 @@ export function DashboardOverview() {
   const days = [
     {
       date: `Recent Activity (${allRecent.length} records)`,
-      dateTime: new Date().toISOString(),
+      dateTime: allRecent[0]
+        ? new Date(allRecent[0].date).toISOString()
+        : '1970-01-01T00:00:00.000Z',
       transactions: allRecent.map((a) => ({
         id: a.slug,
         slug: a.slug,
