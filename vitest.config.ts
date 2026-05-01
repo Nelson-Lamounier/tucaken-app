@@ -1,6 +1,6 @@
 /**
  * @format
- * Vitest configuration for start-admin server function tests.
+ * Vitest configuration for tucaken-app server function tests.
  *
  * Uses the same path aliases as vite.config.ts so that shared package
  * imports resolve correctly in the test environment.

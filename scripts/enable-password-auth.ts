@@ -9,6 +9,7 @@
 
 import {
   CognitoIdentityProviderClient,
+  ExplicitAuthFlowsType,
   ListUserPoolsCommand,
   ListUserPoolClientsCommand,
   DescribeUserPoolClientCommand,
@@ -17,7 +18,7 @@ import {
 import { fromIni } from '@aws-sdk/credential-providers'
 
 const AWS_PROFILE = 'dev-account'
-const REQUIRED_FLOW = 'ALLOW_USER_PASSWORD_AUTH'
+const REQUIRED_FLOW = 'ALLOW_USER_PASSWORD_AUTH' as ExplicitAuthFlowsType
 
 const c = {
   reset:  '\x1b[0m',

@@ -10,8 +10,8 @@
  * Use `just admin-api-up` in the cdk-monitoring repo first.
  *
  * Network wiring:
- *   K8s production:  start-admin → http://admin-api.admin-api:3002
- *   Local (this):    start-admin → http://admin-api:3002  (Docker DNS alias)
+ *   K8s production:  tucaken-app → http://admin-api.admin-api:3002
+ *   Local (this):    tucaken-app → http://admin-api:3002  (Docker DNS alias)
  *   Achieved via:    docker network connect --alias admin-api
  *
  * Usage:
