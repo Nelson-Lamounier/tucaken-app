@@ -11,6 +11,12 @@ on:
         required: false
         default: "main"
         type: string
+      no_cache:
+        description: "Skip Docker layer cache (use for stale cache recovery)"
+        required: false
+        default: "false"
+        type: choice
+        options: ["false", "true"]
 
   repository_dispatch:
     types: [deploy-tucaken-app-dev]
@@ -77,6 +83,7 @@ jobs:
           tags: tucaken-app:${{ env.IMAGE_TAG }}
           cache-from: type=gha,scope=tucaken-app
           cache-to: type=gha,mode=max,scope=tucaken-app
+          no-cache: ${{ github.event.inputs.no_cache == 'true' }}
           provenance: false
           outputs: type=docker,dest=/tmp/app-image.tar
           build-args: |
