@@ -9,11 +9,11 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './app/__root'
+import { Route as SignInRouteImport } from './app/sign-in'
 import { Route as LoginRouteImport } from './app/login'
-import { Route as AuthRouteImport } from './app/auth'
 import { Route as DashboardRouteImport } from './app/_dashboard'
 import { Route as IndexRouteImport } from './app/index'
-import { Route as AuthCallbackRouteImport } from './app/auth.callback'
+import { Route as SignInCallbackRouteImport } from './app/sign-in.callback'
 import { Route as DashboardTestRouteImport } from './app/_dashboard.test'
 import { Route as DashboardResumesRouteImport } from './app/_dashboard.resumes'
 import { Route as DashboardReportsRouteImport } from './app/_dashboard.reports'
@@ -32,14 +32,14 @@ import { Route as DashboardApplicationsInterviewPrepRouteImport } from './app/_d
 import { Route as DashboardApplicationsSlugRouteImport } from './app/_dashboard.applications.$slug'
 import { Route as DashboardResumesEditIdRouteImport } from './app/_dashboard.resumes.edit.$id'
 
+const SignInRoute = SignInRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -51,10 +51,10 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthCallbackRoute = AuthCallbackRouteImport.update({
+const SignInCallbackRoute = SignInCallbackRouteImport.update({
   id: '/callback',
   path: '/callback',
-  getParentRoute: () => AuthRoute,
+  getParentRoute: () => SignInRoute,
 } as any)
 const DashboardTestRoute = DashboardTestRouteImport.update({
   id: '/test',
@@ -149,8 +149,8 @@ const DashboardResumesEditIdRoute = DashboardResumesEditIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/auth': typeof AuthRouteWithChildren
   '/login': typeof LoginRoute
+  '/sign-in': typeof SignInRouteWithChildren
   '/$': typeof DashboardSplatRoute
   '/ai-agent': typeof DashboardAiAgentRoute
   '/articles': typeof DashboardArticlesRoute
@@ -160,7 +160,7 @@ export interface FileRoutesByFullPath {
   '/reports': typeof DashboardReportsRoute
   '/resumes': typeof DashboardResumesRouteWithChildren
   '/test': typeof DashboardTestRoute
-  '/auth/callback': typeof AuthCallbackRoute
+  '/sign-in/callback': typeof SignInCallbackRoute
   '/applications/$slug': typeof DashboardApplicationsSlugRoute
   '/applications/interview-prep': typeof DashboardApplicationsInterviewPrepRoute
   '/applications/list': typeof DashboardApplicationsListRoute
@@ -172,8 +172,8 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/auth': typeof AuthRouteWithChildren
   '/login': typeof LoginRoute
+  '/sign-in': typeof SignInRouteWithChildren
   '/$': typeof DashboardSplatRoute
   '/ai-agent': typeof DashboardAiAgentRoute
   '/articles': typeof DashboardArticlesRoute
@@ -183,7 +183,7 @@ export interface FileRoutesByTo {
   '/reports': typeof DashboardReportsRoute
   '/resumes': typeof DashboardResumesRouteWithChildren
   '/test': typeof DashboardTestRoute
-  '/auth/callback': typeof AuthCallbackRoute
+  '/sign-in/callback': typeof SignInCallbackRoute
   '/applications/$slug': typeof DashboardApplicationsSlugRoute
   '/applications/interview-prep': typeof DashboardApplicationsInterviewPrepRoute
   '/applications/list': typeof DashboardApplicationsListRoute
@@ -197,8 +197,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_dashboard': typeof DashboardRouteWithChildren
-  '/auth': typeof AuthRouteWithChildren
   '/login': typeof LoginRoute
+  '/sign-in': typeof SignInRouteWithChildren
   '/_dashboard/$': typeof DashboardSplatRoute
   '/_dashboard/ai-agent': typeof DashboardAiAgentRoute
   '/_dashboard/articles': typeof DashboardArticlesRoute
@@ -208,7 +208,7 @@ export interface FileRoutesById {
   '/_dashboard/reports': typeof DashboardReportsRoute
   '/_dashboard/resumes': typeof DashboardResumesRouteWithChildren
   '/_dashboard/test': typeof DashboardTestRoute
-  '/auth/callback': typeof AuthCallbackRoute
+  '/sign-in/callback': typeof SignInCallbackRoute
   '/_dashboard/applications/$slug': typeof DashboardApplicationsSlugRoute
   '/_dashboard/applications/interview-prep': typeof DashboardApplicationsInterviewPrepRoute
   '/_dashboard/applications/list': typeof DashboardApplicationsListRoute
@@ -222,8 +222,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/auth'
     | '/login'
+    | '/sign-in'
     | '/$'
     | '/ai-agent'
     | '/articles'
@@ -233,7 +233,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/resumes'
     | '/test'
-    | '/auth/callback'
+    | '/sign-in/callback'
     | '/applications/$slug'
     | '/applications/interview-prep'
     | '/applications/list'
@@ -245,8 +245,8 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/auth'
     | '/login'
+    | '/sign-in'
     | '/$'
     | '/ai-agent'
     | '/articles'
@@ -256,7 +256,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/resumes'
     | '/test'
-    | '/auth/callback'
+    | '/sign-in/callback'
     | '/applications/$slug'
     | '/applications/interview-prep'
     | '/applications/list'
@@ -269,8 +269,8 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_dashboard'
-    | '/auth'
     | '/login'
+    | '/sign-in'
     | '/_dashboard/$'
     | '/_dashboard/ai-agent'
     | '/_dashboard/articles'
@@ -280,7 +280,7 @@ export interface FileRouteTypes {
     | '/_dashboard/reports'
     | '/_dashboard/resumes'
     | '/_dashboard/test'
-    | '/auth/callback'
+    | '/sign-in/callback'
     | '/_dashboard/applications/$slug'
     | '/_dashboard/applications/interview-prep'
     | '/_dashboard/applications/list'
@@ -294,24 +294,24 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRouteWithChildren
-  AuthRoute: typeof AuthRouteWithChildren
   LoginRoute: typeof LoginRoute
+  SignInRoute: typeof SignInRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/sign-in': {
+      id: '/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof SignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_dashboard': {
@@ -328,12 +328,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/auth/callback': {
-      id: '/auth/callback'
+    '/sign-in/callback': {
+      id: '/sign-in/callback'
       path: '/callback'
-      fullPath: '/auth/callback'
-      preLoaderRoute: typeof AuthCallbackRouteImport
-      parentRoute: typeof AuthRoute
+      fullPath: '/sign-in/callback'
+      preLoaderRoute: typeof SignInCallbackRouteImport
+      parentRoute: typeof SignInRoute
     }
     '/_dashboard/test': {
       id: '/_dashboard/test'
@@ -511,21 +511,22 @@ const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
   DashboardRouteChildren,
 )
 
-interface AuthRouteChildren {
-  AuthCallbackRoute: typeof AuthCallbackRoute
+interface SignInRouteChildren {
+  SignInCallbackRoute: typeof SignInCallbackRoute
 }
 
-const AuthRouteChildren: AuthRouteChildren = {
-  AuthCallbackRoute: AuthCallbackRoute,
+const SignInRouteChildren: SignInRouteChildren = {
+  SignInCallbackRoute: SignInCallbackRoute,
 }
 
-const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
+const SignInRouteWithChildren =
+  SignInRoute._addFileChildren(SignInRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRouteWithChildren,
-  AuthRoute: AuthRouteWithChildren,
   LoginRoute: LoginRoute,
+  SignInRoute: SignInRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

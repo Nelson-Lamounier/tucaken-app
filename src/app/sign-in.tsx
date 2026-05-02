@@ -3,7 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { EnergeticAuthShell } from '../features/auth/components/EnergeticAuthShell'
 import { getLoginUrlFn, signInWithPasswordFn, respondToMfaChallengeFn, forgotPasswordFn, confirmForgotPasswordFn } from '../server/auth'
 
-export const Route = createFileRoute('/auth')({
+export const Route = createFileRoute('/sign-in')({
   component: AuthPage,
 })
 
@@ -20,11 +20,11 @@ function AuthPage() {
       onSignIn={async (v) => {
         const result = await signInWithPasswordFn({ data: v })
         if (!result.success) return 'otp'
-        globalThis.window.location.href = '/admin/overview'
+        globalThis.window.location.href = '/overview'
       }}
       onOtp={async (code) => {
         await respondToMfaChallengeFn({ data: { code } })
-        globalThis.window.location.href = '/admin/overview'
+        globalThis.window.location.href = '/overview'
       }}
       onRequestPasswordCode={async (email) => {
         await forgotPasswordFn({ data: { email } })

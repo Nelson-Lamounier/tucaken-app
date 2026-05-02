@@ -2,38 +2,30 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 import { z } from 'zod'
 import { handleAuthCallbackFn } from '../server/auth'
 
-/**
- * Zod schema for the OAuth callback search parameters.
- * State is mandatory — prevents CSRF attacks via OAuth state mismatch.
- */
 const callbackSearchSchema = z.object({
   code: z.string().optional(),
   state: z.string().optional(),
   error: z.string().optional(),
 })
 
-export const Route = createFileRoute('/auth/callback')({
+export const Route = createFileRoute('/sign-in/callback')({
   validateSearch: callbackSearchSchema,
   beforeLoad: async ({ search }) => {
     if (search.error) {
-      // console.error('[auth-callback] Cognito OAuth error:', search.error)
-      throw redirect({ to: '/login' })
+      throw redirect({ to: '/sign-in' })
     }
 
     if (!search.code) {
-      // console.error('[auth-callback] Missing authorisation code in callback')
-      throw redirect({ to: '/login' })
+      throw redirect({ to: '/sign-in' })
     }
 
     if (!search.state) {
-      // console.error('[auth-callback] Missing OAuth state parameter — potential CSRF')
-      throw redirect({ to: '/login' })
+      throw redirect({ to: '/sign-in' })
     }
 
     try {
       await handleAuthCallbackFn({ data: { code: search.code, state: search.state } })
     } catch (err: unknown) {
-      // Re-throw redirect errors from TanStack Router
       if (
         typeof err === 'object' &&
         err !== null &&
@@ -49,18 +41,14 @@ export const Route = createFileRoute('/auth/callback')({
           throw err
         }
       }
-
-      // const message = err instanceof Error ? err.message : String(err)
-      // const stack = err instanceof Error ? err.stack : undefined
-      // console.error('[auth-callback] Token exchange failed:', { message, stack })
-      throw redirect({ to: '/login' })
+      throw redirect({ to: '/sign-in' })
     }
 
     if (typeof window !== 'undefined') {
-      globalThis.window.location.href = '/admin/'
-      await new Promise<void>(() => {}) // freeze until reload
+      globalThis.window.location.href = '/overview'
+      await new Promise<void>(() => {})
     }
-    throw redirect({ to: '/' })
+    throw redirect({ to: '/overview' })
   },
   component: () => (
     <div className="flex h-screen w-full items-center justify-center bg-zinc-950 text-white">
