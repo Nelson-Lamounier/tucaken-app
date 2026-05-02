@@ -77,6 +77,10 @@ enable-password-auth:
 update-cognito-prod:
     yarn update:cognito-prod
 
+# Pass explicit app URL (e.g. just update-cognito-prod-url https://tucaken.io)
+update-cognito-prod-url app_url:
+    npx tsx scripts/update-cognito-prod.ts --app-url {{app_url}}
+
 # Same but skip discovery prompts
 update-cognito-prod-explicit region pool_id client_id:
     npx tsx scripts/update-cognito-prod.ts --region {{region}} --pool-id {{pool_id}} --client-id {{client_id}}
