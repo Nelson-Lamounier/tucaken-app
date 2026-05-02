@@ -28,10 +28,10 @@ function Header() {
           <a href="#faq" className="hover:text-zinc-900">FAQ</a>
         </nav>
         <div className="flex items-center gap-2">
-          <Link to="/auth" className="hidden font-mono text-xs text-zinc-500 hover:text-zinc-900 md:block">
+          <Link to="/sign-in" className="hidden font-mono text-xs text-zinc-500 hover:text-zinc-900 md:block">
             Sign in
           </Link>
-          <MagneticButton primary onClick={() => navigate({ to: '/auth' })}>Try free</MagneticButton>
+          <MagneticButton primary onClick={() => navigate({ to: '/sign-in' })}>Try free</MagneticButton>
         </div>
       </div>
     </header>

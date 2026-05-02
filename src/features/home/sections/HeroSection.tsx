@@ -108,8 +108,8 @@ export function HeroSection() {
             transition={{ delay: 0.8 }}
             className="mt-8 flex flex-wrap items-center gap-3"
           >
-            <MagneticButton primary onClick={() => navigate({ to: '/auth' })}>⌥ {hero.primaryCta}</MagneticButton>
-            <MagneticButton onClick={() => navigate({ to: '/auth' })}>{hero.secondaryCta}</MagneticButton>
+            <MagneticButton primary onClick={() => navigate({ to: '/sign-in' })}>⌥ {hero.primaryCta}</MagneticButton>
+            <MagneticButton onClick={() => navigate({ to: '/sign-in' })}>{hero.secondaryCta}</MagneticButton>
           </motion.div>
           <div className="mt-5 font-mono text-[11px] text-zinc-500">{hero.founderNote}</div>
         </div>

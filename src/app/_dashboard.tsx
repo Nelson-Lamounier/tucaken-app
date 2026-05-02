@@ -8,7 +8,7 @@ export const Route = createFileRoute('/_dashboard')({
     // Gate 1: valid Cognito session
     if (!context.auth.user) {
       throw redirect({
-        to: '/auth',
+        to: '/sign-in',
         search: { callbackUrl: location.href },
       })
     }
@@ -16,14 +16,14 @@ export const Route = createFileRoute('/_dashboard')({
     // Gate 2: user must exist in the database.
     // getMeFn() calls /api/admin/me which runs userProvisionMiddleware —
     // the upsert happens here on first sign-in. If provisioning fails
-    // (DB unreachable, 503) we redirect back to /auth rather than letting
+    // (DB unreachable, 503) we redirect back to /sign-in rather than letting
     // the user into an unusable dashboard.
     let me: MeResponse
     try {
       me = await getMeFn()
     } catch {
       throw redirect({
-        to: '/auth',
+        to: '/sign-in',
         search: { callbackUrl: location.href },
       })
     }

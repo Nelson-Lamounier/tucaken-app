@@ -190,7 +190,7 @@ export function PricingSection() {
                   </li>
                 ))}
               </ul>
-              <MagneticButton primary={p.hl} className="mt-7 w-full" onClick={() => navigate({ to: '/auth' })}>
+              <MagneticButton primary={p.hl} className="mt-7 w-full" onClick={() => navigate({ to: '/sign-in' })}>
                 {p.cta}
               </MagneticButton>
             </div>
