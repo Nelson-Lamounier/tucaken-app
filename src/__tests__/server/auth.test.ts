@@ -270,13 +270,13 @@ describe('logoutFn', () => {
     expect(result.logoutUrl).toContain(`client_id=${COGNITO_CLIENT_ID}`)
   })
 
-  it('should fall back to /admin/login when Cognito is not configured', async () => {
+  it('should fall back to /sign-in when Cognito is not configured', async () => {
     delete process.env.AUTH_COGNITO_DOMAIN
     delete process.env.AUTH_COGNITO_ID
     delete process.env.AUTH_COGNITO_CLIENT_ID
 
     const result = await (logoutFn as () => Promise<{ success: boolean; logoutUrl: string }>)()
 
-    expect(result.logoutUrl).toBe('/admin/login')
+    expect(result.logoutUrl).toBe('/sign-in')
   })
 })
