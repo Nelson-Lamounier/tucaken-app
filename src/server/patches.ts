@@ -1,26 +1,11 @@
 /**
- * Production HTTP server for TanStack Start (Admin).
- *
- * This file is the single source of truth for the production server wrapper.
- * It is compiled from `src/server/patches.ts` → `server.js` (project root) by
- * esbuild as part of the standard `yarn build` script:
- *
- *   esbuild src/server/patches.ts --bundle --platform=node --format=esm \
- *     --outfile=server.js '--external:./dist/*'
+ * Production HTTP server for TanStack Start.
  *
  * Responsibilities:
- *   1. Fast-path static file serving: maps /admin/assets/* → dist/client/assets/*
- *      before any request reaches the SSR handler. TanStack Start's SSR fetch
- *      handler does not serve dist/client/ assets natively.
+ *   1. Fast-path static file serving: maps /assets/* → dist/client/assets/*
+ *      before any request reaches the SSR handler.
  *   2. SSR delegation: converts Node.js IncomingMessage → Web Request and
  *      pipes the Web Response back to the Node.js ServerResponse.
- *
- * Runtime import note:
- *   `serverExport` is loaded via a dynamic `createRequire` call so TypeScript
- *   does not attempt to resolve `./dist/server/server.js` at type-check time.
- *   The file is produced by `vite build` and only exists after a full build.
- *   esbuild marks the path as external (--external:./dist/*), so at runtime the
- *   Node.js ESM loader resolves it from the same directory as `server.js`.
  */
 import type { IncomingMessage, ServerResponse } from 'http';
 import { createServer } from 'http';
@@ -59,9 +44,7 @@ const port = Number(process.env.PORT) || 5001;
 // ---------------------------------------------------------------------------
 // Static asset config
 // ---------------------------------------------------------------------------
-// Vite outputs client assets to dist/client/. The app is built with
-// ROUTER_BASEPATH="admin" so browsers request /admin/assets/<hash>.<ext>.
-// We strip the basepath prefix and resolve against dist/client/.
+// Vite outputs client assets to dist/client/. Asset URLs are /assets/<hash>.<ext>.
 const CLIENT_DIR = join(__dirname, 'dist', 'client');
 
 /** MIME type map for static assets served from dist/client/. */
@@ -88,22 +71,19 @@ const MIME_TYPES: Record<string, string> = {
  * Attempts to serve a static file from `dist/client/`.
  *
  * URL mapping:
- *   /admin/assets/styles-BaHLhT7v.css  →  dist/client/assets/styles-BaHLhT7v.css
- *   /admin/assets/main-BPTnT1y8.js     →  dist/client/assets/main-BPTnT1y8.js
+ *   /assets/styles-BaHLhT7v.css  →  dist/client/assets/styles-BaHLhT7v.css
+ *   /assets/main-BPTnT1y8.js     →  dist/client/assets/main-BPTnT1y8.js
  *
  * @param urlPath - Pathname portion of the request URL (no query string).
  * @param res     - Node.js HTTP server response.
  * @returns `true` if the response was sent; `false` to fall through to SSR.
  */
 function tryServeStatic(urlPath: string, res: ServerResponse): boolean {
-  // Strip the "/admin" basepath prefix so we resolve relative to dist/client/.
-  let stripped = urlPath.startsWith('/admin') ? urlPath.slice(6) : urlPath;
-
   // Decode percent-encoded characters (e.g. spaces, non-ASCII filenames).
+  let stripped = urlPath;
   try {
     stripped = decodeURIComponent(stripped);
   } catch {
-    // Malformed URI — fall through to SSR (which will 404 cleanly).
     return false;
   }
 
