@@ -11,7 +11,7 @@ import viteReact from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 // After the client build, copy the hashed stylesheet to a fixed name so the
-// SSR bundle and browser always agree on the URL (/admin/assets/styles.css).
+// SSR bundle and browser always agree on the URL (/assets/styles.css).
 //
 // Why fixed name: Vinxi's client and server builds are separate Vite processes.
 // Each process independently transforms styles.css → different content hash.
@@ -19,7 +19,7 @@ import tailwindcss from '@tailwindcss/vite'
 // The server embeds hash B as the stylesheet URL, but only hash A exists on
 // disk → "Refused to apply style … text/html" MIME error on every load.
 //
-// The __root.tsx hardcodes /admin/assets/styles.css (no hash). This plugin
+// The __root.tsx hardcodes /assets/styles.css (no hash). This plugin
 // ensures that file actually exists after the client build by copying the
 // hashed file to the fixed name. Cache busting is handled at deploy time —
 // a new container image always replaces the old one.
@@ -44,7 +44,7 @@ function copyStylesFixedName(isSsrBuild: boolean): Plugin {
 }
 
 const config = defineConfig(({ isSsrBuild }) => ({
-  base: '/admin/',
+  base: '/',
   resolve: {
     alias: {
       '@/': fileURLToPath(new URL('./src/', import.meta.url)),
@@ -52,7 +52,7 @@ const config = defineConfig(({ isSsrBuild }) => ({
   },
   server: {
     proxy: {
-      '/admin/api': {
+      '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,
       },

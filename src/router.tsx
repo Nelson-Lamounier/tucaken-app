@@ -9,7 +9,6 @@ export interface RouterContext {
 export function getRouter() {
   const router = createTanStackRouter({
     routeTree,
-    basepath: '/admin',
     context: {
       auth: { user: null },
     } as RouterContext,

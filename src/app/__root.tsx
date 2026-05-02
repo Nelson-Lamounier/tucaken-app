@@ -5,7 +5,7 @@ import { HeadContent, Scripts, createRootRouteWithContext, Outlet, Link } from '
 // Instead we reference a fixed path that our copyStylesFixedName plugin ensures
 // exists on disk after the client build (see vite.config.ts).
 import '../styles.css'
-const appCss = `${import.meta.env.BASE_URL ?? '/admin/'}assets/styles.css`
+const appCss = `${import.meta.env.BASE_URL ?? '/'}assets/styles.css`
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { RouterContext } from '../router'
 import { getUserSessionFn } from '../server/auth'
