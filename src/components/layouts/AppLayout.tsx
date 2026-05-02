@@ -144,7 +144,7 @@ export default function AppLayout({
    * Falls back to `/login` if the server returns no redirect URL.
    */
   const handleSignOut = async () => {
-    let targetUrl = "/admin/auth";
+    let targetUrl = "/sign-in";
     try {
       const { logoutFn } = await import("@/server/auth");
       const res = await logoutFn();
