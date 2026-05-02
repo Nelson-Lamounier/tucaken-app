@@ -235,8 +235,9 @@ jobs:
           done
 
           for i in $(seq 1 24); do
-            PHASE=$(kubectl argo rollouts get rollout "$ROLLOUT" -n "$NAMESPACE" --no-color 2>/dev/null \
-              | grep -E "^Status" | awk '{print $NF}' || true)
+            PHASE=$(kubectl get rollout "$ROLLOUT" -n "$NAMESPACE" \
+              -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+            echo "[INFO] Rollout phase: ${PHASE:-unknown}"
             [[ "$PHASE" == "Paused" ]] && { echo "[PASS] Rollout Paused"; break; }
             [[ "$PHASE" == "Healthy" ]] && { echo "[INFO] Already Healthy — no promotion needed"; exit 0; }
             [[ "$PHASE" == "Degraded" || "$PHASE" == "Error" ]] && {
@@ -249,8 +250,9 @@ jobs:
           kubectl argo rollouts promote "$ROLLOUT" -n "$NAMESPACE"
 
           for i in $(seq 1 12); do
-            PHASE=$(kubectl argo rollouts get rollout "$ROLLOUT" -n "$NAMESPACE" --no-color 2>/dev/null \
-              | grep -E "^Status" | awk '{print $NF}' || true)
+            PHASE=$(kubectl get rollout "$ROLLOUT" -n "$NAMESPACE" \
+              -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+            echo "[INFO] Rollout phase: ${PHASE:-unknown}"
             [[ "$PHASE" == "Healthy" ]] && { echo "[PASS] Healthy"; exit 0; }
             [[ "$PHASE" == "Degraded" || "$PHASE" == "Error" ]] && {
               echo "[FAIL] Rollout ${PHASE} after promotion"; exit 1;
