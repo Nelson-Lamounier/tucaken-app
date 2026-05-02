@@ -325,14 +325,14 @@ async function main(): Promise<void> {
 
   run('docker', dockerArgs)
   try { unlinkSync(tmpEnv) } catch { /* ignore */ }
-  log.ok(`${APP_CONTAINER} started → http://localhost:${APP_PORT}/admin/`)
+  log.ok(`${APP_CONTAINER} started → http://localhost:${APP_PORT}/`)
 
   // ── 6. Health check ────────────────────────────────────────────────────────
   log.step(stepN++, 'Waiting for health check')
 
   try {
     await waitHealthy(APP_CONTAINER, 'tucaken-app', 120_000)
-    log.ok(`tucaken-app healthy → http://localhost:${APP_PORT}/admin/`)
+    log.ok(`tucaken-app healthy → http://localhost:${APP_PORT}/`)
   } catch (err) {
     log.error((err as Error).message)
     process.exit(1)
@@ -343,7 +343,7 @@ async function main(): Promise<void> {
   console.log(`│   ✓  tucaken-app running                        │`)
   console.log(`└──────────────────────────────────────────────────┘${C.reset}`)
   console.log('')
-  console.log(`  ${C.bold}tucaken-app${C.reset}   http://localhost:${APP_PORT}/admin/`)
+  console.log(`  ${C.bold}tucaken-app${C.reset}   http://localhost:${APP_PORT}/`)
   console.log(`               → admin-api:${ADMIN_API_PORT}  (Docker DNS on ${NETWORK_NAME})`)
   console.log('')
   console.log(`  ${C.dim}Logs:`)

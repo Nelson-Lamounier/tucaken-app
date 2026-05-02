@@ -124,8 +124,8 @@ function normalise(url: string): string {
   return url.replace(/\/+$/, '').toLowerCase()
 }
 
-function callbackUrl(base: string) { return `${base}/admin/auth/callback` }
-function logoutUrl(base: string)   { return `${base}/admin/login` }
+function callbackUrl(base: string) { return `${base}/sign-in/callback` }
+function logoutUrl(base: string)   { return `${base}/sign-in` }
 
 function mergeUrls(existing: string[], toAdd: string[]): { next: string[]; added: string[] } {
   const normExisting = existing.map(normalise)

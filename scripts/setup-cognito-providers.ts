@@ -798,7 +798,7 @@ function printSummary(opts: {
   githubOidcUrl: string
 }) {
   const base = `https://${opts.cognitoDomain}.auth.${opts.region}.amazoncognito.com`
-  const redirectUri = encodeURIComponent(`${opts.appUrl}/admin/auth/callback`)
+  const redirectUri = encodeURIComponent(`${opts.appUrl}/sign-in/callback`)
   const testQs = `client_id=${opts.clientId}&response_type=code&scope=email+openid+profile&redirect_uri=${redirectUri}`
 
   console.log(`
