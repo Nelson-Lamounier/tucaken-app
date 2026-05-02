@@ -130,7 +130,7 @@ jobs:
         run: |
           docker run -d --name test-container -p 5001:5001 tucaken-app:ci-test
           for i in $(seq 1 30); do
-            if curl -sf --max-time 2 http://localhost:5001/admin/ > /dev/null 2>&1; then
+            if curl -sf --max-time 2 http://localhost:5001/sign-in > /dev/null 2>&1; then
               echo "Server ready (attempt $i)"
               break
             fi
@@ -141,11 +141,11 @@ jobs:
             fi
             sleep 1
           done
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://localhost:5001/admin/)
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://localhost:5001/sign-in)
           if [ "$STATUS" -lt "500" ]; then
-            echo "/admin/ returned $STATUS"
+            echo "/sign-in returned $STATUS"
           else
-            echo "/admin/ returned $STATUS (expected < 500)"
+            echo "/sign-in returned $STATUS (expected < 500)"
             docker logs test-container
             exit 1
           fi

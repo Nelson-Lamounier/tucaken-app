@@ -81,7 +81,6 @@ jobs:
           outputs: type=docker,dest=/tmp/app-image.tar
           build-args: |
             NODE_ENV=production
-            VITE_ADMIN_BASE_PATH=/admin
 
       - name: Cache Image
         uses: actions/cache/save@v4
@@ -254,7 +253,7 @@ jobs:
           echo "[WARN] Rollout still converging after promotion — ArgoCD will continue managing it"
 
   invalidate:
-    name: Invalidate CloudFront /admin/*
+    name: Invalidate CloudFront cache
     needs: [promote]
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -289,6 +288,6 @@ jobs:
         run: |
           INVALIDATION_ID=$(aws cloudfront create-invalidation \
             --distribution-id "$DIST_ID" \
-            --paths "/admin/*" \
+            --paths "/*" \
             --query 'Invalidation.Id' --output text)
           echo "Invalidation ID: $INVALIDATION_ID"
