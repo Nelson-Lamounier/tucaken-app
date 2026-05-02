@@ -117,7 +117,7 @@ export const getLoginUrlFn = createServerFn({ method: 'POST' })
     const appUrl = process.env.VITE_APP_URL || 'http://localhost:5001'
     const scheme = appUrl.startsWith('https://') ? 'https' : 'http'
     const host = appUrl.replace(/^https?:\/\//, '')
-    const redirectUri = `${scheme}://${host}/admin/auth/callback`
+    const redirectUri = `${scheme}://${host}/sign-in/callback`
 
     authUrl.searchParams.set('redirect_uri', redirectUri)
     authUrl.searchParams.set('state', state)
@@ -335,9 +335,9 @@ export const logoutFn = createServerFn({ method: 'POST' }).handler(async () => {
   const appUrl = process.env.VITE_APP_URL || 'http://localhost:5001'
   const scheme = appUrl.startsWith('https://') ? 'https' : 'http'
   const host = appUrl.replace(/^https?:\/\//, '')
-  const logoutUri = `${scheme}://${host}/admin/login`
+  const logoutUri = `${scheme}://${host}/sign-in`
 
-  let logoutUrl = '/admin/login'
+  let logoutUrl = '/sign-in'
   if (domain && clientId) {
     const url = new URL(`https://${domain}/logout`)
     url.searchParams.set('client_id', clientId)
@@ -385,7 +385,7 @@ export const handleAuthCallbackFn = createServerFn({ method: 'POST' })
     const appUrl = process.env.VITE_APP_URL || 'http://localhost:5001'
     const scheme = appUrl.startsWith('https://') ? 'https' : 'http'
     const host = appUrl.replace(/^https?:\/\//, '')
-    const redirectUri = `${scheme}://${host}/admin/auth/callback`
+    const redirectUri = `${scheme}://${host}/sign-in/callback`
 
     const { exchangeCognitoCode } = await import('@/lib/auth/tanstack-auth')
     const tokenRes = await exchangeCognitoCode(code, codeVerifier, redirectUri)
