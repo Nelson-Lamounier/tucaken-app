@@ -43,9 +43,10 @@ export function initialiseFaroAdmin(): Faro | null {
   }
 
   try {
-    const collectorUrl =
-      import.meta.env.VITE_FARO_URL ??
-      'https://ops.nelsonlamounier.com/faro/collect'
+    const collectorUrl = import.meta.env.VITE_FARO_URL
+    if (!collectorUrl) {
+      return null
+    }
 
     faroInstance = initializeFaro({
       url: collectorUrl,
