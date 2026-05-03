@@ -237,7 +237,7 @@ describe('handleAuthCallbackFn', () => {
       data: { code: 'auth-code', state: 'matching-state' },
     })
 
-    expect(result).toEqual({ success: true })
+    expect(result).toEqual({ success: true, isNewUser: expect.any(Boolean) })
     expect(mockSetCookie).toHaveBeenCalledWith(
       '__session',
       'new-jwt-token',
@@ -255,7 +255,7 @@ describe('logoutFn', () => {
   })
 
   it('should clear all session cookies', async () => {
-    const result = await (logoutFn as () => Promise<{ success: boolean; logoutUrl: string }>)()
+    const result = await (logoutFn as unknown as (opts: { data: { appOrigin?: string } }) => Promise<{ success: boolean; logoutUrl: string }>)({ data: {} })
 
     expect(result.success).toBe(true)
     expect(mockDeleteCookie).toHaveBeenCalledWith('__session', { path: '/' })
@@ -264,7 +264,7 @@ describe('logoutFn', () => {
   })
 
   it('should return a Cognito logout URL when credentials are configured', async () => {
-    const result = await (logoutFn as () => Promise<{ success: boolean; logoutUrl: string }>)()
+    const result = await (logoutFn as unknown as (opts: { data: { appOrigin?: string } }) => Promise<{ success: boolean; logoutUrl: string }>)({ data: {} })
 
     expect(result.logoutUrl).toContain(`https://${COGNITO_DOMAIN}/logout`)
     expect(result.logoutUrl).toContain(`client_id=${COGNITO_CLIENT_ID}`)
@@ -275,7 +275,7 @@ describe('logoutFn', () => {
     delete process.env.AUTH_COGNITO_ID
     delete process.env.AUTH_COGNITO_CLIENT_ID
 
-    const result = await (logoutFn as () => Promise<{ success: boolean; logoutUrl: string }>)()
+    const result = await (logoutFn as unknown as (opts: { data: { appOrigin?: string } }) => Promise<{ success: boolean; logoutUrl: string }>)({ data: {} })
 
     expect(result.logoutUrl).toBe('/sign-in')
   })
