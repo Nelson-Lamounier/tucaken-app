@@ -75,6 +75,16 @@ local-cluster-logs:
 local-cluster-stop:
     npx tsx scripts/local-dev.ts --cluster --stop
 
+# ── Test User ─────────────────────────────────────────────────────────────────
+
+# Create a role=user test account in Cognito (run once; credentials saved to .env.local)
+create-test-user:
+    npx tsx scripts/create-test-user.ts
+
+# Delete test user from Cognito so sign-up can be tested end-to-end via the UI
+reset-test-user:
+    npx tsx scripts/reset-test-user.ts
+
 # ── AWS / Cognito Setup ───────────────────────────────────────────────────────
 
 # Configure Google + GitHub sign-in in Cognito (interactive, uses dev-account profile)
