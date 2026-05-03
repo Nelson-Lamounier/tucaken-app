@@ -166,6 +166,21 @@ export const completeUploadFn = createServerFn({ method: 'POST' })
   })
 
 /**
+ * Retry a failed import job. Re-dispatches the K8s Job for an existing import record.
+ */
+export const retryImportFn = createServerFn({ method: 'POST' })
+  .inputValidator(importIdSchema)
+  .handler(async ({ data: importId }) => {
+    await requireAuth()
+    const token = getSessionToken()
+    return apiFetch<{ importId: string; status: string }>(
+      `/api/admin/resume-imports/${importId}/retry`,
+      token,
+      { method: 'POST' },
+    )
+  })
+
+/**
  * Poll import status. Call until status is 'ready_for_review', 'completed', or 'failed'.
  */
 export const getImportStatusFn = createServerFn({ method: 'GET' })
