@@ -1,3 +1,4 @@
+"use client"
 // src/features/home/lib/MagneticButton.tsx
 import { motion } from 'motion/react'
 import { useRef, useState, type ReactNode, type MouseEvent } from 'react'

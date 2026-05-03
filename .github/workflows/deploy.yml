@@ -284,6 +284,7 @@ jobs:
         run: |
           DIST_ID=$(aws ssm get-parameter \
             --name "/tucaken/${ENVIRONMENT}/edge/io-distribution-id" \
+            --region us-east-1 \
             --query 'Parameter.Value' --output text)
           if [ -z "$DIST_ID" ] || [ "$DIST_ID" = "None" ]; then
             echo "::error::Tucaken .io CloudFront distribution ID not found in SSM"

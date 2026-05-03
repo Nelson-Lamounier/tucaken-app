@@ -1,3 +1,4 @@
+"use client"
 // src/features/home/lib/Section.tsx
 import { motion } from 'motion/react'
 import type { ReactNode } from 'react'

@@ -1,3 +1,4 @@
+"use client"
 // src/features/home/lib/MeshBg.tsx
 import { motion } from 'motion/react'
 

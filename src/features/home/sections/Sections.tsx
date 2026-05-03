@@ -1,3 +1,4 @@
+"use client"
 // src/features/home/sections/Sections.tsx
 // Re-usable below-the-fold sections (Problem, HowItWorks, Comparison, Founder, Pricing, FAQ, Footer).
 import { motion } from 'motion/react'

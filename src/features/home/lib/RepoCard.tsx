@@ -1,3 +1,4 @@
+"use client"
 // src/features/home/lib/RepoCard.tsx
 import { motion } from 'motion/react'
 import { useState, type MouseEvent } from 'react'

@@ -1,3 +1,4 @@
+"use client"
 // src/features/home/HomePage.tsx
 // Single-page Tucaken Home — energetic + spotlight + 3D resume + floating repos.
 import { Link, useNavigate } from '@tanstack/react-router'

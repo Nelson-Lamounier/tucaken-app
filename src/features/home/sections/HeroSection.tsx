@@ -1,3 +1,4 @@
+"use client"
 // src/features/home/sections/HeroSection.tsx
 import { motion, useMotionValue, useSpring, useTransform } from 'motion/react'
 import { useEffect, useRef } from 'react'

@@ -1,3 +1,4 @@
+"use client"
 // src/features/home/lib/Pipeline.tsx
 import { motion } from 'motion/react'
 import { Fragment } from 'react'
