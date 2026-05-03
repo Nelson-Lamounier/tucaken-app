@@ -63,10 +63,10 @@ vi.mock('../../server/security-headers', () => ({
 // ---------------------------------------------------------------------------
 // createServerFn mocks return the handler fn directly, so these exports
 // are the raw async handler functions.
+import { getUserSessionFn } from '../../server/session'
+import { handleAuthCallbackFn } from '../../server/auth-callback'
 import {
-  getUserSessionFn,
   getLoginUrlFn,
-  handleAuthCallbackFn,
   logoutFn,
 } from '../../server/auth'
 

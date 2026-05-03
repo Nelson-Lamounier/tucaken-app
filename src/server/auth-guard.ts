@@ -9,7 +9,7 @@
 
 import { getCookie } from '@tanstack/react-start/server'
 import { verifyCognitoJwt } from '@/lib/auth/tanstack-auth'
-import type { AuthUser } from './auth'
+import type { AuthUser } from './session'
 
 // =============================================================================
 // Error Types

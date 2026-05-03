@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { z } from 'zod'
-import { handleAuthCallbackFn } from '../server/auth'
+import { handleAuthCallbackFn } from '../server/auth-callback'
 
 const callbackSearchSchema = z.object({
   code: z.string().optional(),

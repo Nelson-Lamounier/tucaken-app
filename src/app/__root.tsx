@@ -1,4 +1,5 @@
 import { HeadContent, Scripts, createRootRouteWithContext, Outlet, Link } from '@tanstack/react-router'
+import { MotionConfig } from 'motion/react'
 // Side-effect import: tells Vite/Tailwind to process and emit styles.css.
 // We do NOT use ?url here — that would trigger Vite's hash-based URL resolution
 // which differs between the client and SSR builds (cross-process hash mismatch).
@@ -8,7 +9,7 @@ import '../styles.css'
 const appCss = `${import.meta.env.BASE_URL ?? '/'}assets/styles.css`
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { RouterContext } from '../router'
-import { getUserSessionFn } from '../server/auth'
+import { getUserSessionFn } from '../server/session'
 import { Toaster } from '../components/ui/Toaster'
 import { initialiseFaroAdmin } from '../lib/observability/faro-admin'
 import { ThemeProvider } from '../contexts/ThemeContext'
@@ -114,14 +115,16 @@ function RootComponent() {
   }, [])
 
   return (
-    <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
-        <Outlet />
-        <Suspense fallback={null}>
-          <TanStackDevtools />
-        </Suspense>
-      </QueryClientProvider>
-    </ThemeProvider>
+    <MotionConfig reducedMotion="never">
+      <ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+          <Outlet />
+          <Suspense fallback={null}>
+            <TanStackDevtools />
+          </Suspense>
+        </QueryClientProvider>
+      </ThemeProvider>
+    </MotionConfig>
   )
 }
 
