@@ -22,6 +22,7 @@ import {
   completeUploadFn,
   getImportStatusFn,
   listCareerEntriesFn,
+  retryImportFn,
 } from '../../../../server/resume-imports'
 import type { CareerEntry } from '../../../../server/resume-imports'
 
@@ -53,6 +54,7 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
   const [importId, setImportId] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string>('')
   const [dragOver, setDragOver] = useState(false)
+  const [retrying, setRetrying] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const accept = '.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -147,6 +149,20 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
       }
       setErrorMsg(msg)
       setPhase('error')
+    }
+  }
+
+  async function handleRetry() {
+    if (!importId) return
+    setRetrying(true)
+    try {
+      await retryImportFn({ data: importId })
+      setErrorMsg('')
+      setRetrying(false)
+      setPhase('processing')
+    } catch (err) {
+      setRetrying(false)
+      setErrorMsg(err instanceof Error ? err.message : 'Retry failed — please try again.')
     }
   }
 
@@ -282,9 +298,24 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => { setPhase('idle'); setFile(null); setImportId(null) }}>
-            Try again
-          </Button>
+          {importId ? (
+            <Button
+              variant="secondary"
+              onClick={() => void handleRetry()}
+              disabled={retrying}
+              className="flex items-center gap-1.5"
+            >
+              {retrying && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {retrying ? 'Retrying…' : 'Retry'}
+            </Button>
+          ) : (
+            <Button
+              variant="secondary"
+              onClick={() => { setPhase('idle'); setFile(null); setImportId(null) }}
+            >
+              Try again
+            </Button>
+          )}
           <Button variant="ghost" onClick={onSkip}>Skip for now</Button>
         </div>
       </div>
