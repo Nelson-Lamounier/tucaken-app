@@ -271,9 +271,29 @@ const signUpSchema = z.object({
   name: z.string().min(1),
 })
 
+const ALREADY_HAS_ACCOUNT_MSG =
+  'An account with this email already exists. Please sign in instead.'
+
 export const signUpFn = createServerFn({ method: 'POST' })
   .inputValidator(signUpSchema)
   .handler(async ({ data }) => {
+    // ── Pre-check: email already in RDS (Google / GitHub account) ────────────
+    // Catches cross-provider duplicates before Cognito creates a conflicting
+    // native user. Best-effort — if admin-api is unavailable we fall through
+    // and let Cognito's AliasExistsException handle it below.
+    try {
+      const checkRes = await fetch(
+        `${ADMIN_API_URL}/api/public/email-exists?email=${encodeURIComponent(data.email)}`,
+      )
+      if (checkRes.ok) {
+        const { exists } = await checkRes.json() as { exists: boolean }
+        if (exists) throw new Error(ALREADY_HAS_ACCOUNT_MSG)
+      }
+    } catch (e) {
+      // Re-throw our own error; swallow network/parse failures.
+      if (e instanceof Error && e.message === ALREADY_HAS_ACCOUNT_MSG) throw e
+    }
+
     const { client, clientId } = makeCognitoClient()
     try {
       await client.send(
@@ -289,7 +309,12 @@ export const signUpFn = createServerFn({ method: 'POST' })
       )
     } catch (err: unknown) {
       if (err instanceof Error) {
-        if (err.name === 'UsernameExistsException') throw new Error('An account with this email already exists')
+        // AliasExistsException: pool has email aliasing — same email used by a
+        // federated user. UsernameExistsException: exact username collision.
+        if (
+          err.name === 'AliasExistsException' ||
+          err.name === 'UsernameExistsException'
+        ) throw new Error(ALREADY_HAS_ACCOUNT_MSG)
         if (err.name === 'InvalidPasswordException') throw new Error(err.message)
         throw new Error(err.message)
       }
