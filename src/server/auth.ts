@@ -15,6 +15,9 @@ import {
   RespondToAuthChallengeCommand,
   ForgotPasswordCommand,
   ConfirmForgotPasswordCommand,
+  SignUpCommand,
+  ConfirmSignUpCommand,
+  ResendConfirmationCodeCommand,
 } from '@aws-sdk/client-cognito-identity-provider'
 import {
   generateRandomString,
@@ -23,6 +26,32 @@ import {
 
 // Re-export types from session.ts so existing import paths keep working.
 export type { AuthUser, AuthState } from './session'
+
+const ADMIN_API_URL =
+  process.env['ADMIN_API_URL'] ?? 'http://admin-api.admin-api:3002'
+
+// Secure cookies require HTTPS. In local Docker (http://localhost) we must
+// set this to false or browsers reject/ignore the cookie.
+const SECURE_COOKIES =
+  process.env.NODE_ENV === 'production' &&
+  (process.env['VITE_APP_URL']?.startsWith('https') ?? true)
+
+async function detectNewUser(idToken: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${ADMIN_API_URL}/api/admin/me`, {
+      headers: { Authorization: `Bearer ${idToken}` },
+    })
+    if (!res.ok) {
+      console.error(`[auth] detectNewUser: admin-api responded ${res.status}`)
+      return false
+    }
+    const me = await res.json() as { isNew?: boolean }
+    return me.isNew === true
+  } catch (e) {
+    console.error('[auth] detectNewUser: failed to reach admin-api:', e instanceof Error ? e.message : e)
+    return false
+  }
+}
 
 const loginUrlSchema = z.object({
   provider: z.enum(['Google', 'GitHub', 'LoginWithAmazon']).optional(),
@@ -43,7 +72,7 @@ export const getLoginUrlFn = createServerFn({ method: 'POST' })
     // Store verifier + state for the callback route
     setCookie('pkce_verifier', codeVerifier, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: SECURE_COOKIES,
       sameSite: 'lax',
       maxAge: 60 * 15, // 15 mins
       path: '/',
@@ -51,7 +80,7 @@ export const getLoginUrlFn = createServerFn({ method: 'POST' })
 
     setCookie('oauth_state', state, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: SECURE_COOKIES,
       sameSite: 'lax',
       maxAge: 60 * 15,
       path: '/',
@@ -118,7 +147,7 @@ const signInPasswordSchema = z.object({
 })
 
 export type SignInResult =
-  | { success: true }
+  | { success: true; isNewUser: boolean }
   | { success: false; challenge: 'SOFTWARE_TOKEN_MFA' | 'SMS_MFA' | string }
 
 export const signInWithPasswordFn = createServerFn({ method: 'POST' })
@@ -149,28 +178,30 @@ export const signInWithPasswordFn = createServerFn({ method: 'POST' })
     }
 
     if (res.AuthenticationResult?.IdToken) {
-      setCookie('__session', res.AuthenticationResult.IdToken, {
+      const idToken = res.AuthenticationResult.IdToken
+      setCookie('__session', idToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: SECURE_COOKIES,
         sameSite: 'lax',
         maxAge: 24 * 60 * 60,
         path: '/',
       })
-      return { success: true }
+      const isNewUser = await detectNewUser(idToken)
+      return { success: true, isNewUser }
     }
 
     if (res.ChallengeName) {
       // Store session token so OTP step can complete the challenge
       setCookie('mfa_session', res.Session ?? '', {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: SECURE_COOKIES,
         sameSite: 'lax',
         maxAge: 60 * 5,
         path: '/',
       })
       setCookie('mfa_username', data.email, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: SECURE_COOKIES,
         sameSite: 'lax',
         maxAge: 60 * 5,
         path: '/',
@@ -218,7 +249,7 @@ export const respondToMfaChallengeFn = createServerFn({ method: 'POST' })
 
     setCookie('__session', res.AuthenticationResult.IdToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: SECURE_COOKIES,
       sameSite: 'lax',
       maxAge: 24 * 60 * 60,
       path: '/',
@@ -227,6 +258,97 @@ export const respondToMfaChallengeFn = createServerFn({ method: 'POST' })
     deleteCookie('mfa_session', { path: '/' })
     deleteCookie('mfa_username', { path: '/' })
 
+    return { success: true }
+  })
+
+// =============================================================================
+// Email / Password Sign-Up
+// =============================================================================
+
+const signUpSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(12),
+  name: z.string().min(1),
+})
+
+export const signUpFn = createServerFn({ method: 'POST' })
+  .inputValidator(signUpSchema)
+  .handler(async ({ data }) => {
+    const { client, clientId } = makeCognitoClient()
+    try {
+      await client.send(
+        new SignUpCommand({
+          ClientId: clientId,
+          Username: data.email,
+          Password: data.password,
+          UserAttributes: [
+            { Name: 'email', Value: data.email },
+            { Name: 'name', Value: data.name },
+          ],
+        }),
+      )
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        if (err.name === 'UsernameExistsException') throw new Error('An account with this email already exists')
+        if (err.name === 'InvalidPasswordException') throw new Error(err.message)
+        throw new Error(err.message)
+      }
+      throw new Error('Sign-up failed')
+    }
+    return { success: true }
+  })
+
+const confirmSignUpSchema = z.object({
+  email: z.string().email(),
+  code: z.string().min(1),
+  password: z.string().min(1),
+})
+
+export const confirmSignUpFn = createServerFn({ method: 'POST' })
+  .inputValidator(confirmSignUpSchema)
+  .handler(async ({ data }) => {
+    const { client, clientId } = makeCognitoClient()
+
+    await client.send(
+      new ConfirmSignUpCommand({
+        ClientId: clientId,
+        Username: data.email,
+        ConfirmationCode: data.code,
+      }),
+    )
+
+    // Auto sign-in after confirmation
+    const res = await client.send(
+      new InitiateAuthCommand({
+        AuthFlow: 'USER_PASSWORD_AUTH',
+        ClientId: clientId,
+        AuthParameters: { USERNAME: data.email, PASSWORD: data.password },
+      }),
+    )
+
+    const idToken = res.AuthenticationResult?.IdToken
+    if (!idToken) throw new Error('Authentication failed after email confirmation')
+
+    setCookie('__session', idToken, {
+      httpOnly: true,
+      secure: SECURE_COOKIES,
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60,
+      path: '/',
+    })
+
+    // Provision the user in admin-api (creates the RDS row via userProvisionMiddleware).
+    // Result is ignored for routing — a confirmed email is always a new user.
+    await detectNewUser(idToken)
+    const isNewUser = true
+    return { success: true, isNewUser }
+  })
+
+export const resendConfirmationCodeFn = createServerFn({ method: 'POST' })
+  .inputValidator(z.object({ email: z.string().email() }))
+  .handler(async ({ data }) => {
+    const { client, clientId } = makeCognitoClient()
+    await client.send(new ResendConfirmationCodeCommand({ ClientId: clientId, Username: data.email }))
     return { success: true }
   })
 
@@ -278,28 +400,28 @@ export const confirmForgotPasswordFn = createServerFn({ method: 'POST' })
   })
 
 /** Logs the user out by clearing session cookies and returning logout URL. */
-export const logoutFn = createServerFn({ method: 'POST' }).handler(async () => {
-  deleteCookie('__session', { path: '/' })
-  deleteCookie('pkce_verifier', { path: '/' })
-  deleteCookie('oauth_state', { path: '/' })
+export const logoutFn = createServerFn({ method: 'POST' })
+  .inputValidator(z.object({ appOrigin: z.string().optional() }))
+  .handler(async ({ data }) => {
+    deleteCookie('__session', { path: '/' })
+    deleteCookie('pkce_verifier', { path: '/' })
+    deleteCookie('oauth_state', { path: '/' })
 
-  const domain = process.env.AUTH_COGNITO_DOMAIN
-  const clientId = process.env.AUTH_COGNITO_ID || process.env.AUTH_COGNITO_CLIENT_ID
-  const appUrl = process.env.VITE_APP_URL || 'http://localhost:5001'
-  const scheme = appUrl.startsWith('https://') ? 'https' : 'http'
-  const host = appUrl.replace(/^https?:\/\//, '')
-  const logoutUri = `${scheme}://${host}/sign-in`
+    const domain = process.env.AUTH_COGNITO_DOMAIN
+    const clientId = process.env.AUTH_COGNITO_ID || process.env.AUTH_COGNITO_CLIENT_ID
+    const origin = data.appOrigin ?? process.env.VITE_APP_URL ?? 'http://localhost:5001'
+    const logoutUri = `${origin}/sign-in`
 
-  let logoutUrl = '/sign-in'
-  if (domain && clientId) {
-    const url = new URL(`https://${domain}/logout`)
-    url.searchParams.set('client_id', clientId)
-    url.searchParams.set('logout_uri', logoutUri)
-    logoutUrl = url.toString()
-  }
+    let logoutUrl = '/sign-in'
+    if (domain && clientId) {
+      const url = new URL(`https://${domain}/logout`)
+      url.searchParams.set('client_id', clientId)
+      url.searchParams.set('logout_uri', logoutUri)
+      logoutUrl = url.toString()
+    }
 
-  return { success: true, logoutUrl }
-})
+    return { success: true, logoutUrl }
+  })
 
 // Re-export from auth-callback.ts so existing import paths keep working.
 export { handleAuthCallbackFn } from './auth-callback'
