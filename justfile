@@ -59,6 +59,22 @@ local-logs:
 local-stop:
     npx tsx scripts/local-dev.ts --stop
 
+# Build image and start container wired to the dev cluster via kubectl port-forward
+local-cluster:
+    npx tsx scripts/local-dev.ts --cluster
+
+# Same but skip Docker build (use cached image)
+local-cluster-fast:
+    npx tsx scripts/local-dev.ts --cluster --no-rebuild
+
+# Cluster mode + tail logs
+local-cluster-logs:
+    npx tsx scripts/local-dev.ts --cluster --logs
+
+# Stop container and kill the port-forward
+local-cluster-stop:
+    npx tsx scripts/local-dev.ts --cluster --stop
+
 # ── AWS / Cognito Setup ───────────────────────────────────────────────────────
 
 # Configure Google + GitHub sign-in in Cognito (interactive, uses dev-account profile)

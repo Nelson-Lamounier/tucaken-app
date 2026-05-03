@@ -2,32 +2,34 @@
 /**
  * scripts/local-dev.ts — tucaken-app local image test harness
  *
- * Builds and runs the tucaken-app Docker image and wires it to an
- * already-running admin-api container so it can reach it via Docker DNS —
- * replicating K8s pod-to-pod networking.
+ * Two modes:
  *
- * Admin-api lifecycle is NOT managed here.
- * Use `just admin-api-up` in the cdk-monitoring repo first.
+ *   Default (local Docker)
+ *     Wires tucaken-app to an already-running admin-api Docker container via
+ *     a shared Docker network, replicating K8s pod-to-pod DNS.
+ *     Network wiring:
+ *       K8s production:  tucaken-app → http://admin-api.admin-api:3002
+ *       Local (this):    tucaken-app → http://admin-api:3002  (Docker DNS alias)
+ *     Prerequisites: `just admin-api-up` in the cdk-monitoring repo.
  *
- * Network wiring:
- *   K8s production:  tucaken-app → http://admin-api.admin-api:3002
- *   Local (this):    tucaken-app → http://admin-api:3002  (Docker DNS alias)
- *   Achieved via:    docker network connect --alias admin-api
+ *   --cluster (port-forward from dev cluster)
+ *     Opens a kubectl port-forward to the admin-api Service in the cluster and
+ *     runs tucaken-app pointing at host.docker.internal:3002.  No local
+ *     admin-api container needed — uses the real dev pod.
+ *     Prerequisites: valid kubeconfig + access to the development cluster.
  *
  * Usage:
- *   npx tsx scripts/local-dev.ts              # Stop → build → start
- *   npx tsx scripts/local-dev.ts --no-rebuild # Use cached image (faster)
- *   npx tsx scripts/local-dev.ts --logs       # + tail logs after startup
- *   npx tsx scripts/local-dev.ts --stop       # Stop and remove the container
- *
- * Prerequisites:
- *   - Docker Desktop or colima running
- *   - admin-api container already running locally
- *     (run `just admin-api-up` in cdk-monitoring repo)
- *   - .env.local at repo root with Cognito + other vars
+ *   npx tsx scripts/local-dev.ts                        # local Docker mode
+ *   npx tsx scripts/local-dev.ts --no-rebuild           # skip image build
+ *   npx tsx scripts/local-dev.ts --logs                 # tail logs after start
+ *   npx tsx scripts/local-dev.ts --stop                 # stop container
+ *   npx tsx scripts/local-dev.ts --cluster              # cluster port-forward
+ *   npx tsx scripts/local-dev.ts --cluster --no-rebuild # cluster, cached image
+ *   npx tsx scripts/local-dev.ts --cluster --logs       # cluster + tail logs
+ *   npx tsx scripts/local-dev.ts --cluster --stop       # stop container + pf
  */
 
-import { spawnSync, spawn } from 'node:child_process'
+import { spawnSync, spawn, type ChildProcess } from 'node:child_process'
 import { readFileSync, existsSync, writeFileSync, unlinkSync } from 'node:fs'
 import { resolve, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -52,6 +54,12 @@ const ADMIN_API_CONTAINER = 'admin-api-admin-api-1'
 const ADMIN_API_ALIAS     = 'admin-api'
 const ADMIN_API_PORT      = 3002
 
+// K8s cluster port-forward config (--cluster mode)
+const K8S_NAMESPACE        = 'admin-api'
+const K8S_SERVICE          = 'admin-api'
+const K8S_LOCAL_PORT       = 3002
+const PF_PID_FILE          = join(tmpdir(), 'tucaken-app-pf.pid')
+
 const HOME_DIR    = process.env['HOME'] ?? '/root'
 const AWS_PROFILE = process.env['AWS_PROFILE'] ?? 'dev-account'
 
@@ -63,6 +71,7 @@ const argv       = process.argv.slice(2)
 const NO_REBUILD = argv.includes('--no-rebuild')
 const TAIL_LOGS  = argv.includes('--logs')
 const STOP_ONLY  = argv.includes('--stop')
+const CLUSTER    = argv.includes('--cluster')
 
 // =============================================================================
 // Colours
@@ -185,6 +194,66 @@ function writeTempEnvFile(env: Record<string, string>): string {
 }
 
 // =============================================================================
+// Port-forward helpers (--cluster mode)
+// =============================================================================
+
+function killPortForward(): void {
+  if (!existsSync(PF_PID_FILE)) return
+  const pid = parseInt(readFileSync(PF_PID_FILE, 'utf-8').trim(), 10)
+  if (!isNaN(pid)) {
+    try {
+      process.kill(pid, 'SIGTERM')
+      log.ok(`Stopped port-forward (PID ${pid})`)
+    } catch {
+      // Already gone
+    }
+  }
+  try { unlinkSync(PF_PID_FILE) } catch { /* ignore */ }
+}
+
+function startPortForward(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    log.info(`kubectl port-forward svc/${K8S_SERVICE} ${K8S_LOCAL_PORT}:${K8S_LOCAL_PORT} -n ${K8S_NAMESPACE}`)
+
+    const pf: ChildProcess = spawn(
+      'kubectl',
+      ['port-forward', `svc/${K8S_SERVICE}`, `${K8S_LOCAL_PORT}:${K8S_LOCAL_PORT}`, '-n', K8S_NAMESPACE],
+      { stdio: ['ignore', 'pipe', 'pipe'] },
+    )
+
+    if (pf.pid) {
+      writeFileSync(PF_PID_FILE, String(pf.pid), 'utf-8')
+    }
+
+    const deadline = setTimeout(() => {
+      reject(new Error(`Port-forward did not become ready within 15s`))
+    }, 15_000)
+
+    pf.stdout?.on('data', (chunk: Buffer) => {
+      const line = chunk.toString()
+      // kubectl prints "Forwarding from 127.0.0.1:3002 -> 3002" when ready
+      if (line.includes('Forwarding from')) {
+        clearTimeout(deadline)
+        log.ok(`Port-forward ready → localhost:${K8S_LOCAL_PORT}`)
+        resolve()
+      }
+    })
+
+    pf.stderr?.on('data', (chunk: Buffer) => {
+      const line = chunk.toString().trim()
+      if (line) log.warn(`[pf] ${line}`)
+    })
+
+    pf.on('exit', (code) => {
+      clearTimeout(deadline)
+      if (code !== 0 && code !== null) {
+        reject(new Error(`Port-forward exited unexpectedly (code ${code})`))
+      }
+    })
+  })
+}
+
+// =============================================================================
 // Stop
 // =============================================================================
 
@@ -195,6 +264,9 @@ function stopApp(stepNum: number): void {
     log.ok(`Removed ${APP_CONTAINER}`)
   } else {
     log.info(`${APP_CONTAINER} not running — skip`)
+  }
+  if (CLUSTER) {
+    killPortForward()
   }
 }
 
@@ -216,12 +288,22 @@ async function main(): Promise<void> {
   // ── 1. Pre-flight ──────────────────────────────────────────────────────────
   log.step(1, 'Pre-flight checks')
 
-  if (!containerRunning(ADMIN_API_CONTAINER)) {
-    log.warn(`admin-api container "${ADMIN_API_CONTAINER}" is not running.`)
-    log.warn('Run `just admin-api-up` in the cdk-monitoring repo first.')
-    log.warn('Continuing — tucaken-app will start but API calls will fail.')
+  if (CLUSTER) {
+    log.info('Mode: cluster port-forward')
+    const kctx = capture('kubectl', ['config', 'current-context'])
+    if (kctx) {
+      log.ok(`kubectl context: ${kctx}`)
+    } else {
+      log.warn('kubectl context not found — ensure kubeconfig is set')
+    }
   } else {
-    log.ok(`admin-api running (${ADMIN_API_CONTAINER})`)
+    if (!containerRunning(ADMIN_API_CONTAINER)) {
+      log.warn(`admin-api container "${ADMIN_API_CONTAINER}" is not running.`)
+      log.warn('Run `just admin-api-up` in the cdk-monitoring repo first.')
+      log.warn('Continuing — tucaken-app will start but API calls will fail.')
+    } else {
+      log.ok(`admin-api running (${ADMIN_API_CONTAINER})`)
+    }
   }
 
   const awsDir = `${HOME_DIR}/.aws`
@@ -239,34 +321,39 @@ async function main(): Promise<void> {
     log.ok(`Loaded ${Object.keys(appEnv).length} vars from .env.local`)
   }
 
-  // ── 2. Stop existing container ────────────────────────────────────────────
+  // ── 2. Stop existing container (+ port-forward if cluster mode) ───────────
   stopApp(2)
 
-  // ── 3. Ensure shared network ───────────────────────────────────────────────
-  log.step(3, `Ensure network: ${C.cyan}${NETWORK_NAME}${C.reset}`)
-  if (!networkExists(NETWORK_NAME)) {
-    run('docker', ['network', 'create', NETWORK_NAME])
-    log.ok(`Created ${NETWORK_NAME}`)
+  // ── 3. Network / port-forward setup ───────────────────────────────────────
+  let stepN = 3
+  if (CLUSTER) {
+    log.step(stepN++, `Port-forward svc/${K8S_SERVICE} -n ${K8S_NAMESPACE} → localhost:${K8S_LOCAL_PORT}`)
+    await startPortForward()
   } else {
-    log.ok(`Network ${NETWORK_NAME} already exists`)
-  }
-
-  if (containerRunning(ADMIN_API_CONTAINER)) {
-    if (!connectedToNetwork(ADMIN_API_CONTAINER, NETWORK_NAME)) {
-      run('docker', [
-        'network', 'connect',
-        '--alias', ADMIN_API_ALIAS,
-        NETWORK_NAME,
-        ADMIN_API_CONTAINER,
-      ])
-      log.ok(`admin-api joined ${NETWORK_NAME} as alias "${ADMIN_API_ALIAS}"`)
+    log.step(stepN++, `Ensure network: ${C.cyan}${NETWORK_NAME}${C.reset}`)
+    if (!networkExists(NETWORK_NAME)) {
+      run('docker', ['network', 'create', NETWORK_NAME])
+      log.ok(`Created ${NETWORK_NAME}`)
     } else {
-      log.ok(`admin-api already on ${NETWORK_NAME}`)
+      log.ok(`Network ${NETWORK_NAME} already exists`)
+    }
+
+    if (containerRunning(ADMIN_API_CONTAINER)) {
+      if (!connectedToNetwork(ADMIN_API_CONTAINER, NETWORK_NAME)) {
+        run('docker', [
+          'network', 'connect',
+          '--alias', ADMIN_API_ALIAS,
+          NETWORK_NAME,
+          ADMIN_API_CONTAINER,
+        ])
+        log.ok(`admin-api joined ${NETWORK_NAME} as alias "${ADMIN_API_ALIAS}"`)
+      } else {
+        log.ok(`admin-api already on ${NETWORK_NAME}`)
+      }
     }
   }
 
   // ── 4. Build image ─────────────────────────────────────────────────────────
-  let stepN = 4
   if (!NO_REBUILD) {
     log.step(stepN++, 'Build tucaken-app image')
     run('docker', [
@@ -288,13 +375,17 @@ async function main(): Promise<void> {
   // ── 5. Start container ─────────────────────────────────────────────────────
   log.step(stepN++, `Start tucaken-app (port ${APP_PORT})`)
 
+  // In cluster mode: container reaches the forwarded port via host.docker.internal
+  // In local mode:   Docker DNS alias "admin-api" resolves via the shared network
+  const adminApiUrl = CLUSTER
+    ? `http://host.docker.internal:${K8S_LOCAL_PORT}`
+    : `http://${ADMIN_API_ALIAS}:${ADMIN_API_PORT}`
+
   const containerEnv: Record<string, string> = {
     NODE_ENV: 'production',
     PORT: String(APP_PORT),
     HOST: '0.0.0.0',
-    // Pod-to-pod URL: Docker DNS resolves "admin-api" via local-cluster network
-    // mirrors K8s:  http://admin-api.admin-api:3002
-    ADMIN_API_URL: `http://${ADMIN_API_ALIAS}:${ADMIN_API_PORT}`,
+    ADMIN_API_URL: adminApiUrl,
     AWS_PROFILE,
     AWS_DEFAULT_REGION: appEnv['AWS_DEFAULT_REGION'] ?? 'eu-west-1',
     AWS_REGION:         appEnv['AWS_REGION']         ?? 'eu-west-1',
@@ -314,10 +405,13 @@ async function main(): Promise<void> {
   const dockerArgs: string[] = [
     'run', '-d',
     '--name', APP_CONTAINER,
-    '--network', NETWORK_NAME,
     '-p', `${APP_PORT}:${APP_PORT}`,
     '--env-file', tmpEnv,
   ]
+  // cluster mode: no shared Docker network needed — reaches host via host.docker.internal
+  if (!CLUSTER) {
+    dockerArgs.splice(4, 0, '--network', NETWORK_NAME)
+  }
   if (existsSync(awsDir)) {
     dockerArgs.push('-v', `${awsDir}:/home/startadmin/.aws:ro`)
   }
@@ -339,17 +433,24 @@ async function main(): Promise<void> {
   }
 
   // ── 7. Summary ─────────────────────────────────────────────────────────────
+  const stopCmd = CLUSTER
+    ? 'just local-cluster-stop'
+    : 'just local-stop'
+  const apiLine = CLUSTER
+    ? `→ admin-api (cluster pf → host.docker.internal:${K8S_LOCAL_PORT})`
+    : `→ admin-api:${ADMIN_API_PORT}  (Docker DNS on ${NETWORK_NAME})`
+
   console.log(`\n${C.bold}${C.green}┌──────────────────────────────────────────────────┐`)
   console.log(`│   ✓  tucaken-app running                        │`)
   console.log(`└──────────────────────────────────────────────────┘${C.reset}`)
   console.log('')
   console.log(`  ${C.bold}tucaken-app${C.reset}   http://localhost:${APP_PORT}/`)
-  console.log(`               → admin-api:${ADMIN_API_PORT}  (Docker DNS on ${NETWORK_NAME})`)
+  console.log(`               ${apiLine}`)
   console.log('')
   console.log(`  ${C.dim}Logs:`)
   console.log(`    docker logs -f ${APP_CONTAINER}`)
   console.log(`  Stop:`)
-  console.log(`    npx tsx scripts/local-dev.ts --stop${C.reset}`)
+  console.log(`    ${stopCmd}${C.reset}`)
   console.log('')
 
   // ── 8. Optional log tail ───────────────────────────────────────────────────
