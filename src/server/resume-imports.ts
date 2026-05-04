@@ -11,49 +11,9 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import { getCookie } from '@tanstack/react-start/server'
 import { z } from 'zod'
 import { requireAuth } from './auth-guard'
-
-const ADMIN_API_URL =
-  process.env['ADMIN_API_URL'] ?? 'http://admin-api.admin-api:3002'
-
-function getSessionToken(): string {
-  const token = getCookie('__session')
-  if (!token) throw new Error('Session cookie missing after auth guard')
-  return token
-}
-
-async function apiFetch<T>(
-  path: string,
-  token: string,
-  options: RequestInit = {},
-): Promise<T> {
-  const url = `${ADMIN_API_URL}${path}`
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...options.headers,
-    },
-  })
-  if (!response.ok) {
-    let detail = ''
-    try {
-      const body = (await response.json()) as { error?: string; upgradeUrl?: string }
-      detail = body.error ? ` — ${body.error}` : ''
-      // Surface quota errors with a distinct code for the UI to handle
-      if (response.status === 429) {
-        throw new Error(`QUOTA_EXCEEDED${detail}`)
-      }
-    } catch (inner) {
-      if (inner instanceof Error && inner.message.startsWith('QUOTA_EXCEEDED')) throw inner
-    }
-    throw new Error(`admin-api ${options.method ?? 'GET'} ${path} failed [${response.status}]${detail}`)
-  }
-  return response.json() as Promise<T>
-}
+import { apiFetch } from './_api-client'
 
 // ─── JSON value type (same pattern as resumes.ts) ────────────────────────────
 // TanStack Start's ValidateSerializableMapped rejects `unknown` index values.
@@ -138,15 +98,14 @@ export const getUploadUrlFn = createServerFn({ method: 'GET' })
   .inputValidator(uploadUrlSchema)
   .handler(async ({ data }) => {
     await requireAuth()
-    const token = getSessionToken()
     const params = new URLSearchParams({
       filename:      data.filename,
       contentType:   data.contentType,
       fileSizeBytes: String(data.fileSizeBytes),
     })
     return apiFetch<UploadUrlResponse>(
-      `/api/admin/resume-imports/upload-url?${params.toString()}`,
-      token,
+      `/resume-imports/upload-url?${params.toString()}`,
+      { pathTemplate: '/resume-imports/upload-url' },
     )
   })
 
@@ -157,11 +116,9 @@ export const completeUploadFn = createServerFn({ method: 'POST' })
   .inputValidator(importIdSchema)
   .handler(async ({ data: importId }) => {
     await requireAuth()
-    const token = getSessionToken()
     return apiFetch<{ importId: string; status: string }>(
-      `/api/admin/resume-imports/${importId}/complete`,
-      token,
-      { method: 'POST' },
+      `/resume-imports/${importId}/complete`,
+      { method: 'POST', pathTemplate: '/resume-imports/:id/complete' },
     )
   })
 
@@ -172,11 +129,9 @@ export const retryImportFn = createServerFn({ method: 'POST' })
   .inputValidator(importIdSchema)
   .handler(async ({ data: importId }) => {
     await requireAuth()
-    const token = getSessionToken()
     return apiFetch<{ importId: string; status: string }>(
-      `/api/admin/resume-imports/${importId}/retry`,
-      token,
-      { method: 'POST' },
+      `/resume-imports/${importId}/retry`,
+      { method: 'POST', pathTemplate: '/resume-imports/:id/retry' },
     )
   })
 
@@ -187,10 +142,9 @@ export const getImportStatusFn = createServerFn({ method: 'GET' })
   .inputValidator(importIdSchema)
   .handler(async ({ data: importId }) => {
     await requireAuth()
-    const token = getSessionToken()
     const response = await apiFetch<{ import: ResumeImportRecord }>(
-      `/api/admin/resume-imports/${importId}`,
-      token,
+      `/resume-imports/${importId}`,
+      { pathTemplate: '/resume-imports/:id' },
     )
     return response.import
   })
@@ -203,11 +157,10 @@ export const listCareerEntriesFn = createServerFn({ method: 'GET' })
   .inputValidator(listEntriesSchema)
   .handler(async ({ data }) => {
     await requireAuth()
-    const token = getSessionToken()
     const params = data.type ? `?type=${data.type}` : ''
     const response = await apiFetch<{ entries: CareerEntry[] }>(
-      `/api/admin/resume-imports/career-entries${params}`,
-      token,
+      `/resume-imports/career-entries${params}`,
+      { pathTemplate: '/resume-imports/career-entries' },
     )
     return response.entries
   })
@@ -217,10 +170,8 @@ export const listCareerEntriesFn = createServerFn({ method: 'GET' })
  */
 export const listResumeImportsFn = createServerFn({ method: 'GET' }).handler(async () => {
   await requireAuth()
-  const token = getSessionToken()
   const response = await apiFetch<{ imports: ResumeImportRecord[] }>(
-    '/api/admin/resume-imports',
-    token,
+    '/resume-imports',
   )
   return response.imports
 })

@@ -15,72 +15,9 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import { getCookie } from '@tanstack/react-start/server'
 import { z } from 'zod'
 import { requireAuth } from './auth-guard'
-
-// =============================================================================
-// Constants
-// =============================================================================
-
-const ADMIN_API_URL =
-  process.env['ADMIN_API_URL'] ?? 'http://admin-api.admin-api:3002'
-
-// =============================================================================
-// Helpers
-// =============================================================================
-
-/**
- * Returns the raw Cognito JWT from the `__session` cookie.
- *
- * The token is forwarded as-is to admin-api, which re-validates it
- * against the Cognito JWKS endpoint.
- *
- * @returns JWT string
- * @throws {Error} If the `__session` cookie is absent (should not occur after requireAuth())
- */
-function getSessionToken(): string {
-  const token = getCookie('__session')
-  if (!token) {
-    throw new Error('Session cookie missing after auth guard — this should not happen')
-  }
-  return token
-}
-
-/**
- * Performs an authenticated fetch to the admin-api BFF.
- *
- * @param path - Path relative to `/api/admin` (e.g. `/articles`)
- * @param init - Standard RequestInit options
- * @returns Parsed JSON response body
- * @throws {Error} If the response status is not OK
- */
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getSessionToken()
-  const res = await fetch(`${ADMIN_API_URL}/api/admin${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...(init?.headers ?? {}),
-    },
-  })
-
-  if (!res.ok) {
-    let detail = ''
-    try {
-      const body = (await res.json()) as { error?: string }
-      detail = body.error ? ` — ${body.error}` : ''
-    } catch {
-      // ignore parse failures
-    }
-    throw new Error(
-      `admin-api ${init?.method ?? 'GET'} ${path} failed [${res.status}]${detail}`,
-    )
-  }
-
-  return res.json() as Promise<T>
-}
+import { apiFetch } from './_api-client'
 
 // =============================================================================
 // Types
@@ -169,7 +106,10 @@ export const getArticlesFn = createServerFn({ method: 'GET' })
     await requireAuth()
 
     const qs = data.status !== 'all' ? `?status=${encodeURIComponent(data.status)}` : ''
-    const body = await apiFetch<{ articles: ArticleSummary[]; count: number }>(`/articles${qs}`)
+    const body = await apiFetch<{ articles: ArticleSummary[]; count: number }>(
+      `/articles${qs}`,
+      { pathTemplate: '/articles' },
+    )
     return body.articles
   })
 
@@ -191,6 +131,7 @@ export const getArticleContentFn = createServerFn({ method: 'GET' })
     try {
       const body = await apiFetch<{ slug: string; contentRef: string; content: string }>(
         `/content/${encodeURIComponent(slug)}`,
+        { pathTemplate: '/content/:slug' },
       )
       return body
     } catch (err: unknown) {
@@ -215,7 +156,7 @@ export const publishArticleFn = createServerFn({ method: 'POST' })
 
     const body = await apiFetch<{ queued: boolean; slug: string }>(
       `/articles/${encodeURIComponent(slug)}/publish`,
-      { method: 'POST' },
+      { method: 'POST', pathTemplate: '/articles/:slug/publish' },
     )
     return { success: body.queued, slug: body.slug }
   })
@@ -236,6 +177,7 @@ export const unpublishArticleFn = createServerFn({ method: 'POST' })
       {
         method: 'PUT',
         body: JSON.stringify({ status: 'draft' }),
+        pathTemplate: '/articles/:slug',
       },
     )
     return { success: true }
@@ -254,7 +196,7 @@ export const deleteArticleFn = createServerFn({ method: 'POST' })
 
     await apiFetch<{ deleted: boolean; slug: string }>(
       `/articles/${encodeURIComponent(slug)}`,
-      { method: 'DELETE' },
+      { method: 'DELETE', pathTemplate: '/articles/:slug' },
     )
     return { success: true }
   })
@@ -280,6 +222,7 @@ export const saveArticleContentFn = createServerFn({ method: 'POST' })
       {
         method: 'POST',
         body: JSON.stringify({ content: data.content }),
+        pathTemplate: '/content/:slug',
       },
     )
     return { success: true }
@@ -303,6 +246,7 @@ export const saveArticleMetadataFn = createServerFn({ method: 'POST' })
       {
         method: 'PUT',
         body: JSON.stringify(updates),
+        pathTemplate: '/articles/:slug',
       },
     )
     return { success: true }
@@ -326,7 +270,10 @@ export const getArticleVersionsFn = createServerFn({ method: 'GET' })
       slug: string
       totalVersions: number
       versions: ArticleVersion[]
-    }>(`/articles/${encodeURIComponent(slug)}/versions`)
+    }>(
+      `/articles/${encodeURIComponent(slug)}/versions`,
+      { pathTemplate: '/articles/:slug/versions' },
+    )
 
     return body
   })

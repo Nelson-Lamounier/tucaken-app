@@ -53,8 +53,18 @@ COPY --from=builder --chown=startadmin:nodejs /app/dist ./dist
 # directory hierarchy looking for node_modules folders).
 COPY --from=builder --chown=startadmin:nodejs /app/node_modules ./node_modules
 
-# Production server runner
-COPY --from=builder --chown=startadmin:nodejs /app/server.js ./server.js
+# Production server runner + OTel preload bundle.
+# telemetry.js is a separate esbuild output (see package.json `build`); it
+# externalises @opentelemetry/* so `node --import` can register the import-
+# in-the-middle hook before server.js evaluates http/undici/fetch.
+COPY --from=builder --chown=startadmin:nodejs /app/server.js    ./server.js
+COPY --from=builder --chown=startadmin:nodejs /app/telemetry.js ./telemetry.js
+
+# start.sh: conditionally preloads OTel only when OTEL_EXPORTER_OTLP_ENDPOINT
+# is set. CI has no collector → plain `node server.js`. K8s prod has the env
+# var → `node --import ./telemetry.js server.js` for full instrumentation.
+COPY --chown=startadmin:nodejs start.sh ./start.sh
+RUN chmod +x /app/start.sh
 
 # ESM resolution: server.js uses `import` — needs "type": "module" in chain.
 RUN echo '{"type":"module"}' > /app/package.json && chown startadmin:nodejs /app/package.json
@@ -66,6 +76,6 @@ ENV PORT=5001
 ENV HOST="0.0.0.0"
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD node -e "import('http').then(h => h.default.get('http://localhost:' + (process.env.PORT || 5001) + '/admin/', r => process.exit(r.statusCode < 500 ? 0 : 1)))" || exit 1
+  CMD node -e "import('http').then(h => h.default.get('http://localhost:' + (process.env.PORT || 5001) + '/livez', r => process.exit(r.statusCode < 500 ? 0 : 1)))" || exit 1
 
-CMD ["node", "server.js"]
+CMD ["/bin/sh", "./start.sh"]

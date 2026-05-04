@@ -31,6 +31,8 @@ import {
   ExternalLink,
   LogOut,
   Github,
+  CreditCard,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { HeaderNav } from "../ui/HeaderNav";
@@ -93,6 +95,8 @@ const observabilityLinks = [
 ] as const;
 
 const settingsNavigation = [
+  { name: "Settings", href: "/settings", icon: SettingsIcon },
+  { name: "Billing", href: "/billing", icon: CreditCard },
   { name: "GitHub", href: "/settings/github", icon: Github },
 ] as const;
 

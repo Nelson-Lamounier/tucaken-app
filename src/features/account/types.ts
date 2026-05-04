@@ -1,0 +1,164 @@
+// src/features/account/types.ts
+//
+// Shared types for the Billing and Settings pages.
+
+// ---- Billing ---------------------------------------------------------------
+
+export type PlanId = 'free' | 'pro' | 'team'
+export type BillingStatus = 'active' | 'trialing' | 'past_due' | 'canceled'
+export type BillingInterval = 'monthly' | 'annual'
+
+export interface PaymentMethod {
+  brand: string
+  last4: string
+  expMonth: number
+  expYear: number
+}
+
+export interface BillingAddress {
+  line1: string
+  line2?: string
+  city: string
+  state: string
+  postal: string
+  country: string
+}
+
+export interface UsageMeter {
+  used: number
+  included: number
+  unit: string
+}
+
+export interface UsageBlock {
+  resumes: UsageMeter
+  articles: UsageMeter
+  repos: UsageMeter
+  storage: UsageMeter
+}
+
+export interface Invoice {
+  id: string
+  date: string         // ISO
+  amount: number
+  status: 'paid' | 'open' | 'failed'
+  number: string
+}
+
+export interface Billing {
+  plan: PlanId
+  status: BillingStatus
+  interval: BillingInterval
+  seats: number
+  pricePerMonth: number
+  pricePerYear: number
+  renewsAt: string                 // ISO
+  trialEndsAt: string | null
+  cancelAtPeriodEnd: boolean
+  paymentMethod: PaymentMethod
+  billingEmail: string
+  taxId: string
+  address: BillingAddress
+  usage: UsageBlock
+  invoices: Invoice[]
+}
+
+// ---- Settings --------------------------------------------------------------
+
+export type Theme = 'light' | 'dark' | 'system'
+export type Accent = 'teal' | 'indigo' | 'rose' | 'amber'
+export type Density = 'comfortable' | 'compact'
+
+export interface AppearanceSettings {
+  theme: Theme
+  accent: Accent
+  density: Density
+  reducedMotion: boolean
+}
+
+export type DateFormat = 'Mon DD, YYYY' | 'DD/MM/YYYY' | 'MM/DD/YYYY' | 'YYYY-MM-DD'
+export type TimeFormat = '12h' | '24h'
+
+export interface LocaleSettings {
+  language: string
+  timezone: string
+  dateFormat: DateFormat
+  timeFormat: TimeFormat
+  weekStartsOn: 'sunday' | 'monday'
+}
+
+export type ResumeTemplate = 'classic' | 'compact' | 'modern'
+export type ResumeTone = 'professional' | 'warm' | 'punchy'
+export type PageSize = 'Letter' | 'A4'
+
+export interface ResumeDefaults {
+  template: ResumeTemplate
+  tone: ResumeTone
+  includePhoto: boolean
+  includeLinks: boolean
+  pageSize: PageSize
+  autoPublish: boolean
+}
+
+export type WorkspaceRole = 'viewer' | 'editor' | 'admin'
+
+export interface WorkspaceSettings {
+  name: string
+  slug: string
+  defaultRoleForNewMembers: WorkspaceRole
+  requireSso: boolean
+}
+
+export type ApiScope = 'read' | 'write'
+
+export interface ApiToken {
+  id: string
+  name: string
+  last4: string
+  scopes: ApiScope[]
+  createdAt: string
+  lastUsedAt: string | null
+}
+
+export interface Webhook {
+  id: string
+  url: string
+  events: string[]
+  active: boolean
+  lastDeliveryAt: string | null
+}
+
+export interface Settings {
+  appearance: AppearanceSettings
+  locale: LocaleSettings
+  resumeDefaults: ResumeDefaults
+  workspace: WorkspaceSettings
+  apiTokens: ApiToken[]
+  webhooks: Webhook[]
+  legal: {
+    acceptedTermsAt: string
+    acceptedPrivacyAt: string
+  }
+}
+
+// ---- Page section descriptor used by PageShell -----------------------------
+
+import type { LucideIcon } from 'lucide-react'
+
+export interface PageNavSection {
+  id: string
+  label: string
+  icon: LucideIcon
+}
+
+// ---- Shell props -----------------------------------------------------------
+
+export interface BillingPageProps {
+  billing: Billing
+  onUpdateBilling: (patch: Partial<Billing>) => void
+}
+
+export interface SettingsPageProps {
+  settings: Settings
+  onUpdateSettings: (patch: Partial<Settings>) => void
+}

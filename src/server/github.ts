@@ -1,36 +1,8 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { getCookie } from '@tanstack/react-start/server'
 import type { GitHubInstallation, GitHubAccessibleRepo, ConnectedRepo } from '@/lib/types/github.types'
 import { requireAuth } from './auth-guard'
-
-const ADMIN_API_URL =
-  process.env['ADMIN_API_URL'] ?? 'http://admin-api.admin-api:3002'
-
-function getSessionToken(): string {
-  const token = getCookie('__session')
-  if (!token) throw new Error('Session cookie missing after auth guard')
-  return token
-}
-
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getSessionToken()
-  const res = await fetch(`${ADMIN_API_URL}/api/admin${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...(init?.headers ?? {}),
-    },
-  })
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText)
-    throw new Error(`admin-api ${res.status}: ${text}`)
-  }
-
-  return res.json() as Promise<T>
-}
+import { apiFetch } from './_api-client'
 
 export const getGitHubInstallationFn = createServerFn({ method: 'GET' }).handler(async () => {
   await requireAuth()
@@ -38,7 +10,7 @@ export const getGitHubInstallationFn = createServerFn({ method: 'GET' }).handler
     const body = await apiFetch<{ installation: GitHubInstallation }>('/github/installation')
     return body.installation
   } catch (err) {
-    if (err instanceof Error && err.message.startsWith('admin-api 404')) return null
+    if (err instanceof Error && err.message.includes('[404]')) return null
     throw err
   }
 })
@@ -108,6 +80,7 @@ export const removeConnectedRepoFn = createServerFn({ method: 'POST' })
       {
         method: 'DELETE',
         body: JSON.stringify({ repoFullName: data.repoFullName }),
+        pathTemplate: '/github/connected-repos/:repoFullName',
       },
     )
   })
