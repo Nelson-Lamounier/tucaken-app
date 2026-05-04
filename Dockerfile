@@ -57,14 +57,15 @@ COPY --from=builder --chown=startadmin:nodejs /app/node_modules ./node_modules
 # telemetry.js is a separate esbuild output (see package.json `build`); it
 # externalises @opentelemetry/* so `node --import` can register the import-
 # in-the-middle hook before server.js evaluates http/undici/fetch.
-COPY --from=builder --chown=startadmin:nodejs /app/server.js    ./server.js
-COPY --from=builder --chown=startadmin:nodejs /app/telemetry.js ./telemetry.js
+# 444 = read-only for owner + group + other; no write permission assigned.
+COPY --from=builder --chown=startadmin:nodejs --chmod=444 /app/server.js    ./server.js
+COPY --from=builder --chown=startadmin:nodejs --chmod=444 /app/telemetry.js ./telemetry.js
 
 # start.sh: conditionally preloads OTel only when OTEL_EXPORTER_OTLP_ENDPOINT
 # is set. CI has no collector → plain `node server.js`. K8s prod has the env
 # var → `node --import ./telemetry.js server.js` for full instrumentation.
-COPY --chown=startadmin:nodejs start.sh ./start.sh
-RUN chmod +x /app/start.sh
+# 555 = read+execute for owner + group + other; no write permission assigned.
+COPY --chown=startadmin:nodejs --chmod=555 start.sh ./start.sh
 
 # ESM resolution: server.js uses `import` — needs "type": "module" in chain.
 RUN echo '{"type":"module"}' > /app/package.json && chown startadmin:nodejs /app/package.json
