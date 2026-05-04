@@ -21,9 +21,11 @@ import { Route as DashboardReportsRouteImport } from './app/_dashboard.reports'
 import { Route as DashboardOverviewRouteImport } from './app/_dashboard.overview'
 import { Route as DashboardCommentsRouteImport } from './app/_dashboard.comments'
 import { Route as DashboardCalendarRouteImport } from './app/_dashboard.calendar'
+import { Route as DashboardBillingRouteImport } from './app/_dashboard.billing'
 import { Route as DashboardArticlesRouteImport } from './app/_dashboard.articles'
 import { Route as DashboardAiAgentRouteImport } from './app/_dashboard.ai-agent'
 import { Route as DashboardSplatRouteImport } from './app/_dashboard.$'
+import { Route as DashboardSettingsIndexRouteImport } from './app/_dashboard.settings.index'
 import { Route as DashboardApplicationsIndexRouteImport } from './app/_dashboard.applications.index'
 import { Route as DashboardSettingsGithubRouteImport } from './app/_dashboard.settings.github'
 import { Route as DashboardResumesNewRouteImport } from './app/_dashboard.resumes.new'
@@ -92,6 +94,11 @@ const DashboardCalendarRoute = DashboardCalendarRouteImport.update({
   path: '/calendar',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardBillingRoute = DashboardBillingRouteImport.update({
+  id: '/billing',
+  path: '/billing',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardArticlesRoute = DashboardArticlesRouteImport.update({
   id: '/articles',
   path: '/articles',
@@ -105,6 +112,11 @@ const DashboardAiAgentRoute = DashboardAiAgentRouteImport.update({
 const DashboardSplatRoute = DashboardSplatRouteImport.update({
   id: '/$',
   path: '/$',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardSettingsIndexRoute = DashboardSettingsIndexRouteImport.update({
+  id: '/settings/',
+  path: '/settings/',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardApplicationsIndexRoute =
@@ -161,6 +173,7 @@ export interface FileRoutesByFullPath {
   '/$': typeof DashboardSplatRoute
   '/ai-agent': typeof DashboardAiAgentRoute
   '/articles': typeof DashboardArticlesRoute
+  '/billing': typeof DashboardBillingRoute
   '/calendar': typeof DashboardCalendarRoute
   '/comments': typeof DashboardCommentsRoute
   '/overview': typeof DashboardOverviewRoute
@@ -175,6 +188,7 @@ export interface FileRoutesByFullPath {
   '/resumes/new': typeof DashboardResumesNewRoute
   '/settings/github': typeof DashboardSettingsGithubRoute
   '/applications/': typeof DashboardApplicationsIndexRoute
+  '/settings/': typeof DashboardSettingsIndexRoute
   '/resumes/edit/$id': typeof DashboardResumesEditIdRoute
 }
 export interface FileRoutesByTo {
@@ -185,6 +199,7 @@ export interface FileRoutesByTo {
   '/$': typeof DashboardSplatRoute
   '/ai-agent': typeof DashboardAiAgentRoute
   '/articles': typeof DashboardArticlesRoute
+  '/billing': typeof DashboardBillingRoute
   '/calendar': typeof DashboardCalendarRoute
   '/comments': typeof DashboardCommentsRoute
   '/overview': typeof DashboardOverviewRoute
@@ -199,6 +214,7 @@ export interface FileRoutesByTo {
   '/resumes/new': typeof DashboardResumesNewRoute
   '/settings/github': typeof DashboardSettingsGithubRoute
   '/applications': typeof DashboardApplicationsIndexRoute
+  '/settings': typeof DashboardSettingsIndexRoute
   '/resumes/edit/$id': typeof DashboardResumesEditIdRoute
 }
 export interface FileRoutesById {
@@ -211,6 +227,7 @@ export interface FileRoutesById {
   '/_dashboard/$': typeof DashboardSplatRoute
   '/_dashboard/ai-agent': typeof DashboardAiAgentRoute
   '/_dashboard/articles': typeof DashboardArticlesRoute
+  '/_dashboard/billing': typeof DashboardBillingRoute
   '/_dashboard/calendar': typeof DashboardCalendarRoute
   '/_dashboard/comments': typeof DashboardCommentsRoute
   '/_dashboard/overview': typeof DashboardOverviewRoute
@@ -225,6 +242,7 @@ export interface FileRoutesById {
   '/_dashboard/resumes/new': typeof DashboardResumesNewRoute
   '/_dashboard/settings/github': typeof DashboardSettingsGithubRoute
   '/_dashboard/applications/': typeof DashboardApplicationsIndexRoute
+  '/_dashboard/settings/': typeof DashboardSettingsIndexRoute
   '/_dashboard/resumes/edit/$id': typeof DashboardResumesEditIdRoute
 }
 export interface FileRouteTypes {
@@ -237,6 +255,7 @@ export interface FileRouteTypes {
     | '/$'
     | '/ai-agent'
     | '/articles'
+    | '/billing'
     | '/calendar'
     | '/comments'
     | '/overview'
@@ -251,6 +270,7 @@ export interface FileRouteTypes {
     | '/resumes/new'
     | '/settings/github'
     | '/applications/'
+    | '/settings/'
     | '/resumes/edit/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -261,6 +281,7 @@ export interface FileRouteTypes {
     | '/$'
     | '/ai-agent'
     | '/articles'
+    | '/billing'
     | '/calendar'
     | '/comments'
     | '/overview'
@@ -275,6 +296,7 @@ export interface FileRouteTypes {
     | '/resumes/new'
     | '/settings/github'
     | '/applications'
+    | '/settings'
     | '/resumes/edit/$id'
   id:
     | '__root__'
@@ -286,6 +308,7 @@ export interface FileRouteTypes {
     | '/_dashboard/$'
     | '/_dashboard/ai-agent'
     | '/_dashboard/articles'
+    | '/_dashboard/billing'
     | '/_dashboard/calendar'
     | '/_dashboard/comments'
     | '/_dashboard/overview'
@@ -300,6 +323,7 @@ export interface FileRouteTypes {
     | '/_dashboard/resumes/new'
     | '/_dashboard/settings/github'
     | '/_dashboard/applications/'
+    | '/_dashboard/settings/'
     | '/_dashboard/resumes/edit/$id'
   fileRoutesById: FileRoutesById
 }
@@ -397,6 +421,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCalendarRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/_dashboard/billing': {
+      id: '/_dashboard/billing'
+      path: '/billing'
+      fullPath: '/billing'
+      preLoaderRoute: typeof DashboardBillingRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/_dashboard/articles': {
       id: '/_dashboard/articles'
       path: '/articles'
@@ -416,6 +447,13 @@ declare module '@tanstack/react-router' {
       path: '/$'
       fullPath: '/$'
       preLoaderRoute: typeof DashboardSplatRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/_dashboard/settings/': {
+      id: '/_dashboard/settings/'
+      path: '/settings'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof DashboardSettingsIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/_dashboard/applications/': {
@@ -494,6 +532,7 @@ interface DashboardRouteChildren {
   DashboardSplatRoute: typeof DashboardSplatRoute
   DashboardAiAgentRoute: typeof DashboardAiAgentRoute
   DashboardArticlesRoute: typeof DashboardArticlesRoute
+  DashboardBillingRoute: typeof DashboardBillingRoute
   DashboardCalendarRoute: typeof DashboardCalendarRoute
   DashboardCommentsRoute: typeof DashboardCommentsRoute
   DashboardOverviewRoute: typeof DashboardOverviewRoute
@@ -506,12 +545,14 @@ interface DashboardRouteChildren {
   DashboardApplicationsNewRoute: typeof DashboardApplicationsNewRoute
   DashboardSettingsGithubRoute: typeof DashboardSettingsGithubRoute
   DashboardApplicationsIndexRoute: typeof DashboardApplicationsIndexRoute
+  DashboardSettingsIndexRoute: typeof DashboardSettingsIndexRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardSplatRoute: DashboardSplatRoute,
   DashboardAiAgentRoute: DashboardAiAgentRoute,
   DashboardArticlesRoute: DashboardArticlesRoute,
+  DashboardBillingRoute: DashboardBillingRoute,
   DashboardCalendarRoute: DashboardCalendarRoute,
   DashboardCommentsRoute: DashboardCommentsRoute,
   DashboardOverviewRoute: DashboardOverviewRoute,
@@ -525,6 +566,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardApplicationsNewRoute: DashboardApplicationsNewRoute,
   DashboardSettingsGithubRoute: DashboardSettingsGithubRoute,
   DashboardApplicationsIndexRoute: DashboardApplicationsIndexRoute,
+  DashboardSettingsIndexRoute: DashboardSettingsIndexRoute,
 }
 
 const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
