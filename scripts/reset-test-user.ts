@@ -25,8 +25,8 @@ import { fileURLToPath } from 'node:url'
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const AWS_PROFILE    = 'dev-account'
-const K8S_NAMESPACE  = 'admin-api'
-const K8S_DEPLOYMENT = 'admin-api'
+const K8S_NAMESPACE  = 'platform'
+const K8S_DEPLOYMENT = 'pgbouncer'
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), '../..')
 const ENV_LOCAL = resolve(REPO_ROOT, '.env.local')
@@ -80,7 +80,7 @@ function buildPurgeSql(email: string): string {
     `DELETE FROM resume_imports      WHERE user_id IN (SELECT id FROM users WHERE email = ${e});`,
     `DELETE FROM user_career_history WHERE user_id IN (SELECT id FROM users WHERE email = ${e});`,
     `DELETE FROM resumes             WHERE user_id IN (SELECT id FROM users WHERE email = ${e});`,
-    `DELETE FROM articles            WHERE user_id IN (SELECT id FROM users WHERE email = ${e});`,
+    `DELETE FROM articles            WHERE author_id IN (SELECT id FROM users WHERE email = ${e});`,
     `DELETE FROM job_applications    WHERE user_id IN (SELECT id FROM users WHERE email = ${e});`,
     `DELETE FROM pipeline_runs       WHERE user_id IN (SELECT id FROM users WHERE email = ${e});`,
     `DELETE FROM user_identities     WHERE user_id IN (SELECT id FROM users WHERE email = ${e});`,
@@ -100,7 +100,7 @@ function purgeRds(email: string): boolean {
       `deployment/${K8S_DEPLOYMENT}`,
       '--',
       'sh', '-c',
-      'psql "host=$PG_HOST dbname=$PG_DATABASE user=$PG_USER password=$PG_PASSWORD" -v ON_ERROR_STOP=1',
+      'psql "host=$POSTGRESQL_HOST dbname=$POSTGRESQL_DATABASE user=$POSTGRESQL_USERNAME password=$POSTGRESQL_PASSWORD" -v ON_ERROR_STOP=1',
     ],
     { input: sql, encoding: 'utf-8' },
   )
