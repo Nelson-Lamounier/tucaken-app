@@ -47,11 +47,12 @@ RUN groupadd --system --gid 1001 nodejs && \
   useradd --system --uid 1001 --gid nodejs startadmin
 
 # Vite SSR build output
-COPY --from=builder --chown=startadmin:nodejs /app/dist ./dist
+# 555 = read+execute (no write); directories need execute bit to be traversable.
+COPY --from=builder --chown=startadmin:nodejs --chmod=555 /app/dist ./dist
 
 # node_modules at /app for ESM resolution (Node ESM resolver walks the
 # directory hierarchy looking for node_modules folders).
-COPY --from=builder --chown=startadmin:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=startadmin:nodejs --chmod=555 /app/node_modules ./node_modules
 
 # Production server runner + OTel preload bundle.
 # telemetry.js is a separate esbuild output (see package.json `build`); it
@@ -68,7 +69,10 @@ COPY --from=builder --chown=startadmin:nodejs --chmod=444 /app/telemetry.js ./te
 COPY --chown=startadmin:nodejs --chmod=555 start.sh ./start.sh
 
 # ESM resolution: server.js uses `import` — needs "type": "module" in chain.
-RUN echo '{"type":"module"}' > /app/package.json && chown startadmin:nodejs /app/package.json
+# 444 = read-only; no process needs to write this file at runtime.
+RUN echo '{"type":"module"}' > /app/package.json && \
+    chown startadmin:nodejs /app/package.json && \
+    chmod 444 /app/package.json
 
 USER startadmin
 
