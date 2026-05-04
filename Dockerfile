@@ -53,8 +53,12 @@ COPY --from=builder --chown=startadmin:nodejs /app/dist ./dist
 # directory hierarchy looking for node_modules folders).
 COPY --from=builder --chown=startadmin:nodejs /app/node_modules ./node_modules
 
-# Production server runner
-COPY --from=builder --chown=startadmin:nodejs /app/server.js ./server.js
+# Production server runner + OTel preload bundle.
+# telemetry.js is a separate esbuild output (see package.json `build`); it
+# externalises @opentelemetry/* so `node --import` can register the import-
+# in-the-middle hook before server.js evaluates http/undici/fetch.
+COPY --from=builder --chown=startadmin:nodejs /app/server.js    ./server.js
+COPY --from=builder --chown=startadmin:nodejs /app/telemetry.js ./telemetry.js
 
 # ESM resolution: server.js uses `import` — needs "type": "module" in chain.
 RUN echo '{"type":"module"}' > /app/package.json && chown startadmin:nodejs /app/package.json
@@ -66,6 +70,9 @@ ENV PORT=5001
 ENV HOST="0.0.0.0"
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD node -e "import('http').then(h => h.default.get('http://localhost:' + (process.env.PORT || 5001) + '/admin/', r => process.exit(r.statusCode < 500 ? 0 : 1)))" || exit 1
+  CMD node -e "import('http').then(h => h.default.get('http://localhost:' + (process.env.PORT || 5001) + '/livez', r => process.exit(r.statusCode < 500 ? 0 : 1)))" || exit 1
 
-CMD ["node", "server.js"]
+# --import preloads OTel SDK before server.js's imports evaluate, so http
+# and undici (global fetch) get instrumented and outbound calls to
+# admin-api carry W3C traceparent automatically.
+CMD ["node", "--import", "./telemetry.js", "server.js"]
