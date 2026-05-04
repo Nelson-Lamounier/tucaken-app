@@ -75,6 +75,88 @@ local-cluster-logs:
 local-cluster-stop:
     npx tsx scripts/local-dev.ts --cluster --stop
 
+# ── CI Smoke Test ─────────────────────────────────────────────────────────────
+
+# Build image and run the Docker smoke test (mirrors ci.yml docker-build job)
+smoke-test:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    TAG="tucaken-app:ci-test"
+    CONTAINER="test-container"
+
+    fail() {
+        echo "==> Container logs:"
+        docker logs "$CONTAINER" 2>&1 || true
+        docker rm -f "$CONTAINER" 2>/dev/null || true
+        exit 1
+    }
+    trap 'docker rm -f "$CONTAINER" 2>/dev/null || true' EXIT
+
+    echo "==> Building $TAG …"
+    docker build -t "$TAG" .
+
+    echo "==> Starting container …"
+    docker run -d --name "$CONTAINER" -p 5001:5001 "$TAG"
+
+    echo "==> Waiting for server …"
+    for i in $(seq 1 30); do
+        if curl -sf --max-time 2 http://localhost:5001/sign-in > /dev/null 2>&1; then
+            echo "Server ready (attempt $i)"
+            break
+        fi
+        if [ "$i" -eq 30 ]; then
+            echo "ERROR: server did not start within 30s"
+            fail
+        fi
+        sleep 1
+    done
+
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://localhost:5001/sign-in || echo "curl_error_$?")
+    if [[ "$HTTP_CODE" =~ ^[0-9]+$ ]] && [ "$HTTP_CODE" -lt 500 ]; then
+        echo "PASS — /sign-in returned $HTTP_CODE"
+    else
+        echo "FAIL — /sign-in returned '$HTTP_CODE' (expected HTTP < 500)"
+        fail
+    fi
+
+# Same but skip the Docker build (use cached image)
+smoke-test-fast:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    CONTAINER="test-container"
+
+    fail() {
+        echo "==> Container logs:"
+        docker logs "$CONTAINER" 2>&1 || true
+        docker rm -f "$CONTAINER" 2>/dev/null || true
+        exit 1
+    }
+    trap 'docker rm -f "$CONTAINER" 2>/dev/null || true' EXIT
+
+    echo "==> Starting container (cached image) …"
+    docker run -d --name "$CONTAINER" -p 5001:5001 tucaken-app:ci-test
+
+    echo "==> Waiting for server …"
+    for i in $(seq 1 30); do
+        if curl -sf --max-time 2 http://localhost:5001/sign-in > /dev/null 2>&1; then
+            echo "Server ready (attempt $i)"
+            break
+        fi
+        if [ "$i" -eq 30 ]; then
+            echo "ERROR: server did not start within 30s"
+            fail
+        fi
+        sleep 1
+    done
+
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://localhost:5001/sign-in || echo "curl_error_$?")
+    if [[ "$HTTP_CODE" =~ ^[0-9]+$ ]] && [ "$HTTP_CODE" -lt 500 ]; then
+        echo "PASS — /sign-in returned $HTTP_CODE"
+    else
+        echo "FAIL — /sign-in returned '$HTTP_CODE' (expected HTTP < 500)"
+        fail
+    fi
+
 # ── Test User ─────────────────────────────────────────────────────────────────
 
 # Create a role=user test account in Cognito (run once; credentials saved to .env.local)
