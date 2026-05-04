@@ -226,18 +226,22 @@ jobs:
           set -euo pipefail
           ROLLOUT="tucaken-app"
           NAMESPACE="tucaken-app"
+          # Budget: 40 × 15s = 10 min.
+          # Image Updater scan interval (~2 min) + git write-back (~15s)
+          # + ArgoCD reconcile (~30s) = ~3 min typical; 10 min absorbs
+          # repo-server restarts and git clone cold-starts.
           echo "Waiting for ArgoCD to reconcile image: *${IMAGE_TAG_ENV}*"
-          for i in $(seq 1 20); do
+          for i in $(seq 1 40); do
             SPEC_IMAGE=$(kubectl get rollout "$ROLLOUT" -n "$NAMESPACE" \
               -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "<not found>")
-            echo "[attempt ${i}/20] spec image: ${SPEC_IMAGE}"
+            echo "[attempt ${i}/40] spec image: ${SPEC_IMAGE}"
             if [[ "$SPEC_IMAGE" == *"$IMAGE_TAG_ENV"* ]]; then
               echo "ArgoCD synced"
               break
             fi
-            [[ "$i" -eq 20 ]] && {
-              echo "FAIL: ArgoCD did not sync within 5 min"
-              kubectl describe application -n argocd 2>/dev/null || true
+            [[ "$i" -eq 40 ]] && {
+              echo "FAIL: ArgoCD did not sync within 10 min"
+              kubectl describe application -n argocd tucaken-app 2>/dev/null || true
               exit 1
             }
             sleep 15
