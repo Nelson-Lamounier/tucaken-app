@@ -145,14 +145,13 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
   res.setHeader('x-request-id', requestId);
 
   // Record RED on response close — covers static + SSR + observability paths.
-  res.on('close', () => {
+  res.on('finish', () => {
     const durationSec = Number(process.hrtime.bigint() - start) / 1e9;
     const route = classifyRoute(req.url ?? '/');
     const method = req.method ?? 'GET';
     const status = String(res.statusCode);
     ssrRequestsTotal.inc({ method, route, status_code: status });
     ssrRequestDurationSeconds.observe({ method, route, status_code: status }, durationSec);
-    res.setHeader?.('Server-Timing', `app;dur=${(durationSec * 1000).toFixed(1)}`);
     const lvl = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info';
     logger[lvl]({
       method, route, status: res.statusCode,
