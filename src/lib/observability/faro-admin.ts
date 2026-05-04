@@ -66,9 +66,14 @@ export function initialiseFaroAdmin(): Faro | null {
         // Client-side tracing → forwarded to Tempo via Alloy OTLP
         new TracingInstrumentation({
           instrumentationOptions: {
-            // Propagate trace context to same-origin API calls
+            // Propagate trace context (traceparent/tracestate) so the SSR
+            // Node process continues the browser's trace, and so does
+            // admin-api on the next hop. Tempo then renders one waterfall
+            // for browser → SSR → admin-api → pg.
             propagateTraceHeaderCorsUrls: [
               /^https:\/\/.*\.nelsonlamounier\.com/,
+              /^https:\/\/(www\.)?tucaken\.(io|com)/,
+              /^http:\/\/localhost(:\d+)?/,
             ],
           },
         }),
