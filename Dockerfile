@@ -60,6 +60,12 @@ COPY --from=builder --chown=startadmin:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=startadmin:nodejs /app/server.js    ./server.js
 COPY --from=builder --chown=startadmin:nodejs /app/telemetry.js ./telemetry.js
 
+# start.sh: conditionally preloads OTel only when OTEL_EXPORTER_OTLP_ENDPOINT
+# is set. CI has no collector → plain `node server.js`. K8s prod has the env
+# var → `node --import ./telemetry.js server.js` for full instrumentation.
+COPY --chown=startadmin:nodejs start.sh ./start.sh
+RUN chmod +x /app/start.sh
+
 # ESM resolution: server.js uses `import` — needs "type": "module" in chain.
 RUN echo '{"type":"module"}' > /app/package.json && chown startadmin:nodejs /app/package.json
 
@@ -72,7 +78,4 @@ ENV HOST="0.0.0.0"
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD node -e "import('http').then(h => h.default.get('http://localhost:' + (process.env.PORT || 5001) + '/livez', r => process.exit(r.statusCode < 500 ? 0 : 1)))" || exit 1
 
-# --import preloads OTel SDK before server.js's imports evaluate, so http
-# and undici (global fetch) get instrumented and outbound calls to
-# admin-api carry W3C traceparent automatically.
-CMD ["node", "--import", "./telemetry.js", "server.js"]
+CMD ["/bin/sh", "./start.sh"]
