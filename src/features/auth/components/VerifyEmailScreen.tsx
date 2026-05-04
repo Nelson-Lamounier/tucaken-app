@@ -1,5 +1,6 @@
 "use client"
 // src/features/auth/components/VerifyEmailScreen.tsx
+import { useState } from 'react'
 import { motion } from 'motion/react'
 import { Mail, ArrowLeft } from 'lucide-react'
 
@@ -7,9 +8,34 @@ interface VerifyEmailScreenProps {
   email: string
   onBack: () => void
   onResend?: () => void | Promise<void>
+  onConfirm?: (code: string) => Promise<void>
 }
 
-export function VerifyEmailScreen({ email, onBack, onResend }: VerifyEmailScreenProps) {
+export function VerifyEmailScreen({ email, onBack, onResend, onConfirm }: VerifyEmailScreenProps) {
+  const [code, setCode] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleConfirm = async () => {
+    if (!code.trim() || !onConfirm) return
+    setError(null)
+    setSubmitting(true)
+    try {
+      await onConfirm(code.trim())
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Verification failed')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleResend = async () => {
+    if (!onResend) return
+    setResending(true)
+    try { await onResend() } finally { setResending(false) }
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -36,22 +62,57 @@ export function VerifyEmailScreen({ email, onBack, onResend }: VerifyEmailScreen
           Verify your email
         </h2>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          We sent a verification link to
+          We sent a 6-digit code to
           <br />
           <span className="font-medium text-zinc-700 dark:text-zinc-200">{email}</span>
         </p>
       </div>
 
-      <motion.button
-        type="button"
-        whileHover={{ scale: 1.01 }}
-        whileTap={{ scale: 0.98 }}
-        onClick={onResend}
-        className="flex h-11 w-full items-center justify-center rounded-xl border border-zinc-200/80 bg-white/70 text-sm font-medium text-zinc-700 backdrop-blur-md transition-colors hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-zinc-200 dark:hover:bg-white/10"
-        style={{ willChange: 'transform' }}
-      >
-        Resend verification email
-      </motion.button>
+      <div className="space-y-3">
+        <input
+          type="text"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={6}
+          placeholder="000000"
+          value={code}
+          onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+          className="w-full rounded-xl border border-zinc-200/80 bg-white/70 px-4 py-3 text-center text-2xl font-semibold tracking-[0.5em] text-zinc-900 placeholder-zinc-300 backdrop-blur-md outline-none transition-colors focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 dark:border-white/10 dark:bg-white/5 dark:text-white dark:placeholder-zinc-600"
+          onKeyDown={(e) => e.key === 'Enter' && handleConfirm()}
+        />
+
+        {error && (
+          <p className="text-center text-xs font-medium text-red-500">{error}</p>
+        )}
+
+        <motion.button
+          type="button"
+          disabled={code.length < 6 || submitting}
+          onClick={handleConfirm}
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.98 }}
+          className="group relative flex h-11 w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 text-sm font-semibold text-white shadow-lg shadow-teal-500/25 transition-shadow hover:shadow-xl hover:shadow-teal-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+          style={{ willChange: 'transform' }}
+        >
+          {submitting ? (
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+          ) : (
+            'Verify account'
+          )}
+        </motion.button>
+
+        <motion.button
+          type="button"
+          disabled={resending}
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={handleResend}
+          className="flex h-11 w-full items-center justify-center rounded-xl border border-zinc-200/80 bg-white/70 text-sm font-medium text-zinc-700 backdrop-blur-md transition-colors hover:bg-white disabled:opacity-60 dark:border-white/10 dark:bg-white/5 dark:text-zinc-200 dark:hover:bg-white/10"
+          style={{ willChange: 'transform' }}
+        >
+          {resending ? 'Sending…' : 'Resend code'}
+        </motion.button>
+      </div>
 
       <p className="text-center text-xs text-zinc-500 dark:text-zinc-400">
         Wrong address?{' '}

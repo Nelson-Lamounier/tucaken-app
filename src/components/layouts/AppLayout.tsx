@@ -35,6 +35,7 @@ import {
 import { Link } from "@tanstack/react-router";
 import { HeaderNav } from "../ui/HeaderNav";
 import { PipelineNotificationWatcher } from "../ui/PipelineNotificationWatcher";
+import type { MeResponse } from "@/server/me";
 import avatarImage from "@/images/avatar.jpg";
 import logo from "@/images/logo.png";
 
@@ -111,6 +112,8 @@ function classNames(...classes: (string | undefined | null | false)[]): string {
 interface AppLayoutProps {
   /** Page content rendered in the main area. */
   children: React.ReactNode;
+  /** Current user data from the dashboard route context. */
+  me?: MeResponse;
   /**
    * When `true`, skips wrapping `children` in the default `<main>` padding shell.
    * Useful for full-bleed pages (e.g. data-table views).
@@ -135,6 +138,7 @@ interface AppLayoutProps {
  */
 export default function AppLayout({
   children,
+  me,
   disableMainWrapper = false,
 }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -147,7 +151,7 @@ export default function AppLayout({
     let targetUrl = "/sign-in";
     try {
       const { logoutFn } = await import("@/server/auth");
-      const res = await logoutFn();
+      const res = await logoutFn({ data: { appOrigin: globalThis.location?.origin } });
       if (res?.logoutUrl) {
         targetUrl = res.logoutUrl;
       }
@@ -210,7 +214,7 @@ export default function AppLayout({
                 <nav className="relative flex flex-1 flex-col">
                   <SidebarNavList />
                   <SidebarObservability />
-                  <SidebarFooter onSignOut={handleSignOut} />
+                  <SidebarFooter onSignOut={handleSignOut} me={me} />
                 </nav>
               </div>
             </DialogPanel>
@@ -243,8 +247,9 @@ export default function AppLayout({
           <HeaderNav
             onOpenSidebar={() => setSidebarOpen(true)}
             onSignOut={handleSignOut}
-            userAvatar={avatarImage as unknown as string}
-            userEmail="admin@nelsonlamounier.com"
+            userAvatar={me?.avatarUrl ?? (avatarImage as unknown as string)}
+            userEmail={me?.email}
+            userName={me?.name}
           />
 
           {disableMainWrapper ? (
@@ -413,7 +418,7 @@ function SidebarObservability() {
  *
  * @param props.onSignOut - Sign-out callback.
  */
-function SidebarFooter({ onSignOut }: { onSignOut: () => void }) {
+function SidebarFooter({ onSignOut, me }: { onSignOut: () => void; me?: MeResponse }) {
   return (
     <li className="-mx-6 mt-6">
       {/* Back to site */}
@@ -433,16 +438,16 @@ function SidebarFooter({ onSignOut }: { onSignOut: () => void }) {
       {/* User row */}
       <div className="flex items-center gap-x-4 border-t border-zinc-200 dark:border-zinc-700/50 px-6 py-3">
         <img
-          alt="Admin avatar"
-          src={avatarImage as unknown as string}
+          alt="User avatar"
+          src={me?.avatarUrl ?? (avatarImage as unknown as string)}
           className="size-8 shrink-0 rounded-full bg-zinc-100 dark:bg-zinc-800 ring-1 ring-zinc-200 dark:ring-zinc-700"
         />
         <div className="flex-1 min-w-0">
           <p className="truncate text-sm/6 font-medium text-zinc-900 dark:text-white">
-            Admin
+            {me?.name ?? me?.email?.split('@')[0] ?? 'User'}
           </p>
           <p className="truncate text-xs text-zinc-500 dark:text-zinc-500">
-            admin@nelsonlamounier.com
+            {me?.email ?? ''}
           </p>
         </div>
         <button

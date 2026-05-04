@@ -23,8 +23,10 @@ export const Route = createFileRoute('/sign-in/callback')({
       throw redirect({ to: '/sign-in' })
     }
 
+    let isNewUser = false
     try {
-      await handleAuthCallbackFn({ data: { code: search.code, state: search.state } })
+      const result = await handleAuthCallbackFn({ data: { code: search.code, state: search.state } })
+      isNewUser = result.isNewUser
     } catch (err: unknown) {
       if (
         typeof err === 'object' &&
@@ -44,11 +46,13 @@ export const Route = createFileRoute('/sign-in/callback')({
       throw redirect({ to: '/sign-in' })
     }
 
+    const destination = isNewUser ? '/onboarding' : '/overview'
+
     if (typeof window !== 'undefined') {
-      globalThis.window.location.href = '/overview'
+      globalThis.window.location.href = destination
       await new Promise<void>(() => {})
     }
-    throw redirect({ to: '/overview' })
+    throw redirect({ to: destination })
   },
   component: () => (
     <div className="flex h-screen w-full items-center justify-center bg-zinc-950 text-white">

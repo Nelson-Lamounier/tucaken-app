@@ -7,7 +7,7 @@ export const emailSchema = z
   .email('Enter a valid email address')
 
 export const passwordRules = [
-  { id: 'len', label: 'At least 8 characters', test: (v: string) => v.length >= 8 },
+  { id: 'len', label: 'At least 12 characters', test: (v: string) => v.length >= 12 },
   { id: 'upper', label: 'One uppercase letter', test: (v: string) => /[A-Z]/.test(v) },
   { id: 'lower', label: 'One lowercase letter', test: (v: string) => /[a-z]/.test(v) },
   { id: 'num', label: 'One number', test: (v: string) => /\d/.test(v) },
@@ -39,7 +39,7 @@ export const signUpSchema = z
     email: emailSchema,
     password: z
       .string()
-      .min(8, 'Password must be at least 8 characters')
+      .min(12, 'Password must be at least 12 characters')
       .regex(/[A-Z]/, 'Add an uppercase letter')
       .regex(/[a-z]/, 'Add a lowercase letter')
       .regex(/\d/, 'Add a number')

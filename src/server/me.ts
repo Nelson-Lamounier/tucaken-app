@@ -25,6 +25,8 @@ export interface MeResponse {
   email:     string
   name?:     string
   avatarUrl?: string
+  /** True only on the first-ever sign-in — authoritative signal from the DB insert. */
+  isNew:     boolean
   plan: {
     plan:                 string
     effectivePlan:        'pro' | 'trial' | 'free'

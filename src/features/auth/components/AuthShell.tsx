@@ -18,6 +18,9 @@ interface AuthShellProps {
   /** Return 'otp' to trigger MFA view, throw to show an error banner */
   onSignIn?: (v: { email: string; password: string }) => Promise<'otp' | void>
   onSignUp?: (v: { email: string; name: string; password: string }) => Promise<void>
+  /** Called with the 6-digit code after sign-up — should sign the user in and resolve */
+  onConfirmSignUp?: (email: string, code: string, password: string) => Promise<void>
+  onResendCode?: (email: string) => Promise<void>
   onOtp?: (code: string) => Promise<void>
   onRequestPasswordCode?: (email: string) => Promise<void>
   onConfirmPassword?: (email: string, code: string, newPassword: string) => Promise<void>
@@ -31,6 +34,8 @@ export function AuthShell({
   initial = 'signin',
   onSignIn,
   onSignUp,
+  onConfirmSignUp,
+  onResendCode,
   onOtp,
   onRequestPasswordCode,
   onConfirmPassword,
@@ -40,6 +45,7 @@ export function AuthShell({
 }: AuthShellProps) {
   const [view, setView] = useState<View>(initial)
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [signInError, setSignInError] = useState<string | null>(null)
 
   useEffect(() => { setSignInError(null) }, [view])
@@ -134,6 +140,7 @@ export function AuthShell({
                 onSwitchToSignIn={() => setView('signin')}
                 onSubmit={async (v) => {
                   setEmail(v.email)
+                  setPassword(v.password)
                   await onSignUp?.(v)
                   setView('verify')
                 }}
@@ -150,7 +157,15 @@ export function AuthShell({
               />
             )}
             {view === 'otp' && <OtpForm key="otp" onBack={() => setView('signin')} onSubmit={onOtp} />}
-            {view === 'verify' && <VerifyEmailScreen key="verify" email={email} onBack={() => setView('signup')} />}
+            {view === 'verify' && (
+              <VerifyEmailScreen
+                key="verify"
+                email={email}
+                onBack={() => setView('signup')}
+                onResend={() => onResendCode?.(email)}
+                onConfirm={(code) => onConfirmSignUp?.(email, code, password) ?? Promise.resolve()}
+              />
+            )}
           </AnimatePresence>
         </motion.div>
 

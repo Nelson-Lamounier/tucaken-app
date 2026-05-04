@@ -16,6 +16,8 @@ interface HeaderNavProps {
   userAvatar?: string
   /** Email address displayed in the profile dropdown. */
   userEmail?: string
+  /** Display name shown next to avatar in the header. */
+  userName?: string
 }
 
 /**
@@ -31,7 +33,7 @@ interface HeaderNavProps {
  *
  * @param props - {@link HeaderNavProps}
  */
-export function HeaderNav({ onOpenSidebar, onSignOut, userAvatar, userEmail }: HeaderNavProps) {
+export function HeaderNav({ onOpenSidebar, onSignOut, userAvatar, userEmail, userName }: HeaderNavProps) {
   const { theme, toggleTheme } = useTheme()
 
   return (
@@ -89,7 +91,7 @@ export function HeaderNav({ onOpenSidebar, onSignOut, userAvatar, userEmail }: H
               />
               <span className="hidden lg:flex lg:items-center">
                 <span className="ml-4 text-sm font-semibold leading-6 text-zinc-900 dark:text-zinc-100" aria-hidden="true">
-                  Admin User
+                  {userName ?? userEmail?.split('@')[0] ?? 'User'}
                 </span>
               </span>
             </MenuButton>
@@ -105,7 +107,7 @@ export function HeaderNav({ onOpenSidebar, onSignOut, userAvatar, userEmail }: H
               <MenuItems className="absolute right-0 z-10 mt-2.5 w-48 origin-top-right rounded-lg bg-white dark:bg-zinc-800 py-2 shadow-lg ring-1 ring-zinc-200 dark:ring-zinc-700/50 focus:outline-none">
                 <div className="px-3 py-2 border-b border-zinc-100 dark:border-zinc-700/50 mb-1">
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
-                    {userEmail || 'admin@nelsonlamounier.com'}
+                    {userEmail ?? ''}
                   </p>
                 </div>
                 <MenuItem>

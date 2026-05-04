@@ -21,11 +21,15 @@ export const Route = createFileRoute('/_dashboard')({
     let me: MeResponse
     try {
       me = await getMeFn()
-    } catch {
-      throw redirect({
-        to: '/sign-in',
-        search: { callbackUrl: location.href },
-      })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.error('[dashboard] getMeFn failed:', msg)
+      // Only redirect to sign-in on auth errors — other failures (network, 5xx)
+      // should surface as errors rather than silently dropping the session.
+      if (msg.includes('401') || msg.includes('No session') || msg.includes('Session expired')) {
+        throw redirect({ to: '/sign-in', search: { callbackUrl: location.href } })
+      }
+      throw redirect({ to: '/sign-in', search: { callbackUrl: location.href } })
     }
 
     return { me }
@@ -34,11 +38,12 @@ export const Route = createFileRoute('/_dashboard')({
 })
 
 function DashboardLayout() {
+  const { me } = Route.useRouteContext()
   const matches = useMatches()
   const disableMainWrapper = matches.some((match) => (match.staticData as { disableMainWrapper?: boolean })?.disableMainWrapper)
 
   return (
-    <AppLayout disableMainWrapper={disableMainWrapper}>
+    <AppLayout me={me} disableMainWrapper={disableMainWrapper}>
       <Outlet />
     </AppLayout>
   )
