@@ -188,11 +188,12 @@ jobs:
     name: Promote Rollout
     needs: [deploy]
     runs-on: k8s-runner
-    timeout-minutes: 15
+    timeout-minutes: 20
     environment: development
     permissions:
       id-token: write
       contents: read
+      deployments: write
     steps:
       - uses: actions/checkout@v4
 
@@ -214,7 +215,10 @@ jobs:
             > /tmp/kubeconfig
           chmod 600 /tmp/kubeconfig
 
-      - name: Wait for ArgoCD Sync + Promote Rollout
+      # ── 1. ArgoCD sync ───────────────────────────────────────────────────────
+      # Separate step so you can tell at a glance in the GitHub UI whether a
+      # hang is ArgoCD not reconciling vs. the rollout itself stalling.
+      - name: Wait for ArgoCD sync
         env:
           KUBECONFIG: /tmp/kubeconfig
           IMAGE_TAG_ENV: ${{ env.IMAGE_TAG }}
@@ -222,44 +226,129 @@ jobs:
           set -euo pipefail
           ROLLOUT="tucaken-app"
           NAMESPACE="tucaken-app"
-
+          echo "Waiting for ArgoCD to reconcile image: *${IMAGE_TAG_ENV}*"
           for i in $(seq 1 20); do
             SPEC_IMAGE=$(kubectl get rollout "$ROLLOUT" -n "$NAMESPACE" \
-              -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "")
+              -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "<not found>")
+            echo "[attempt ${i}/20] spec image: ${SPEC_IMAGE}"
             if [[ "$SPEC_IMAGE" == *"$IMAGE_TAG_ENV"* ]]; then
-              echo "[PASS] ArgoCD synced new image: $SPEC_IMAGE"
+              echo "ArgoCD synced"
               break
             fi
-            [[ "$i" -eq 20 ]] && { echo "[FAIL] ArgoCD did not sync within 5 min"; exit 1; }
+            [[ "$i" -eq 20 ]] && {
+              echo "FAIL: ArgoCD did not sync within 5 min"
+              kubectl describe application -n argocd 2>/dev/null || true
+              exit 1
+            }
             sleep 15
           done
 
+      # ── 2. Pre-promotion snapshot ─────────────────────────────────────────────
+      # Full rollout state (ReplicaSets, canary steps, analysis) before promote.
+      - name: Snapshot rollout state
+        env:
+          KUBECONFIG: /tmp/kubeconfig
+        run: kubectl argo rollouts get rollout tucaken-app -n tucaken-app
+
+      # ── 3. Wait for Paused phase then promote ─────────────────────────────────
+      # Argo Rollouts pauses at the canary step boundary while pre-promotion
+      # analysis runs. Prints phase + status message each attempt so you can
+      # see exactly what the rollout controller is waiting on.
+      - name: Wait for pre-promotion pause and promote
+        env:
+          KUBECONFIG: /tmp/kubeconfig
+        run: |
+          set -euo pipefail
+          ROLLOUT="tucaken-app"
+          NAMESPACE="tucaken-app"
           for i in $(seq 1 24); do
             PHASE=$(kubectl get rollout "$ROLLOUT" -n "$NAMESPACE" \
-              -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
-            echo "[INFO] Rollout phase: ${PHASE:-unknown}"
-            [[ "$PHASE" == "Paused" ]] && { echo "[PASS] Rollout Paused"; break; }
-            [[ "$PHASE" == "Healthy" ]] && { echo "[INFO] Already Healthy — no promotion needed"; exit 0; }
+              -o jsonpath='{.status.phase}' 2>/dev/null || echo "unknown")
+            MESSAGE=$(kubectl get rollout "$ROLLOUT" -n "$NAMESPACE" \
+              -o jsonpath='{.status.message}' 2>/dev/null || echo "")
+            echo "[attempt ${i}/24] phase=${PHASE}${MESSAGE:+ | ${MESSAGE}}"
+            [[ "$PHASE" == "Paused" ]] && { echo "Rollout paused — promoting"; break; }
+            [[ "$PHASE" == "Healthy" ]] && { echo "Already Healthy — no promotion needed"; exit 0; }
             [[ "$PHASE" == "Degraded" || "$PHASE" == "Error" ]] && {
-              echo "[FAIL] Rollout ${PHASE} — pre-promotion analysis likely failed"; exit 1;
+              echo "FAIL: rollout entered ${PHASE} before promotion"
+              kubectl argo rollouts get rollout "$ROLLOUT" -n "$NAMESPACE"
+              exit 1
             }
-            [[ "$i" -eq 24 ]] && { echo "[FAIL] Rollout did not pause within 6 min (phase: ${PHASE:-unknown})"; exit 1; }
+            [[ "$i" -eq 24 ]] && {
+              echo "FAIL: rollout did not pause within 6 min (phase=${PHASE})"
+              kubectl argo rollouts get rollout "$ROLLOUT" -n "$NAMESPACE"
+              exit 1
+            }
             sleep 15
           done
-
           kubectl argo rollouts promote "$ROLLOUT" -n "$NAMESPACE"
+          echo "Promote issued"
 
-          for i in $(seq 1 12); do
-            PHASE=$(kubectl get rollout "$ROLLOUT" -n "$NAMESPACE" \
-              -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
-            echo "[INFO] Rollout phase: ${PHASE:-unknown}"
-            [[ "$PHASE" == "Healthy" ]] && { echo "[PASS] Healthy"; exit 0; }
-            [[ "$PHASE" == "Degraded" || "$PHASE" == "Error" ]] && {
-              echo "[FAIL] Rollout ${PHASE} after promotion"; exit 1;
-            }
-            sleep 10
+      # ── 4. Watch rollout to Healthy ───────────────────────────────────────────
+      # `kubectl argo rollouts status` streams live output (step transitions,
+      # replica counts, analysis results) rather than a silent sleep loop.
+      # Exits 0 on Healthy, non-0 on Degraded or timeout.
+      - name: Watch rollout to Healthy
+        env:
+          KUBECONFIG: /tmp/kubeconfig
+        run: |
+          set -euo pipefail
+          kubectl argo rollouts status tucaken-app -n tucaken-app --timeout 10m
+          echo "Rollout Healthy"
+
+      # ── 5. Diagnostics on failure ─────────────────────────────────────────────
+      # Fires automatically on any step failure. Dumps rollout detail, events,
+      # pod state, recent logs, and analysis runs — everything needed to diagnose
+      # without direct cluster access. Also posts a failure status to the GitHub
+      # Environments tab via the ARC GitHub App token.
+      - name: Dump diagnostics
+        if: failure()
+        env:
+          KUBECONFIG: /tmp/kubeconfig
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          GH_SHA: ${{ github.sha }}
+        run: |
+          ROLLOUT="tucaken-app"
+          NAMESPACE="tucaken-app"
+
+          echo "──────────────── rollout detail ────────────────"
+          kubectl argo rollouts get rollout "$ROLLOUT" -n "$NAMESPACE" || true
+
+          echo "──────────────── rollout events ────────────────"
+          kubectl get events -n "$NAMESPACE" \
+            --field-selector "involvedObject.name=${ROLLOUT}" \
+            --sort-by='.lastTimestamp' || true
+
+          echo "──────────────── pods ──────────────────────────"
+          kubectl get pods -n "$NAMESPACE" -o wide || true
+
+          echo "──────────────── recent pod logs (last 50 lines) ───────────────"
+          for POD in $(kubectl get pods -n "$NAMESPACE" \
+            -l "app.kubernetes.io/name=${ROLLOUT}" \
+            -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+            echo "--- ${POD} ---"
+            kubectl logs "$POD" -n "$NAMESPACE" --tail=50 2>/dev/null || true
           done
-          echo "[WARN] Rollout still converging after promotion — ArgoCD will continue managing it"
+
+          echo "──────────────── analysis runs ─────────────────"
+          kubectl get analysisrun -n "$NAMESPACE" \
+            --sort-by='.metadata.creationTimestamp' 2>/dev/null | tail -5 || true
+
+          # Post failure status to GitHub Environments tab via ARC GitHub App token.
+          DEPLOY_ID=$(gh api "/repos/${GH_REPO}/deployments" \
+            --jq ".[] | select(.sha == \"${GH_SHA}\" and .environment == \"development\") | .id" \
+            2>/dev/null | head -1 || echo "")
+          if [ -n "$DEPLOY_ID" ]; then
+            gh api \
+              --method POST \
+              -H "Accept: application/vnd.github+json" \
+              "/repos/${GH_REPO}/deployments/${DEPLOY_ID}/statuses" \
+              -f state=failure \
+              -f description="Rollout did not become Healthy — see Actions log" \
+              -f environment=development \
+              2>/dev/null || true
+          fi
 
   invalidate:
     name: Invalidate CloudFront cache
