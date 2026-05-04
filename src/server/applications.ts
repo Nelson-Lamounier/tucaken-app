@@ -14,7 +14,6 @@
 
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { getCookie } from '@tanstack/react-start/server'
 import type {
   ApplicationSummary,
   ApplicationStatus,
@@ -22,61 +21,7 @@ import type {
 } from '@/lib/types/applications.types'
 import type { ResumeData } from '@/lib/resumes/resume-data'
 import { requireAuth } from './auth-guard'
-
-// =============================================================================
-// Constants
-// =============================================================================
-
-const ADMIN_API_URL =
-  process.env['ADMIN_API_URL'] ?? 'http://admin-api.admin-api:3002'
-
-// =============================================================================
-// Helpers
-// =============================================================================
-
-/**
- * Returns the raw Cognito JWT from the `__session` cookie.
- *
- * The token is forwarded as-is to admin-api, which re-validates it
- * against the Cognito JWKS endpoint.
- *
- * @returns JWT string
- * @throws {Error} If the `__session` cookie is absent (should not occur after requireAuth())
- */
-function getSessionToken(): string {
-  const token = getCookie('__session')
-  if (!token) {
-    throw new Error('Session cookie missing after auth guard — this should not happen')
-  }
-  return token
-}
-
-/**
- * Performs an authenticated fetch to the admin-api BFF.
- *
- * @param path - Path relative to `/api/admin` (e.g. `/applications`)
- * @param init - Standard RequestInit options
- * @returns Parsed JSON response body
- * @throws Error if the response status is not OK
- */
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getSessionToken()
-  const res = await fetch(`${ADMIN_API_URL}/api/admin${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...(init?.headers ?? {}),
-    },
-  })
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText)
-    throw new Error(`admin-api ${res.status}: ${text}`)
-  }
-
-  return res.json() as Promise<T>
-}
+import { apiFetch } from './_api-client'
 
 // =============================================================================
 // Input Schemas
@@ -112,6 +57,7 @@ export const getApplicationsFn = createServerFn({ method: 'GET' })
     const qs = data.status !== 'all' ? `?status=${encodeURIComponent(data.status)}` : ''
     const body = await apiFetch<{ applications: ApplicationSummary[]; count: number }>(
       `/applications${qs}`,
+      { pathTemplate: '/applications' },
     )
     return body.applications
   })
@@ -129,6 +75,7 @@ export const getApplicationDetailFn = createServerFn({ method: 'GET' })
 
     const body = await apiFetch<{ application: ApplicationDetail }>(
       `/applications/${encodeURIComponent(slug)}`,
+      { pathTemplate: '/applications/:slug' },
     )
     return body.application
   })
@@ -146,7 +93,7 @@ export const deleteApplicationFn = createServerFn({ method: 'POST' })
 
     await apiFetch<{ deleted: boolean; slug: string }>(
       `/applications/${encodeURIComponent(slug)}`,
-      { method: 'DELETE' },
+      { method: 'DELETE', pathTemplate: '/applications/:slug' },
     )
     return { success: true }
   })
@@ -172,6 +119,7 @@ export const updateApplicationStatusFn = createServerFn({ method: 'POST' })
           status: data.status,
           interviewStage: data.interviewStage,
         }),
+        pathTemplate: '/applications/:slug/status',
       },
     )
     return { success: body.success, status: body.status }
@@ -203,6 +151,7 @@ export const getExecutionStatusFn = createServerFn({ method: 'GET' })
 
     const body = await apiFetch<ExecutionStatus>(
       `/applications/${encodeURIComponent(slug)}/execution`,
+      { pathTemplate: '/applications/:slug/execution' },
     )
     return body
   })
@@ -242,6 +191,7 @@ export const getTailoredResumesFn = createServerFn({ method: 'GET' }).handler(as
     candidates.map((app) =>
       apiFetch<{ application: ApplicationDetail }>(
         `/applications/${encodeURIComponent(app.slug)}`,
+        { pathTemplate: '/applications/:slug' },
       ),
     ),
   )

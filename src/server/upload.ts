@@ -15,16 +15,13 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import { getCookie } from '@tanstack/react-start/server'
 import { requireAuth } from './auth-guard'
+import { apiFetch } from './_api-client'
 import { z } from 'zod'
 
 // =============================================================================
 // Constants
 // =============================================================================
-
-const ADMIN_API_URL =
-  process.env['ADMIN_API_URL'] ?? 'http://admin-api.admin-api:3002'
 
 const PRODUCTION_DOMAIN = 'https://nelsonlamounier.com'
 
@@ -46,55 +43,6 @@ const ALLOWED_MIME_TYPES: ReadonlySet<string> = new Set(Object.keys(MIME_TO_EXTE
 // =============================================================================
 // Helpers
 // =============================================================================
-
-/**
- * Returns the raw Cognito JWT from the `__session` cookie.
- *
- * @returns JWT string
- * @throws {Error} If the `__session` cookie is absent
- */
-function getSessionToken(): string {
-  const token = getCookie('__session')
-  if (!token) {
-    throw new Error('Session cookie missing after auth guard — this should not happen')
-  }
-  return token
-}
-
-/**
- * Performs an authenticated fetch to the admin-api BFF.
- *
- * @param path - Full path on admin-api (e.g. `/api/admin/assets/presign`)
- * @param init - Standard RequestInit options
- * @returns Parsed JSON response body
- * @throws {Error} If the response status is not OK
- */
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getSessionToken()
-  const res = await fetch(`${ADMIN_API_URL}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...(init?.headers ?? {}),
-    },
-  })
-
-  if (!res.ok) {
-    let detail = ''
-    try {
-      const body = (await res.json()) as { error?: string }
-      detail = body.error ? ` — ${body.error}` : ''
-    } catch {
-      // ignore parse failures
-    }
-    throw new Error(
-      `admin-api ${init?.method ?? 'GET'} ${path} failed [${res.status}]${detail}`,
-    )
-  }
-
-  return res.json() as Promise<T>
-}
 
 /**
  * Maps a MIME type to its file extension.
@@ -181,7 +129,7 @@ export const uploadMediaFn = createServerFn({ method: 'POST' })
       url: string
       key: string
       expiresIn: number
-    }>('/api/admin/assets/presign', {
+    }>('/assets/presign', {
       method: 'POST',
       body: JSON.stringify({
         key: s3Key,

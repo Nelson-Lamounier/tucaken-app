@@ -13,6 +13,13 @@ import { createReadStream, statSync } from 'fs';
 import { extname, join } from 'path';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
+import { randomUUID } from 'crypto';
+import { logger } from '../lib/observability/logger';
+import {
+  registry,
+  ssrRequestsTotal,
+  ssrRequestDurationSeconds,
+} from '../lib/observability/metrics';
 
 // ---------------------------------------------------------------------------
 // SSR server export type
@@ -133,8 +140,43 @@ interface NodeRequestInit extends RequestInit {
 }
 
 const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+  const start = process.hrtime.bigint();
+  const requestId = (req.headers['x-request-id'] as string | undefined) ?? randomUUID();
+  res.setHeader('x-request-id', requestId);
+
+  // Record RED on response close — covers static + SSR + observability paths.
+  res.on('close', () => {
+    const durationSec = Number(process.hrtime.bigint() - start) / 1e9;
+    const route = classifyRoute(req.url ?? '/');
+    const method = req.method ?? 'GET';
+    const status = String(res.statusCode);
+    ssrRequestsTotal.inc({ method, route, status_code: status });
+    ssrRequestDurationSeconds.observe({ method, route, status_code: status }, durationSec);
+    res.setHeader?.('Server-Timing', `app;dur=${(durationSec * 1000).toFixed(1)}`);
+    const lvl = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info';
+    logger[lvl]({
+      method, route, status: res.statusCode,
+      duration_ms: Math.round(durationSec * 1000),
+      request_id: requestId,
+    }, 'ssr request');
+  });
+
   try {
     const urlPath = req.url?.split('?')[0] ?? '/';
+
+    // Observability endpoints — bypass static + SSR. Probes must NEVER 503
+    // because the SSR bundle is slow to warm up; livez stays a 200 always.
+    if (req.method === 'GET' && urlPath === '/metrics') {
+      const body = await registry.metrics();
+      res.writeHead(200, { 'Content-Type': registry.contentType });
+      res.end(body);
+      return;
+    }
+    if (req.method === 'GET' && (urlPath === '/livez' || urlPath === '/readyz')) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'ok' }));
+      return;
+    }
 
     // 1. Fast-path: serve Vite-built static assets directly from disk.
     //    Only GET/HEAD can produce a static file — everything else goes to SSR.
@@ -190,12 +232,29 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
 
     res.end();
   } catch (error) {
-    console.error('Server error:', error);
+    logger.error({ err: error, request_id: requestId, path: req.url }, 'ssr handler error');
     res.statusCode = 500;
     res.end('Internal Server Error');
   }
 });
 
+/**
+ * Collapse arbitrary URL paths into a small fixed label set so Prometheus
+ * series stay bounded. Per-route SSR tracing already lives in Tempo via
+ * the http auto-instrumentation; metrics only need coarse buckets.
+ */
+function classifyRoute(url: string): string {
+  const path = url.split('?')[0];
+  if (!path) return 'unknown';
+  if (path === '/metrics' || path === '/livez' || path === '/readyz') return path;
+  if (path.startsWith('/assets/'))   return '/assets/*';
+  if (path.startsWith('/_serverFn')) return '/_serverFn/*';
+  if (path.startsWith('/_build/'))   return '/_build/*';
+  if (path === '/' || path === '/admin' || path === '/admin/') return path;
+  if (path.startsWith('/admin/'))    return '/admin/*';
+  return 'other';
+}
+
 httpServer.listen(port, process.env.HOST ?? '0.0.0.0', () => {
-  console.log(`🚀 Production server listening at http://${process.env.HOST ?? '0.0.0.0'}:${port}`);
+  logger.info({ host: process.env.HOST ?? '0.0.0.0', port }, 'tucaken-app ssr listening');
 });

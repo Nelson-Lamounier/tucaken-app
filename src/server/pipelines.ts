@@ -16,76 +16,16 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import { getCookie } from '@tanstack/react-start/server'
 import { z } from 'zod'
 import { requireAuth } from './auth-guard'
+import { apiFetch } from './_api-client'
 import type { TriggerResponse } from '@/lib/types/applications.types'
-
-// =============================================================================
-// Constants
-// =============================================================================
-
-const ADMIN_API_URL =
-  process.env['ADMIN_API_URL'] ?? 'http://admin-api.admin-api:3002'
 
 // =============================================================================
 // Types
 // =============================================================================
 
 type PipelineState = 'pending' | 'processing' | 'review' | 'published' | 'rejected' | 'flagged' | 'failed'
-
-// =============================================================================
-// Helpers
-// =============================================================================
-
-/**
- * Returns the raw Cognito JWT from the `__session` cookie.
- *
- * @returns JWT string
- * @throws {Error} If the `__session` cookie is absent
- */
-function getSessionToken(): string {
-  const token = getCookie('__session')
-  if (!token) {
-    throw new Error('Session cookie missing after auth guard — this should not happen')
-  }
-  return token
-}
-
-/**
- * Performs an authenticated fetch to the admin-api BFF.
- *
- * @param path - Path relative to admin-api base URL (e.g. `/api/admin/pipelines/article`)
- * @param init - Standard RequestInit options
- * @returns Parsed JSON response body
- * @throws {Error} If the response status is not OK
- */
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getSessionToken()
-  const res = await fetch(`${ADMIN_API_URL}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...(init?.headers ?? {}),
-    },
-  })
-
-  if (!res.ok) {
-    let detail = ''
-    try {
-      const body = (await res.json()) as { error?: string }
-      detail = body.error ? ` — ${body.error}` : ''
-    } catch {
-      // ignore parse failures
-    }
-    throw new Error(
-      `admin-api ${init?.method ?? 'GET'} ${path} failed [${res.status}]${detail}`,
-    )
-  }
-
-  return res.json() as Promise<T>
-}
 
 // =============================================================================
 // Input Schemas
@@ -151,7 +91,10 @@ export const getPipelineStatusFn = createServerFn({ method: 'GET' })
           title?: string
           updatedAt?: string
         }
-      }>(`/api/admin/articles/${encodeURIComponent(slug)}`)
+      }>(
+        `/articles/${encodeURIComponent(slug)}`,
+        { pathTemplate: '/articles/:slug' },
+      )
 
       const article = body.article
       const dynamoStatus = article.status
@@ -215,15 +158,16 @@ export const triggerPipelineActionFn = createServerFn({ method: 'POST' })
 
     if (data.action === 'approve') {
       await apiFetch<{ queued: boolean; slug: string }>(
-        `/api/admin/articles/${encodeURIComponent(data.slug)}/publish`,
-        { method: 'POST' },
+        `/articles/${encodeURIComponent(data.slug)}/publish`,
+        { method: 'POST', pathTemplate: '/articles/:slug/publish' },
       )
     } else {
       await apiFetch<{ updated: boolean; slug: string }>(
-        `/api/admin/articles/${encodeURIComponent(data.slug)}`,
+        `/articles/${encodeURIComponent(data.slug)}`,
         {
           method: 'PUT',
           body: JSON.stringify({ status: 'rejected' }),
+          pathTemplate: '/articles/:slug',
         },
       )
     }
@@ -251,7 +195,7 @@ export const triggerStrategistCoachFn = createServerFn({ method: 'POST' })
     await requireAuth()
 
     const body = await apiFetch<Record<string, object>>(
-      '/api/admin/pipelines/strategist-job',
+      '/pipelines/strategist-job',
       {
         method: 'POST',
         body: JSON.stringify({
@@ -304,8 +248,8 @@ export const requeueApplicationFn = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     await requireAuth()
     return apiFetch<{ success: boolean; message: string }>(
-      `/api/admin/applications/${encodeURIComponent(data.slug)}/requeue`,
-      { method: 'POST' },
+      `/applications/${encodeURIComponent(data.slug)}/requeue`,
+      { method: 'POST', pathTemplate: '/applications/:slug/requeue' },
     )
   })
 
@@ -326,7 +270,7 @@ export const triggerApplicationsAnalysisFn = createServerFn({ method: 'POST' })
     }
 
     const body = await apiFetch<TriggerResponse>(
-      '/api/admin/pipelines/strategist-job',
+      '/pipelines/strategist-job',
       {
         method: 'POST',
         body: JSON.stringify(lambdaPayload),

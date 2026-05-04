@@ -14,15 +14,8 @@
 
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { getCookie } from '@tanstack/react-start/server'
 import { requireAuth } from './auth-guard'
-
-// =============================================================================
-// Constants
-// =============================================================================
-
-const ADMIN_API_URL =
-  process.env['ADMIN_API_URL'] ?? 'http://admin-api.admin-api:3002'
+import { apiFetch } from './_api-client'
 
 // =============================================================================
 // Types
@@ -44,51 +37,6 @@ interface AdminComment {
 
 /** Moderated comment returned after approve/reject. */
 type ModeratedComment = AdminComment
-
-// =============================================================================
-// Helpers
-// =============================================================================
-
-/**
- * Returns the raw Cognito JWT from the `__session` cookie.
- *
- * @returns JWT string
- * @throws {Error} If the `__session` cookie is absent
- */
-function getSessionToken(): string {
-  const token = getCookie('__session')
-  if (!token) {
-    throw new Error('Session cookie missing after auth guard — this should not happen')
-  }
-  return token
-}
-
-/**
- * Performs an authenticated fetch to the admin-api BFF.
- *
- * @param path - Path relative to `/api/admin` (e.g. `/comments/pending`)
- * @param init - Standard RequestInit options
- * @returns Parsed JSON response body
- * @throws Error if the response status is not OK
- */
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getSessionToken()
-  const res = await fetch(`${ADMIN_API_URL}/api/admin${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...(init?.headers ?? {}),
-    },
-  })
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText)
-    throw new Error(`admin-api ${res.status}: ${text}`)
-  }
-
-  return res.json() as Promise<T>
-}
 
 // =============================================================================
 // Input Schemas
@@ -134,6 +82,7 @@ export const moderateCommentFn = createServerFn({ method: 'POST' })
       {
         method: 'POST',
         body: JSON.stringify({ status: data.status }),
+        pathTemplate: '/comments/:id/moderate',
       },
     )
 
@@ -153,7 +102,7 @@ export const deleteCommentFn = createServerFn({ method: 'POST' })
 
     await apiFetch<{ deleted: boolean }>(
       `/comments/${encodeURIComponent(compositeId)}`,
-      { method: 'DELETE' },
+      { method: 'DELETE', pathTemplate: '/comments/:id' },
     )
 
     return { success: true }

@@ -8,17 +8,8 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import { getCookie } from '@tanstack/react-start/server'
 import { requireAuth } from './auth-guard'
-
-const ADMIN_API_URL =
-  process.env['ADMIN_API_URL'] ?? 'http://admin-api.admin-api:3002'
-
-function getSessionToken(): string {
-  const token = getCookie('__session')
-  if (!token) throw new Error('Session cookie missing after auth guard')
-  return token
-}
+import { apiFetch } from './_api-client'
 
 export interface MeResponse {
   id:        string
@@ -42,18 +33,6 @@ export interface MeResponse {
 export const getMeFn = createServerFn({ method: 'GET' }).handler(
   async (): Promise<MeResponse> => {
     await requireAuth()
-
-    const res = await fetch(`${ADMIN_API_URL}/api/admin/me`, {
-      headers: {
-        Authorization: `Bearer ${getSessionToken()}`,
-        'Content-Type': 'application/json',
-      },
-    })
-
-    if (!res.ok) {
-      throw new Error(`[me] admin-api responded ${res.status}`)
-    }
-
-    return res.json() as Promise<MeResponse>
+    return apiFetch<MeResponse>('/me')
   },
 )

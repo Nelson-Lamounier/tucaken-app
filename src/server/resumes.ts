@@ -11,80 +11,9 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import { getCookie } from '@tanstack/react-start/server'
 import { z } from 'zod'
 import { requireAuth } from './auth-guard'
-
-// =============================================================================
-// BFF client helper
-// =============================================================================
-
-/**
- * Base URL for the admin-api BFF service.
- * Set via `ADMIN_API_URL` ConfigMap entry (injected by deploy.py).
- * Falls back to in-cluster service DNS for local development.
- */
-const ADMIN_API_URL =
-  process.env['ADMIN_API_URL'] ?? 'http://admin-api.admin-api:3002'
-
-/**
- * Retrieve the raw Cognito JWT from the session cookie for Bearer forwarding.
- *
- * `requireAuth()` only validates the JWT and returns user info — it does not
- * expose the raw token string. We read the cookie directly here so we can
- * forward it in the Authorization header to admin-api.
- *
- * @returns Raw JWT string from the `__session` cookie
- * @throws Error if the cookie is missing (should not happen after requireAuth())
- */
-function getSessionToken(): string {
-  const token = getCookie('__session')
-  if (!token) {
-    throw new Error('Session cookie missing after auth guard — this should not happen')
-  }
-  return token
-}
-
-/**
- * Execute a fetch request to the admin-api BFF, forwarding the Cognito session token.
- *
- * @param path - API path relative to admin-api base URL (e.g. '/api/admin/resumes')
- * @param token - Cognito JWT from the current session cookie
- * @param options - Additional fetch options (method, body, etc.)
- * @returns Parsed JSON response body
- * @throws Error if the response is not OK
- */
-async function apiFetch<T>(
-  path: string,
-  token: string,
-  options: RequestInit = {},
-): Promise<T> {
-  const url = `${ADMIN_API_URL}${path}`
-
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...options.headers,
-    },
-  })
-
-  if (!response.ok) {
-    let detail = ''
-    try {
-      const body = (await response.json()) as { error?: string }
-      detail = body.error ? ` — ${body.error}` : ''
-    } catch {
-      // ignore parse failures
-    }
-    throw new Error(
-      `admin-api ${options.method ?? 'GET'} ${path} failed [${response.status}]${detail}`,
-    )
-  }
-
-  return response.json() as Promise<T>
-}
+import { apiFetch } from './_api-client'
 
 // =============================================================================
 // JSON value type (avoids Record<string, unknown> strict-mode incompatibility)
@@ -142,10 +71,8 @@ export interface ResumeWithData extends ResumeSummary {
 export const getResumesFn = createServerFn({ method: 'GET' }).handler(
   async () => {
     await requireAuth()
-    const token = getSessionToken()
     const response = await apiFetch<{ resumes: ResumeSummary[]; count: number }>(
-      '/api/admin/resumes',
-      token,
+      '/resumes',
     )
     return response.resumes
   },
@@ -161,10 +88,9 @@ export const getResumeFn = createServerFn({ method: 'GET' })
   .inputValidator(resumeIdSchema)
   .handler(async ({ data: resumeId }) => {
     await requireAuth()
-    const token = getSessionToken()
     const response = await apiFetch<{ resume: ResumeWithData }>(
-      `/api/admin/resumes/${resumeId}`,
-      token,
+      `/resumes/${resumeId}`,
+      { pathTemplate: '/resumes/:id' },
     )
     return response.resume
   })
@@ -180,10 +106,8 @@ export const createResumeFn = createServerFn({ method: 'POST' })
   .inputValidator(createResumeSchema)
   .handler(async ({ data }) => {
     await requireAuth()
-    const token = getSessionToken()
     const response = await apiFetch<{ resume: ResumeWithData }>(
-      '/api/admin/resumes',
-      token,
+      '/resumes',
       {
         method: 'POST',
         body: JSON.stringify({ label: data.label, data: data.data }),
@@ -204,13 +128,12 @@ export const updateResumeFn = createServerFn({ method: 'POST' })
   .inputValidator(updateResumeSchema)
   .handler(async ({ data }) => {
     await requireAuth()
-    const token = getSessionToken()
     const response = await apiFetch<{ resume: ResumeWithData }>(
-      `/api/admin/resumes/${data.resumeId}`,
-      token,
+      `/resumes/${data.resumeId}`,
       {
         method: 'PUT',
         body: JSON.stringify({ label: data.label, data: data.data }),
+        pathTemplate: '/resumes/:id',
       },
     )
     return response.resume
@@ -227,11 +150,9 @@ export const deleteResumeFn = createServerFn({ method: 'POST' })
   .inputValidator(resumeIdSchema)
   .handler(async ({ data: resumeId }) => {
     await requireAuth()
-    const token = getSessionToken()
     await apiFetch<{ deleted: boolean; resumeId: string }>(
-      `/api/admin/resumes/${resumeId}`,
-      token,
-      { method: 'DELETE' },
+      `/resumes/${resumeId}`,
+      { method: 'DELETE', pathTemplate: '/resumes/:id' },
     )
     return { success: true }
   })
@@ -247,11 +168,9 @@ export const setActiveResumeFn = createServerFn({ method: 'POST' })
   .inputValidator(resumeIdSchema)
   .handler(async ({ data: resumeId }) => {
     await requireAuth()
-    const token = getSessionToken()
     const response = await apiFetch<{ resume: ResumeWithData }>(
-      `/api/admin/resumes/${resumeId}/activate`,
-      token,
-      { method: 'POST' },
+      `/resumes/${resumeId}/activate`,
+      { method: 'POST', pathTemplate: '/resumes/:id/activate' },
     )
     return response.resume
   })
@@ -264,11 +183,9 @@ export const setActiveResumeFn = createServerFn({ method: 'POST' })
 export const getActiveResumeFn = createServerFn({ method: 'GET' }).handler(
   async () => {
     await requireAuth()
-    const token = getSessionToken()
     try {
       const response = await apiFetch<{ resume: ResumeWithData }>(
-        '/api/admin/resumes/active',
-        token,
+        '/resumes/active',
       )
       return response.resume
     } catch (err: unknown) {
