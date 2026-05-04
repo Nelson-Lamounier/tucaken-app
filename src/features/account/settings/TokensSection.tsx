@@ -39,9 +39,12 @@ export function TokensSection({ tokens, onChange }: Props) {
   }
   function createToken() {
     if (!draftName.trim()) return
-    const last4 = Math.random().toString(36).slice(-4)
+    const last4 = Array.from(crypto.getRandomValues(new Uint8Array(3)))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('')
+      .slice(0, 4)
     const newToken: ApiToken = {
-      id: `tok_live_${Date.now()}`,
+      id: `tok_live_${crypto.randomUUID()}`,
       name: draftName.trim(),
       last4,
       scopes: ['read'],
