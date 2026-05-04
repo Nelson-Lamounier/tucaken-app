@@ -58,8 +58,7 @@ sdk.start();
 // renders consume CPU per route. Skipped when PYROSCOPE_SERVER_ADDRESS is
 // unset so local dev doesn't pull native bindings.
 if (process.env['PYROSCOPE_SERVER_ADDRESS']) {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const Pyroscope = require('@pyroscope/nodejs');
+  const { default: Pyroscope } = await import('@pyroscope/nodejs');
   Pyroscope.init({
     serverAddress: process.env['PYROSCOPE_SERVER_ADDRESS'],
     appName:       process.env['OTEL_SERVICE_NAME'] ?? 'tucaken-app',

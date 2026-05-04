@@ -47,27 +47,32 @@ RUN groupadd --system --gid 1001 nodejs && \
   useradd --system --uid 1001 --gid nodejs startadmin
 
 # Vite SSR build output
-COPY --from=builder --chown=startadmin:nodejs /app/dist ./dist
+# 555 = read+execute (no write); directories need execute bit to be traversable.
+COPY --from=builder --chown=startadmin:nodejs --chmod=555 /app/dist ./dist
 
 # node_modules at /app for ESM resolution (Node ESM resolver walks the
 # directory hierarchy looking for node_modules folders).
-COPY --from=builder --chown=startadmin:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=startadmin:nodejs --chmod=555 /app/node_modules ./node_modules
 
 # Production server runner + OTel preload bundle.
 # telemetry.js is a separate esbuild output (see package.json `build`); it
 # externalises @opentelemetry/* so `node --import` can register the import-
 # in-the-middle hook before server.js evaluates http/undici/fetch.
-COPY --from=builder --chown=startadmin:nodejs /app/server.js    ./server.js
-COPY --from=builder --chown=startadmin:nodejs /app/telemetry.js ./telemetry.js
+# 444 = read-only for owner + group + other; no write permission assigned.
+COPY --from=builder --chown=startadmin:nodejs --chmod=444 /app/server.js    ./server.js
+COPY --from=builder --chown=startadmin:nodejs --chmod=444 /app/telemetry.js ./telemetry.js
 
 # start.sh: conditionally preloads OTel only when OTEL_EXPORTER_OTLP_ENDPOINT
 # is set. CI has no collector → plain `node server.js`. K8s prod has the env
 # var → `node --import ./telemetry.js server.js` for full instrumentation.
-COPY --chown=startadmin:nodejs start.sh ./start.sh
-RUN chmod +x /app/start.sh
+# 555 = read+execute for owner + group + other; no write permission assigned.
+COPY --chown=startadmin:nodejs --chmod=555 start.sh ./start.sh
 
 # ESM resolution: server.js uses `import` — needs "type": "module" in chain.
-RUN echo '{"type":"module"}' > /app/package.json && chown startadmin:nodejs /app/package.json
+# 444 = read-only; no process needs to write this file at runtime.
+RUN echo '{"type":"module"}' > /app/package.json && \
+    chown startadmin:nodejs /app/package.json && \
+    chmod 444 /app/package.json
 
 USER startadmin
 

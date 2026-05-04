@@ -38,10 +38,11 @@ function GitHubSettingsPage() {
 
   useEffect(() => {
     if (!installation_id) return
+    const installationId = installation_id
 
-    void (async () => {
+    async function handleInstall() {
       try {
-        await handleGitHubInstallFn({ data: { installationId: installation_id } })
+        await handleGitHubInstallFn({ data: { installationId } })
       } catch (err) {
         // Existing installation or config error — surface it so it's not silent
         const msg = err instanceof Error ? err.message : 'GitHub installation failed'
@@ -51,7 +52,8 @@ function GitHubSettingsPage() {
         await queryClient.invalidateQueries({ queryKey: adminKeys.github.installation() })
         void navigate({ to: '/settings/github', replace: true, search: { step: 2 } })
       }
-    })()
+    }
+    void handleInstall()
   }, [installation_id, navigate, queryClient, addToast])
 
   function handleStepChange(next: OnboardingStep) {
