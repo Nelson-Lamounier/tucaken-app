@@ -36,19 +36,38 @@ const SECURE_COOKIES =
   process.env.NODE_ENV === 'production' &&
   (process.env['VITE_APP_URL']?.startsWith('https') ?? true)
 
+// ── Structured auth event logger ──────────────────────────────────────────────
+// Server functions run in Node; JSON stdout is scraped by Alloy → Loki.
+// Fields: level, service, env, event, timestamp + per-event context.
+// Credentials (password, tokens) are never logged.
+const SVC = { service: 'tucaken-app', env: process.env['DEPLOY_ENV'] ?? 'development' }
+
+function logAuth(event: string, ctx: Record<string, unknown> = {}): void {
+  process.stdout.write(
+    JSON.stringify({ level: 'info', ...SVC, event, ...ctx, timestamp: new Date().toISOString() }) + '\n',
+  )
+}
+
+function logAuthError(event: string, error: string, ctx: Record<string, unknown> = {}): void {
+  process.stderr.write(
+    JSON.stringify({ level: 'error', ...SVC, event, error, ...ctx, timestamp: new Date().toISOString() }) + '\n',
+  )
+}
+
 async function detectNewUser(idToken: string): Promise<boolean> {
   try {
     const res = await fetch(`${ADMIN_API_URL}/api/admin/me`, {
       headers: { Authorization: `Bearer ${idToken}` },
     })
     if (!res.ok) {
-      console.error(`[auth] detectNewUser: admin-api responded ${res.status}`)
+      logAuthError('auth_detect_new_user_failed', `admin-api responded ${res.status}`, { status: res.status })
       return false
     }
     const me = await res.json() as { isNew?: boolean }
+    logAuth('auth_detect_new_user', { isNew: me.isNew === true })
     return me.isNew === true
   } catch (e) {
-    console.error('[auth] detectNewUser: failed to reach admin-api:', e instanceof Error ? e.message : e)
+    logAuthError('auth_detect_new_user_failed', e instanceof Error ? e.message : 'network error', { adminApiUrl: ADMIN_API_URL })
     return false
   }
 }
@@ -170,8 +189,10 @@ export const signInWithPasswordFn = createServerFn({ method: 'POST' })
     } catch (err: unknown) {
       if (err instanceof Error) {
         if (err.name === 'NotAuthorizedException' || err.name === 'UserNotFoundException') {
+          logAuthError('auth_signin_failed', 'invalid credentials', { errorCode: err.name })
           throw new Error('Incorrect email or password')
         }
+        logAuthError('auth_signin_failed', err.message, { errorCode: err.name })
         throw new Error(err.message)
       }
       throw new Error('Authentication failed')
@@ -187,6 +208,7 @@ export const signInWithPasswordFn = createServerFn({ method: 'POST' })
         path: '/',
       })
       const isNewUser = await detectNewUser(idToken)
+      logAuth('auth_signin_success', { isNewUser, method: 'password' })
       return { success: true, isNewUser }
     }
 
@@ -287,7 +309,10 @@ export const signUpFn = createServerFn({ method: 'POST' })
       )
       if (checkRes.ok) {
         const { exists } = await checkRes.json() as { exists: boolean }
-        if (exists) throw new Error(ALREADY_HAS_ACCOUNT_MSG)
+        if (exists) {
+          logAuthError('auth_signup_blocked', 'email already exists in RDS', { reason: 'email_exists' })
+          throw new Error(ALREADY_HAS_ACCOUNT_MSG)
+        }
       }
     } catch (e) {
       // Re-throw our own error; swallow network/parse failures.
@@ -314,12 +339,20 @@ export const signUpFn = createServerFn({ method: 'POST' })
         if (
           err.name === 'AliasExistsException' ||
           err.name === 'UsernameExistsException'
-        ) throw new Error(ALREADY_HAS_ACCOUNT_MSG)
-        if (err.name === 'InvalidPasswordException') throw new Error(err.message)
+        ) {
+          logAuthError('auth_signup_blocked', 'Cognito alias/username collision', { errorCode: err.name })
+          throw new Error(ALREADY_HAS_ACCOUNT_MSG)
+        }
+        if (err.name === 'InvalidPasswordException') {
+          logAuthError('auth_signup_failed', 'invalid password policy', { errorCode: err.name })
+          throw new Error(err.message)
+        }
+        logAuthError('auth_signup_failed', err.message, { errorCode: err.name })
         throw new Error(err.message)
       }
       throw new Error('Sign-up failed')
     }
+    logAuth('auth_signup_initiated', { method: 'password' })
     return { success: true }
   })
 
@@ -365,6 +398,7 @@ export const confirmSignUpFn = createServerFn({ method: 'POST' })
     // Provision the user in admin-api (creates the RDS row via userProvisionMiddleware).
     // Result is ignored for routing — a confirmed email is always a new user.
     await detectNewUser(idToken)
+    logAuth('auth_signup_confirmed', { method: 'password', isNewUser: true })
     const isNewUser = true
     return { success: true, isNewUser }
   })

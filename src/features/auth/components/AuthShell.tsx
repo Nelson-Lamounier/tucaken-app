@@ -47,8 +47,12 @@ export function AuthShell({
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [signInError, setSignInError] = useState<string | null>(null)
+  const [signUpError, setSignUpError] = useState<string | null>(null)
 
-  useEffect(() => { setSignInError(null) }, [view])
+  useEffect(() => {
+    setSignInError(null)
+    setSignUpError(null)
+  }, [view])
 
   const cardClass =
     variant === 'safe'
@@ -138,11 +142,17 @@ export function AuthShell({
               <SignUpForm
                 key="signup"
                 onSwitchToSignIn={() => setView('signin')}
+                error={signUpError}
                 onSubmit={async (v) => {
+                  setSignUpError(null)
                   setEmail(v.email)
                   setPassword(v.password)
-                  await onSignUp?.(v)
-                  setView('verify')
+                  try {
+                    await onSignUp?.(v)
+                    setView('verify')
+                  } catch (err) {
+                    setSignUpError(err instanceof Error ? err.message : 'Sign-up failed')
+                  }
                 }}
                 onGoogle={onGoogle}
                 onGithub={onGithub}
