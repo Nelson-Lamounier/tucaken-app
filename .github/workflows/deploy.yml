@@ -229,23 +229,20 @@ jobs:
           PROM: "http://prometheus.monitoring.svc.cluster.local:9090/prometheus"
         run: |
           set -euo pipefail
-          kubectl run prom-preflight --rm -i --restart=Never \
-            --image=curlimages/curl:8.9.1 \
-            --namespace=tucaken-app \
-            -- sh -c "
-              set -e
-              echo '── Prometheus health ──'
-              curl -sf '${PROM}/-/healthy' && echo ' OK'
+          # Runner pod is already inside the cluster — curl Prometheus directly.
+          # No extra pod creation needed (avoids the tucaken-app ResourceQuota
+          # that requires explicit cpu/memory limits on every pod).
+          echo '── Prometheus health ──'
+          curl -sf "${PROM}/-/healthy" && echo ' OK'
 
-              echo '── SLO recording rule reachable ──'
-              STATUS=\$(curl -sf '${PROM}/api/v1/query?query=slo:tucaken-app:errors_ratio:rate5m' \
-                | grep -o '\"status\":\"[^\"]*\"' | head -1)
-              if [ \"\$STATUS\" != '\"status\":\"success\"' ]; then
-                echo \"FAIL: SLO recording rule query failed — Prometheus may be missing the rule\"
-                exit 1
-              fi
-              echo \"SLO recording rule reachable: OK\"
-            "
+          echo '── SLO recording rule reachable ──'
+          STATUS=$(curl -sf "${PROM}/api/v1/query?query=slo:tucaken-app:errors_ratio:rate5m" \
+            | grep -o '"status":"[^"]*"' | head -1)
+          if [ "$STATUS" != '"status":"success"' ]; then
+            echo "FAIL: SLO recording rule query failed — Prometheus may be missing the rule"
+            exit 1
+          fi
+          echo "SLO recording rule reachable: OK"
 
       # ── 1. ArgoCD sync ───────────────────────────────────────────────────────
       # Separate step so you can tell at a glance in the GitHub UI whether a
