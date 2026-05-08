@@ -1,4 +1,6 @@
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
+import { motion } from 'motion/react'
+import { AlertTriangle } from 'lucide-react'
 import { OnboardingShell } from '@/features/onboarding/components/onboarding/OnboardingShell'
 import {
   getUploadUrlFn,
@@ -12,9 +14,14 @@ import type { ResumeSummary } from '@/features/onboarding/components/onboarding/
 export const Route = createFileRoute('/onboarding')({
   beforeLoad: async ({ context }) => {
     if (!context.auth.user) throw redirect({ to: '/sign-in' })
-    // Best-effort provisioning — a 503 here must not block the page.
-    // The upload step retries provisioning before each attempt.
-    try { await getMeFn() } catch { /* logged below */ }
+  },
+  loader: async () => {
+    try {
+      await getMeFn()
+      return { provisioningReady: true as const }
+    } catch {
+      return { provisioningReady: false as const }
+    }
   },
   component: OnboardingPage,
 })
@@ -104,12 +111,29 @@ async function uploadResume(
 
 function OnboardingPage() {
   const navigate = useNavigate()
+  const { provisioningReady } = Route.useLoaderData()
   return (
-    <OnboardingShell
-      onUploadResume={uploadResume}
-      onComplete={async () => {
-        await navigate({ to: '/overview' })
-      }}
-    />
+    <div className="relative">
+      {!provisioningReady && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="fixed inset-x-0 top-0 z-50 flex items-center gap-3 border-b border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-400 backdrop-blur-sm"
+          style={{ willChange: 'transform, opacity' }}
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>
+            Backend service is temporarily unavailable — resume upload may not work yet.
+            Refresh to retry once the service recovers.
+          </span>
+        </motion.div>
+      )}
+      <OnboardingShell
+        onUploadResume={uploadResume}
+        onComplete={async () => {
+          await navigate({ to: '/overview' })
+        }}
+      />
+    </div>
   )
 }
