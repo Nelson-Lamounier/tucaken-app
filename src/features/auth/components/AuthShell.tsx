@@ -143,6 +143,7 @@ export function AuthShell({
                 key="signup"
                 onSwitchToSignIn={() => setView('signin')}
                 error={signUpError}
+                accountExists={signUpError?.toLowerCase().includes('already exists') ?? false}
                 onSubmit={async (v) => {
                   setSignUpError(null)
                   setEmail(v.email)
