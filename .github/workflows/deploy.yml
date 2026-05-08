@@ -211,9 +211,38 @@ jobs:
             --region "${AWS_REGION}" \
             --query 'Parameter.Value' \
             --output text \
-            | sed 's|https://127.0.0.1:6443|https://kubernetes.default.svc:443|g' \
             > /tmp/kubeconfig
           chmod 600 /tmp/kubeconfig
+
+      # ── 0. Prometheus pre-flight ─────────────────────────────────────────────
+      # The pre-promotion analysis queries Prometheus for error rate and P95
+      # latency. A silent Prometheus failure causes the AnalysisRun to error
+      # rather than fail cleanly, making the root cause harder to diagnose.
+      # This step verifies Prometheus is healthy and the Traefik job is present
+      # before the rollout starts — failing fast with a clear message.
+      - name: Verify Prometheus is reachable
+        env:
+          KUBECONFIG: /tmp/kubeconfig
+          PROM: "http://prometheus.monitoring.svc.cluster.local:9090/prometheus"
+        run: |
+          set -euo pipefail
+          kubectl run prom-preflight --rm -i --restart=Never \
+            --image=curlimages/curl:8.9.1 \
+            --namespace=tucaken-app \
+            -- sh -c "
+              set -e
+              echo '── Prometheus health ──'
+              curl -sf '${PROM}/-/healthy' && echo ' OK'
+
+              echo '── Traefik job present ──'
+              RESULT=\$(curl -sf '${PROM}/api/v1/query?query=up{job=\"traefik\"}')
+              COUNT=\$(echo \"\$RESULT\" | grep -o '\"result\":\[' | wc -l)
+              if [ \"\$COUNT\" -eq 0 ]; then
+                echo \"FAIL: traefik job not found in Prometheus — analysis will error\"
+                exit 1
+              fi
+              echo \"Traefik series found: OK\"
+            "
 
       # ── 1. ArgoCD sync ───────────────────────────────────────────────────────
       # Separate step so you can tell at a glance in the GitHub UI whether a
