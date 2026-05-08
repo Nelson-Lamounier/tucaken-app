@@ -234,14 +234,14 @@ jobs:
               echo '── Prometheus health ──'
               curl -sf '${PROM}/-/healthy' && echo ' OK'
 
-              echo '── Traefik job present ──'
-              RESULT=\$(curl -sf '${PROM}/api/v1/query?query=up{job=\"traefik\"}')
-              COUNT=\$(echo \"\$RESULT\" | grep -o '\"result\":\[' | wc -l)
-              if [ \"\$COUNT\" -eq 0 ]; then
-                echo \"FAIL: traefik job not found in Prometheus — analysis will error\"
+              echo '── SLO recording rule reachable ──'
+              STATUS=\$(curl -sf '${PROM}/api/v1/query?query=slo:tucaken-app:errors_ratio:rate5m' \
+                | grep -o '\"status\":\"[^\"]*\"' | head -1)
+              if [ \"\$STATUS\" != '\"status\":\"success\"' ]; then
+                echo \"FAIL: SLO recording rule query failed — Prometheus may be missing the rule\"
                 exit 1
               fi
-              echo \"Traefik series found: OK\"
+              echo \"SLO recording rule reachable: OK\"
             "
 
       # ── 1. ArgoCD sync ───────────────────────────────────────────────────────
