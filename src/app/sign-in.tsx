@@ -1,5 +1,6 @@
 "use client"
 import { createFileRoute } from '@tanstack/react-router'
+import { z } from 'zod'
 import { EnergeticAuthShell } from '../features/auth/components/EnergeticAuthShell'
 import {
   getLoginUrlFn,
@@ -13,14 +14,23 @@ import {
 } from '../server/auth'
 
 export const Route = createFileRoute('/sign-in')({
+  validateSearch: z.object({
+    callbackUrl: z.string().optional(),
+  }),
   component: AuthPage,
 })
 
-function navigate(isNewUser: boolean) {
-  globalThis.window.location.href = isNewUser ? '/onboarding' : '/overview'
-}
-
 function AuthPage() {
+  const { callbackUrl } = Route.useSearch()
+
+  function navigateAfterAuth(isNewUser: boolean) {
+    if (isNewUser) {
+      globalThis.window.location.href = '/onboarding'
+    } else {
+      globalThis.window.location.href = callbackUrl ?? '/overview'
+    }
+  }
+
   const goOAuth = async (provider: 'Google' | 'GitHub') => {
     const url = await getLoginUrlFn({ data: { provider } })
     globalThis.window.location.href = url
@@ -33,18 +43,18 @@ function AuthPage() {
       onSignIn={async (v) => {
         const result = await signInWithPasswordFn({ data: v })
         if (!result.success) return 'otp'
-        navigate(result.isNewUser)
+        navigateAfterAuth(result.isNewUser)
       }}
       onOtp={async (code) => {
         await respondToMfaChallengeFn({ data: { code } })
-        globalThis.window.location.href = '/overview'
+        globalThis.window.location.href = callbackUrl ?? '/overview'
       }}
       onSignUp={async (v) => {
         await signUpFn({ data: { email: v.email, password: v.password, name: v.name } })
       }}
       onConfirmSignUp={async (email, code, password) => {
         const result = await confirmSignUpFn({ data: { email, code, password } })
-        navigate(result.isNewUser)
+        navigateAfterAuth(result.isNewUser)
       }}
       onResendCode={async (email) => {
         await resendConfirmationCodeFn({ data: { email } })

@@ -29,7 +29,7 @@ export const Route = createFileRoute('/_dashboard')({
       if (msg.includes('401') || msg.includes('No session') || msg.includes('Session expired')) {
         throw redirect({ to: '/sign-in', search: { callbackUrl: location.href } })
       }
-      throw redirect({ to: '/sign-in', search: { callbackUrl: location.href } })
+      throw e
     }
 
     return { me }
