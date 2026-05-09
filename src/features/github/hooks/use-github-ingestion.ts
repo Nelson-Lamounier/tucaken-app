@@ -20,7 +20,10 @@ export function useGitHubIngestion() {
       void queryClient.invalidateQueries({ queryKey: adminKeys.github.accessibleRepos() })
     },
     onError: (err) => {
-      addToast('error', `Ingestion failed: ${err.message}`)
+      const is429 = err.message.includes('[429]')
+      addToast('error', is429
+        ? 'Monthly ingestion limit reached. Upgrade to Pro for unlimited syncs.'
+        : `Failed to queue repo: ${err.message}`)
     },
   })
 }
