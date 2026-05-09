@@ -54,7 +54,7 @@ export function EnhanceRoleCard({ entry, onSave }: EnhanceRoleCardProps) {
       setFields(existing)
     }
     setInitialized(true)
-  }, [entry.enrichmentStatus]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entry.enrichmentStatus])
 
   const isLoading     = !isTerminal(entry.enrichmentStatus)
   const isUnavailable = entry.enrichmentStatus === 'skipped' || entry.enrichmentStatus === 'failed'
