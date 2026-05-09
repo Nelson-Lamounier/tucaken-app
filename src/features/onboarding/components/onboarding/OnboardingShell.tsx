@@ -4,16 +4,16 @@
 // Variant B from the canvas — teal accent, top stepper, centered modal,
 // slide transitions, warm tone.
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { OnboardingBackground } from './OnboardingBackground'
 import { OnboardingProgress } from './OnboardingProgress'
 import { WelcomeStep } from './WelcomeStep'
 import { PortfolioStep } from './PortfolioStep'
-import { ResumeStep } from './ResumeStep'
+import { ImportCareerStep } from '../steps/ImportCareerStep'
 import { ConnectStep } from './ConnectStep'
 import { useOnboardingState } from './useOnboardingState'
-import type { OnboardingShellProps, ResumeSummary } from './types'
+import type { OnboardingShellProps } from './types'
 
 const VISIBLE_STEPS = [
   { id: 'welcome'   as const, name: 'Welcome' },
@@ -24,12 +24,10 @@ const VISIBLE_STEPS = [
 
 export function OnboardingShell({
   onSubmitPortfolio,
-  onUploadResume,
   onConnectGithub,
   onComplete,
 }: OnboardingShellProps) {
   const s = useOnboardingState()
-  const [resumeStatus, setResumeStatus] = useState<string | undefined>()
 
   // Step 5 ("done") is a one-frame state — we run onComplete and let the
   // parent route navigate away.
@@ -44,21 +42,6 @@ export function OnboardingShell({
     enter:  { opacity: 0, x: 20 * direction },
     center: { opacity: 1, x: 0 },
     exit:   { opacity: 0, x: -20 * direction },
-  }
-
-  async function handleResumeUpload(file: File): Promise<ResumeSummary> {
-    setResumeStatus(undefined)
-    if (onUploadResume) {
-      const result = await onUploadResume(file, setResumeStatus)
-      s.setResume(file.name, result)
-      setResumeStatus(undefined)
-      return result
-    }
-    // Local-dev fallback: deterministic mock
-    const mock: ResumeSummary = { roles: 4, education: 2, skills: 18 }
-    await new Promise((r) => setTimeout(r, 800))
-    s.setResume(file.name, mock)
-    return mock
   }
 
   async function handlePortfolioSubmit(url: string) {
@@ -126,14 +109,9 @@ export function OnboardingShell({
                 )}
 
                 {s.stepId === 'resume' && (
-                  <ResumeStep
-                    initialFileName={s.data.resume?.fileName}
-                    initialSummary={s.data.resume?.summary}
-                    statusMessage={resumeStatus}
-                    onUpload={handleResumeUpload}
+                  <ImportCareerStep
                     onNext={s.next}
                     onSkip={s.next}
-                    onBack={s.back}
                   />
                 )}
 
