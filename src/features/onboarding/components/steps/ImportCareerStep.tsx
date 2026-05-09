@@ -100,9 +100,11 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
     refetchInterval: (query) => {
       const all = query.state.data ?? []
       const experienceEntries = all.filter((e: CareerEntry) => e.entryType === 'experience')
-      const allTerminal = experienceEntries.every((e: CareerEntry) =>
-        ['complete', 'skipped', 'failed'].includes(e.enrichmentStatus),
-      )
+      const allTerminal =
+        experienceEntries.length > 0 &&
+        experienceEntries.every((e: CareerEntry) =>
+          ['complete', 'skipped', 'failed'].includes(e.enrichmentStatus),
+        )
       return allTerminal ? false : 3_000
     },
   })
@@ -190,6 +192,7 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
     const rawData = { ...(entry.rawData as Record<string, unknown>), highlights }
     await updateCareerEntryFn({ data: { id, rawData } })
     await queryClient.invalidateQueries({ queryKey: adminKeys.resumeImports.entries() })
+    await queryClient.invalidateQueries({ queryKey: adminKeys.resumeImports.entries('enhance') })
   }
 
   function handleDrop(e: React.DragEvent) {
