@@ -26,7 +26,7 @@ export function OnboardingShell({
   onSubmitPortfolio,
   onConnectGithub,
   onComplete,
-}: OnboardingShellProps) {
+}: Readonly<OnboardingShellProps>) {
   const s = useOnboardingState()
 
   // Step 5 ("done") is a one-frame state — we run onComplete and let the
