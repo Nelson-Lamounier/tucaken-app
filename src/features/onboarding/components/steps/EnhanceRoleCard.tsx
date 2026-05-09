@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Loader2, X, Plus, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { useToastStore } from '@/lib/stores/toast-store'
 import type { CareerEntry } from '@/server/resume-imports'
 
 interface EnhanceRoleCardProps {
@@ -35,6 +36,8 @@ function notAlreadyIn(fields: string[]) {
 export function EnhanceRoleCard({ entry, onSave }: EnhanceRoleCardProps) {
   const raw      = entry.rawData      as RawData
   const enriched = entry.enrichedData as EnrichedData | null
+
+  const { addToast } = useToastStore()
 
   const [fields, setFields]           = useState<string[]>(raw.highlights ?? [])
   const [saving, setSaving]           = useState(false)
@@ -79,6 +82,8 @@ export function EnhanceRoleCard({ entry, onSave }: EnhanceRoleCardProps) {
     try {
       await onSave(entry.id, fields.filter((f) => f.trim()))
       setSaved(true)
+    } catch {
+      addToast('error', 'Save failed. Please try again.')
     } finally {
       setSaving(false)
     }
