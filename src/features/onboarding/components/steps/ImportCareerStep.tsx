@@ -14,7 +14,7 @@ import {
   Wrench,
   Award,
 } from 'lucide-react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/Button'
 import { adminKeys } from '@/lib/api/query-keys'
 import {
@@ -23,8 +23,10 @@ import {
   getImportStatusFn,
   listCareerEntriesFn,
   retryImportFn,
+  updateCareerEntryFn,
 } from '../../../../server/resume-imports'
 import type { CareerEntry } from '../../../../server/resume-imports'
+import { EnhanceRoleCard } from './EnhanceRoleCard'
 
 type Phase =
   | 'idle'
@@ -32,6 +34,7 @@ type Phase =
   | 'uploading'
   | 'processing'
   | 'review'
+  | 'enhance'
   | 'saved'
   | 'error'
 
@@ -56,6 +59,7 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
   const [dragOver, setDragOver] = useState(false)
   const [retrying, setRetrying] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const queryClient = useQueryClient()
 
   const accept = '.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
@@ -87,6 +91,20 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
     queryFn:  () => listCareerEntriesFn({ data: {} }),
     enabled:  phase === 'review',
     staleTime: Infinity,
+  })
+
+  const { data: enhancedEntries = [] } = useQuery<CareerEntry[]>({
+    queryKey: adminKeys.resumeImports.entries('enhance'),
+    queryFn:  () => listCareerEntriesFn({ data: {} }),
+    enabled:  phase === 'enhance',
+    refetchInterval: (query) => {
+      const all = query.state.data ?? []
+      const experienceEntries = all.filter((e: CareerEntry) => e.entryType === 'experience')
+      const allTerminal = experienceEntries.every((e: CareerEntry) =>
+        ['complete', 'skipped', 'failed'].includes(e.enrichmentStatus),
+      )
+      return allTerminal ? false : 3_000
+    },
   })
 
   // ── Upload flow ───────────────────────────────────────────────────────────
@@ -164,6 +182,14 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
       setRetrying(false)
       setErrorMsg(err instanceof Error ? err.message : 'Retry failed — please try again.')
     }
+  }
+
+  async function handleSaveEntry(id: string, highlights: string[]) {
+    const entry = enhancedEntries.find((e) => e.id === id)
+    if (!entry) return
+    const rawData = { ...(entry.rawData as Record<string, unknown>), highlights }
+    await updateCareerEntryFn({ data: { id, rawData } })
+    await queryClient.invalidateQueries({ queryKey: adminKeys.resumeImports.entries() })
   }
 
   function handleDrop(e: React.DragEvent) {
@@ -335,6 +361,76 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
     )
   }
 
+  if (phase === 'enhance') {
+    const experienceEntries = enhancedEntries.filter(
+      (e: CareerEntry) => e.entryType === 'experience',
+    )
+    const allTerminal = experienceEntries.every((e: CareerEntry) =>
+      ['complete', 'skipped', 'failed'].includes(e.enrichmentStatus),
+    )
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <h3 className="text-base font-semibold text-zinc-100">Enhance your experience</h3>
+          <p className="mt-1 text-sm text-zinc-500">
+            We researched each role online. Review the suggestions, edit your highlights,
+            and save — or skip to keep them as extracted.
+          </p>
+          {!allTerminal && (
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-indigo-400">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Researching remaining roles…
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+          {experienceEntries.length === 0 ? (
+            <div className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-6 text-center text-sm text-zinc-500">
+              No experience entries found.
+            </div>
+          ) : (
+            experienceEntries.map((entry: CareerEntry) => (
+              <EnhanceRoleCard
+                key={entry.id}
+                entry={entry}
+                onSave={handleSaveEntry}
+              />
+            ))
+          )}
+        </div>
+
+        <div className="flex items-center justify-between pt-2 border-t border-white/10">
+          <Button
+            variant="ghost"
+            onClick={() => setPhase('review')}
+            className="text-xs"
+          >
+            ← Back to review
+          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => { setPhase('saved'); setTimeout(onNext, 800) }}
+              className="text-xs"
+            >
+              Skip enhancement
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => { setPhase('saved'); setTimeout(onNext, 800) }}
+              className="flex items-center gap-1.5"
+            >
+              Save &amp; continue
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // ── review ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
@@ -458,7 +554,7 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
         </Button>
         <Button
           variant="primary"
-          onClick={() => { setPhase('saved'); setTimeout(onNext, 800) }}
+          onClick={() => setPhase('enhance')}
           className="flex items-center gap-1.5"
         >
           Looks good
