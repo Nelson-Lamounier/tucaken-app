@@ -165,6 +165,25 @@ export const listCareerEntriesFn = createServerFn({ method: 'GET' })
     return response.entries
   })
 
+export const updateCareerEntryFn = createServerFn({ method: 'POST' })
+  .inputValidator(
+    z.object({
+      id:      z.string().uuid(),
+      rawData: z.record(z.string(), z.unknown()),
+    }),
+  )
+  .handler(async ({ data }) => {
+    await requireAuth()
+    return apiFetch<{ entry: CareerEntry }>(
+      `/resume-imports/career-entries/${data.id}`,
+      {
+        method:       'PUT',
+        body:         JSON.stringify({ rawData: data.rawData }),
+        pathTemplate: '/resume-imports/career-entries/:id',
+      },
+    )
+  })
+
 /**
  * List all past resume imports for the authenticated user.
  */
