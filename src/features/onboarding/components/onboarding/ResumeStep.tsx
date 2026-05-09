@@ -50,7 +50,12 @@ export function ResumeStep({
     setFileName(file.name)
     try {
       const result = await onUpload(file)
-      setSummary(result)
+      if (result.roles === 0 && result.education === 0 && result.skills === 0) {
+        setError('Resume uploaded but no content could be extracted. Try a different file or ensure it contains readable text.')
+        setFileName(undefined)
+      } else {
+        setSummary(result)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not parse that file.')
       setFileName(undefined)
@@ -124,7 +129,7 @@ export function ResumeStep({
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-medium text-zinc-100">{fileName}</div>
               <div className="mt-0.5 text-[11px] text-zinc-500">
-                {busy ? (statusMessage ?? 'Uploading…') : 'Parsed and ready.'}
+                {busy ? (statusMessage ?? 'Uploading…') : summary ? 'Parsed and ready.' : 'Awaiting result…'}
               </div>
             </div>
             <button
@@ -144,6 +149,11 @@ export function ResumeStep({
                 exit={{ opacity: 0, height: 0 }}
                 className="overflow-hidden"
               >
+                {(summary.roles === 0 || summary.education === 0 || summary.skills === 0) && (
+                  <p className="mt-3 text-[11px] text-amber-400/80">
+                    Some sections returned 0 — the file may be image-based or partially readable. You can continue or re-upload a text-based PDF.
+                  </p>
+                )}
                 <div className="mt-4 grid grid-cols-3 gap-2">
                   {[
                     { label: 'Roles', count: summary.roles },
@@ -155,12 +165,20 @@ export function ResumeStep({
                       initial={{ opacity: 0, y: 6 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.1 + i * 0.08 }}
-                      className="rounded-lg border border-white/10 bg-white/[0.02] p-3"
+                      className={[
+                        'rounded-lg border p-3',
+                        s.count === 0
+                          ? 'border-amber-500/20 bg-amber-500/4'
+                          : 'border-white/10 bg-white/2',
+                      ].join(' ')}
                     >
                       <div className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">
                         {s.label}
                       </div>
-                      <div className="mt-1 text-xl font-semibold tabular-nums text-zinc-100">
+                      <div className={[
+                        'mt-1 text-xl font-semibold tabular-nums',
+                        s.count === 0 ? 'text-amber-400' : 'text-zinc-100',
+                      ].join(' ')}>
                         {s.count}
                       </div>
                     </motion.div>
