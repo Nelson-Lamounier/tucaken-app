@@ -59,7 +59,10 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
   const [dragOver, setDragOver] = useState(false)
   const [retrying, setRetrying] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const processingStartedAt = useRef<number | null>(null)
   const queryClient = useQueryClient()
+
+  const PROCESSING_TIMEOUT_MS = 120_000 // 2 min — job crashes before touching DB on image errors
 
   const accept = '.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
@@ -70,20 +73,57 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
     enabled:  !!importId && phase === 'processing',
     refetchInterval: (query) => {
       const status = query.state.data?.status
-      return status && TERMINAL_STATUSES.has(status) ? false : 3000
+      if (status && TERMINAL_STATUSES.has(status)) return false
+
+      // Stop polling and surface timeout if job hasn't progressed — guards against
+      // pods that crash before writing to DB (e.g. MODULE_NOT_FOUND at startup)
+      if (processingStartedAt.current !== null) {
+        const elapsed = Date.now() - processingStartedAt.current
+        if (elapsed > PROCESSING_TIMEOUT_MS) return false
+      }
+      return 3000
     },
   })
 
   // ── Transition out of processing once extraction is done ──────────────────
   useEffect(() => {
-    if (!importStatus) return
+    if (phase !== 'processing') return
+
+    if (!importStatus) {
+      // No data yet — check if we've been waiting too long (job likely dead)
+      if (
+        processingStartedAt.current !== null &&
+        Date.now() - processingStartedAt.current > PROCESSING_TIMEOUT_MS
+      ) {
+        setErrorMsg('Processing timed out — the import job may have failed to start. Please retry.')
+        setPhase('error')
+      }
+      return
+    }
+
     if (importStatus.status === 'failed') {
       setErrorMsg(importStatus.statusMessage ?? 'Extraction failed — please try a different file.')
       setPhase('error')
     } else if (importStatus.status === 'ready_for_review' || importStatus.status === 'completed') {
       setPhase('review')
+    } else if (
+      processingStartedAt.current !== null &&
+      Date.now() - processingStartedAt.current > PROCESSING_TIMEOUT_MS
+    ) {
+      setErrorMsg('Processing timed out — the import job may have failed to start. Please retry.')
+      setPhase('error')
     }
-  }, [importStatus?.status])
+  }, [importStatus?.status, phase])
+
+  // ── Hard timeout timer — fires once polling stops due to timeout ──────────
+  useEffect(() => {
+    if (phase !== 'processing') return
+    const timer = setTimeout(() => {
+      setErrorMsg('Processing timed out — the import job may have failed to start. Please retry.')
+      setPhase('error')
+    }, PROCESSING_TIMEOUT_MS + 3000) // +3s grace for last poll to land
+    return () => clearTimeout(timer)
+  }, [phase])
 
   // ── Career entries — fetched once we reach 'review' ───────────────────────
   const { data: entries = [] } = useQuery<CareerEntry[]>({
@@ -150,6 +190,7 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
 
       // 3. Signal upload complete — dispatches K8s Job
       await completeUploadFn({ data: id })
+      processingStartedAt.current = Date.now()
       setPhase('processing')
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err)
@@ -179,6 +220,7 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
       await retryImportFn({ data: importId })
       setErrorMsg('')
       setRetrying(false)
+      processingStartedAt.current = Date.now()
       setPhase('processing')
     } catch (err) {
       setRetrying(false)
