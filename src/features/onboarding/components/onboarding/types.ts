@@ -4,14 +4,15 @@
 
 import type { GitHubInstallation } from '@/lib/types/github.types'
 
-export type StepId = 'welcome' | 'portfolio' | 'resume' | 'connect' | 'done'
+export type StepId = 'welcome' | 'portfolio' | 'resume' | 'connect' | 'repos' | 'processing'
 
 export const STEPS: Array<{ id: StepId; name: string; required: boolean }> = [
-  { id: 'welcome',   name: 'Welcome',   required: false },
-  { id: 'portfolio', name: 'Portfolio', required: false },
-  { id: 'resume',    name: 'Resume',    required: false },
-  { id: 'connect',   name: 'Connect',   required: true  },
-  { id: 'done',      name: 'Done',      required: false },
+  { id: 'welcome',    name: 'Welcome',       required: false },
+  { id: 'portfolio',  name: 'Portfolio',     required: false },
+  { id: 'resume',     name: 'Resume',        required: false },
+  { id: 'connect',    name: 'Connect',       required: true  },
+  { id: 'repos',      name: 'Repositories',  required: true  },
+  { id: 'processing', name: 'Processing',    required: true  },
 ]
 
 export interface ResumeSummary {
@@ -24,21 +25,17 @@ export interface OnboardingData {
   portfolioUrl?: string
   resume?: { fileName: string; summary: ResumeSummary }
   githubConnected: boolean
+  reposConnected: boolean
 }
 
 export interface OnboardingShellProps {
-  /** Called when the user submits the portfolio URL on step 2. */
   onSubmitPortfolio?: (url: string) => Promise<void> | void
-  /** Called when the user picks a resume file on step 3. Returns parsed summary.
-   *  The optional second argument receives live pipeline step messages for the UI. */
   onUploadResume?: (file: File, onProgress?: (step: string) => void) => Promise<ResumeSummary>
-  /** Called when the user clicks "Connect GitHub". Should redirect to the GitHub App install URL. */
+  /** Sync redirect to GitHub App install URL. */
   onConnectGithub?: () => void
-  /** Called once after step 5. Mark onboarding complete server-side and redirect. */
   onComplete?: () => Promise<void> | void
-  /** Live GitHub installation — drives the "connected" state in ConnectStep. */
   installation?: GitHubInstallation | null
   isLoadingInstallation?: boolean
-  /** Step index to start from (0 = welcome). Used to restore position after GitHub redirect. */
+  /** Step index to restore after GitHub install redirect (0 = welcome). */
   initialStepIndex?: number
 }
