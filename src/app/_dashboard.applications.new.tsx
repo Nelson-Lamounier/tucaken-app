@@ -28,8 +28,8 @@ function ApplicationsNewRoute() {
 
   return (
     <DashboardPage
-      title="Application Analysis"
-      description="Create a new application analysis."
+      title="Resume Analysis"
+      description="Create a new resume analysis."
       headerBottom={<FullWidthBar steps={steps} />}
     >
       {step === 1 && (
