@@ -63,7 +63,7 @@ export function OnboardingShell({
       <div className="relative flex w-full max-w-3xl flex-col">
         <header className="mb-8 flex flex-col gap-6">
           <div className="flex items-center gap-2.5">
-            <div className="grid size-7 place-items-center rounded-lg bg-gradient-to-br from-teal-400 to-emerald-600 font-mono text-xs font-bold text-white">
+            <div className="grid size-7 place-items-center rounded-lg bg-linear-to-br from-teal-400 to-emerald-600 font-mono text-xs font-bold text-white">
               t
             </div>
             <span className="font-mono text-sm font-semibold tracking-tight text-white">tucaken</span>
@@ -90,7 +90,7 @@ export function OnboardingShell({
                 animate="center"
                 exit="exit"
                 transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-                className="min-h-[480px]"
+                className="min-h-120"
               >
                 {s.stepId === 'welcome' && <WelcomeStep onNext={s.next} />}
 
