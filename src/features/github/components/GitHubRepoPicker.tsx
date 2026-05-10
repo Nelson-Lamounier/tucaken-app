@@ -11,13 +11,17 @@ interface GitHubRepoPickerProps {
   readonly accessibleRepos: GitHubAccessibleRepo[] | undefined
   readonly isLoading: boolean
   readonly connectedRepos: ConnectedRepo[] | undefined
+  readonly maxRepos?: number
 }
 
-export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos }: GitHubRepoPickerProps) {
+export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos, maxRepos }: GitHubRepoPickerProps) {
   const [search, setSearch] = useState('')
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const [queuingRepos, setQueuingRepos] = useState<Set<string>>(new Set())
   const ingestion = useGitHubIngestion()
+
+  const connectedCount = connectedRepos?.length ?? 0
+  const atCap = maxRepos !== undefined && connectedCount >= maxRepos
 
   const connectedSet = useMemo(
     () => new Set((connectedRepos ?? []).map((r) => r.repoFullName)),
@@ -59,9 +63,18 @@ export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos }:
             Select repositories to index into the knowledge base
           </p>
         </div>
-        {accessibleRepos && (
-          <span className="text-xs text-zinc-600">{accessibleRepos.length} accessible</span>
-        )}
+        <div>
+          {accessibleRepos && (
+            <span className="text-xs text-zinc-600">{accessibleRepos.length} accessible</span>
+          )}
+          {maxRepos !== undefined && (
+            <p className="mt-1 text-[11px] text-zinc-500">
+              {connectedCount >= maxRepos
+                ? `Maximum of ${maxRepos} repositories reached`
+                : `${connectedCount} of ${maxRepos} repositories connected`}
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="border-b border-white/[0.06] px-4 py-2.5">
@@ -118,7 +131,7 @@ export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos }:
                   <Button
                     variant="secondary"
                     onClick={() => handleAdd(repo.fullName, repo.defaultBranch)}
-                    disabled={isQueuing}
+                    disabled={isQueuing || atCap}
                     className="py-1 px-2.5 text-[10px]"
                   >
                     + Add
