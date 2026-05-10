@@ -30,7 +30,7 @@ import {
   MessageSquareText,
   ExternalLink,
   LogOut,
-  Github,
+  Database,
   CreditCard,
   Settings as SettingsIcon,
 } from "lucide-react";
@@ -97,7 +97,7 @@ const observabilityLinks = [
 const settingsNavigation = [
   { name: "Settings", href: "/settings", icon: SettingsIcon },
   { name: "Billing", href: "/billing", icon: CreditCard },
-  { name: "GitHub", href: "/settings/github", icon: Github },
+  { name: "Database", href: "/settings/github", icon: Database },
 ] as const;
 
 /**
