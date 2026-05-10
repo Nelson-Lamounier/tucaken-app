@@ -73,6 +73,16 @@ function DatabaseSettingsPage() {
     void handleInstall()
   }, [installation_id, navigate, queryClient, addToast])
 
+  // Suppress page content while handling a GitHub App install callback to avoid
+  // a content flash before the redirect fires.
+  if (installation_id) {
+    return (
+      <div className="flex h-64 items-center justify-center text-sm text-zinc-500">
+        Connecting GitHub…
+      </div>
+    )
+  }
+
   const tabs: Array<{ id: Tab; label: string; icon: React.ReactNode }> = [
     { id: 'repositories', label: 'Repositories', icon: <GitBranch className="size-4" /> },
     { id: 'resumes',      label: 'Resumes',       icon: <FileText className="size-4" /> },
