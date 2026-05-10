@@ -24,7 +24,7 @@ export function ProcessingStep() {
   }, [connectedRepos, navigate])
 
   return (
-    <div className="flex h-[480px] flex-col items-center justify-center gap-6 text-center">
+    <div className="flex h-120 flex-col items-center justify-center gap-6 text-center">
       <div className="relative">
         <motion.div
           className="size-16 rounded-full border-2 border-teal-400/20"
