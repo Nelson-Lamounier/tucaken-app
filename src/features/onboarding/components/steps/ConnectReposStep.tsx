@@ -5,6 +5,8 @@ import { GitHubRepoPicker } from '@/features/github/components/GitHubRepoPicker'
 import { GitHubConnectedRepos } from '@/features/github/components/GitHubConnectedRepos'
 import type { GitHubInstallation, GitHubAccessibleRepo, ConnectedRepo } from '@/lib/types/github.types'
 
+const MAX_REPOS = 3
+
 interface ConnectReposStepProps {
   readonly installation: GitHubInstallation | null | undefined
   readonly isLoadingInstallation: boolean
@@ -12,6 +14,8 @@ interface ConnectReposStepProps {
   readonly isLoadingRepos: boolean
   readonly connectedRepos: ConnectedRepo[] | undefined
   readonly onNext: () => void
+  /** When true, enforces the 3-repo cap and shows "Next: Start Indexing". */
+  readonly enforceLimit?: boolean
 }
 
 export function ConnectReposStep({
@@ -21,8 +25,10 @@ export function ConnectReposStep({
   isLoadingRepos,
   connectedRepos,
   onNext,
+  enforceLimit = false,
 }: ConnectReposStepProps) {
-  const hasConnected = (connectedRepos?.length ?? 0) > 0
+  const connectedCount = connectedRepos?.length ?? 0
+  const hasConnected = connectedCount > 0
 
   return (
     <div className="space-y-6">
@@ -32,6 +38,11 @@ export function ConnectReposStep({
           Select which GitHub repos to index. Tucaken kicks off ingestion and enriches each previous
           role against your actual commit history.
         </p>
+        {enforceLimit && (
+          <p className="mt-1 text-xs text-zinc-600">
+            You can connect up to {MAX_REPOS} repositories during onboarding.
+          </p>
+        )}
       </div>
 
       <div className="space-y-4">
@@ -41,6 +52,7 @@ export function ConnectReposStep({
             accessibleRepos={accessibleRepos}
             isLoading={isLoadingRepos}
             connectedRepos={connectedRepos}
+            maxRepos={enforceLimit ? MAX_REPOS : undefined}
           />
         )}
         {installation && <GitHubConnectedRepos connectedRepos={connectedRepos} />}
@@ -53,7 +65,11 @@ export function ConnectReposStep({
           disabled={!hasConnected}
           className="flex items-center gap-1.5"
         >
-          {hasConnected ? 'Next: Generate Resume' : 'Add a repo to continue'}
+          {hasConnected
+            ? enforceLimit
+              ? 'Next: Start Indexing'
+              : 'Next'
+            : 'Add a repo to continue'}
           {hasConnected && <ChevronRight className="h-4 w-4" />}
         </Button>
       </div>
