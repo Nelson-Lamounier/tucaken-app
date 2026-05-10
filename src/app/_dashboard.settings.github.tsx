@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueryClient, useQuery } from '@tanstack/react-query'
 import { z } from 'zod'
 import { GitBranch, FileText, Plus } from 'lucide-react'
 import { DashboardPage } from '@/components/layouts/DashboardPage'
@@ -15,7 +15,6 @@ import { getResumesFn } from '@/server/resumes'
 import { handleGitHubInstallFn } from '@/server/github'
 import { adminKeys } from '@/lib/api/query-keys'
 import { useToastStore } from '@/lib/stores/toast-store'
-import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/Button'
 
 type Tab = 'repositories' | 'resumes'
@@ -23,7 +22,7 @@ type Tab = 'repositories' | 'resumes'
 const searchSchema = z.object({
   installation_id: z.coerce.string().optional(),
   setup_action:    z.coerce.string().optional(),
-  tab:             z.enum(['repositories', 'resumes']).catch('repositories'),
+  tab:             z.enum(['repositories', 'resumes']).default('repositories'),
 })
 
 export const Route = createFileRoute('/_dashboard/settings/github')({
@@ -56,7 +55,6 @@ function DatabaseSettingsPage() {
         await handleGitHubInstallFn({ data: { installationId: id } })
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'GitHub installation failed'
-        console.error('[database] installation callback error:', msg)
         addToast('error', `GitHub connect failed: ${msg}`)
       } finally {
         await queryClient.invalidateQueries({ queryKey: adminKeys.github.installation() })
@@ -145,7 +143,7 @@ function DatabaseSettingsPage() {
                 </div>
 
                 {resumes && resumes.length > 0 ? (
-                  <ul className="divide-y divide-white/[0.06] rounded-xl border border-white/10">
+                  <ul className="divide-y divide-white/6 rounded-xl border border-white/10">
                     {resumes.map((r) => (
                       <li key={r.resumeId} className="flex items-center justify-between px-4 py-3">
                         <div>
