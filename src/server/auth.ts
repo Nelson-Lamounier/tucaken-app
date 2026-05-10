@@ -367,22 +367,41 @@ export const confirmSignUpFn = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const { client, clientId } = makeCognitoClient()
 
-    await client.send(
-      new ConfirmSignUpCommand({
-        ClientId: clientId,
-        Username: data.email,
-        ConfirmationCode: data.code,
-      }),
-    )
+    try {
+      await client.send(
+        new ConfirmSignUpCommand({
+          ClientId: clientId,
+          Username: data.email,
+          ConfirmationCode: data.code,
+        }),
+      )
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        logAuthError('auth_confirm_signup_failed', err.message, { errorCode: err.name })
+        if (err.name === 'CodeMismatchException') throw new Error('Incorrect verification code — check your email and try again')
+        if (err.name === 'ExpiredCodeException')  throw new Error('This code has expired — request a new one below')
+        throw new Error(err.message)
+      }
+      throw new Error('Verification failed')
+    }
 
     // Auto sign-in after confirmation
-    const res = await client.send(
-      new InitiateAuthCommand({
-        AuthFlow: 'USER_PASSWORD_AUTH',
-        ClientId: clientId,
-        AuthParameters: { USERNAME: data.email, PASSWORD: data.password },
-      }),
-    )
+    let res
+    try {
+      res = await client.send(
+        new InitiateAuthCommand({
+          AuthFlow: 'USER_PASSWORD_AUTH',
+          ClientId: clientId,
+          AuthParameters: { USERNAME: data.email, PASSWORD: data.password },
+        }),
+      )
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        logAuthError('auth_confirm_signup_signin_failed', err.message, { errorCode: err.name })
+        throw new Error(err.message)
+      }
+      throw new Error('Authentication failed after email confirmation')
+    }
 
     const idToken = res.AuthenticationResult?.IdToken
     if (!idToken) throw new Error('Authentication failed after email confirmation')
