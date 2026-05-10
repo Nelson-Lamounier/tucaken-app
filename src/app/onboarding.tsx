@@ -22,7 +22,7 @@ const searchSchema = z.object({
   setup_action:    z.coerce.string().optional(),
   // Step index (0-based) to restore after GitHub redirects back.
   // The callback handler sets this to 3 (connect step) so the user lands there.
-  step:            z.coerce.number().min(0).max(4).optional(),
+  step:            z.coerce.number().min(0).max(5).optional(),
 })
 
 export const Route = createFileRoute('/onboarding')({
@@ -182,9 +182,6 @@ function OnboardingPage() {
         installation={installation}
         isLoadingInstallation={isLoadingInstallation}
         initialStepIndex={step}
-        onComplete={async () => {
-          await navigate({ to: '/overview' })
-        }}
       />
     </div>
   )
