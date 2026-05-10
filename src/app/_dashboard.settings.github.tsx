@@ -58,7 +58,16 @@ function DatabaseSettingsPage() {
         addToast('error', `GitHub connect failed: ${msg}`)
       } finally {
         await queryClient.invalidateQueries({ queryKey: adminKeys.github.installation() })
-        void navigate({ to: '/settings/github', replace: true, search: { tab: 'repositories' } })
+        // If the install was triggered from onboarding, return there (repos step).
+        // GitHub's App Setup URL is fixed to /settings/github, so we coordinate
+        // the return destination via localStorage.
+        const returnTo = localStorage.getItem('github_install_return')
+        localStorage.removeItem('github_install_return')
+        if (returnTo === 'onboarding') {
+          void navigate({ to: '/onboarding', replace: true, search: { step: 4 } })
+        } else {
+          void navigate({ to: '/settings/github', replace: true, search: { tab: 'repositories' } })
+        }
       }
     }
     void handleInstall()

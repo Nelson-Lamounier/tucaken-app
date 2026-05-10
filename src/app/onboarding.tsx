@@ -55,8 +55,8 @@ function OnboardingPage() {
     async function handleInstall() {
       try {
         await handleGitHubInstallFn({ data: { installationId: id } })
-      } catch (err) {
-        console.error('[onboarding] GitHub installation callback error:', err instanceof Error ? err.message : err)
+      } catch {
+        // callback error is non-fatal — installation may still have succeeded
       } finally {
         await queryClient.invalidateQueries({ queryKey: adminKeys.github.installation() })
         // Remove installation_id from the URL and land on the connect step.
@@ -85,6 +85,9 @@ function OnboardingPage() {
       <OnboardingShell
         onConnectGithub={() => {
           if (appSlug) {
+            // Flag so the settings-page callback handler redirects back to onboarding
+            // instead of staying on /settings/github (GitHub App Setup URL is fixed).
+            localStorage.setItem('github_install_return', 'onboarding')
             globalThis.location.href = `https://github.com/apps/${appSlug}/installations/new`
           }
         }}
