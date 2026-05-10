@@ -29,6 +29,7 @@ export function ConnectReposStep({
 }: ConnectReposStepProps) {
   const connectedCount = connectedRepos?.length ?? 0
   const hasConnected = connectedCount > 0
+  const nextLabel = hasConnected ? (enforceLimit ? 'Next: Start Indexing' : 'Next') : 'Add a repo to continue'
 
   return (
     <div className="space-y-6">
@@ -65,11 +66,7 @@ export function ConnectReposStep({
           disabled={!hasConnected}
           className="flex items-center gap-1.5"
         >
-          {hasConnected
-            ? enforceLimit
-              ? 'Next: Start Indexing'
-              : 'Next'
-            : 'Add a repo to continue'}
+          {nextLabel}
           {hasConnected && <ChevronRight className="h-4 w-4" />}
         </Button>
       </div>
