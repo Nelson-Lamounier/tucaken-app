@@ -26,8 +26,11 @@ export function OnboardingShell({
   onSubmitPortfolio,
   onConnectGithub,
   onComplete,
+  installation,
+  isLoadingInstallation,
+  initialStepIndex = 0,
 }: Readonly<OnboardingShellProps>) {
-  const s = useOnboardingState()
+  const s = useOnboardingState(initialStepIndex)
 
   // Step 5 ("done") is a one-frame state — we run onComplete and let the
   // parent route navigate away.
@@ -49,13 +52,8 @@ export function OnboardingShell({
     await onSubmitPortfolio?.(url)
   }
 
-  async function handleConnectGithub() {
-    if (onConnectGithub) {
-      await onConnectGithub()
-      return
-    }
-    // Local-dev fallback: simulate the round-trip
-    await new Promise((r) => setTimeout(r, 600))
+  function handleConnectGithub() {
+    onConnectGithub?.()
   }
 
   const visibleIndex = Math.min(s.stepIndex, VISIBLE_STEPS.length - 1)
@@ -117,8 +115,8 @@ export function OnboardingShell({
 
                 {s.stepId === 'connect' && (
                   <ConnectStep
-                    connected={s.data.githubConnected}
-                    setConnected={s.setGithubConnected}
+                    installation={installation}
+                    isLoadingInstallation={isLoadingInstallation}
                     onConnectGithub={handleConnectGithub}
                     onNext={s.next}
                     onBack={s.back}

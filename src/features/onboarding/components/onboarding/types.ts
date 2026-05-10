@@ -2,6 +2,8 @@
 //
 // Shared types for the first-run onboarding flow.
 
+import type { GitHubInstallation } from '@/lib/types/github.types'
+
 export type StepId = 'welcome' | 'portfolio' | 'resume' | 'connect' | 'done'
 
 export const STEPS: Array<{ id: StepId; name: string; required: boolean }> = [
@@ -30,8 +32,13 @@ export interface OnboardingShellProps {
   /** Called when the user picks a resume file on step 3. Returns parsed summary.
    *  The optional second argument receives live pipeline step messages for the UI. */
   onUploadResume?: (file: File, onProgress?: (step: string) => void) => Promise<ResumeSummary>
-  /** Called when the user clicks "Connect GitHub". Should kick off OAuth. */
-  onConnectGithub?: () => Promise<void> | void
+  /** Called when the user clicks "Connect GitHub". Should redirect to the GitHub App install URL. */
+  onConnectGithub?: () => void
   /** Called once after step 5. Mark onboarding complete server-side and redirect. */
   onComplete?: () => Promise<void> | void
+  /** Live GitHub installation — drives the "connected" state in ConnectStep. */
+  installation?: GitHubInstallation | null
+  isLoadingInstallation?: boolean
+  /** Step index to start from (0 = welcome). Used to restore position after GitHub redirect. */
+  initialStepIndex?: number
 }

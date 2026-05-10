@@ -1,7 +1,13 @@
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
+import { useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { motion } from 'motion/react'
 import { AlertTriangle } from 'lucide-react'
+import { z } from 'zod'
 import { OnboardingShell } from '@/features/onboarding/components/onboarding/OnboardingShell'
+import { useGitHubInstallation } from '@/features/github/hooks/use-github-installation'
+import { handleGitHubInstallFn } from '@/server/github'
+import { adminKeys } from '@/lib/api/query-keys'
 import {
   getUploadUrlFn,
   completeUploadFn,
@@ -11,7 +17,16 @@ import {
 import { getMeFn } from '@/server/me'
 import type { ResumeSummary } from '@/features/onboarding/components/onboarding/types'
 
+const searchSchema = z.object({
+  installation_id: z.coerce.string().optional(),
+  setup_action:    z.coerce.string().optional(),
+  // Step index (0-based) to restore after GitHub redirects back.
+  // The callback handler sets this to 3 (connect step) so the user lands there.
+  step:            z.coerce.number().min(0).max(4).optional(),
+})
+
 export const Route = createFileRoute('/onboarding')({
+  validateSearch: searchSchema,
   beforeLoad: async ({ context }) => {
     if (!context.auth.user) throw redirect({ to: '/sign-in' })
   },
@@ -109,9 +124,38 @@ async function uploadResume(
   return { roles, education, skills }
 }
 
+// connect step is index 3 in the STEPS array (welcome/portfolio/resume/connect/done)
+const CONNECT_STEP_INDEX = 3
+
 function OnboardingPage() {
-  const navigate = useNavigate()
-  const { provisioningReady } = Route.useLoaderData()
+  const navigate                         = useNavigate()
+  const queryClient                      = useQueryClient()
+  const { provisioningReady }            = Route.useLoaderData()
+  const { installation_id, step }        = Route.useSearch()
+  const { data: installation, isLoading: isLoadingInstallation } = useGitHubInstallation()
+
+  const appSlug = import.meta.env.VITE_GITHUB_APP_SLUG as string | undefined
+
+  // Handle the GitHub App installation callback — same pattern as /settings/github.
+  // GitHub redirects here with ?installation_id=...&setup_action=install after the user
+  // completes the App installation flow.
+  useEffect(() => {
+    if (!installation_id) return
+    const id = installation_id
+    async function handleInstall() {
+      try {
+        await handleGitHubInstallFn({ data: { installationId: id } })
+      } catch (err) {
+        console.error('[onboarding] GitHub installation callback error:', err instanceof Error ? err.message : err)
+      } finally {
+        await queryClient.invalidateQueries({ queryKey: adminKeys.github.installation() })
+        // Remove installation_id from the URL and land on the connect step.
+        void navigate({ to: '/onboarding', replace: true, search: { step: CONNECT_STEP_INDEX } })
+      }
+    }
+    void handleInstall()
+  }, [installation_id, navigate, queryClient])
+
   return (
     <div className="relative">
       {!provisioningReady && (
@@ -130,6 +174,14 @@ function OnboardingPage() {
       )}
       <OnboardingShell
         onUploadResume={uploadResume}
+        onConnectGithub={() => {
+          if (appSlug) {
+            globalThis.location.href = `https://github.com/apps/${appSlug}/installations/new`
+          }
+        }}
+        installation={installation}
+        isLoadingInstallation={isLoadingInstallation}
+        initialStepIndex={step}
         onComplete={async () => {
           await navigate({ to: '/overview' })
         }}

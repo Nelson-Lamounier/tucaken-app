@@ -18,8 +18,10 @@ const STEP_INDEX: Record<StepId, number> = {
 
 const ID_BY_INDEX: StepId[] = STEPS.map((s) => s.id)
 
-export function useOnboardingState() {
-  const [stepIndex, setStepIndex] = useState(0)
+export function useOnboardingState(initialStepIndex = 0) {
+  const [stepIndex, setStepIndex] = useState(() =>
+    Math.min(Math.max(initialStepIndex, 0), ID_BY_INDEX.length - 1),
+  )
   const [data, setData] = useState<OnboardingData>({ githubConnected: false })
 
   const stepId = ID_BY_INDEX[stepIndex]
