@@ -21,6 +21,7 @@ type Tab = 'repositories' | 'resumes'
 
 const searchSchema = z.object({
   installation_id: z.coerce.string().optional(),
+  // GitHub appends setup_action=install automatically — accepted but not used.
   setup_action:    z.coerce.string().optional(),
   tab:             z.enum(['repositories', 'resumes']).default('repositories'),
 })
@@ -36,7 +37,6 @@ function DatabaseSettingsPage() {
   const { installation_id, tab } = Route.useSearch()
   const { addToast } = useToastStore()
 
-  const [activeTab, setActiveTab]       = useState<Tab>(tab)
   const [addingResume, setAddingResume] = useState(false)
 
   const { data: installation, isLoading: isLoadingInstallation } = useGitHubInstallation()
@@ -82,10 +82,10 @@ function DatabaseSettingsPage() {
             <button
               key={t.id}
               type="button"
-              onClick={() => setActiveTab(t.id)}
+              onClick={() => void navigate({ to: '/settings/github', search: { tab: t.id }, replace: true })}
               className={[
                 'flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors',
-                activeTab === t.id
+                tab === t.id
                   ? 'border-teal-400 text-teal-300'
                   : 'border-transparent text-zinc-500 hover:text-zinc-300',
               ].join(' ')}
@@ -98,7 +98,7 @@ function DatabaseSettingsPage() {
       </div>
 
       <div className="mt-6">
-        {activeTab === 'repositories' && (
+        {tab === 'repositories' && (
           <div className="max-w-3xl space-y-6">
             <GitHubAccountSection installation={installation} isLoading={isLoadingInstallation} />
             {installation && (
@@ -112,7 +112,7 @@ function DatabaseSettingsPage() {
           </div>
         )}
 
-        {activeTab === 'resumes' && (
+        {tab === 'resumes' && (
           <div className="max-w-3xl space-y-6">
             {addingResume ? (
               <div>
