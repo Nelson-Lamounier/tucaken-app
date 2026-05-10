@@ -30,10 +30,8 @@ export interface OnboardingData {
 
 export interface OnboardingShellProps {
   onSubmitPortfolio?: (url: string) => Promise<void> | void
-  onUploadResume?: (file: File, onProgress?: (step: string) => void) => Promise<ResumeSummary>
   /** Sync redirect to GitHub App install URL. */
   onConnectGithub?: () => void
-  onComplete?: () => Promise<void> | void
   installation?: GitHubInstallation | null
   isLoadingInstallation?: boolean
   /** Step index to restore after GitHub install redirect (0 = welcome). */
