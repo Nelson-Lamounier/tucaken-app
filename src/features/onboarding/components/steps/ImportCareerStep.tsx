@@ -24,8 +24,8 @@ import {
   listCareerEntriesFn,
   retryImportFn,
   updateCareerEntryFn,
-} from '../../../../server/resume-imports'
-import type { CareerEntry } from '../../../../server/resume-imports'
+} from '@/server/resume-imports'
+import type { CareerEntry } from '@/server/resume-imports'
 import { EnhanceRoleCard } from './EnhanceRoleCard'
 
 type Phase =

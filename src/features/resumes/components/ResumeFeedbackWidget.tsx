@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { HandThumbUpIcon, HandThumbDownIcon } from '@heroicons/react/24/outline'
 import { HandThumbUpIcon as HandThumbUpSolid, HandThumbDownIcon as HandThumbDownSolid } from '@heroicons/react/24/solid'
 import { useMutation } from '@tanstack/react-query'
-import { submitPromptFeedbackFn } from '../../../server/prompt-feedback'
+import { submitPromptFeedbackFn } from '@/server/prompt-feedback'
 import { useToastStore } from '@/lib/stores/toast-store'
 
 interface ResumeFeedbackWidgetProps {

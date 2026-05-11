@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useForm } from '@tanstack/react-form'
 import { z } from 'zod'
-import { Button } from '../../../components/ui/Button'
-import { FormTextarea } from '../../../components/ui/Field'
+import { Button } from '@/components/ui/Button'
+import { FormTextarea } from '@/components/ui/Field'
 
 interface CoverLetterFormProps {
   readonly initialContent?: string

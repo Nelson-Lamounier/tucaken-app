@@ -8,7 +8,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { adminKeys } from '@/lib/api/query-keys'
-import { triggerPipelineActionFn } from '../../../server/pipelines'
+import { triggerPipelineActionFn } from '@/server/pipelines'
 
 export interface PipelineActionResponse {
   readonly success: true

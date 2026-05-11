@@ -14,7 +14,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { adminKeys } from '@/lib/api/query-keys'
-import { getPipelineStatusFn } from '../../../server/pipelines'
+import { getPipelineStatusFn } from '@/server/pipelines'
 
 export type PipelineState =
   | 'pending'

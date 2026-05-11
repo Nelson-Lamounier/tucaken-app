@@ -1,5 +1,5 @@
 import { BookOpen, DollarSign, Lightbulb, MessageSquare } from 'lucide-react'
-import { StatsCard, type StatItem } from '../../../components/ui/StatsCard'
+import { StatsCard, type StatItem } from '@/components/ui/StatsCard'
 
 export interface ApplicationStats {
   cumulativeCostUsd: number

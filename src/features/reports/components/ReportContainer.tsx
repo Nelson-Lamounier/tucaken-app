@@ -8,12 +8,12 @@ import {
   EllipsisHorizontalIcon,
   PlusSmallIcon,
 } from '@heroicons/react/20/solid'
-import { Stats } from '../../../components/ui/Stats'
+import { Stats } from '@/components/ui/Stats'
 import { useQuery } from '@tanstack/react-query'
 import { finopsQueries, articlePipelineQueries, promptQualityQueries } from '../queries'
-import type { ArticleSummary } from '../../../server/articles'
-import type { RealtimeUsageStats, ChatbotUsageStats, SelfHealingStats } from '../../../server/finops'
-import type { PromptQualityStats } from '../../../server/prompt-feedback'
+import type { ArticleSummary } from '@/server/articles'
+import type { RealtimeUsageStats, ChatbotUsageStats, SelfHealingStats } from '@/server/finops'
+import type { PromptQualityStats } from '@/server/prompt-feedback'
 
 const secondaryNavigation = [
   { name: 'Last 7 days', days: 7 },

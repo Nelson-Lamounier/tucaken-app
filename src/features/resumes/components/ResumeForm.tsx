@@ -6,8 +6,8 @@ import { z } from 'zod'
 
 // Icon imports for styling
 
-import { Button, AddButton, RemoveButton, AddSubItemButton, RemoveSubItemButton } from '../../../components/ui/Button'
-import { FormInput, FormTextarea, FieldInfo } from '../../../components/ui/Field'
+import { Button, AddButton, RemoveButton, AddSubItemButton, RemoveSubItemButton } from '@/components/ui/Button'
+import { FormInput, FormTextarea, FieldInfo } from '@/components/ui/Field'
 
 // ============================================================================
 // Types

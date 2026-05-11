@@ -8,7 +8,7 @@ import {
 import type { ApplicationSummary } from '@/lib/types/applications.types'
 import { RECOMMENDATION_LABELS } from './ApplicationTypes'
 import { FitRatingChip } from './FitRatingChip'
-import { LinkCard } from '../../../components/ui/LinkCards'
+import { LinkCard } from '@/components/ui/LinkCards'
 
 interface ApplicationCardProps {
   readonly app: ApplicationSummary

@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { adminKeys } from '@/lib/api/query-keys'
-import { publishDraftFn } from '../../../server/draft-publish'
+import { publishDraftFn } from '@/server/draft-publish'
 
 interface PublishDraftParams {
   readonly fileName: string

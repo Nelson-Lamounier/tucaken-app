@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ArticleWithSlug } from '@/lib/types/article.types'
-import { DashboardDrawer } from '../../../components/ui/DashboardDrawer'
+import { DashboardDrawer } from '@/components/ui/DashboardDrawer'
 import { ArticleEditorDrawerContent } from './ArticleEditorDrawerContent'
 import {
   useDeleteArticle,

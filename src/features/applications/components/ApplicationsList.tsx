@@ -11,10 +11,10 @@ import { useApplicationsStore } from '@/lib/stores/applications-store'
 import type { ApplicationStatus } from '@/lib/types/applications.types'
 import { STATUS_FILTER_OPTIONS } from './ApplicationTypes'
 import { ApplicationCard } from './ApplicationCard'
-import { CustomDropDown } from '../../../components/ui/CustomDropDown'
-import { CommandPallete } from '../../../components/ui/CommandPallete'
-import type { CommandPalleteItem } from '../../../components/ui/CommandPallete'
-import { Pagination } from '../../../components/ui/Pagination'
+import { CustomDropDown } from '@/components/ui/CustomDropDown'
+import { CommandPallete } from '@/components/ui/CommandPallete'
+import type { CommandPalleteItem } from '@/components/ui/CommandPallete'
+import { Pagination } from '@/components/ui/Pagination'
 
 export function ApplicationsList({ initialStage }: { initialStage?: string }) {
   const navigate = useNavigate()

@@ -11,7 +11,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { adminKeys } from '@/lib/api/query-keys'
-import { triggerApplicationsAnalysisFn } from '../../../server/pipelines'
+import { triggerApplicationsAnalysisFn } from '@/server/pipelines'
 import type { AnalyseTriggerBody, TriggerResponse } from '@/lib/types/applications.types'
 
 /**

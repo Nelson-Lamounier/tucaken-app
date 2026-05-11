@@ -12,7 +12,7 @@ import {
 import { useApplicationDetail, useApplicationStatus } from '@/hooks/use-admin-applications'
 import type { ApplicationStatus } from '@/lib/types/applications.types'
 import { ApplicationReviewDetail } from './ApplicationReviewDetail'
-import DropDownOptions from '../../../components/ui/DropDownOptions'
+import DropDownOptions from '@/components/ui/DropDownOptions'
 
 import {
   STATUS_OPTIONS,

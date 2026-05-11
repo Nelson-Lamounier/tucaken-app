@@ -18,20 +18,20 @@ import {
   deleteResumeFn,
   getResumeFn,
   createResumeFn,
-} from '../../../server/resumes'
-import { getTailoredResumesFn } from '../../../server/applications'
-import type { TailoredResumeSummary } from '../../../server/applications'
-import type { ResumeSummary } from '../../../server/resumes'
+} from '@/server/resumes'
+import { getTailoredResumesFn } from '@/server/applications'
+import type { TailoredResumeSummary } from '@/server/applications'
+import type { ResumeSummary } from '@/server/resumes'
 import type { ResumeData } from '@/lib/resumes/resume-data'
 import { useToastStore } from '@/lib/stores/toast-store'
 import { buildResumeDomForPdf, A4_WIDTH, A4_HEIGHT, PDF_BG } from '@/lib/resumes/resume-dom-builder'
 import { adminKeys } from '@/lib/api/query-keys'
 
 import { Link } from '@tanstack/react-router'
-import { SectionHeader } from '../../../components/ui/SectionHeader'
-import { Button } from '../../../components/ui/Button'
-import { DashboardDrawer } from '../../../components/ui/DashboardDrawer'
-import { ResumeDocument } from '../../../components/resume/ResumeDocument'
+import { SectionHeader } from '@/components/ui/SectionHeader'
+import { Button } from '@/components/ui/Button'
+import { DashboardDrawer } from '@/components/ui/DashboardDrawer'
+import { ResumeDocument } from '@/components/resume/ResumeDocument'
 
 export function ResumesDisplayer() {
   const { addToast } = useToastStore()

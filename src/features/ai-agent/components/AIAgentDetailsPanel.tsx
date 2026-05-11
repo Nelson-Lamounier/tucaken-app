@@ -1,4 +1,4 @@
-import { ProgressBar, type ProgressStep, type ProgressStepStatus } from '../../../components/ui/ProgressBar'
+import { ProgressBar, type ProgressStep, type ProgressStepStatus } from '@/components/ui/ProgressBar'
 import type { PipelineState } from '../hooks/use-pipeline-status'
 import type { AgentMode } from './AIAgentTypes'
 

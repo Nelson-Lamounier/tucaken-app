@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { requeueApplicationFn } from '../../../server/pipelines'
+import { requeueApplicationFn } from '@/server/pipelines'
 
 /**
  * Mutation hook for requeuing a failed application analysis via the SQS DLQ.

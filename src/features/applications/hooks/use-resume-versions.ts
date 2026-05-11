@@ -11,7 +11,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { adminKeys } from '@/lib/api/query-keys'
-import { getResumesFn } from '../../../server/resumes'
+import { getResumesFn } from '@/server/resumes'
 
 export interface AdminResume {
   readonly resumeId: string

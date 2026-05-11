@@ -3,9 +3,9 @@
 import { Download } from 'lucide-react'
 import { ResumeDocument } from '@/components/resume/ResumeDocument'
 import { CoverLetterDocument } from '@/components/resume/CoverLetterDocument'
-import { Button } from '../../../components/ui/Button'
+import { Button } from '@/components/ui/Button'
 import type { AdminResumeWithData } from '../../applications/hooks/use-resume-versions'
-import { DashboardDrawer } from '../../../components/ui/DashboardDrawer'
+import { DashboardDrawer } from '@/components/ui/DashboardDrawer'
 import type { ResumeData, ResumeProfile } from '@/lib/resumes/resume-data'
 import { ResumeFeedbackWidget } from './ResumeFeedbackWidget'
 

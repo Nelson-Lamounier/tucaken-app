@@ -12,9 +12,9 @@ import type { ArticleWithSlug } from '@/lib/types/article.types'
 import { useAdminArticles } from '@/hooks/use-admin-articles'
 import { useAdminComments } from '@/hooks/use-admin-comments'
 import { useQuery } from '@tanstack/react-query'
-import { getResumesFn } from '../../../server/resumes'
+import { getResumesFn } from '@/server/resumes'
 import { finopsQueries, articlePipelineQueries } from '../../reports/queries'
-import { Stats } from '../../../components/ui/Stats'
+import { Stats } from '@/components/ui/Stats'
 
 // =============================================================================
 // CONSTANTS

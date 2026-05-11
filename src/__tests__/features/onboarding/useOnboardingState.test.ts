@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
-import { useOnboardingState } from '../../../features/onboarding/components/onboarding/useOnboardingState'
+import { useOnboardingState } from '@/features/onboarding/components/onboarding/useOnboardingState'
 
 describe('useOnboardingState', () => {
   it('starts at welcome by default', () => {

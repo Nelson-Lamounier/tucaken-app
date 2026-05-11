@@ -12,8 +12,8 @@ import { useApplicationsTrigger } from '../hooks/use-applications-trigger'
 import { usePipelineNotificationsStore } from '@/lib/stores/pipeline-notifications-store'
 import type { InterviewStage } from '@/lib/types/applications.types'
 import { INTERVIEW_STAGE_OPTIONS, MIN_JD_LENGTH } from './ApplicationTypes'
-import { FormInput } from '../../../components/ui/Field'
-import { Button } from '../../../components/ui/Button'
+import { FormInput } from '@/components/ui/Field'
+import { Button } from '@/components/ui/Button'
 import { ProgressBars } from './ProgressBars'
 
 function DraftSaver({ values }: { readonly values: Record<string, unknown> }) {
