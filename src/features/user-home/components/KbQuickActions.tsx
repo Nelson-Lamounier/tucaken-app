@@ -11,7 +11,7 @@ export function KbQuickActions() {
 
         <Link
           to="/ai-agent"
-          className="group flex items-center gap-4 rounded-xl border border-white/10 bg-white/4 p-4 transition-all hover:border-teal-500/30 hover:bg-white/[0.04]"
+          className="group flex items-center gap-4 rounded-xl border border-white/10 bg-white/4 p-4 transition-all hover:border-teal-500/30 hover:bg-white/4"
         >
           <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-teal-500/10 text-teal-400 ring-1 ring-inset ring-teal-500/20">
             <Bot className="size-5" />
@@ -25,7 +25,7 @@ export function KbQuickActions() {
         <Link
           to="/settings/github"
           search={{ tab: 'resumes' }}
-          className="group flex items-center gap-4 rounded-xl border border-white/10 bg-white/4 p-4 transition-all hover:border-teal-500/30 hover:bg-white/[0.04]"
+          className="group flex items-center gap-4 rounded-xl border border-white/10 bg-white/4 p-4 transition-all hover:border-teal-500/30 hover:bg-white/4"
         >
           <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-teal-500/10 text-teal-400 ring-1 ring-inset ring-teal-500/20">
             <Upload className="size-5" />
@@ -39,7 +39,7 @@ export function KbQuickActions() {
         <Link
           to="/settings/github"
           search={{ tab: 'repositories' }}
-          className="group flex items-center gap-4 rounded-xl border border-white/10 bg-white/4 p-4 transition-all hover:border-teal-500/30 hover:bg-white/[0.04]"
+          className="group flex items-center gap-4 rounded-xl border border-white/10 bg-white/4 p-4 transition-all hover:border-teal-500/30 hover:bg-white/4"
         >
           <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-teal-500/10 text-teal-400 ring-1 ring-inset ring-teal-500/20">
             <GitBranch className="size-5" />
@@ -52,7 +52,7 @@ export function KbQuickActions() {
 
         <Link
           to="/applications"
-          className="group flex items-center gap-4 rounded-xl border border-white/10 bg-white/4 p-4 transition-all hover:border-teal-500/30 hover:bg-white/[0.04]"
+          className="group flex items-center gap-4 rounded-xl border border-white/10 bg-white/4 p-4 transition-all hover:border-teal-500/30 hover:bg-white/4"
         >
           <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-teal-500/10 text-teal-400 ring-1 ring-inset ring-teal-500/20">
             <Briefcase className="size-5" />
