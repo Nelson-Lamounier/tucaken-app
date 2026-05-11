@@ -6,7 +6,7 @@ describe('deriveKbStats', () => {
     ({ syncStatus: status })
   const entry = (type: string) => ({ entryType: type })
   const imp = (status: string, entries = 0) =>
-    ({ status, careerEntriesCreated: Array(entries).fill('id'), embeddingsCreatedCount: 0 })
+    ({ status, careerEntriesCreated: new Array(entries).fill('id'), embeddingsCreatedCount: 0 })
 
   it('counts repos by sync status', () => {
     const result = deriveKbStats(
