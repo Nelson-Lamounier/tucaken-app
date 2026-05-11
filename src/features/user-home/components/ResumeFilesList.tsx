@@ -45,13 +45,15 @@ export function ResumeFilesList({ imports, isLoading }: ResumeFilesListProps) {
             const isOk     = imp.status === 'completed' || imp.status === 'ready_for_review'
             const isFailed = imp.status === 'failed'
 
-            const badgeClass = isOk
-              ? 'bg-emerald-500/15 text-emerald-300 ring-emerald-400/25'
-              : isFailed
-                ? 'bg-red-500/15 text-red-300 ring-red-400/25'
-                : 'bg-indigo-500/15 text-indigo-300 ring-indigo-400/25'
+            let badgeClass: string
+            if (isOk)          { badgeClass = 'bg-emerald-500/15 text-emerald-300 ring-emerald-400/25' }
+            else if (isFailed) { badgeClass = 'bg-red-500/15 text-red-300 ring-red-400/25' }
+            else               { badgeClass = 'bg-indigo-500/15 text-indigo-300 ring-indigo-400/25' }
 
-            const badgeLabel = isOk ? 'Processed' : isFailed ? 'Failed' : 'Processing'
+            let badgeLabel: string
+            if (isOk)          { badgeLabel = 'Processed' }
+            else if (isFailed) { badgeLabel = 'Failed' }
+            else               { badgeLabel = 'Processing' }
 
             return (
               <li key={imp.id} className="flex items-center gap-3 px-4 py-3">
