@@ -9,6 +9,7 @@ import {
   PlusSmallIcon,
 } from '@heroicons/react/20/solid'
 import { Stats } from '@/components/ui/Stats'
+import { DashboardOverview } from '@/features/overview/components/DashboardOverview'
 import { useQuery } from '@tanstack/react-query'
 import { finopsQueries, articlePipelineQueries, promptQualityQueries } from '../queries'
 import type { ArticleSummary } from '@/server/articles'
@@ -33,7 +34,7 @@ function classNames(...classes: (string | undefined | null | false)[]) {
 
 export default function ReportContainer() {
   const [period, setPeriod] = useState(7)
-  const [activeTab, setActiveTab] = useState<'all' | 'pipelines' | 'chatbot' | 'selfhealing' | 'prompt-quality'>('all')
+  const [activeTab, setActiveTab] = useState<'all' | 'pipelines' | 'chatbot' | 'selfhealing' | 'prompt-quality' | 'admin'>('all')
 
   const tabs = [
     { id: 'all', name: 'Combined Overview' },
@@ -41,6 +42,7 @@ export default function ReportContainer() {
     { id: 'chatbot', name: 'Chatbot Application' },
     { id: 'selfhealing', name: 'Self-Healing Automation' },
     { id: 'prompt-quality', name: 'Prompt Quality' },
+    { id: 'admin', name: 'Admin' },
   ]
 
   // Fetch real data
@@ -465,6 +467,13 @@ export default function ReportContainer() {
                     </table>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Admin */}
+            {activeTab === 'admin' && (
+              <div>
+                <DashboardOverview />
               </div>
             )}
 
