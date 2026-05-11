@@ -32,6 +32,7 @@ export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }:
   const trigger = useApplicationsTrigger()
   const addNotification = usePipelineNotificationsStore((s) => s.addNotification)
   const [submittedSlug, setSubmittedSlug] = useState<string | null>(null)
+  const [submittedRunId, setSubmittedRunId] = useState<string | null>(null)
 
   const [initialDraft] = useState(() => {
     if (typeof window === 'undefined') return null
@@ -78,6 +79,7 @@ export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }:
             localStorage.removeItem('application-form-draft')
             form.reset()
             setSubmittedSlug(data.applicationId)
+            setSubmittedRunId(data.pipelineRunId)
             addNotification({
               type: 'application',
               slug: data.applicationId,
@@ -108,7 +110,7 @@ export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }:
   if (submittedSlug) {
     return (
       <div className="mb-8 overflow-hidden rounded-lg border border-white/10 bg-white/5 shadow-sm">
-        <ProgressBars slug={submittedSlug} />
+        <ProgressBars slug={submittedSlug} pipelineRunId={submittedRunId ?? undefined} />
       </div>
     )
   }

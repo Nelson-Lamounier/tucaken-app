@@ -266,9 +266,28 @@ export const triggerApplicationsAnalysisFn = createServerFn({ method: 'POST' })
           jobDescription: data.jobDescription,
           targetCompany: data.targetCompany,
           targetRole: data.targetRole,
+          ...(data.resumeId ? { resumeId: data.resumeId } : {}),
         }),
       },
     )
 
     return body
+  })
+
+export const getPipelineRunStatusFn = createServerFn({ method: 'GET' })
+  .inputValidator(z.string().uuid('Pipeline run ID must be a UUID'))
+  .handler(async ({ data: runId }) => {
+    await requireAuth()
+    const body = await apiFetch<{
+      run: {
+        id: string
+        status: string
+        errorMessage: string | null
+        updatedAt: string
+      }
+    }>(
+      `/pipelines/runs/${encodeURIComponent(runId)}`,
+      { pathTemplate: '/pipelines/runs/:id' },
+    )
+    return body.run
   })

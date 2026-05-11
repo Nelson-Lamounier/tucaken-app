@@ -9,26 +9,24 @@ import {
   Cpu,
   FileSearch,
   FileText,
-  PenLine,
   Database,
 } from 'lucide-react'
-import { useApplicationDetail, useExecutionStatus } from '@/hooks/use-admin-applications'
+import { useApplicationDetail, usePipelineRunStatus } from '@/hooks/use-admin-applications'
 import { useApplicationRequeue } from '../hooks/use-application-requeue'
 
 // =============================================================================
 // Pipeline stage definitions
 //
-// Reflects the real AWS Step Function execution sequence for the Strategist
-// pipeline. Timing windows are based on observed Bedrock invocation latency:
-//   Research Agent     ~30–60 s  (job description extraction + fit analysis)
-//   Strategist Agent   ~30–90 s  (cover letter + resume strategy generation)
-//   Resume Builder     ~30–90 s  (full resume rewrite with tailored bullets)
-//   Persist            ~5–10 s   (DynamoDB write + status update)
+// Reflects the real K8s Job execution sequence for the Strategist pipeline.
+// Timing windows are based on observed Bedrock invocation latency:
+//   K8s Job scheduled  ~0–8 s    (pod pull + start)
+//   Research Agent     ~8–90 s   (job description extraction + KB retrieval)
+//   Strategist Agent   ~90–240 s (resume + cover letter generation)
+//   Persist            ~240–260 s (PG write + status update)
 //
-// Advancement is driven by elapsed wall-clock time, NOT by artificial
-// setTimeout chains, so the UI reflects actual pipeline pacing.
-// Windows are intentionally wider than median latency so the last stage
-// does not show complete before the real pipeline finishes.
+// Advancement is driven by elapsed wall-clock time and real pipeline_runs
+// status when available. Windows are intentionally wider than median latency
+// so the last stage does not show complete before the real pipeline finishes.
 // =============================================================================
 
 type StageStatus = 'complete' | 'current' | 'upcoming' | 'failed'
@@ -44,44 +42,36 @@ interface PipelineStage {
 
 const PIPELINE_STAGES: PipelineStage[] = [
   {
-    id: 'trigger',
+    id: 'queued',
     name: 'Pipeline initialised',
-    description: 'Lambda invoked — Step Function execution started.',
+    description: 'K8s Job scheduled — pod pulling image and starting.',
     Icon: Cpu,
     startMs: 0,
-    endMs: 3_000,
+    endMs: 8_000,
   },
   {
     id: 'research',
     name: 'Research Agent',
-    description: 'Claude analysing the job description against your resume profile.',
+    description: 'Haiku 4.5 analysing job description and querying your Knowledge Base.',
     Icon: FileSearch,
-    startMs: 3_000,
-    endMs: 75_000,
+    startMs: 8_000,
+    endMs: 90_000,
   },
   {
     id: 'strategist',
     name: 'Strategist Agent',
-    description: 'Generating cover letter and positioning strategy.',
+    description: 'Sonnet 4.6 generating tailored resume and cover letter.',
     Icon: FileText,
-    startMs: 75_000,
-    endMs: 165_000,
-  },
-  {
-    id: 'resume-builder',
-    name: 'Resume Builder',
-    description: 'Rewriting resume bullets tailored to this role.',
-    Icon: PenLine,
-    startMs: 165_000,
+    startMs: 90_000,
     endMs: 240_000,
   },
   {
     id: 'persist',
     name: 'Saving results',
-    description: 'Persisting analysis output to DynamoDB and updating status.',
+    description: 'Validating and persisting resume + analysis to database.',
     Icon: Database,
     startMs: 240_000,
-    endMs: 255_000,
+    endMs: 260_000,
   },
 ]
 
@@ -100,7 +90,7 @@ function formatElapsed(ms: number): string {
 // Component
 // =============================================================================
 
-export function ProgressBars({ slug }: { slug: string }) {
+export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRunId?: string }) {
   const navigate = useNavigate()
   const { data } = useApplicationDetail(slug)
   const requeue = useApplicationRequeue()
@@ -109,24 +99,17 @@ export function ProgressBars({ slug }: { slug: string }) {
   const isFinished = data != null && !['analysing', 'coaching'].includes(data.status)
   const isActive   = !isFinished && !isFailed
 
-  // ── Real Step Functions execution state (polled every 5s while active) ───
-  const execution = useExecutionStatus(slug, isActive)
+  // ── Real pipeline_runs status (polled every 5s while active) ─────────────
+  const pipelineRun = usePipelineRunStatus(pipelineRunId ?? null, isActive)
 
-  // ── Elapsed wall-clock (from SFN startDate when available, else mount) ───
+  // ── Elapsed wall-clock ────────────────────────────────────────────────────
   const startEpochRef = useRef<number | null>(null)
   const [elapsedMs, setElapsedMs] = useState(0)
 
   useEffect(() => {
-    if (execution?.startDate && !startEpochRef.current) {
-      startEpochRef.current = new Date(execution.startDate).getTime()
-    }
-  }, [execution?.startDate])
-
-  useEffect(() => {
     if (isFinished) return
-    const origin = () => startEpochRef.current ?? Date.now()
     if (!startEpochRef.current) startEpochRef.current = Date.now()
-    const iv = setInterval(() => setElapsedMs(Date.now() - origin()), 1_000)
+    const iv = setInterval(() => setElapsedMs(Date.now() - startEpochRef.current!), 1_000)
     return () => clearInterval(iv)
   }, [isFinished])
 
@@ -140,10 +123,14 @@ export function ProgressBars({ slug }: { slug: string }) {
   }, [isFinished, isFailed, navigate, slug])
 
   // ── Stage status resolution ───────────────────────────────────────────────
-  // Real SFN stageId takes priority over wall-clock estimation.
-  // When stageId is known: that stage is 'current', all before are 'complete',
-  // all after are 'upcoming'. Wall-clock is only used when SFN data is absent.
-  const activeStageId = execution?.stageId ?? null
+  // Real pipeline_runs status takes priority over wall-clock estimation.
+  function pipelineStatusToStageId(status: string | null | undefined): string | null {
+    if (status === 'researching') return 'research'
+    if (status === 'analysing') return 'strategist'
+    return null
+  }
+
+  const activeStageId = pipelineStatusToStageId(pipelineRun?.status) ?? null
   const activeStageIdx = activeStageId
     ? PIPELINE_STAGES.findIndex(s => s.id === activeStageId)
     : -1
@@ -158,7 +145,7 @@ export function ProgressBars({ slug }: { slug: string }) {
       return 'upcoming'
     }
     if (isFinished) return 'complete'
-    // Real SFN state available
+    // Real pipeline_runs state available
     if (activeStageIdx >= 0) {
       if (idx < activeStageIdx) return 'complete'
       if (idx === activeStageIdx) return 'current'
@@ -198,7 +185,7 @@ export function ProgressBars({ slug }: { slug: string }) {
         {!isFinished && (
           <div className="flex-none flex items-center gap-1.5 rounded-md bg-zinc-800 px-2.5 py-1.5 font-mono text-xs text-zinc-400 tabular-nums">
             <Clock className="w-3 h-3 shrink-0" />
-            {formatElapsed(execution?.elapsedMs ?? elapsedMs)}
+            {formatElapsed(elapsedMs)}
           </div>
         )}
       </div>
