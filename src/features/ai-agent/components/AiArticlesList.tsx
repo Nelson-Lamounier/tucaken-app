@@ -5,9 +5,9 @@ import { Eye, X } from 'lucide-react'
 import { useAdminArticles } from '@/hooks/use-admin-articles'
 import type { ArticleWithSlug, ArticleStatus } from '@/lib/types/article.types'
 
-import { Pagination } from '#/components/ui/Pagination'
-import { DashboardDrawer } from '#/components/ui/DashboardDrawer'
-import { ArticleEditorDrawerContent } from '#/features/articles/components/ArticleEditorDrawerContent'
+import { Pagination } from '@/components/ui/Pagination'
+import { DashboardDrawer } from '@/components/ui/DashboardDrawer'
+import { ArticleEditorDrawerContent } from '@/features/articles/components/ArticleEditorDrawerContent'
 
 /**
  * Maps an ArticleStatus to a display label for the badge.

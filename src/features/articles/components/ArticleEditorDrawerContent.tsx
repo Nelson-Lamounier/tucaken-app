@@ -4,7 +4,7 @@ import {
   useSaveContent,
 } from '@/hooks/use-admin-articles'
 import { useToastStore } from '@/lib/stores/toast-store'
-import { Tabs } from '#/components/ui/Tabs'
+import { Tabs } from '@/components/ui/Tabs'
 import { MdxPreview } from './MdxPreview'
 
 interface ArticleEditorDrawerContentProps {

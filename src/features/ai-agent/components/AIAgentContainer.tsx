@@ -7,7 +7,7 @@ import { usePipelineStatus } from '../hooks/use-pipeline-status'
 import { useToastStore } from '@/lib/stores/toast-store'
 import { usePipelineNotificationsStore } from '@/lib/stores/pipeline-notifications-store'
 import { AiArticlesList } from './AiArticlesList'
-import { MultiColumnLayout } from '#/components/ui/MultiColumnLayout'
+import { MultiColumnLayout } from '@/components/ui/MultiColumnLayout'
 import { AIAgentDetailsPanel } from './AIAgentDetailsPanel'
 
 
