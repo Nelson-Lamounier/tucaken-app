@@ -13,6 +13,54 @@ import { CareerDataBreakdown } from './CareerDataBreakdown'
 import { ResumeFilesList } from './ResumeFilesList'
 import { KbQuickActions } from './KbQuickActions'
 import { deriveKbStats } from '../lib/kb-stats'
+import type { KbStats } from '../lib/kb-stats'
+import type { Stat } from '@/components/ui/Stats'
+
+function buildHeroStats(isLoading: boolean, stats: KbStats): Stat[] {
+  const uploadsChangeType: 'positive' | 'negative' =
+    stats.failedImportCount > 0 ? 'negative' : 'positive'
+
+  const kbChangeType: 'positive' | 'negative' = stats.isReady ? 'positive' : 'negative'
+
+  let kbValue: string
+  if (isLoading)          { kbValue = '…' }
+  else if (stats.isReady) { kbValue = 'Ready' }
+  else                    { kbValue = 'Needs setup' }
+
+  let kbChange: string
+  if (isLoading)          { kbChange = '' }
+  else if (stats.isReady) { kbChange = 'AI agent has data to work with' }
+  else                    { kbChange = 'Upload a resume or connect a repo' }
+
+  return [
+    {
+      name: 'Connected Repositories',
+      value: isLoading ? '…' : stats.repoCount.toString(),
+      change: isLoading ? '' : `${stats.syncedRepoCount} synced · ${stats.pendingRepoCount} pending`,
+      changeType: 'positive',
+    },
+    {
+      name: 'Career Entries',
+      value: isLoading ? '…' : stats.careerEntryCount.toString(),
+      change: isLoading
+        ? ''
+        : `${stats.experienceCount} experience · ${stats.educationCount} education · ${stats.skillCount} skills`,
+      changeType: 'positive',
+    },
+    {
+      name: 'Resume Uploads',
+      value: isLoading ? '…' : stats.importCount.toString(),
+      change: isLoading ? '' : `${stats.processedImportCount} processed · ${stats.failedImportCount} failed`,
+      changeType: uploadsChangeType,
+    },
+    {
+      name: 'Knowledge Base',
+      value: kbValue,
+      change: kbChange,
+      changeType: kbChangeType,
+    },
+  ]
+}
 
 export function UserDashboard() {
   const { data: repos = [], isLoading: loadingRepos } = useGitHubConnectedRepos()
@@ -30,53 +78,7 @@ export function UserDashboard() {
   const isLoading    = loadingRepos || loadingImports || loadingEntries
   const stats        = deriveKbStats(repos, entries, imports)
   const latestImport = imports[0]
-
-  let uploadsChangeType: 'positive' | 'negative'
-  if (stats.failedImportCount > 0) { uploadsChangeType = 'negative' }
-  else                              { uploadsChangeType = 'positive' }
-
-  let kbChangeType: 'positive' | 'negative'
-  if (stats.isReady) { kbChangeType = 'positive' }
-  else               { kbChangeType = 'negative' }
-
-  let kbValue: string
-  if (isLoading)          { kbValue = '…' }
-  else if (stats.isReady) { kbValue = 'Ready' }
-  else                    { kbValue = 'Needs setup' }
-
-  let kbChange: string
-  if (isLoading)          { kbChange = '' }
-  else if (stats.isReady) { kbChange = 'AI agent has data to work with' }
-  else                    { kbChange = 'Upload a resume or connect a repo' }
-
-  const heroStats = [
-    {
-      name: 'Connected Repositories',
-      value: isLoading ? '…' : stats.repoCount.toString(),
-      change: isLoading ? '' : `${stats.syncedRepoCount} synced · ${stats.pendingRepoCount} pending`,
-      changeType: 'positive' as const,
-    },
-    {
-      name: 'Career Entries',
-      value: isLoading ? '…' : stats.careerEntryCount.toString(),
-      change: isLoading
-        ? ''
-        : `${stats.experienceCount} experience · ${stats.educationCount} education · ${stats.skillCount} skills`,
-      changeType: 'positive' as const,
-    },
-    {
-      name: 'Resume Uploads',
-      value: isLoading ? '…' : stats.importCount.toString(),
-      change: isLoading ? '' : `${stats.processedImportCount} processed · ${stats.failedImportCount} failed`,
-      changeType: uploadsChangeType,
-    },
-    {
-      name: 'Knowledge Base',
-      value: kbValue,
-      change: kbChange,
-      changeType: kbChangeType,
-    },
-  ]
+  const heroStats    = buildHeroStats(isLoading, stats)
 
   return (
     <DashboardPage
