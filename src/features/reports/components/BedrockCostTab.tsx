@@ -80,7 +80,7 @@ export function BedrockCostTab() {
                     {row.importId ?? row.repoName ?? '—'}
                   </td>
                   <td className="px-4 py-2 text-zinc-500">
-                    {new Date(row.invokedAt).toLocaleDateString('en-GB', {
+                    {new Date(row.invokedAt).toLocaleString('en-GB', {
                       day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
                     })}
                   </td>
