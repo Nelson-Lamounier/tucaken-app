@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { DashboardOverview } from '../features/overview/components/DashboardOverview'
+import { UserDashboard } from '@/features/user-home/components/UserDashboard'
 
 export const Route = createFileRoute('/_dashboard/overview')({
-  component: DashboardOverview,
+  component: UserDashboard,
 })
 
 
