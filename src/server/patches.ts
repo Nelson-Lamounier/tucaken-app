@@ -249,8 +249,7 @@ function classifyRoute(url: string): string {
   if (path.startsWith('/assets/'))   return '/assets/*';
   if (path.startsWith('/_serverFn')) return '/_serverFn/*';
   if (path.startsWith('/_build/'))   return '/_build/*';
-  if (path === '/' || path === '/admin' || path === '/admin/') return path;
-  if (path.startsWith('/admin/'))    return '/admin/*';
+  if (path === '/') return path;
   return 'other';
 }
 
