@@ -85,6 +85,11 @@ export const adminKeys = {
     connectedRepos: () => ['admin', 'github', 'connected-repos'] as const,
   },
 
+  /** Current-user profile + plan (from /api/admin/me) */
+  me: {
+    detail: () => ['admin', 'me'] as const,
+  },
+
   /** Resume import pipeline query keys */
   resumeImports: {
     /** All resume import queries */
