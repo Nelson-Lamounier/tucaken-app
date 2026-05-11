@@ -47,3 +47,15 @@ export const promptQualityQueries = {
       staleTime: 5 * 60 * 1000,
     }),
 }
+
+import { getUsageSummaryFn } from '../../server/bedrock-usage'
+export type { UsageSummary } from '../../server/bedrock-usage'
+
+export const bedrockUsageQueries = {
+  summary: (month?: string) =>
+    queryOptions({
+      queryKey: ['bedrockUsage', 'summary', month ?? 'current'],
+      queryFn: () => getUsageSummaryFn({ data: { month } }),
+      staleTime: 5 * 60 * 1000,
+    }),
+}
