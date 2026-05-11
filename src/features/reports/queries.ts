@@ -2,6 +2,8 @@ import { queryOptions } from '@tanstack/react-query'
 import { getRealtimeUsageFn, getBilledCostsFn, getChatbotUsageFn, getSelfHealingUsageFn } from '../../server/finops'
 import { getArticlesFn } from '../../server/articles'
 import { getPromptQualityStatsFn } from '../../server/prompt-feedback'
+import { getUsageSummaryFn } from '../../server/bedrock-usage'
+export type { UsageSummary } from '../../server/bedrock-usage'
 
 export const finopsQueries = {
   realtimeUsage: (days: number) =>
@@ -47,9 +49,6 @@ export const promptQualityQueries = {
       staleTime: 5 * 60 * 1000,
     }),
 }
-
-import { getUsageSummaryFn } from '../../server/bedrock-usage'
-export type { UsageSummary } from '../../server/bedrock-usage'
 
 export const bedrockUsageQueries = {
   summary: (month?: string) =>
