@@ -45,6 +45,14 @@ export function ResumeFilesList({ imports, isLoading }: ResumeFilesListProps) {
             const isOk     = imp.status === 'completed' || imp.status === 'ready_for_review'
             const isFailed = imp.status === 'failed'
 
+            const badgeClass = isOk
+              ? 'bg-emerald-500/15 text-emerald-300 ring-emerald-400/25'
+              : isFailed
+                ? 'bg-red-500/15 text-red-300 ring-red-400/25'
+                : 'bg-indigo-500/15 text-indigo-300 ring-indigo-400/25'
+
+            const badgeLabel = isOk ? 'Processed' : isFailed ? 'Failed' : 'Processing'
+
             return (
               <li key={imp.id} className="flex items-center gap-3 px-4 py-3">
                 {isOk     && <CheckCircle2 className="size-4 shrink-0 text-emerald-400" />}
@@ -65,17 +73,8 @@ export function ResumeFilesList({ imports, isLoading }: ResumeFilesListProps) {
                   </p>
                 </div>
 
-                <span
-                  className={[
-                    'rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset',
-                    isOk
-                      ? 'bg-emerald-500/15 text-emerald-300 ring-emerald-400/25'
-                      : isFailed
-                        ? 'bg-red-500/15 text-red-300 ring-red-400/25'
-                        : 'bg-indigo-500/15 text-indigo-300 ring-indigo-400/25',
-                  ].join(' ')}
-                >
-                  {isOk ? 'Processed' : isFailed ? 'Failed' : 'Processing'}
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset ${badgeClass}`}>
+                  {badgeLabel}
                 </span>
               </li>
             )
