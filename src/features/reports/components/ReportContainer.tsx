@@ -14,6 +14,7 @@ import { useAdminArticles } from '@/hooks/use-admin-articles'
 import { useAdminComments } from '@/hooks/use-admin-comments'
 import { getResumesFn } from '@/server/resumes'
 import { finopsQueries, articlePipelineQueries, promptQualityQueries } from '../queries'
+import { BedrockCostTab } from './BedrockCostTab'
 import type { ArticleSummary } from '@/server/articles'
 import type { ArticleWithSlug } from '@/lib/types/article.types'
 
@@ -42,6 +43,7 @@ type TabId =
   | 'chatbot'
   | 'selfhealing'
   | 'prompt-quality'
+  | 'cost'
   | 'content-management'
   | 'career-docs'
 
@@ -88,6 +90,7 @@ export default function ReportContainer() {
     { id: 'chatbot',           name: 'Chatbot' },
     { id: 'selfhealing',       name: 'Self-Healing' },
     { id: 'prompt-quality',    name: 'Prompt Quality' },
+    { id: 'cost' as TabId,     name: 'Cost' },
     { id: 'content-management', name: 'Content Management' },
     { id: 'career-docs',       name: 'Career Documents' },
   ]
@@ -479,6 +482,8 @@ export default function ReportContainer() {
               {promptQualityContent}
             </div>
           )}
+
+          {activeTab === 'cost' && <BedrockCostTab />}
 
           {activeTab === 'content-management' && (
             <div>
