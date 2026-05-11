@@ -62,7 +62,7 @@ export function CareerDataBreakdown({
           {Object.entries(countsByType).map(([type, count]) => (
             <span
               key={type}
-              className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-0.5 text-xs text-zinc-300"
+              className="rounded-full border border-white/10 bg-white/4 px-2.5 py-0.5 text-xs text-zinc-300"
             >
               {count} {ENTRY_LABELS[type] ?? type}
             </span>
@@ -70,7 +70,7 @@ export function CareerDataBreakdown({
         </div>
 
         {latestImport && (
-          <div className="flex items-center gap-2 border-t border-white/[0.06] pt-3">
+          <div className="flex items-center gap-2 border-t border-white/6 pt-3">
             {isOk      && <CheckCircle2 className="size-3.5 shrink-0 text-emerald-400" />}
             {isFailed  && <AlertCircle  className="size-3.5 shrink-0 text-red-400" />}
             {isPending && <Loader2      className="size-3.5 shrink-0 animate-spin text-indigo-400" />}
