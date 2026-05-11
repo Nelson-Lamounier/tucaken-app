@@ -249,6 +249,7 @@ function classifyRoute(url: string): string {
   if (path.startsWith('/assets/'))   return '/assets/*';
   if (path.startsWith('/_serverFn')) return '/_serverFn/*';
   if (path.startsWith('/_build/'))   return '/_build/*';
+  // App no longer serves under /admin — basepath removed; all routes start at /.
   if (path === '/') return path;
   return 'other';
 }

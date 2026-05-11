@@ -6,6 +6,7 @@ export interface RouterContext {
   auth: AuthState
 }
 
+// No basepath — the app serves at /. Routes live at /overview, /sign-in, etc.
 export function getRouter() {
   const router = createTanStackRouter({
     routeTree,

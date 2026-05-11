@@ -52,6 +52,7 @@ export const handleAuthCallbackFn = createServerFn({ method: 'POST' })
     const appUrl = process.env.VITE_APP_URL || 'http://localhost:5001'
     const scheme = appUrl.startsWith('https://') ? 'https' : 'http'
     const host = appUrl.replace(/^https?:\/\//, '')
+    // Must match Cognito App Client → Allowed callback URLs exactly.
     const redirectUri = `${scheme}://${host}/sign-in/callback`
 
     const { exchangeCognitoCode } = await import('@/lib/auth/tanstack-auth')

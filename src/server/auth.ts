@@ -118,6 +118,7 @@ export const getLoginUrlFn = createServerFn({ method: 'POST' })
     const appUrl = process.env.VITE_APP_URL || 'http://localhost:5001'
     const scheme = appUrl.startsWith('https://') ? 'https' : 'http'
     const host = appUrl.replace(/^https?:\/\//, '')
+    // Must match Cognito App Client → Allowed callback URLs exactly.
     const redirectUri = `${scheme}://${host}/sign-in/callback`
 
     authUrl.searchParams.set('redirect_uri', redirectUri)
@@ -488,6 +489,7 @@ export const logoutFn = createServerFn({ method: 'POST' })
     const domain = process.env.AUTH_COGNITO_DOMAIN
     const clientId = process.env.AUTH_COGNITO_ID || process.env.AUTH_COGNITO_CLIENT_ID
     const origin = data.appOrigin ?? process.env.VITE_APP_URL ?? 'http://localhost:5001'
+    // Must match Cognito App Client → Allowed sign-out URLs exactly.
     const logoutUri = `${origin}/sign-in`
 
     let logoutUrl = '/sign-in'
