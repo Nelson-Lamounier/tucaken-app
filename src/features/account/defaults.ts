@@ -1,7 +1,11 @@
 // Seed data for Billing & Settings pages.
 //
-// TODO: replace with server fns + React Query (`getBillingFn`, `updateBillingFn`,
-// `getSettingsFn`, `updateSettingsFn`). See `features/account/README.md` §Wiring.
+// Billing: use-billing overlays live plan fields (tier, status, trialEndsAt,
+// billingEmail) from getMeFn() on top of these defaults. Payment/invoices/usage
+// remain stubs until a Stripe webhook handler writes to the DB.
+//
+// Settings: use-settings persists to localStorage (key: tucaken-user-settings-v1)
+// until a /me/settings backend endpoint exists.
 
 import type { Billing, Settings } from './types'
 

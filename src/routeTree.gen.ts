@@ -18,6 +18,7 @@ import { Route as SignInCallbackRouteImport } from './app/sign-in.callback'
 import { Route as DashboardTestRouteImport } from './app/_dashboard.test'
 import { Route as DashboardResumesRouteImport } from './app/_dashboard.resumes'
 import { Route as DashboardReportsRouteImport } from './app/_dashboard.reports'
+import { Route as DashboardProjectsRouteImport } from './app/_dashboard.projects'
 import { Route as DashboardOverviewRouteImport } from './app/_dashboard.overview'
 import { Route as DashboardCommentsRouteImport } from './app/_dashboard.comments'
 import { Route as DashboardCalendarRouteImport } from './app/_dashboard.calendar'
@@ -77,6 +78,11 @@ const DashboardResumesRoute = DashboardResumesRouteImport.update({
 const DashboardReportsRoute = DashboardReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardProjectsRoute = DashboardProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardOverviewRoute = DashboardOverviewRouteImport.update({
@@ -177,6 +183,7 @@ export interface FileRoutesByFullPath {
   '/calendar': typeof DashboardCalendarRoute
   '/comments': typeof DashboardCommentsRoute
   '/overview': typeof DashboardOverviewRoute
+  '/projects': typeof DashboardProjectsRoute
   '/reports': typeof DashboardReportsRoute
   '/resumes': typeof DashboardResumesRouteWithChildren
   '/test': typeof DashboardTestRoute
@@ -203,6 +210,7 @@ export interface FileRoutesByTo {
   '/calendar': typeof DashboardCalendarRoute
   '/comments': typeof DashboardCommentsRoute
   '/overview': typeof DashboardOverviewRoute
+  '/projects': typeof DashboardProjectsRoute
   '/reports': typeof DashboardReportsRoute
   '/resumes': typeof DashboardResumesRouteWithChildren
   '/test': typeof DashboardTestRoute
@@ -231,6 +239,7 @@ export interface FileRoutesById {
   '/_dashboard/calendar': typeof DashboardCalendarRoute
   '/_dashboard/comments': typeof DashboardCommentsRoute
   '/_dashboard/overview': typeof DashboardOverviewRoute
+  '/_dashboard/projects': typeof DashboardProjectsRoute
   '/_dashboard/reports': typeof DashboardReportsRoute
   '/_dashboard/resumes': typeof DashboardResumesRouteWithChildren
   '/_dashboard/test': typeof DashboardTestRoute
@@ -259,6 +268,7 @@ export interface FileRouteTypes {
     | '/calendar'
     | '/comments'
     | '/overview'
+    | '/projects'
     | '/reports'
     | '/resumes'
     | '/test'
@@ -285,6 +295,7 @@ export interface FileRouteTypes {
     | '/calendar'
     | '/comments'
     | '/overview'
+    | '/projects'
     | '/reports'
     | '/resumes'
     | '/test'
@@ -312,6 +323,7 @@ export interface FileRouteTypes {
     | '/_dashboard/calendar'
     | '/_dashboard/comments'
     | '/_dashboard/overview'
+    | '/_dashboard/projects'
     | '/_dashboard/reports'
     | '/_dashboard/resumes'
     | '/_dashboard/test'
@@ -398,6 +410,13 @@ declare module '@tanstack/react-router' {
       path: '/reports'
       fullPath: '/reports'
       preLoaderRoute: typeof DashboardReportsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/_dashboard/projects': {
+      id: '/_dashboard/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof DashboardProjectsRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/_dashboard/overview': {
@@ -536,6 +555,7 @@ interface DashboardRouteChildren {
   DashboardCalendarRoute: typeof DashboardCalendarRoute
   DashboardCommentsRoute: typeof DashboardCommentsRoute
   DashboardOverviewRoute: typeof DashboardOverviewRoute
+  DashboardProjectsRoute: typeof DashboardProjectsRoute
   DashboardReportsRoute: typeof DashboardReportsRoute
   DashboardResumesRoute: typeof DashboardResumesRouteWithChildren
   DashboardTestRoute: typeof DashboardTestRoute
@@ -556,6 +576,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardCalendarRoute: DashboardCalendarRoute,
   DashboardCommentsRoute: DashboardCommentsRoute,
   DashboardOverviewRoute: DashboardOverviewRoute,
+  DashboardProjectsRoute: DashboardProjectsRoute,
   DashboardReportsRoute: DashboardReportsRoute,
   DashboardResumesRoute: DashboardResumesRouteWithChildren,
   DashboardTestRoute: DashboardTestRoute,
