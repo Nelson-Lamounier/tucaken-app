@@ -258,22 +258,15 @@ export const triggerApplicationsAnalysisFn = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     await requireAuth()
 
-    // Build the exact payload the Lambda's AnalyseRequestSchema expects.
-    // The schema uses .strict() so only these fields are allowed.
-    const lambdaPayload: Record<string, unknown> = {
-      operation: 'analyse',
-      jobDescription: data.jobDescription,
-      targetCompany: data.targetCompany,
-      targetRole: data.targetRole,
-      resumeId: data.resumeId ?? '',
-      includeCoverLetter: data.includeCoverLetter ?? true,
-    }
-
     const body = await apiFetch<TriggerResponse>(
       '/pipelines/strategist-job',
       {
         method: 'POST',
-        body: JSON.stringify(lambdaPayload),
+        body: JSON.stringify({
+          jobDescription: data.jobDescription,
+          targetCompany: data.targetCompany,
+          targetRole: data.targetRole,
+        }),
       },
     )
 

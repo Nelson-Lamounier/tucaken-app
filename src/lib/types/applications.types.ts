@@ -116,17 +116,19 @@ export interface CoachTriggerBody {
 }
 
 /**
- * Response from either trigger Lambda.
+ * Response from the strategist-job pipeline trigger.
  */
 export interface TriggerResponse {
-  /** Unique execution ID for this pipeline run */
-  readonly pipelineId: string
-  /** Kebab-case slug (e.g. "revolut-senior-devops-engineer") */
+  /** Always 'queued' on trigger */
+  readonly status: 'queued'
+  /** UUID used to poll /api/admin/pipelines/runs/:id */
+  readonly pipelineRunId: string
+  /** K8s Job name */
+  readonly jobName: string
+  /** UUID of the created job_applications row */
+  readonly applicationId: string
+  /** Same as applicationId (used as the route slug) */
   readonly applicationSlug: string
-  /** Always 'analysing' on trigger */
-  readonly status: 'analysing'
-  /** Step Functions execution ARN */
-  readonly executionArn: string
 }
 
 // =============================================================================

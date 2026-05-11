@@ -77,13 +77,13 @@ export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }:
           onSuccess: (data) => {
             localStorage.removeItem('application-form-draft')
             form.reset()
-            setSubmittedSlug(data.applicationSlug)
+            setSubmittedSlug(data.applicationId)
             addNotification({
               type: 'application',
-              slug: data.applicationSlug,
+              slug: data.applicationId,
               label: `${company} — ${role}`,
               status: 'running',
-              link: `/applications/${encodeURIComponent(data.applicationSlug)}`,
+              link: `/applications/${encodeURIComponent(data.applicationId)}`,
             })
             // We now skip calling onSuccess() to let the ProgressBars take over navigation
           },
