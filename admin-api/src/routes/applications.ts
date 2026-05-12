@@ -49,6 +49,57 @@ const VALID_STATUSES = new Set([
   'rejected',
 ]);
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Maps raw research agent output (pipeline field names) to the ResearchOutput
+ * shape expected by the UI (applications.types.ts).
+ *
+ * Key differences:
+ *   experienceSignals.domainExperience   → domain
+ *   experienceSignals.leadershipExpectation → leadership
+ *   experienceSignals.scaleIndicators    → scale
+ *   verifiedMatch.depth (SkillDepth)     → depthBadge (string)
+ *   skillGap.impactSeverity              → severity
+ *   skillGap.impactSeverity === 'blocking' → isDisqualifying
+ *   overallFitRating spaces              → underscores (UI FitRating enum)
+ */
+function normaliseResearch(raw: Record<string, unknown>): Record<string, unknown> {
+  const signals = raw['experienceSignals'] as Record<string, unknown> | undefined;
+
+  const fitRatingRaw = raw['overallFitRating'] as string | undefined ?? '';
+  const fitRating = fitRatingRaw.replaceAll(' ', '_');
+
+  const verifiedMatches = (raw['verifiedMatches'] as Record<string, unknown>[] | undefined ?? []).map(m => ({
+    skill:          m['skill'],
+    sourceCitation: m['sourceCitation'],
+    depthBadge:     m['depth'],
+    recency:        m['recency'],
+  }));
+
+  const gaps = (raw['gaps'] as Record<string, unknown>[] | undefined ?? []).map(g => ({
+    skill:           g['skill'],
+    gapType:         g['gapType'],
+    severity:        g['impactSeverity'],
+    isDisqualifying: g['impactSeverity'] === 'blocking',
+  }));
+
+  return {
+    fitSummary:   raw['fitSummary'] ?? '',
+    fitRating,
+    verifiedMatches,
+    partialMatches: raw['partialMatches'] ?? [],
+    gaps,
+    experienceSignals: signals ? {
+      yearsExpected: signals['yearsExpected'],
+      domain:        signals['domainExperience'],
+      leadership:    signals['leadershipExpectation'],
+      scale:         signals['scaleIndicators'],
+    } : undefined,
+    technologyInventory: raw['technologyInventory'] ?? null,
+  };
+}
+
 // ── Router factory ────────────────────────────────────────────────────────────
 
 /**
@@ -111,7 +162,7 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
 
       const analysisResult = await db.query<{
         id:         string;
-        metadata:   { analysis?: unknown } | null;
+        metadata:   Record<string, unknown> | null;
         created_at: Date;
       }>(
         `SELECT id, metadata, created_at
@@ -145,6 +196,26 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
         [slug],
       );
 
+      const rawAnalysis  = latestAnalysis?.metadata?.['analysis']  as Record<string, unknown> | null | undefined;
+      const rawResearch  = latestAnalysis?.metadata?.['research']  as Record<string, unknown> | null | undefined;
+      const persistedResume = resumeResult.rows[0]?.content_json ?? null;
+
+      // Map strategist output → AnalysisOutput shape expected by the UI.
+      // tailoredResume prefers the persisted resumes row (validated JSON) over
+      // the raw tailoredResumeData blob stored in pipeline_runs.metadata.
+      const analysis = rawAnalysis ? {
+        analysisXml:       rawAnalysis['analysisXml'] ?? null,
+        coverLetter:       rawAnalysis['coverLetter'] ?? null,
+        metadata:          rawAnalysis['metadata'] ?? null,
+        resumeSuggestions: rawAnalysis['resumeSuggestions'] ?? null,
+        tailoredResume:    persistedResume ?? rawAnalysis['tailoredResumeData'] ?? null,
+      } : null;
+
+      // Map research agent output → ResearchOutput shape.
+      // Field names differ between the pipeline contract (@bedrock/shared) and
+      // the UI types (applications.types.ts), so we normalise here.
+      const research = rawResearch ? normaliseResearch(rawResearch) : null;
+
       return ctx.json({
         application: {
           id:                  application.id,
@@ -157,9 +228,17 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
           interviewStage:      'applied',
           createdAt:           application.createdAt,
           updatedAt:           application.updatedAt,
-          analysis:            latestAnalysis?.metadata?.analysis ?? null,
+          context: {
+            pipelineId:               latestAnalysis?.id ?? application.id,
+            cumulativeInputTokens:    0,
+            cumulativeOutputTokens:   0,
+            cumulativeThinkingTokens: 0,
+            cumulativeCostUsd:        0,
+          },
+          research,
+          analysis,
+          interviewPrep:       null,
           latestAnalysisRunId: latestAnalysis?.id ?? null,
-          tailoredResume:      resumeResult.rows[0]?.content_json ?? null,
           coaching:            coachingResult.rows.reduce<Record<string, unknown>>((acc, row) => {
             acc[row.stage_type] = {
               topics:    row.topics_to_study,
