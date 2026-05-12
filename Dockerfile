@@ -18,6 +18,7 @@ FROM base AS deps
 WORKDIR /app
 
 COPY package.json yarn.lock .yarnrc.yml ./
+COPY admin-api/package.json ./admin-api/
 
 RUN yarn install --immutable
 
