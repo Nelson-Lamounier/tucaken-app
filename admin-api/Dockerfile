@@ -13,18 +13,18 @@ RUN corepack enable && corepack prepare yarn@4.12.0 --activate
 # .yarn/ is git-ignored (only install-state.gz exists locally);
 # nodeLinker: node-modules only requires package.json + yarn.lock + .yarnrc.yml.
 COPY package.json yarn.lock .yarnrc.yml ./
-# tsconfig.base.json lives at the repo root; api/*/tsconfig.json extends it
-# via '../../tsconfig.base.json' so it must be present at /app/.
+# tsconfig.base.json lives at the repo root; admin-api/tsconfig.json extends it
+# via '../tsconfig.base.json' so it must be present at /app/.
 COPY tsconfig.base.json ./
-COPY api/admin-api/package.json  api/admin-api/
-COPY api/admin-api/tsconfig.json api/admin-api/
+COPY admin-api/package.json  admin-api/
+COPY admin-api/tsconfig.json admin-api/
 
 # Install all deps including devDependencies (needed for tsc).
 # Yarn Berry v4 flag: omit --production to get devDeps; --production for prod-only.
 RUN yarn workspaces focus @repo/admin-api
 
 # Copy source and compile.
-COPY api/admin-api/src api/admin-api/src/
+COPY admin-api/src admin-api/src/
 RUN yarn workspace @repo/admin-api build
 
 # Prune to production-only deps for the runtime layer.
@@ -40,9 +40,9 @@ RUN addgroup --system --gid 1001 nodejs && \
 WORKDIR /app
 
 # Copy built artefacts and production dependencies.
-COPY --from=builder --chown=adminapi:nodejs /app/api/admin-api/dist      ./dist/
-COPY --from=builder --chown=adminapi:nodejs /app/node_modules            ./node_modules/
-COPY --from=builder --chown=adminapi:nodejs /app/api/admin-api/package.json ./
+COPY --from=builder --chown=adminapi:nodejs /app/admin-api/dist      ./dist/
+COPY --from=builder --chown=adminapi:nodejs /app/node_modules        ./node_modules/
+COPY --from=builder --chown=adminapi:nodejs /app/admin-api/package.json ./
 
 USER adminapi
 
