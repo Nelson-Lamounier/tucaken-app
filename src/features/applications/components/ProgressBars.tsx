@@ -92,26 +92,32 @@ function formatElapsed(ms: number): string {
 
 export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRunId?: string }) {
   const navigate = useNavigate()
-  const { data } = useApplicationDetail(slug)
+  const { data, timedOut } = useApplicationDetail(slug)
   const requeue = useApplicationRequeue()
 
-  const isFailed   = data?.status === 'failed'
+  // Poll pipeline_runs while the application status is active (or not yet loaded).
+  // Do NOT derive this from isFailed — pipelineRun.status itself informs isFailed,
+  // so coupling the enabled flag to isFailed would create a circular dependency.
+  const appIsActive = !data || ['analysing', 'coaching'].includes(data.status)
+  const pipelineRun = usePipelineRunStatus(pipelineRunId ?? null, appIsActive)
+
+  // Failure: check both sources. If the K8s Job was OOM-killed before its catch
+  // block ran, kanban_status stays 'analysing' but pipeline_runs.status may have
+  // been updated to 'failed' by an earlier successful DB write.
+  const isFailed   = data?.status === 'failed' || pipelineRun?.status === 'failed'
   const isFinished = data != null && !['analysing', 'coaching'].includes(data.status)
   const isActive   = !isFinished && !isFailed
-
-  // ── Real pipeline_runs status (polled every 5s while active) ─────────────
-  const pipelineRun = usePipelineRunStatus(pipelineRunId ?? null, isActive)
 
   // ── Elapsed wall-clock ────────────────────────────────────────────────────
   const startEpochRef = useRef<number | null>(null)
   const [elapsedMs, setElapsedMs] = useState(0)
 
   useEffect(() => {
-    if (isFinished) return
+    if (isFinished || isFailed) return
     if (!startEpochRef.current) startEpochRef.current = Date.now()
     const iv = setInterval(() => setElapsedMs(Date.now() - startEpochRef.current!), 1_000)
     return () => clearInterval(iv)
-  }, [isFinished])
+  }, [isFinished, isFailed])
 
   // ── Auto-redirect on success ──────────────────────────────────────────────
   useEffect(() => {
@@ -125,8 +131,10 @@ export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRu
   // ── Stage status resolution ───────────────────────────────────────────────
   // Real pipeline_runs status takes priority over wall-clock estimation.
   function pipelineStatusToStageId(status: string | null | undefined): string | null {
+    if (status === 'queued')      return 'queued'
     if (status === 'researching') return 'research'
-    if (status === 'analysing') return 'strategist'
+    if (status === 'analysing')   return 'strategist'
+    if (status === 'persisting')  return 'persist'
     return null
   }
 
@@ -161,12 +169,16 @@ export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRu
   // ── Heading copy ──────────────────────────────────────────────────────────
   const heading = isFailed
     ? 'Analysis failed'
+    : timedOut
+    ? 'Analysis timed out'
     : isFinished
     ? 'Analysis complete'
     : 'Analysing application'
 
   const subheading = isFailed
     ? 'The pipeline encountered an error. Requeue via the DLQ to retry.'
+    : timedOut
+    ? 'No status update after 10 minutes — the K8s Job may have crashed. Requeue to retry.'
     : isFinished
     ? 'Redirecting to your results…'
     : 'Bedrock agents are running. This typically takes 4–6 minutes.'
@@ -182,7 +194,7 @@ export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRu
           <p className="mt-1 text-xs text-zinc-500">{subheading}</p>
         </div>
 
-        {!isFinished && (
+        {!isFinished && !isFailed && (
           <div className="flex-none flex items-center gap-1.5 rounded-md bg-zinc-800 px-2.5 py-1.5 font-mono text-xs text-zinc-400 tabular-nums">
             <Clock className="w-3 h-3 shrink-0" />
             {formatElapsed(elapsedMs)}
@@ -278,7 +290,7 @@ export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRu
           Feel free to navigate away — you'll be notified when complete.
         </p>
 
-        {isFailed ? (
+        {(isFailed || timedOut) ? (
           <button
             type="button"
             onClick={() => requeue.mutate({ slug })}
