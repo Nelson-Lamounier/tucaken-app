@@ -3,6 +3,10 @@
     "**/*.ts",
     "**/*.tsx"
   ],
+  "exclude": [
+    "admin-api",
+    "node_modules"
+  ],
   "compilerOptions": {
     "target": "ES2022",
     "jsx": "react-jsx",
