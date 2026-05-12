@@ -8,7 +8,7 @@ export default {
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       useESM: true,
-      tsconfig: './tsconfig.json',
+      tsconfig: './tsconfig.test.json',
     }],
   },
   roots: ['<rootDir>'],
