@@ -17,8 +17,8 @@
 services:
   admin-api:
     build:
-      context: ../..          # Repo root — Dockerfile copies workspace packages
-      dockerfile: api/admin-api/Dockerfile
+      context: ..             # Repo root — Dockerfile copies workspace packages
+      dockerfile: admin-api/Dockerfile
     # EC2 worker nodes are x86_64. Force amd64 so Apple Silicon builds produce
     # a runnable image for the cluster (local dev only; CI runs on ubuntu-latest).
     platform: linux/amd64

@@ -26,7 +26,7 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ADMIN_API_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-REPO_ROOT="$(cd "${ADMIN_API_DIR}/../.." && pwd)"
+REPO_ROOT="$(cd "${ADMIN_API_DIR}/.." && pwd)"
 COMPOSE_FILE="${ADMIN_API_DIR}/docker-compose.yml"
 IMAGE_NAME="admin-api:local"
 CONTAINER_NAME="admin-api-local"
