@@ -19,6 +19,7 @@ export default tseslint.config(
       '.turbo/**',
       'coverage/**',
       'server.js',
+      'admin-api/**',
     ],
   },
 
@@ -74,6 +75,7 @@ export default tseslint.config(
       'no-console': 'warn',
       'prefer-const': 'error',
       'no-var': 'error',
+      'no-empty': ['error', { allowEmptyCatch: true }],
     },
   },
 
