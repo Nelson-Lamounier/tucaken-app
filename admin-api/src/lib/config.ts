@@ -202,6 +202,12 @@ export interface AdminApiConfig {
   /** ServiceAccount the resume-import-processor Job pod runs as. */
   readonly resumeImportServiceAccount: string;
 
+  /**
+   * Bedrock model ID forwarded to job-strategist K8s Jobs as RESEARCH_MODEL.
+   * Injected via admin-api ConfigMap (RESEARCH_MODEL key).
+   */
+  readonly researchModel: string;
+
   // Note: image URIs are NOT in this config object. Use getJobImage(name)
   // from this same module — it reads from the file mount on each call (with
   // a 30s cache) so a Secret rotation by ESO is picked up without restart.
@@ -227,6 +233,7 @@ export function loadConfig(): AdminApiConfig {
     PG_DATABASE: process.env['PG_DATABASE'],
     PG_USER: process.env['PG_USER'],
     PG_PASSWORD: process.env['PG_PASSWORD'],
+    RESEARCH_MODEL: process.env['RESEARCH_MODEL'],
   };
 
   // ASSETS_BUCKET_NAME is intentionally optional — it lands in SSM only
@@ -278,5 +285,6 @@ export function loadConfig(): AdminApiConfig {
     strategistPipelineServiceAccount: process.env['STRATEGIST_PIPELINE_SERVICE_ACCOUNT'] ?? 'job-strategist-sa',
     resumeImportNamespace:           process.env['RESUME_IMPORT_NAMESPACE'] ?? 'resume-import',
     resumeImportServiceAccount:      process.env['RESUME_IMPORT_SERVICE_ACCOUNT'] ?? 'resume-import-sa',
+    researchModel:                   required['RESEARCH_MODEL']!,
   };
 }

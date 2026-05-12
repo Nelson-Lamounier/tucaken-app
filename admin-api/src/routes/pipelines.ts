@@ -197,6 +197,7 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
           { name: 'TARGET_ROLE',        value: targetRole! },
           { name: 'JOB_DESCRIPTION',    value: truncatedJd },
           { name: 'MODE',               value: mode },
+          { name: 'RESEARCH_MODEL',     value: config.researchModel },
           ...(resumeId ? [{ name: 'RESUME_ID', value: resumeId }] : []),
         ],
         envFromSecretRefs: ['platform-rds-credentials'],
