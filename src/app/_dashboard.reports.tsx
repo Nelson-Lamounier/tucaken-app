@@ -1,8 +1,11 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 import { DashboardPage } from '@/components/layouts/DashboardPage'
 import ReportContainer from '@/features/reports/components/ReportContainer'
 
 export const Route = createFileRoute('/_dashboard/reports')({
+  beforeLoad: ({ context }) => {
+    if (!context.isAdmin) throw redirect({ to: '/overview' })
+  },
   component: ReportsPage,
 })
 
