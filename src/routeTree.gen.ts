@@ -17,6 +17,7 @@ import { Route as IndexRouteImport } from './app/index'
 import { Route as SignInCallbackRouteImport } from './app/sign-in.callback'
 import { Route as DashboardTestRouteImport } from './app/_dashboard.test'
 import { Route as DashboardResumesRouteImport } from './app/_dashboard.resumes'
+import { Route as DashboardResumeThemeRouteImport } from './app/_dashboard.resume-theme'
 import { Route as DashboardReportsRouteImport } from './app/_dashboard.reports'
 import { Route as DashboardProjectsRouteImport } from './app/_dashboard.projects'
 import { Route as DashboardOverviewRouteImport } from './app/_dashboard.overview'
@@ -73,6 +74,11 @@ const DashboardTestRoute = DashboardTestRouteImport.update({
 const DashboardResumesRoute = DashboardResumesRouteImport.update({
   id: '/resumes',
   path: '/resumes',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardResumeThemeRoute = DashboardResumeThemeRouteImport.update({
+  id: '/resume-theme',
+  path: '/resume-theme',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardReportsRoute = DashboardReportsRouteImport.update({
@@ -185,6 +191,7 @@ export interface FileRoutesByFullPath {
   '/overview': typeof DashboardOverviewRoute
   '/projects': typeof DashboardProjectsRoute
   '/reports': typeof DashboardReportsRoute
+  '/resume-theme': typeof DashboardResumeThemeRoute
   '/resumes': typeof DashboardResumesRouteWithChildren
   '/test': typeof DashboardTestRoute
   '/sign-in/callback': typeof SignInCallbackRoute
@@ -212,6 +219,7 @@ export interface FileRoutesByTo {
   '/overview': typeof DashboardOverviewRoute
   '/projects': typeof DashboardProjectsRoute
   '/reports': typeof DashboardReportsRoute
+  '/resume-theme': typeof DashboardResumeThemeRoute
   '/resumes': typeof DashboardResumesRouteWithChildren
   '/test': typeof DashboardTestRoute
   '/sign-in/callback': typeof SignInCallbackRoute
@@ -241,6 +249,7 @@ export interface FileRoutesById {
   '/_dashboard/overview': typeof DashboardOverviewRoute
   '/_dashboard/projects': typeof DashboardProjectsRoute
   '/_dashboard/reports': typeof DashboardReportsRoute
+  '/_dashboard/resume-theme': typeof DashboardResumeThemeRoute
   '/_dashboard/resumes': typeof DashboardResumesRouteWithChildren
   '/_dashboard/test': typeof DashboardTestRoute
   '/sign-in/callback': typeof SignInCallbackRoute
@@ -270,6 +279,7 @@ export interface FileRouteTypes {
     | '/overview'
     | '/projects'
     | '/reports'
+    | '/resume-theme'
     | '/resumes'
     | '/test'
     | '/sign-in/callback'
@@ -297,6 +307,7 @@ export interface FileRouteTypes {
     | '/overview'
     | '/projects'
     | '/reports'
+    | '/resume-theme'
     | '/resumes'
     | '/test'
     | '/sign-in/callback'
@@ -325,6 +336,7 @@ export interface FileRouteTypes {
     | '/_dashboard/overview'
     | '/_dashboard/projects'
     | '/_dashboard/reports'
+    | '/_dashboard/resume-theme'
     | '/_dashboard/resumes'
     | '/_dashboard/test'
     | '/sign-in/callback'
@@ -403,6 +415,13 @@ declare module '@tanstack/react-router' {
       path: '/resumes'
       fullPath: '/resumes'
       preLoaderRoute: typeof DashboardResumesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/_dashboard/resume-theme': {
+      id: '/_dashboard/resume-theme'
+      path: '/resume-theme'
+      fullPath: '/resume-theme'
+      preLoaderRoute: typeof DashboardResumeThemeRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/_dashboard/reports': {
@@ -557,6 +576,7 @@ interface DashboardRouteChildren {
   DashboardOverviewRoute: typeof DashboardOverviewRoute
   DashboardProjectsRoute: typeof DashboardProjectsRoute
   DashboardReportsRoute: typeof DashboardReportsRoute
+  DashboardResumeThemeRoute: typeof DashboardResumeThemeRoute
   DashboardResumesRoute: typeof DashboardResumesRouteWithChildren
   DashboardTestRoute: typeof DashboardTestRoute
   DashboardApplicationsSlugRoute: typeof DashboardApplicationsSlugRoute
@@ -578,6 +598,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardOverviewRoute: DashboardOverviewRoute,
   DashboardProjectsRoute: DashboardProjectsRoute,
   DashboardReportsRoute: DashboardReportsRoute,
+  DashboardResumeThemeRoute: DashboardResumeThemeRoute,
   DashboardResumesRoute: DashboardResumesRouteWithChildren,
   DashboardTestRoute: DashboardTestRoute,
   DashboardApplicationsSlugRoute: DashboardApplicationsSlugRoute,
