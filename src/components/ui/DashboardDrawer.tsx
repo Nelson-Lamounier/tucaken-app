@@ -12,6 +12,7 @@ export interface DashboardDrawerProps {
   readonly children: React.ReactNode
   readonly actions?: React.ReactNode
   readonly unstyledContent?: boolean
+  readonly fullBleed?: boolean
 }
 
 export function DashboardDrawer({
@@ -22,9 +23,10 @@ export function DashboardDrawer({
   children,
   actions,
   unstyledContent = false,
+  fullBleed = false,
 }: DashboardDrawerProps) {
   return (
-    <Dialog open={isOpen} onClose={onClose} className="relative z-30">
+    <Dialog open={isOpen} onClose={onClose} className="relative z-30" unmount>
       {/* Backdrop — pointer-events-none keeps it invisible to clicks */}
       <div aria-hidden="true" className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity pointer-events-none" />
 
@@ -63,7 +65,7 @@ export function DashboardDrawer({
                 </div>
 
                 {/* Content */}
-                <div className="relative mt-6 flex-1 px-4 sm:px-6 overflow-hidden">
+                <div className={`relative mt-6 flex-1 overflow-hidden flex flex-col${fullBleed ? '' : ' px-4 sm:px-6'}`}>
                   {unstyledContent ? (
                     children
                   ) : (

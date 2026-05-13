@@ -5,22 +5,27 @@ import {
   XCircle,
 } from 'lucide-react'
 import type { ApplicationDetail } from '@/lib/types/applications.types'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { adminKeys } from '@/lib/api/query-keys'
 import { useToastStore } from '@/lib/stores/toast-store'
-import { ResumePreviewDrawer } from '../../resumes/components/ResumePreviewDrawer'
-import { ResumeForm } from '../../resumes/components/ResumeForm'
-import { CoverLetterForm } from './CoverLetterForm'
 import { DashboardDrawer } from '@/components/ui/DashboardDrawer'
 import DropDownOptions from '@/components/ui/DropDownOptions'
-import type { AdminResumeWithData } from '../../applications/hooks/use-resume-versions'
 import { createResumeFn, setActiveResumeFn } from '@/server/resumes'
 import { deleteApplicationFn } from '@/server/applications'
 import { buildResumeDomForPdf, buildCoverLetterDomForPdf } from '@/lib/resumes/resume-dom-builder'
 import { usePdfDownload } from '@/hooks/use-pdf-download'
 import type { ResumeData } from '@/lib/resumes/resume-data'
+import { ResumeBuilderApp } from '@/features/resume-theme/app/main'
+import {
+  getState,
+  setState,
+  enterEphemeralMode,
+  exitEphemeralMode,
+  type AppState,
+} from '@/features/resume-theme/app/state'
+import { mapApplicationToBuilderState } from '../utils/resume-adapters'
 
 interface ApplicationReviewDetailProps {
   readonly detail: ApplicationDetail
@@ -31,11 +36,53 @@ export function ApplicationReviewDetail({ detail }: ApplicationReviewDetailProps
   const queryClient = useQueryClient()
   const { addToast } = useToastStore()
 
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
-  const [isCoverLetterPreviewOpen, setIsCoverLetterPreviewOpen] = useState(false)
-  const [isEditResumeOpen, setIsEditResumeOpen] = useState(false)
-  const [isEditCoverLetterOpen, setIsEditCoverLetterOpen] = useState(false)
-const { downloading: isDownloading, generatePdf } = usePdfDownload()
+  const [isBuilderOpen, setIsBuilderOpen] = useState(false)
+  const [builderKey, setBuilderKey] = useState(0)
+  const prevStateRef = useRef<AppState | null>(null)
+
+  const handleOpenBuilder = useCallback(() => {
+    if (!detail.analysis?.tailoredResume) return
+    prevStateRef.current = getState()
+    enterEphemeralMode()
+    try {
+      setState(() =>
+        mapApplicationToBuilderState(
+          detail.analysis!.tailoredResume as unknown as ResumeData,
+          detail.analysis?.coverLetter ?? null,
+          detail.targetCompany,
+          detail.targetRole,
+        ),
+      )
+    } catch (err) {
+      console.error('[ResumeBuilder] adapter failed:', err)
+      exitEphemeralMode()
+      prevStateRef.current = null
+      return
+    }
+    setBuilderKey((k) => k + 1)
+    setIsBuilderOpen(true)
+  }, [detail])
+
+  const handleCloseBuilder = useCallback(() => {
+    setIsBuilderOpen(false)
+    if (prevStateRef.current) {
+      setState(() => prevStateRef.current!)
+      prevStateRef.current = null
+    }
+    exitEphemeralMode()
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (prevStateRef.current) {
+        setState(() => prevStateRef.current!)
+        prevStateRef.current = null
+        exitEphemeralMode()
+      }
+    }
+  }, [])
+
+  const { downloading: isDownloading, generatePdf } = usePdfDownload()
 
   const handleDownloadResume = useCallback(() => {
     if (!detail.analysis?.tailoredResume) return
@@ -98,12 +145,7 @@ const { downloading: isDownloading, generatePdf } = usePdfDownload()
         </div>
         <div className="flex shrink-0">
           <DropDownOptions
-            onEditResume={() => setIsEditResumeOpen(true)}
-            onEditCoverLetter={detail.analysis?.coverLetter ? () => setIsEditCoverLetterOpen(true) : undefined}
-            showPreviewResume={!!detail.analysis?.tailoredResume}
-            onPreviewResume={() => setIsPreviewOpen(true)}
-            showPreviewCoverLetter={!!detail.analysis?.coverLetter}
-            onPreviewCoverLetter={detail.analysis?.coverLetter ? () => setIsCoverLetterPreviewOpen(true) : undefined}
+            onEdit={detail.analysis?.tailoredResume ? handleOpenBuilder : undefined}
             onPublish={detail.analysis?.tailoredResume ? () => publishMutation.mutate() : undefined}
             onDelete={() => deleteMutation.mutate()}
           />
@@ -352,79 +394,17 @@ const { downloading: isDownloading, generatePdf } = usePdfDownload()
       </div>
 
       {detail.analysis?.tailoredResume && (
-        <ResumePreviewDrawer
-          isOpen={isPreviewOpen}
-          onClose={() => setIsPreviewOpen(false)}
-          isDownloading={isDownloading}
-          onDownload={handleDownloadResume}
-          resume={{
-            id: 'tailored',
-            resumeId: 'tailored',
-            userId: 'user',
-            createdAt: detail.createdAt,
-            updatedAt: detail.updatedAt,
-            label: 'Tailored Resume',
-            version: 1,
-            isActive: true,
-            data: detail.analysis.tailoredResume,
-          } as unknown as AdminResumeWithData}
-        />
-      )} 
-
-       {detail.analysis?.coverLetter && (
-        <ResumePreviewDrawer
-          isOpen={isCoverLetterPreviewOpen}
-          onClose={() => setIsCoverLetterPreviewOpen(false)}
-          isDownloading={isDownloading}
-          onDownload={handleDownloadCoverLetter}
-          coverLetter={detail.analysis.coverLetter}
-          coverLetterProfile={detail.analysis.tailoredResume?.profile}
-          coverLetterCompany={detail.targetCompany}
-          coverLetterRole={detail.targetRole}
-        />
-      )}
-
-      {detail.analysis?.tailoredResume && (
         <DashboardDrawer
-          isOpen={isEditResumeOpen}
-          onClose={() => setIsEditResumeOpen(false)}
+          isOpen={isBuilderOpen}
+          onClose={handleCloseBuilder}
           title="Edit Tailored Resume"
-          description={`${detail.targetCompany} - ${detail.targetRole}`}
+          description={`${detail.targetCompany} — ${detail.targetRole}`}
           unstyledContent
+          fullBleed
         >
-          <div className="h-full overflow-y-auto no-scrollbar">
-            <ResumeForm
-              mode="edit"
-              initialLabel="Tailored Resume"
-              initialData={detail.analysis.tailoredResume}
-              onCancel={() => setIsEditResumeOpen(false)}
-              onSubmit={async (_label, _data) => {
-                /* console.log('Resume updated', { label, data }) */
-                setIsEditResumeOpen(false)
-              }}
-            />
-          </div>
-        </DashboardDrawer>
-      )}
-
-      {detail.analysis?.coverLetter && (
-        <DashboardDrawer
-          isOpen={isEditCoverLetterOpen}
-          onClose={() => setIsEditCoverLetterOpen(false)}
-          title="Edit Cover Letter"
-          description={`${detail.targetCompany} - ${detail.targetRole}`}
-          unstyledContent
-        >
-          <div className="h-full overflow-y-auto no-scrollbar">
-            <CoverLetterForm
-              initialContent={detail.analysis.coverLetter}
-              onCancel={() => setIsEditCoverLetterOpen(false)}
-              onSubmit={async (_content) => {
-                /* console.log('Cover letter updated', content) */
-                setIsEditCoverLetterOpen(false)
-              }}
-            />
-          </div>
+          {isBuilderOpen && (
+            <ResumeBuilderApp key={builderKey} onClose={handleCloseBuilder} />
+          )}
         </DashboardDrawer>
       )}
     </div>
