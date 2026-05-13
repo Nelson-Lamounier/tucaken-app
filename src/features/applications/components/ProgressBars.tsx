@@ -106,8 +106,6 @@ export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRu
   // been updated to 'failed' by an earlier successful DB write.
   const isFailed   = data?.status === 'failed' || pipelineRun?.status === 'failed'
   const isFinished = data != null && !['analysing', 'coaching'].includes(data.status)
-  const isActive   = !isFinished && !isFailed
-
   // ── Elapsed wall-clock ────────────────────────────────────────────────────
   const startEpochRef = useRef<number | null>(null)
   const [elapsedMs, setElapsedMs] = useState(0)
