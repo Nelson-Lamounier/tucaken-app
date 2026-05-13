@@ -32,18 +32,18 @@ export const Route = createFileRoute('/_dashboard')({
       throw e
     }
 
-    return { me }
+    return { me, isAdmin: me.plan.role === 'admin' }
   },
   component: DashboardLayout,
 })
 
 function DashboardLayout() {
-  const { me } = Route.useRouteContext()
+  const { me, isAdmin } = Route.useRouteContext()
   const matches = useMatches()
   const disableMainWrapper = matches.some((match) => (match.staticData as { disableMainWrapper?: boolean })?.disableMainWrapper)
 
   return (
-    <AppLayout me={me} disableMainWrapper={disableMainWrapper}>
+    <AppLayout me={me} isAdmin={isAdmin} disableMainWrapper={disableMainWrapper}>
       <Outlet />
     </AppLayout>
   )

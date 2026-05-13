@@ -43,16 +43,16 @@ import logo from "@/images/logo.png";
 
 /** Primary sidebar navigation links. */
 const navigation = [
-  { name: "Dashboard", href: "/overview", icon: HomeIcon },
-  { name: "Comments", href: "/comments", icon: MessageSquareText },
-  { name: "Applications", href: "/applications", icon: BriefcaseIcon },
-  { name: "Articles", href: "/articles", icon: DocumentDuplicateIcon },
-  { name: "Resumes", href: "/resumes", icon: DocumentTextIcon },
-  { name: "Projects", href: "/projects", icon: FolderIcon },
-  { name: "Calendar", href: "/calendar", icon: CalendarIcon },
-  { name: "Reports", href: "/reports", icon: ChartPieIcon },
-  { name: "Test Components", href: "/test", icon: BeakerIcon },
-] as const;
+  { name: "Dashboard",       href: "/overview",      icon: HomeIcon,              adminOnly: false },
+  { name: "Comments",        href: "/comments",      icon: MessageSquareText,     adminOnly: true  },
+  { name: "Applications",    href: "/applications",  icon: BriefcaseIcon,         adminOnly: false },
+  { name: "Articles",        href: "/articles",      icon: DocumentDuplicateIcon, adminOnly: true  },
+  { name: "Resumes",         href: "/resumes",       icon: DocumentTextIcon,      adminOnly: false },
+  { name: "Projects",        href: "/projects",      icon: FolderIcon,            adminOnly: false },
+  { name: "Calendar",        href: "/calendar",      icon: CalendarIcon,          adminOnly: false },
+  { name: "Reports",         href: "/reports",       icon: ChartPieIcon,          adminOnly: true  },
+  { name: "Test Components", href: "/test",          icon: BeakerIcon,            adminOnly: true  },
+];
 
 /** External observability tool links rendered in the sidebar secondary section. */
 const observabilityLinks = [
@@ -118,6 +118,8 @@ interface AppLayoutProps {
   children: React.ReactNode;
   /** Current user data from the dashboard route context. */
   me?: MeResponse;
+  /** When `true`, renders all sidebar nav items including admin-only entries. */
+  isAdmin?: boolean;
   /**
    * When `true`, skips wrapping `children` in the default `<main>` padding shell.
    * Useful for full-bleed pages (e.g. data-table views).
@@ -143,6 +145,7 @@ interface AppLayoutProps {
 export default function AppLayout({
   children,
   me,
+  isAdmin = false,
   disableMainWrapper = false,
 }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -216,7 +219,7 @@ export default function AppLayout({
 
                 {/* Navigation */}
                 <nav className="relative flex flex-1 flex-col">
-                  <SidebarNavList />
+                  <SidebarNavList isAdmin={isAdmin} />
                   <SidebarObservability />
                   <SidebarFooter onSignOut={handleSignOut} me={me} />
                 </nav>
@@ -237,7 +240,7 @@ export default function AppLayout({
 
             {/* Navigation */}
             <nav className="flex flex-1 flex-col">
-              <SidebarNavList />
+              <SidebarNavList isAdmin={isAdmin} />
               <SidebarObservability />
               <SidebarFooter onSignOut={handleSignOut} />
             </nav>
@@ -285,7 +288,9 @@ function SidebarLogo() {
 }
 
 /** Primary navigation link list rendered inside sidebar `<nav>`. */
-function SidebarNavList() {
+function SidebarNavList({ isAdmin }: { isAdmin: boolean }) {
+  const visibleNav = navigation.filter((item) => !item.adminOnly || isAdmin)
+
   return (
     <ul
       role="list"
@@ -296,7 +301,7 @@ function SidebarNavList() {
           role="list"
           className="-mx-2 space-y-1"
         >
-          {navigation.map((item) => (
+          {visibleNav.map((item) => (
             <li key={item.name}>
               <Link
                 to={item.href as string}
