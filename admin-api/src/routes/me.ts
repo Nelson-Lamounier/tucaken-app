@@ -51,6 +51,7 @@ export function createMeRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
       plan:      plan ?? {
         plan:                 'free',
         effectivePlan:        'free',
+        role:                 'user',
         trialStartedAt:       null,
         trialEndsAt:          null,
         trialDaysRemaining:   null,
