@@ -393,9 +393,14 @@ describe('GET /connected-repos', () => {
         expect(res.status).toBe(200);
         const repo = body.repos[0]!;
         expect(repo['qualityScore']).toBeNull();
+        expect(repo['qualityBreakdown']).toBeNull();
         expect(repo['classification']).toBeNull();
+        expect(repo['extractionStatus']).toBeNull();
         expect(repo['oneLiner']).toBeNull();
+        expect(repo['domain']).toBeNull();
         expect(repo['techStack']).toBeNull();
+        expect(repo['complexity']).toBeNull();
+        expect(repo['confidence']).toBeNull();
     });
 });
 
