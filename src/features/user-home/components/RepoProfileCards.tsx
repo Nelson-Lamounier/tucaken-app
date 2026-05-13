@@ -29,7 +29,7 @@ const CLASSIFICATION_STYLES: Record<RepoClassification, string> = {
 
 function ClassificationBadge({ value }: { readonly value: RepoClassification }) {
   return (
-    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${CLASSIFICATION_STYLES[value]}`}>
+    <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${CLASSIFICATION_STYLES[value] ?? CLASSIFICATION_STYLES.noise}`}>
       {value}
     </span>
   )
@@ -170,16 +170,16 @@ function RepoCard({ repo }: { readonly repo: ConnectedRepo }) {
       )}
 
       {/* Tech stack + domain + complexity */}
-      {hasProfile && (repo.techStack?.length || repo.domain || repo.complexity) && (
+      {hasProfile && ((repo.techStack?.length ?? 0) > 0 || !!repo.domain || !!repo.complexity) && (
         <div className="flex flex-wrap items-center gap-2">
           {repo.domain && (
             <span className="rounded border border-indigo-500/20 bg-indigo-500/8 px-1.5 py-0.5 text-[10px] font-medium text-indigo-300">
               {repo.domain}
             </span>
           )}
-          {repo.techStack?.slice(0, 6).map((tech, i) => (
+          {[...new Set(repo.techStack ?? [])].slice(0, 6).map(tech => (
             <span
-              key={`${tech}-${i}`}
+              key={tech}
               className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-zinc-400"
             >
               {tech}
