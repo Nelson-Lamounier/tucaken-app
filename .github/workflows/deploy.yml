@@ -185,7 +185,8 @@ jobs:
             --type String --overwrite
 
   promote:
-    name: Promote Rollout
+    
+    
     needs: [deploy]
     runs-on: k8s-runner
     timeout-minutes: 20
