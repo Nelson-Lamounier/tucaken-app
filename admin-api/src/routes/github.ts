@@ -129,24 +129,42 @@ async function deleteConnection(pool: Pool, userId: string): Promise<void> {
 }
 
 interface ConnectedRepoRow {
-    full_name:      string;
-    default_branch: string;
-    index_status:   string;
-    added_at:       Date;
-    sync_status:    string | null;
-    last_synced_at: Date | null;
-    file_count:     number | null;
-    chunk_count:    number | null;
-    error_message:  string | null;
+    full_name:          string;
+    default_branch:     string;
+    index_status:       string;
+    added_at:           Date;
+    sync_status:        string | null;
+    last_synced_at:     Date | null;
+    file_count:         number | null;
+    chunk_count:        number | null;
+    error_message:      string | null;
+    // profile fields — all nullable (LEFT JOIN; no profile yet = nulls)
+    quality_score:      number | null;
+    quality_breakdown:  Record<string, number> | null;
+    classification:     string | null;
+    extraction_status:  string | null;
+    one_liner:          string | null;
+    domain:             string | null;
+    tech_stack:         string[] | null;
+    complexity:         string | null;
+    confidence:         number | null;
 }
 
 async function listConnectedRepos(pool: Pool, userId: string): Promise<ConnectedRepoRow[]> {
     const { rows } = await pool.query<ConnectedRepoRow>(
         `SELECT r.full_name, r.default_branch, r.index_status, r.added_at,
-                s.sync_status, s.last_synced_at, s.file_count, s.chunk_count, s.error_message
+                s.sync_status, s.last_synced_at, s.file_count, s.chunk_count, s.error_message,
+                p.quality_score, p.quality_breakdown, p.classification, p.extraction_status,
+                p.extracted->>'one_liner'             AS one_liner,
+                p.extracted->>'domain'                AS domain,
+                p.extracted->'tech_stack'             AS tech_stack,
+                p.extracted->>'complexity'            AS complexity,
+                (p.extracted->>'confidence')::float   AS confidence
          FROM repositories r
          LEFT JOIN repo_sync_state s
            ON s.user_id = r.user_id AND s.repo_full_name = r.full_name
+         LEFT JOIN repository_profiles p
+           ON p.user_id = r.user_id AND p.repo_full_name = r.full_name
          WHERE r.user_id = $1::uuid AND r.provider = 'github'
          ORDER BY r.added_at DESC`,
         [userId],
@@ -563,16 +581,25 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         const repos = rows.map(r => {
             const [owner, name] = r.full_name.split('/');
             return {
-                repoFullName:   r.full_name,
-                owner:          owner ?? '',
-                name:           name  ?? '',
-                defaultBranch:  r.default_branch,
-                syncStatus:     r.sync_status ?? r.index_status,
-                lastSyncedAt:   r.last_synced_at?.toISOString(),
-                fileCount:      r.file_count ?? 0,
-                chunkCount:     r.chunk_count ?? 0,
-                errorMessage:   r.error_message,
-                addedAt:        r.added_at.toISOString(),
+                repoFullName:      r.full_name,
+                owner:             owner ?? '',
+                name:              name  ?? '',
+                defaultBranch:     r.default_branch,
+                syncStatus:        r.sync_status ?? r.index_status,
+                lastSyncedAt:      r.last_synced_at?.toISOString(),
+                fileCount:         r.file_count ?? 0,
+                chunkCount:        r.chunk_count ?? 0,
+                errorMessage:      r.error_message,
+                addedAt:           r.added_at.toISOString(),
+                qualityScore:      r.quality_score      ?? null,
+                qualityBreakdown:  r.quality_breakdown  ?? null,
+                classification:    r.classification     ?? null,
+                extractionStatus:  r.extraction_status  ?? null,
+                oneLiner:          r.one_liner          ?? null,
+                domain:            r.domain             ?? null,
+                techStack:         r.tech_stack         ?? null,
+                complexity:        r.complexity         ?? null,
+                confidence:        r.confidence         ?? null,
             };
         });
 
