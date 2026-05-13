@@ -40,6 +40,7 @@ import type { Pool } from 'pg';
 import type { AdminApiConfig } from '../lib/config.js';
 import { getJobImage, isImageConfigured } from '../lib/config.js';
 import {
+    deleteInstallation,
     generateInstallationToken,
     getInstallationInfo,
     listInstallationRepos,
@@ -529,7 +530,17 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
     });
 
     // -------------------------------------------------------------------------
-    // DELETE /installation — disconnect GitHub + cascade-delete all repo data
+    // DELETE /installation — uninstall GitHub App + cascade-delete all repo data
+    //
+    // Order matters:
+    //   1. Revoke the GitHub App installation (so the App is removed from the
+    //      user's GitHub account, not just from our DB).
+    //   2. Clean up local DB regardless — user's intent is always to disconnect.
+    //
+    // Non-fatal GitHub errors: log and proceed. A 404 means the installation was
+    // already deleted from GitHub (e.g. the user uninstalled from GitHub settings
+    // first, which fires the installation.deleted webhook — handled above), so the
+    // DB cleanup is still required.
     // -------------------------------------------------------------------------
     router.delete('/installation', async (ctx) => {
         const pool = getPool(config);
@@ -537,6 +548,17 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         if (!uid) return ctx.json({ error: 'Authenticated subject missing' }, 401);
         const conn = await getConnection(pool, uid);
         if (!conn) return ctx.json({ error: 'Not connected' }, 404);
+
+        if (conn.installation_id) {
+            const [appId, key] = requireGitHubConfig(config);
+            try {
+                await deleteInstallation(appId, key, conn.installation_id);
+                console.log(`[github/disconnect] revoked installation ${conn.installation_id} for user ${uid}`);
+            } catch (err) {
+                // Non-fatal: log and continue so local DB is always cleaned up.
+                console.error(`[github/disconnect] GitHub App deletion failed (proceeding with DB cleanup):`, (err as Error).message);
+            }
+        }
 
         await deleteConnection(pool, uid);
         return ctx.json({ success: true });

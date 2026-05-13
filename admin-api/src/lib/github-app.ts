@@ -145,6 +145,24 @@ export async function listInstallationRepos(installationToken: string): Promise<
 }
 
 // =============================================================================
+// INSTALLATION DELETION
+// =============================================================================
+
+/**
+ * Delete a GitHub App installation — uninstalls the App from the user's account.
+ * Requires the App JWT (not an installation token). Returns void; 204 No Content.
+ * If the installation is already gone (404), resolves silently.
+ */
+export async function deleteInstallation(
+    appId: string,
+    privateKeyPem: string,
+    installationId: string,
+): Promise<void> {
+    const jwt = await generateAppJwt(appId, privateKeyPem);
+    await githubDeleteNoBody(`/app/installations/${installationId}`, jwt);
+}
+
+// =============================================================================
 // HTTPS HELPER — consistent with GitHubAdapter
 // =============================================================================
 
@@ -173,6 +191,42 @@ function githubRequest<T>(method: string, path: string, token: string): Promise<
                     }
                     try { resolve(JSON.parse(body) as T); }
                     catch { reject(new Error(`GitHub API ${path}: invalid JSON`)); }
+                });
+            },
+        );
+        req.on('error', reject);
+        req.end();
+    });
+}
+
+/**
+ * Fire a DELETE request that returns 204 No Content (no JSON to parse).
+ * Resolves on 204; also resolves on 404 (installation already gone).
+ * Rejects on any other 4xx/5xx so the caller can decide whether to surface it.
+ */
+function githubDeleteNoBody(path: string, token: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const req = https.request(
+            {
+                hostname: 'api.github.com',
+                path,
+                method:   'DELETE',
+                headers: {
+                    Authorization:          `Bearer ${token}`,
+                    'User-Agent':           'portfolio-admin-api/1.0',
+                    Accept:                 'application/vnd.github+json',
+                    'X-GitHub-Api-Version': '2022-11-28',
+                },
+            },
+            (res) => {
+                const chunks: Buffer[] = [];
+                res.on('data', (c: Buffer) => chunks.push(c));
+                res.on('end', () => {
+                    const status = res.statusCode ?? 0;
+                    // 204 = deleted, 404 = already gone — both are success for our purpose.
+                    if (status === 204 || status === 404) { resolve(); return; }
+                    const body = Buffer.concat(chunks).toString('utf-8');
+                    reject(new Error(`GitHub API DELETE ${path} → ${status}: ${body}`));
                 });
             },
         );
