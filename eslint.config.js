@@ -19,6 +19,7 @@ export default tseslint.config(
       '.turbo/**',
       'coverage/**',
       'server.js',
+      'telemetry.js',
       'admin-api/**',
     ],
   },

@@ -4,7 +4,7 @@ import type { ResumeData, CoverLetterData } from './state'
 import type { ThemeName } from './themes'
 
 export function sanitizeFilename(s: string) {
-  return s.replace(/[^a-z0-9_\-]+/gi, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+  return s.replace(/[^a-z0-9_-]+/gi, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
 }
 
 export function buildResumeTxt(r: ResumeData): string {

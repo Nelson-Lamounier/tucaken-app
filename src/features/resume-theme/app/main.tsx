@@ -427,7 +427,7 @@ function FormPanel({ state }: { state: AppState }) {
         </FormSectionHead>
         {resume.sectionOrder.map((k, i) => renderSectionEditor(k, i))}
 
-        {(missingStandard.length > 0 || true) && (
+        {missingStandard.length > 0 && (
           <div className="add-section-row">
             {missingStandard.map((s) => (
               <button
