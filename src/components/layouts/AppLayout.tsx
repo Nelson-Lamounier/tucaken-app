@@ -220,7 +220,7 @@ export default function AppLayout({
                 {/* Navigation */}
                 <nav className="relative flex flex-1 flex-col">
                   <SidebarNavList isAdmin={isAdmin} />
-                  <SidebarObservability />
+                  <SidebarObservability isAdmin={isAdmin} />
                   <SidebarFooter onSignOut={handleSignOut} me={me} />
                 </nav>
               </div>
@@ -241,7 +241,7 @@ export default function AppLayout({
             {/* Navigation */}
             <nav className="flex flex-1 flex-col">
               <SidebarNavList isAdmin={isAdmin} />
-              <SidebarObservability />
+              <SidebarObservability isAdmin={isAdmin} />
               <SidebarFooter onSignOut={handleSignOut} />
             </nav>
           </div>
@@ -379,8 +379,9 @@ function SidebarNavList({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
-/** Observability external links section rendered below primary navigation. */
-function SidebarObservability() {
+/** Observability external links section rendered below primary navigation. Admin-only. */
+function SidebarObservability({ isAdmin }: { isAdmin: boolean }) {
+  if (!isAdmin) return null;
   return (
     <li className="mt-auto">
       <div className="text-xs/6 font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-2">
