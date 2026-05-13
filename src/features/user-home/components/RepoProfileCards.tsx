@@ -177,9 +177,9 @@ function RepoCard({ repo }: { readonly repo: ConnectedRepo }) {
               {repo.domain}
             </span>
           )}
-          {repo.techStack?.slice(0, 6).map(tech => (
+          {repo.techStack?.slice(0, 6).map((tech, i) => (
             <span
-              key={tech}
+              key={`${tech}-${i}`}
               className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-zinc-400"
             >
               {tech}
