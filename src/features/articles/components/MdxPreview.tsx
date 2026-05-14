@@ -262,7 +262,6 @@ function Mermaid({ chart, children, caption }: MermaidProps) {
     <figure className="not-prose group my-10" ref={containerRef}>
       <div
         role="img"
-        tabIndex={0}
         onMouseMove={handleMouseMove}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
