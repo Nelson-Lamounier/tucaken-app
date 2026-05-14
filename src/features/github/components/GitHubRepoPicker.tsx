@@ -28,12 +28,17 @@ export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos, m
     [connectedRepos],
   )
 
+  const sorted = useMemo(
+    () => [...(accessibleRepos ?? [])].sort(
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+    ),
+    [accessibleRepos],
+  )
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return (accessibleRepos ?? []).filter((r) =>
-      q === '' || r.fullName.toLowerCase().includes(q),
-    )
-  }, [accessibleRepos, search])
+    return sorted.filter((r) => q === '' || r.fullName.toLowerCase().includes(q))
+  }, [sorted, search])
 
   const visible = filtered.slice(0, visibleCount)
   const remaining = filtered.length - visibleCount

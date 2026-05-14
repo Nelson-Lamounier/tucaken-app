@@ -136,12 +136,22 @@ export async function getInstallationInfo(
  * (< 50 repos) a single page is always sufficient.
  */
 export async function listInstallationRepos(installationToken: string): Promise<GitHubRawRepo[]> {
-    const data = await githubRequest<GitHubRepoListResponse>(
+    const first = await githubRequest<GitHubRepoListResponse>(
         'GET',
-        '/installation/repositories?per_page=100',
+        '/installation/repositories?per_page=100&page=1',
         installationToken,
     );
-    return data.repositories;
+    const repos = [...first.repositories];
+    const totalPages = Math.ceil(first.total_count / 100);
+    for (let page = 2; page <= totalPages; page++) {
+        const next = await githubRequest<GitHubRepoListResponse>(
+            'GET',
+            `/installation/repositories?per_page=100&page=${page}`,
+            installationToken,
+        );
+        repos.push(...next.repositories);
+    }
+    return repos;
 }
 
 // =============================================================================
