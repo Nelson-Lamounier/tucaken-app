@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { adminKeys } from '@/lib/api/query-keys'
 import { triggerGitHubIngestionFn } from '@/server/github'
@@ -12,18 +13,31 @@ interface IngestionVariables {
 export function useGitHubIngestion() {
   const queryClient = useQueryClient()
   const { addToast } = useToastStore()
+  const [needsUpgrade, setNeedsUpgrade] = useState(false)
 
-  return useMutation<{ status: string; repoFullName: string; jobName: string }, Error, IngestionVariables>({
+  const mutation = useMutation<
+    { status: string; repoFullName: string; jobName: string },
+    Error,
+    IngestionVariables
+  >({
     mutationFn: (data) => triggerGitHubIngestionFn({ data }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: adminKeys.github.connectedRepos() })
       void queryClient.invalidateQueries({ queryKey: adminKeys.github.accessibleRepos() })
     },
     onError: (err) => {
-      const is429 = err.message.includes('[429]')
-      addToast('error', is429
-        ? 'Monthly ingestion limit reached. Upgrade to Pro for unlimited syncs.'
-        : `Failed to queue repo: ${err.message}`)
+      if (err.message.includes('[429]')) {
+        // Show the persistent upgrade banner instead of an auto-dismissing toast.
+        setNeedsUpgrade(true)
+      } else {
+        addToast('error', `Failed to queue repo: ${err.message}`)
+      }
     },
   })
+
+  return {
+    ...mutation,
+    needsUpgrade,
+    dismissUpgrade: () => setNeedsUpgrade(false),
+  }
 }

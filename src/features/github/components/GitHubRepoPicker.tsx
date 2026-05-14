@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { Loader2, GitBranch, Search } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { GitHubRepoChip } from './GitHubRepoChip'
+import { UpgradeLimitBanner } from './UpgradeLimitBanner'
 import { useGitHubIngestion } from '../hooks/use-github-ingestion'
 import type { GitHubAccessibleRepo, ConnectedRepo } from '@/lib/types/github.types'
 
@@ -60,6 +61,10 @@ export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos, m
   }
 
   return (
+    <div className="space-y-3">
+      {ingestion.needsUpgrade && (
+        <UpgradeLimitBanner onDismiss={ingestion.dismissUpgrade} />
+      )}
     <div className="rounded-lg border border-white/10 overflow-hidden">
       <div className="flex items-center justify-between border-b border-white/[0.08] px-4 py-3">
         <div>
@@ -163,6 +168,7 @@ export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos, m
           )}
         </div>
       )}
+    </div>
     </div>
   )
 }

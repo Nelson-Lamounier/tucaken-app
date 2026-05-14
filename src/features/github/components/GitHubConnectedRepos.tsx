@@ -83,7 +83,9 @@ export function GitHubConnectedRepos({ connectedRepos }: GitHubConnectedReposPro
                     <span className="text-[10px] text-zinc-600">{lastSynced}</span>
                   )}
                   {repo.syncStatus === 'error' && (
-                    <span className="text-[10px] text-zinc-600">Ingestion failed</span>
+                    <span className="text-[10px] text-red-400/70">
+                      {repo.errorMessage ?? 'Ingestion failed'}
+                    </span>
                   )}
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">

@@ -252,6 +252,22 @@ async function checkAndIncrementQuota(
 }
 
 /**
+ * Decrements the monthly ingestion counter by 1 (floor 0).
+ * Called when a job dispatch fails after the quota was already incremented,
+ * so a failed attempt doesn't consume a monthly credit.
+ */
+async function decrementQuota(pool: Pool, userId: string): Promise<void> {
+    await pool.query(
+        `UPDATE usage_quotas
+         SET count      = GREATEST(count - 1, 0),
+             updated_at = NOW()
+         WHERE user_id = $1::uuid AND feature = 'ingestion_jobs'
+           AND period_month = DATE_TRUNC('month', NOW())`,
+        [userId],
+    );
+}
+
+/**
  * Stamp last_sync_triggered_at on a repo so the push cooldown is enforced.
  * Called immediately before dispatching any ingestion job.
  */
@@ -323,6 +339,8 @@ async function autoDispatchRepos(
             console.log(`[github/auto-dispatch] queued ${repo.full_name} (forceReindex=${forceReindex})`);
         } catch (err) {
             console.error(`[github/auto-dispatch] dispatch failed for ${repo.full_name}`, (err as Error).message);
+            // Roll back the quota slot — this repo never got an active job.
+            await decrementQuota(pool, userId).catch(() => {});
         }
     }
 
@@ -666,15 +684,61 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
 
         // Insert repo row + mark pending before Job dispatch so the UI
         // shows "Queued" immediately even if pod startup takes a few seconds.
-        await insertRepository(pool, uid, repoFullName, defaultBranch);
-        await markRepoPending(pool, uid, repoFullName);
-        await markSyncTriggered(pool, uid, repoFullName);
+        // Wrapped in try/catch: if anything after the quota increment fails,
+        // decrement the counter so the user doesn't lose a monthly credit.
+        try {
+            await insertRepository(pool, uid, repoFullName, defaultBranch);
+            await markRepoPending(pool, uid, repoFullName);
+            await markSyncTriggered(pool, uid, repoFullName);
 
-        // Generate a fresh installation token scoped to this user's repos.
-        const githubToken = await generateInstallationToken(appId, key, conn.installation_id);
-        const { jobName } = await dispatchIngestionJob(config, uid, repoFullName, githubToken, forceReindex);
+            // Generate a fresh installation token scoped to this user's repos.
+            const githubToken = await generateInstallationToken(appId, key, conn.installation_id);
+            const { jobName } = await dispatchIngestionJob(config, uid, repoFullName, githubToken, forceReindex);
 
-        return ctx.json({ status: 'queued', repoFullName, jobName }, 202);
+            return ctx.json({ status: 'queued', repoFullName, jobName }, 202);
+        } catch (err) {
+            await decrementQuota(pool, uid).catch(() => {});
+            throw err;
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // POST /connected-repos/mark-timed-out — mark stale pending/syncing repos
+    // Called by the frontend when the 10-min polling timeout elapses without
+    // a status change. Updates sync_status → 'error' so the UI reflects the
+    // actual failure rather than showing 'pending' indefinitely.
+    // -------------------------------------------------------------------------
+    router.post('/connected-repos/mark-timed-out', async (ctx) => {
+        const pool = getPool(config);
+        const uid  = requireUserId(ctx);
+        if (!uid) return ctx.json({ error: 'Authenticated subject missing' }, 401);
+
+        let body: { repoFullNames?: unknown };
+        try { body = await ctx.req.json(); }
+        catch { return ctx.json({ error: 'Body must be valid JSON' }, 400); }
+
+        const repoFullNames = body.repoFullNames;
+        if (!Array.isArray(repoFullNames) || repoFullNames.length === 0) {
+            return ctx.json({ error: '"repoFullNames" must be a non-empty array' }, 400);
+        }
+        const names = repoFullNames.filter((n): n is string => typeof n === 'string');
+        const invalid = names.filter((n) => !/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(n));
+        if (invalid.length > 0) {
+            return ctx.json({ error: `Invalid repo names: ${invalid.join(', ')}` }, 400);
+        }
+
+        const result = await pool.query(
+            `UPDATE repo_sync_state
+             SET sync_status   = 'error',
+                 error_message = 'Ingestion job timed out — the background job may have crashed. Please re-sync.',
+                 updated_at    = NOW()
+             WHERE user_id = $1::uuid
+               AND repo_full_name = ANY($2::text[])
+               AND sync_status IN ('pending', 'syncing')`,
+            [uid, names],
+        );
+
+        return ctx.json({ updated: result.rowCount ?? 0 });
     });
 
     // -------------------------------------------------------------------------

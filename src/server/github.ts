@@ -84,3 +84,20 @@ export const removeConnectedRepoFn = createServerFn({ method: 'POST' })
       },
     )
   })
+
+const markTimedOutSchema = z.object({
+  repoFullNames: z.array(z.string().min(1)).min(1),
+})
+
+export const markReposTimedOutFn = createServerFn({ method: 'POST' })
+  .inputValidator(markTimedOutSchema)
+  .handler(async ({ data }) => {
+    await requireAuth()
+    return apiFetch<{ updated: number }>(
+      '/github/connected-repos/mark-timed-out',
+      {
+        method: 'POST',
+        body: JSON.stringify({ repoFullNames: data.repoFullNames }),
+      },
+    )
+  })

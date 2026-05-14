@@ -43,6 +43,7 @@ export interface ConnectedRepo {
   readonly defaultBranch:    string
   readonly syncStatus:       RepoSyncStatus
   readonly lastSyncedAt?:    string
+  readonly errorMessage?:    string | null
   readonly pipelineRunId?:   string
   readonly jobName?:         string
   readonly addedAt:          string
