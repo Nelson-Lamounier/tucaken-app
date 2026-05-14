@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import type { ArticleWithSlug } from '@/lib/types/article.types'
 import { DashboardDrawer } from '@/components/ui/DashboardDrawer'
 import { ArticleEditorDrawerContent } from './ArticleEditorDrawerContent'
@@ -50,6 +51,7 @@ export function ArticleVersionsList({ article }: ArticleVersionsListProps) {
   const [githubSaved, setGithubSaved] = useState(false)
   const [isEditorOpen, setIsEditorOpen] = useState(false)
 
+  const navigate = useNavigate()
   const updateMetadata = useUpdateMetadata()
   const publishMutation = usePublishArticle()
   const unpublishMutation = useUnpublishArticle()
@@ -107,8 +109,7 @@ export function ArticleVersionsList({ article }: ArticleVersionsListProps) {
   }
 
   function handlePreview(): void {
-    const baseUrl = import.meta.env?.PROD ? 'https://nelsonlamounier.com' : 'http://localhost:3000'
-    globalThis.window.open(`${baseUrl}/articles/${article.slug}`, '_blank', 'noopener,noreferrer')
+    void navigate({ to: '/articles/preview/$slug', params: { slug: article.slug } })
   }
 
   // Status-aware action flags
