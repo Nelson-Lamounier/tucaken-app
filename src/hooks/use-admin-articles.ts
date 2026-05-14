@@ -12,11 +12,9 @@ import {
   deleteArticleFn,
   saveArticleMetadataFn,
   saveArticleContentFn,
-  type ArticleVersion,
-  type ArticleMetadata,
 } from '../server/articles'
 
-export type { ArticleVersion, ArticleMetadata }
+export type { ArticleVersion, ArticleMetadata } from '../server/articles'
 
 // =============================================================================
 // Types
@@ -63,7 +61,7 @@ export function useAdminArticles() {
       for (const item of raw) {
         const slug =
           (item['slug'] as string) ||
-          (typeof item['pk'] === 'string' ? (item['pk'] as string).replace(/^ARTICLE#/, '') : '')
+          (typeof item['pk'] === 'string' ? item['pk'].replace(/^ARTICLE#/, '') : '')
         if (!slug) continue
 
         const existing = slugMap.get(slug)
