@@ -428,6 +428,27 @@ function ProcessTimeline({ children }: ProcessTimelineProps) {
   return <div className="my-8 border-l-2 border-zinc-700 pl-6">{children}</div>
 }
 
+// ─── CodeBlock ────────────────────────────────────────────────────────────────
+// Intercepts ```mermaid fences and routes them to the Mermaid renderer.
+// All other <pre> blocks fall through to the typography-plugin styles.
+
+interface CodeBlockProps {
+  readonly children?: React.ReactNode
+}
+
+function CodeBlock({ children }: CodeBlockProps) {
+  if (isValidElement(children)) {
+    const childProps = children.props as { className?: string; children?: React.ReactNode }
+    if (childProps.className?.includes('language-mermaid')) {
+      const chart = typeof childProps.children === 'string'
+        ? childProps.children.trim()
+        : extractText(childProps.children)
+      return <Mermaid chart={chart} />
+    }
+  }
+  return <pre>{children}</pre>
+}
+
 // ─── MDX component map ────────────────────────────────────────────────────────
 
 const components = {
@@ -438,6 +459,7 @@ const components = {
   ProcessTimeline,
   Mermaid,
   MermaidChart: Mermaid,
+  pre: CodeBlock,
   table: Table,
   thead: TableHead,
   tbody: TableBody,
