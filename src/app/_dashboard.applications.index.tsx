@@ -66,7 +66,7 @@ export const Route = createFileRoute('/_dashboard/applications/')({
 function ApplicationsIndexRoute() {
   return (
     <DashboardPage
-      title="Applications Hub"
+      title="Job Applications Hub"
       description="Manage your job applications and interview preparation."
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-6">

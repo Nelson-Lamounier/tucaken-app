@@ -71,10 +71,14 @@ export interface ResumeWithData extends ResumeSummary {
 export const getResumesFn = createServerFn({ method: 'GET' }).handler(
   async () => {
     await requireAuth()
-    const response = await apiFetch<{ resumes: ResumeSummary[]; count: number }>(
+    const response = await apiFetch<{ resumes: Array<ResumeSummary & { id?: string }>; count: number }>(
       '/resumes',
     )
-    return response.resumes
+    // Normalise: older API shape returns `id`, newer returns `resumeId`.
+    return response.resumes.map((r) => ({
+      ...r,
+      resumeId: r.resumeId ?? r.id ?? '',
+    })) satisfies ResumeSummary[]
   },
 )
 

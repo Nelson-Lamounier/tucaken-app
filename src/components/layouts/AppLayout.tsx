@@ -38,17 +38,17 @@ import { Link } from "@tanstack/react-router";
 import { HeaderNav } from "../ui/HeaderNav";
 import { PipelineNotificationWatcher } from "../ui/PipelineNotificationWatcher";
 import type { MeResponse } from "@/server/me";
-import avatarImage from "@/images/avatar.jpg";
 import logo from "@/images/logo.png";
 
 /** Primary sidebar navigation links. */
 const navigation = [
   { name: "Dashboard",       href: "/overview",      icon: HomeIcon,              adminOnly: false },
   { name: "Comments",        href: "/comments",      icon: MessageSquareText,     adminOnly: true  },
-  { name: "Applications",    href: "/applications",  icon: BriefcaseIcon,         adminOnly: false },
+  { name: "Job Applications", href: "/applications",  icon: BriefcaseIcon,         adminOnly: false },
   { name: "Articles",        href: "/articles",      icon: DocumentDuplicateIcon, adminOnly: true  },
   { name: "Resumes",         href: "/resumes",       icon: DocumentTextIcon,      adminOnly: false },
   { name: "Projects",        href: "/projects",      icon: FolderIcon,            adminOnly: false },
+  { name: "Database",        href: "/settings/github", icon: Database,            adminOnly: false },
   { name: "Calendar",        href: "/calendar",      icon: CalendarIcon,          adminOnly: false },
   { name: "Reports",         href: "/reports",       icon: ChartPieIcon,          adminOnly: true  },
   { name: "Test Components", href: "/test",          icon: BeakerIcon,            adminOnly: true  },
@@ -97,7 +97,6 @@ const observabilityLinks = [
 const settingsNavigation = [
   { name: "Settings", href: "/settings", icon: SettingsIcon },
   { name: "Billing", href: "/billing", icon: CreditCard },
-  { name: "Database", href: "/settings/github", icon: Database },
 ] as const;
 
 /**
@@ -254,7 +253,7 @@ export default function AppLayout({
           <HeaderNav
             onOpenSidebar={() => setSidebarOpen(true)}
             onSignOut={handleSignOut}
-            userAvatar={me?.avatarUrl ?? (avatarImage as unknown as string)}
+            userAvatar={me?.avatarUrl}
             userEmail={me?.email}
             userName={me?.name}
           />
@@ -447,11 +446,17 @@ function SidebarFooter({ onSignOut, me }: { onSignOut: () => void; me?: MeRespon
 
       {/* User row */}
       <div className="flex items-center gap-x-4 border-t border-zinc-200 dark:border-zinc-700/50 px-6 py-3">
-        <img
-          alt="User avatar"
-          src={me?.avatarUrl ?? (avatarImage as unknown as string)}
-          className="size-8 shrink-0 rounded-full bg-zinc-100 dark:bg-zinc-800 ring-1 ring-zinc-200 dark:ring-zinc-700"
-        />
+        {me?.avatarUrl ? (
+          <img
+            alt="User avatar"
+            src={me.avatarUrl}
+            className="size-8 shrink-0 rounded-full bg-zinc-100 dark:bg-zinc-800 ring-1 ring-zinc-200 dark:ring-zinc-700 object-cover"
+          />
+        ) : (
+          <div className="size-8 shrink-0 rounded-full bg-teal-600 dark:bg-teal-700 ring-1 ring-zinc-200 dark:ring-zinc-700 flex items-center justify-center text-xs font-semibold text-white uppercase select-none">
+            {(me?.name ?? me?.email ?? 'U').charAt(0)}
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <p className="truncate text-sm/6 font-medium text-zinc-900 dark:text-white">
             {me?.name ?? me?.email?.split('@')[0] ?? 'User'}
