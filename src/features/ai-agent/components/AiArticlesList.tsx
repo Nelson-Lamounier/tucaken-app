@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 import { EllipsisVerticalIcon } from '@heroicons/react/20/solid'
 import { Eye, X } from 'lucide-react'
@@ -69,6 +70,7 @@ function formatDate(dateStr: string): string {
 export function AiArticlesList() {
   const { data, isLoading, error, refetch } = useAdminArticles()
   const [reviewBannerDismissed, setReviewBannerDismissed] = useState(false)
+  const navigate = useNavigate()
 
   const articles: ArticleWithSlug[] = (data?.all ?? [])
     .slice()
@@ -84,10 +86,7 @@ export function AiArticlesList() {
   )
 
   function handlePreview(slug: string) {
-    const baseUrl = import.meta.env?.PROD
-      ? 'https://nelsonlamounier.com'
-      : 'http://localhost:3000'
-    globalThis.window.open(`${baseUrl}/articles/${slug}`, '_blank', 'noopener,noreferrer')
+    void navigate({ to: '/articles/preview/$slug', params: { slug } })
   }
 
   if (isLoading) {
