@@ -1,6 +1,6 @@
 "use client"
 import { useState } from 'react'
-import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { ArrowLeftIcon, ChevronDoubleRightIcon, ChevronDoubleLeftIcon } from '@heroicons/react/20/solid'
 import { useArticleContent, useArticleMetadata, useArticleVersions } from '@/hooks/use-admin-articles'
 import { MdxPreview } from '@/features/articles/components/MdxPreview'
@@ -26,7 +26,7 @@ const STATUS_CLASS: Record<string, string> = {
 
 function ArticlePreviewPage() {
   const { slug } = Route.useParams()
-  const navigate = useNavigate()
+  const router = useRouter()
   const [panelOpen, setPanelOpen] = useState(true)
 
   const { data: contentData, isLoading: contentLoading } = useArticleContent(slug)
@@ -37,7 +37,7 @@ function ArticlePreviewPage() {
   const status = metadata?.status ?? 'draft'
 
   function handleBack() {
-    void navigate({ to: '/ai-agent' })
+    router.history.back()
   }
 
   function renderContent() {
