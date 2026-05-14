@@ -41,6 +41,7 @@ import { createPromptFeedbackRouter } from './routes/prompt-feedback.js';
 import { createPublicRouter } from './routes/public.js';
 import { createResumeImportsRouter } from './routes/resume-imports.js';
 import { createResumesRouter } from './routes/resumes.js';
+import { createDraftsRouter } from './routes/drafts.js';
 
 // ── Startup Validation ───────────────────────────────────────────────────────
 // loadConfig() throws immediately if any required env var is absent.
@@ -133,6 +134,7 @@ app.route('/api/admin/pipelines', createPipelinesRouter(config));
 app.route('/api/admin/resumes', createResumesRouter(config));
 app.route('/api/admin/resume-imports', createResumeImportsRouter(config));
 app.route('/api/admin/prompt-feedback', createPromptFeedbackRouter(config));
+app.route('/api/admin/drafts',         createDraftsRouter(config));
 
 // ── 404 handler ──────────────────────────────────────────────────────────────
 app.notFound((ctx) => ctx.json({ error: 'Not found' }, 404));
