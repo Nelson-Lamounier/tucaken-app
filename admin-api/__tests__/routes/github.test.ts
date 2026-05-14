@@ -141,17 +141,26 @@ const connectedRow: Row = {
     connected_at:    new Date('2026-04-29T10:00:00Z'),
 };
 
-/** Connected repo row (joins repositories + repo_sync_state) */
+/** Connected repo row (joins repositories + repo_sync_state + repository_profiles) */
 const connectedRepoRow: Row = {
-    full_name:      'Nelson-Lamounier/cdk-monitoring',
-    default_branch: 'develop',
-    index_status:   'pending',
-    added_at:       new Date('2026-04-29T10:00:00Z'),
-    sync_status:    'complete',
-    last_synced_at: new Date('2026-04-29T11:00:00Z'),
-    file_count:     393,
-    chunk_count:    1420,
-    error_message:  null,
+    full_name:          'Nelson-Lamounier/cdk-monitoring',
+    default_branch:     'develop',
+    index_status:       'pending',
+    added_at:           new Date('2026-04-29T10:00:00Z'),
+    sync_status:        'complete',
+    last_synced_at:     new Date('2026-04-29T11:00:00Z'),
+    file_count:         393,
+    chunk_count:        1420,
+    error_message:      null,
+    quality_score:      0.80,
+    quality_breakdown:  { has_readme: 0.25, has_manifest: 0.20, has_ci: 0.15, has_changelog: 0, has_tests: 0, commit_count: 0.10, confidence: 0.10 },
+    classification:     'project',
+    extraction_status:  'completed',
+    one_liner:          'AWS CDK constructs for automated CloudWatch monitoring dashboards.',
+    domain:             'devops',
+    tech_stack:         ['TypeScript', 'AWS CDK', 'CloudWatch'],
+    complexity:         'moderate',
+    confidence:         0.90,
 };
 
 // eslint-disable-next-line jest/require-top-level-describe -- shared reset across all suites in this file; intentional global hook
@@ -334,6 +343,64 @@ describe('GET /connected-repos', () => {
         expect(repo['fileCount']).toBe(393);
         expect(repo['chunkCount']).toBe(1420);
         expect(repo['defaultBranch']).toBe('develop');
+    });
+
+    it('includes profile fields when profile exists', async () => {
+        seedQuery([connectedRepoRow]);
+
+        const res  = await buildApp().request('/connected-repos');
+        const body = await res.json() as { repos: Array<Record<string, unknown>> };
+
+        expect(res.status).toBe(200);
+        const repo = body.repos[0]!;
+        expect(repo['qualityScore']).toBe(0.80);
+        expect(repo['classification']).toBe('project');
+        expect(repo['extractionStatus']).toBe('completed');
+        expect(repo['oneLiner']).toBe('AWS CDK constructs for automated CloudWatch monitoring dashboards.');
+        expect(repo['domain']).toBe('devops');
+        expect(repo['techStack']).toEqual(['TypeScript', 'AWS CDK', 'CloudWatch']);
+        expect(repo['complexity']).toBe('moderate');
+        expect(repo['confidence']).toBe(0.90);
+        expect(repo['qualityBreakdown']).toMatchObject({ has_readme: 0.25, has_manifest: 0.20 });
+    });
+
+    it('returns null profile fields when repo has no profile', async () => {
+        const rowWithoutProfile: Row = {
+            full_name:         'Nelson-Lamounier/cdk-monitoring',
+            default_branch:    'develop',
+            index_status:      'pending',
+            added_at:          new Date('2026-04-29T10:00:00Z'),
+            sync_status:       'complete',
+            last_synced_at:    new Date('2026-04-29T11:00:00Z'),
+            file_count:        393,
+            chunk_count:       1420,
+            error_message:     null,
+            quality_score:     null,
+            quality_breakdown: null,
+            classification:    null,
+            extraction_status: null,
+            one_liner:         null,
+            domain:            null,
+            tech_stack:        null,
+            complexity:        null,
+            confidence:        null,
+        };
+        seedQuery([rowWithoutProfile]);
+
+        const res  = await buildApp().request('/connected-repos');
+        const body = await res.json() as { repos: Array<Record<string, unknown>> };
+
+        expect(res.status).toBe(200);
+        const repo = body.repos[0]!;
+        expect(repo['qualityScore']).toBeNull();
+        expect(repo['qualityBreakdown']).toBeNull();
+        expect(repo['classification']).toBeNull();
+        expect(repo['extractionStatus']).toBeNull();
+        expect(repo['oneLiner']).toBeNull();
+        expect(repo['domain']).toBeNull();
+        expect(repo['techStack']).toBeNull();
+        expect(repo['complexity']).toBeNull();
+        expect(repo['confidence']).toBeNull();
     });
 });
 

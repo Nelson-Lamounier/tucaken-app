@@ -21,6 +21,7 @@ export interface MeResponse {
   plan: {
     plan:                 string
     effectivePlan:        'pro' | 'trial' | 'free'
+    role:                 string   // 'user' | 'admin' — already returned by the API
     trialStartedAt:       string | null
     trialEndsAt:          string | null
     trialDaysRemaining:   number | null

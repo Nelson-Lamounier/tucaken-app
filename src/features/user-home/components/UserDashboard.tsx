@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { useGitHubConnectedRepos } from '@/features/github/hooks/use-github-connected-repos'
 import { adminKeys } from '@/lib/api/query-keys'
 import { listResumeImportsFn, listCareerEntriesFn } from '@/server/resume-imports'
-import { KbRepoList } from './KbRepoList'
+import { RepoProfileCards } from './RepoProfileCards'
 import { CareerDataBreakdown } from './CareerDataBreakdown'
 import { ResumeFilesList } from './ResumeFilesList'
 import { KbQuickActions } from './KbQuickActions'
@@ -92,7 +92,7 @@ export function UserDashboard() {
     >
       <div className="space-y-8">
         <Stats stats={heroStats} />
-        <KbRepoList repos={repos} isLoading={loadingRepos} />
+        <RepoProfileCards repos={repos} isLoading={loadingRepos} />
         <CareerDataBreakdown
           entries={entries}
           latestImport={latestImport}

@@ -25,6 +25,8 @@ interface DropDownOptionsProps {
   readonly onUnpublish?: () => void
   readonly showPreviewResume?: boolean
   readonly showPreviewCoverLetter?: boolean
+  /** Single consolidated "Edit" action — opens the resume builder */
+  readonly onEdit?: () => void
 }
 
 export default function DropDownOptions({
@@ -42,6 +44,7 @@ export default function DropDownOptions({
   onUnpublish,
   onPreviewArticle,
   onEditArticle,
+  onEdit,
   showPreviewResume = true,
   showPreviewCoverLetter = true,
 }: DropDownOptionsProps & { onPreviewArticle?: () => void; onEditArticle?: () => void; }) {
@@ -82,6 +85,25 @@ export default function DropDownOptions({
                 </button>
               </MenuItem>
             ))}
+          </div>
+        )}
+
+        {/* Consolidated edit — opens resume builder */}
+        {onEdit && (
+          <div className="py-1">
+            <MenuItem>
+              <button
+                type="button"
+                onClick={onEdit}
+                className="group flex w-full items-center px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 data-focus:bg-zinc-50 dark:data-focus:bg-white/5 data-focus:text-zinc-900 dark:data-focus:text-white data-focus:outline-hidden"
+              >
+                <PencilSquareIcon
+                  aria-hidden="true"
+                  className="mr-3 size-5 text-zinc-400 dark:text-zinc-500 group-data-focus:text-zinc-600 dark:group-data-focus:text-white"
+                />
+                Edit
+              </button>
+            </MenuItem>
           </div>
         )}
 
