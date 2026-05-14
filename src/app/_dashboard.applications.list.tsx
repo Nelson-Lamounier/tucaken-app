@@ -17,7 +17,7 @@ function ApplicationsListRoute() {
   const { stage } = Route.useSearch()
   return (
     <DashboardPage
-      title="Applications"
+      title="Job Applications"
       description="List of all applications"
     >
       <ApplicationsList initialStage={stage} />

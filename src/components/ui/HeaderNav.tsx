@@ -81,14 +81,17 @@ export function HeaderNav({ onOpenSidebar, onSignOut, userAvatar, userEmail, use
           <Menu as="div" className="relative">
             <MenuButton className="-m-1.5 flex items-center p-1.5 focus:outline-none">
               <span className="sr-only">Open user menu</span>
-              <img
-                className="h-8 w-8 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover ring-2 ring-zinc-200 dark:ring-zinc-700"
-                src={
-                  userAvatar ||
-                  'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80'
-                }
-                alt="Admin avatar"
-              />
+              {userAvatar ? (
+                <img
+                  className="h-8 w-8 rounded-full bg-zinc-200 dark:bg-zinc-800 object-cover ring-2 ring-zinc-200 dark:ring-zinc-700"
+                  src={userAvatar}
+                  alt="User avatar"
+                />
+              ) : (
+                <div className="h-8 w-8 rounded-full bg-teal-600 dark:bg-teal-700 ring-2 ring-zinc-200 dark:ring-zinc-700 flex items-center justify-center text-xs font-semibold text-white uppercase select-none">
+                  {(userName ?? userEmail ?? 'U').charAt(0)}
+                </div>
+              )}
               <span className="hidden lg:flex lg:items-center">
                 <span className="ml-4 text-sm font-semibold leading-6 text-zinc-900 dark:text-zinc-100" aria-hidden="true">
                   {userName ?? userEmail?.split('@')[0] ?? 'User'}
