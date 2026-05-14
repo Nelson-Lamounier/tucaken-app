@@ -181,7 +181,7 @@ export function ArticlePreviewMeta({
               {latestVersion.qaIssues && latestVersion.qaIssues.length > 0 && (
                 <ul className="mt-2 space-y-1">
                   {latestVersion.qaIssues.map((issue, i) => (
-                    <li key={i} className="text-xs text-zinc-400 flex gap-1.5">
+                    <li key={`qa-${i}`} className="text-xs text-zinc-400 flex gap-1.5">
                       <span className="mt-0.5 shrink-0 text-amber-500">·</span>
                       {issue}
                     </li>
