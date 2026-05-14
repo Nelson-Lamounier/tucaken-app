@@ -174,12 +174,12 @@ describe('POST /article-job/:slug — K8s Job article pipeline', () => {
 });
 
 describe('POST /strategist-job — K8s Job strategist pipeline', () => {
+  // Route validates targetCompany / targetRole / jobDescription only.
+  // applicationId is server-generated (randomUUID) — not accepted from caller.
   const validBody = {
-    applicationId:   'app-123',
-    applicationSlug: 'acme-senior-engineer',
-    targetCompany:   'Acme',
-    targetRole:      'Senior Engineer',
-    jobDescription:  'Build cool stuff',
+    targetCompany:  'Acme',
+    targetRole:     'Senior Engineer',
+    jobDescription: 'Build cool stuff',
   };
 
   beforeEach(() => {
@@ -189,11 +189,9 @@ describe('POST /strategist-job — K8s Job strategist pipeline', () => {
   });
 
   it.each([
-    ['applicationId',   { ...validBody, applicationId:   undefined }],
-    ['applicationSlug', { ...validBody, applicationSlug: undefined }],
-    ['targetCompany',   { ...validBody, targetCompany:   undefined }],
-    ['targetRole',      { ...validBody, targetRole:      undefined }],
-    ['jobDescription',  { ...validBody, jobDescription:  undefined }],
+    ['targetCompany',  { ...validBody, targetCompany:  undefined }],
+    ['targetRole',     { ...validBody, targetRole:     undefined }],
+    ['jobDescription', { ...validBody, jobDescription: undefined }],
   ])('returns 400 when %s is missing', async (field, body) => {
     const app = await buildAuthedApp();
     const res = await app.request('/strategist-job', {
@@ -214,17 +212,20 @@ describe('POST /strategist-job — K8s Job strategist pipeline', () => {
       body: JSON.stringify(validBody),
     });
     expect(res.status).toBe(202);
-    const body = await res.json() as { status: string; pipelineRunId: string; jobName: string; applicationId: string };
+    const body = await res.json() as { status: string; pipelineRunId: string; jobName: string; applicationId: string; applicationSlug: string };
     expect(body.status).toBe('queued');
-    expect(body.applicationId).toBe('app-123');
+    // applicationId is server-generated — verify it is a valid UUID
+    expect(body.applicationId).toMatch(/^[0-9a-f-]{36}$/);
+    // applicationSlug mirrors the generated applicationId
+    expect(body.applicationSlug).toBe(body.applicationId);
 
     const callArgs = createNamespacedJobMock.mock.calls[0] as unknown as [{ namespace: string; body: { spec: { template: { spec: { containers: Array<{ env: Array<{ name: string; value: string }> }> } } } } }];
     expect(callArgs[0].namespace).toBe('job-strategist');
     const env = callArgs[0].body.spec.template.spec.containers[0]!.env;
     const envMap = Object.fromEntries(env.map(e => [e.name, e.value]));
     expect(envMap['PIPELINE_RUN_ID']).toBe(body.pipelineRunId);
-    expect(envMap['APPLICATION_ID']).toBe('app-123');
-    expect(envMap['APPLICATION_SLUG']).toBe('acme-senior-engineer');
+    expect(envMap['APPLICATION_ID']).toBe(body.applicationId);
+    expect(envMap['APPLICATION_SLUG']).toBe(body.applicationId);
     expect(envMap['USER_ID']).toBe('test-user');
     expect(envMap['TARGET_COMPANY']).toBe('Acme');
     expect(envMap['TARGET_ROLE']).toBe('Senior Engineer');
