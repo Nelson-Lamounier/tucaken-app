@@ -52,6 +52,21 @@ export interface ArticleVersion {
   kbPassages?: number           // number of KB passages used
 }
 
+/** Metadata returned by GET /articles/:slug on admin-api (PostgreSQL record). */
+export interface ArticleMetadata {
+  slug: string
+  title: string
+  excerpt: string | null
+  tags: string[]
+  status: string
+  aiGenerated: boolean
+  aiModel: string | null
+  publishedAt: string | null
+  coverImage: string | null
+  createdAt: string | null
+  updatedAt: string | null
+}
+
 
 
 // =============================================================================
@@ -276,4 +291,26 @@ export const getArticleVersionsFn = createServerFn({ method: 'GET' })
     )
 
     return body
+  })
+
+/**
+ * Fetches article metadata by slug from admin-api (PostgreSQL record).
+ *
+ * @param data - The article slug
+ * @returns ArticleMetadata or null if not found
+ */
+export const getArticleMetadataFn = createServerFn({ method: 'GET' })
+  .inputValidator(slugSchema)
+  .handler(async ({ data: slug }) => {
+    await requireAuth()
+    try {
+      const body = await apiFetch<{ article: ArticleMetadata }>(
+        `/articles/${encodeURIComponent(slug)}`,
+        { pathTemplate: '/articles/:slug' },
+      )
+      return body.article
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.includes('[404]')) return null
+      throw err
+    }
   })
