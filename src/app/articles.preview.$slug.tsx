@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { createFileRoute, redirect, useRouter } from '@tanstack/react-router'
 import { ArrowLeftIcon, ChevronDoubleRightIcon, ChevronDoubleLeftIcon } from '@heroicons/react/20/solid'
-import { useArticleContent, useArticleMetadata, useArticleVersions } from '@/hooks/use-admin-articles'
+import { useArticleMetadata, useArticleVersions } from '@/hooks/use-admin-articles'
 import { MdxPreview } from '@/features/articles/components/MdxPreview'
 import { ArticlePreviewMeta } from '@/features/articles/components/ArticlePreviewMeta'
 
@@ -29,7 +29,6 @@ function ArticlePreviewPage() {
   const router = useRouter()
   const [panelOpen, setPanelOpen] = useState(true)
 
-  const { data: contentData, isLoading: contentLoading } = useArticleContent(slug)
   const { data: metadata, isLoading: metaLoading } = useArticleMetadata(slug)
   const { data: versionData, isLoading: versionsLoading } = useArticleVersions(slug)
 
@@ -41,7 +40,7 @@ function ArticlePreviewPage() {
   }
 
   function renderContent() {
-    if (contentLoading) {
+    if (metaLoading) {
       return (
         <div className="space-y-4 animate-pulse">
           <div className="h-8 w-2/3 rounded bg-zinc-800" />
@@ -51,18 +50,18 @@ function ArticlePreviewPage() {
         </div>
       )
     }
-    if (contentData === null) {
+    if (metadata === null) {
       return (
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 px-8 py-12 text-center">
-          <p className="text-sm font-medium text-zinc-300">Content not found</p>
+          <p className="text-sm font-medium text-zinc-300">Article not found</p>
           <p className="mt-1 text-xs text-zinc-500">
-            No S3 content exists yet for <code className="font-mono text-zinc-400">{slug}</code>.
-            The article may still be in an early pipeline stage.
+            No article exists for <code className="font-mono text-zinc-400">{slug}</code>.
           </p>
         </div>
       )
     }
-    return <MdxPreview content={contentData?.content ?? ''} />
+    if (!metadata) return null
+    return <MdxPreview content={metadata.contentMd} />
   }
 
   return (

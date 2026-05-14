@@ -57,6 +57,7 @@ export interface ArticleMetadata {
   slug: string
   title: string
   excerpt: string | null
+  contentMd: string
   tags: string[]
   status: string
   aiGenerated: boolean
