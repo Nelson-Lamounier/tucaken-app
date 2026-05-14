@@ -14,6 +14,7 @@ import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 
 const createNamespacedJobMock = jest.fn<() => Promise<object>>().mockResolvedValue({});
 const insertPipelineRunMock   = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
+const upsertArticleMock       = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
 const getPipelineRunMock      = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 
 jest.unstable_mockModule('../../src/lib/k8s.js', () => ({
@@ -31,6 +32,10 @@ jest.unstable_mockModule('../../src/lib/pg.js', () => ({
 jest.unstable_mockModule('../../src/lib/repositories/pipeline-runs.js', () => ({
   insertPipelineRun: insertPipelineRunMock,
   getPipelineRun:    getPipelineRunMock,
+}));
+
+jest.unstable_mockModule('../../src/lib/repositories/articles.js', () => ({
+  upsertArticle: upsertArticleMock,
 }));
 
 // ---------------------------------------------------------------------------
@@ -94,51 +99,36 @@ describe('POST /article-job/:slug — K8s Job article pipeline', () => {
     jest.clearAllMocks();
     createNamespacedJobMock.mockResolvedValue({});
     insertPipelineRunMock.mockResolvedValue(undefined);
+    upsertArticleMock.mockResolvedValue(undefined);
     const { _resetJobImageCache } = await import('../../src/lib/config.js');
     _resetJobImageCache();
   });
 
   it('returns 401 when JWT sub is missing', async () => {
     const app = await buildAuthedApp(null);
-    const res = await app.request('/article-job/my-slug', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ s3Bucket: 'b', s3SourceKey: 'k' }),
-    });
+    const res = await app.request('/article-job/my-slug', { method: 'POST' });
     expect(res.status).toBe(401);
     expect(createNamespacedJobMock).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when s3Bucket missing', async () => {
-    const app = await buildAuthedApp();
-    const res = await app.request('/article-job/my-slug', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ s3SourceKey: 'k' }),
-    });
-    expect(res.status).toBe(400);
+  it('returns 503 when assets bucket not configured', async () => {
+    const { createPipelinesRouter } = await import('../../src/routes/pipelines.js');
+    const app = new Hono();
+    app.use('*', async (c, next) => { (c as any).set('userId', 'test-user'); await next(); });
+    app.route('/', createPipelinesRouter({ ...testConfig, assetsBucketName: undefined } as any));
+    const res = await app.request('/article-job/my-slug', { method: 'POST' });
+    expect(res.status).toBe(503);
     const body = await res.json() as { error: string };
-    expect(body.error).toMatch(/s3Bucket/);
+    expect(body.error).toMatch(/bucket not configured/i);
   });
 
-  it('returns 400 when s3SourceKey missing', async () => {
+  it('returns 202 with pipelineRunId and creates a Job with correct env vars', async () => {
     const app = await buildAuthedApp();
+    // Body is optional — s3Bucket and s3SourceKey are derived from config + slug.
     const res = await app.request('/article-job/my-slug', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ s3Bucket: 'b' }),
-    });
-    expect(res.status).toBe(400);
-    const body = await res.json() as { error: string };
-    expect(body.error).toMatch(/s3SourceKey/);
-  });
-
-  it('returns 202 with pipelineRunId and creates a Job carrying expected env vars', async () => {
-    const app = await buildAuthedApp();
-    const res = await app.request('/article-job/my-slug', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ s3Bucket: 'my-bucket', s3SourceKey: 'drafts/foo.md' }),
+      body: JSON.stringify({ mode: 'kb-augmented' }),
     });
     expect(res.status).toBe(202);
     const body = await res.json() as { status: string; pipelineRunId: string; jobName: string; slug: string };
@@ -148,6 +138,7 @@ describe('POST /article-job/:slug — K8s Job article pipeline', () => {
     expect(body.slug).toBe('my-slug');
 
     expect(insertPipelineRunMock).toHaveBeenCalledTimes(1);
+    expect(upsertArticleMock).toHaveBeenCalledTimes(1);
     expect(createNamespacedJobMock).toHaveBeenCalledTimes(1);
 
     const callArgs = createNamespacedJobMock.mock.calls[0] as unknown as [{ namespace: string; body: { spec: { template: { spec: { containers: Array<{ env: Array<{ name: string; value: string }> }> } } } } }];
@@ -156,8 +147,9 @@ describe('POST /article-job/:slug — K8s Job article pipeline', () => {
     const envMap = Object.fromEntries(env.map(e => [e.name, e.value]));
     expect(envMap['PIPELINE_RUN_ID']).toBe(body.pipelineRunId);
     expect(envMap['SLUG']).toBe('my-slug');
-    expect(envMap['S3_BUCKET']).toBe('my-bucket');
-    expect(envMap['S3_SOURCE_KEY']).toBe('drafts/foo.md');
+    expect(envMap['S3_BUCKET']).toBe('test-assets-bucket');   // from testConfig
+    expect(envMap['S3_SOURCE_KEY']).toBe('drafts/my-slug.md'); // derived from slug
+    expect(envMap['USER_ID']).toBe('test-user');
     expect(envMap['MODE']).toBe('kb-augmented');
   });
 
@@ -165,11 +157,7 @@ describe('POST /article-job/:slug — K8s Job article pipeline', () => {
     insertPipelineRunMock.mockRejectedValueOnce(new Error('pg down'));
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const app = await buildAuthedApp();
-    const res = await app.request('/article-job/my-slug', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ s3Bucket: 'b', s3SourceKey: 'k' }),
-    });
+    const res = await app.request('/article-job/my-slug', { method: 'POST' });
     expect(res.status).toBe(500);
     expect(createNamespacedJobMock).not.toHaveBeenCalled();
     consoleSpy.mockRestore();
@@ -179,11 +167,7 @@ describe('POST /article-job/:slug — K8s Job article pipeline', () => {
     createNamespacedJobMock.mockRejectedValueOnce(new Error('k8s down'));
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const app = await buildAuthedApp();
-    const res = await app.request('/article-job/my-slug', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ s3Bucket: 'b', s3SourceKey: 'k' }),
-    });
+    const res = await app.request('/article-job/my-slug', { method: 'POST' });
     expect(res.status).toBe(502);
     consoleSpy.mockRestore();
   });

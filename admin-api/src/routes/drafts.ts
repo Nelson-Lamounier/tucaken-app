@@ -5,8 +5,9 @@
  * Routes (protected by Cognito JWT middleware):
  *
  *   POST /api/admin/drafts/:slug — Write drafts/<slug>.md to the assets S3
- *        bucket. The bucket has an S3 event notification that fires the
- *        Article Pipeline Trigger Lambda automatically on PUT to drafts/*.
+ *        bucket. Returns { uploaded, slug, key, bucket } so the caller can
+ *        immediately follow up with POST /api/admin/pipelines/article-job/:slug
+ *        to dispatch the K8s Job (no S3 event notification wired).
  *
  * The admin-api writes directly to S3 using its IRSA credentials — no
  * pre-signed URL round-trip needed since the content arrives server-side.

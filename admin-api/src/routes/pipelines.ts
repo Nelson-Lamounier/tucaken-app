@@ -17,11 +17,12 @@ import { randomUUID } from 'node:crypto';
 import { Hono } from 'hono';
 
 import type { AdminApiConfig } from '../lib/config.js';
-import { getJobImage, isImageConfigured } from '../lib/config.js';
+import { getJobImage, isImageConfigured, isAssetsBucketConfigured } from '../lib/config.js';
 import { buildPipelineJob, sanitizeLabel } from '../lib/k8s-job-builder.js';
 import { getBatchApi } from '../lib/k8s.js';
 import { getPool, withUser } from '../lib/pg.js';
 import { upsertApplication } from '../lib/repositories/applications.js';
+import { upsertArticle } from '../lib/repositories/articles.js';
 import { insertPipelineRun, getPipelineRun } from '../lib/repositories/pipeline-runs.js';
 import type { AdminApiBindings } from '../lib/types.js';
 
@@ -44,15 +45,17 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
 
     const slug = ctx.req.param('slug');
 
-    let body: { mode?: string; s3Bucket?: string; s3SourceKey?: string };
+    let body: { mode?: string } = {};
     try { body = await ctx.req.json(); }
-    catch { return ctx.json({ error: 'Body must be valid JSON' }, 400); }
+    catch { /* empty body is fine — all required values come from config + slug */ }
 
-    const s3Bucket    = body.s3Bucket?.trim();
-    const s3SourceKey = body.s3SourceKey?.trim();
-    if (!s3Bucket)    return ctx.json({ error: '"s3Bucket" is required' }, 400);
-    if (!s3SourceKey) return ctx.json({ error: '"s3SourceKey" is required' }, 400);
-    const mode = body.mode?.trim() || 'kb-augmented';
+    if (!isAssetsBucketConfigured(config.assetsBucketName)) {
+      return ctx.json({ error: 'Article pipeline unavailable — assets S3 bucket not configured' }, 503);
+    }
+
+    const s3Bucket    = config.assetsBucketName!;
+    const s3SourceKey = `drafts/${slug}.md`;
+    const mode        = body.mode?.trim() || 'kb-augmented';
 
     const articlePipelineImage = getJobImage('article-pipeline');
     if (!isImageConfigured(articlePipelineImage)) {
@@ -76,6 +79,27 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
         return ctx.json({ error: 'Failed to record pipeline run' }, 500);
       }
 
+      // Pre-create article placeholder so status polling returns 'processing'
+      // during the pipeline run. The K8s Job's persistArticle overwrites this
+      // with the generated content when complete.
+      try {
+        await upsertArticle(db, {
+          slug,
+          title:       slug,
+          excerpt:     null,
+          contentMd:   '',
+          tags:        [],
+          status:      'processing',
+          aiGenerated: true,
+          aiModel:     null,
+          publishedAt: null,
+          coverImage:  null,
+        });
+      } catch (err: unknown) {
+        console.error('[pipelines/article-job] failed to upsert article placeholder', err);
+        return ctx.json({ error: 'Failed to create article record' }, 500);
+      }
+
       const suffixInput = `${pipelineRunId}:${slug}:${Date.now()}`;
       const job = buildPipelineJob({
         namespace:           config.articlePipelineNamespace,
@@ -90,6 +114,7 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
           { name: 'SLUG',            value: slug },
           { name: 'S3_BUCKET',       value: s3Bucket },
           { name: 'S3_SOURCE_KEY',   value: s3SourceKey },
+          { name: 'USER_ID',         value: userId },
           { name: 'MODE',            value: mode },
         ],
         envFromSecretRefs:   ['platform-rds-credentials'],

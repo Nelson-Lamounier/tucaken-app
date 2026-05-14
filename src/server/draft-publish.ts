@@ -2,19 +2,15 @@
  * @format
  * Draft publish server function for the admin dashboard.
  *
- * Uploads a new markdown draft to S3 via the admin-api BFF, which writes it
- * to the `drafts/<slug>.md` key on the assets bucket. The S3 bucket has an
- * event notification configured to invoke the Article Pipeline Trigger Lambda
- * (trigger-handler.ts) automatically — no manual Lambda invocation needed.
- *
- * All operations are delegated to the `admin-api` BFF service:
- * - Draft upload: `POST /api/admin/drafts/:slug` — admin-api writes to S3,
- *   S3 event fires the pipeline trigger Lambda automatically.
+ * Two-step flow delegated entirely to the admin-api BFF:
+ *   1. POST /api/admin/drafts/:slug       — write drafts/<slug>.md to S3
+ *   2. POST /api/admin/pipelines/article-job/:slug — insert pipeline_run,
+ *      upsert article placeholder (status=processing), dispatch K8s Job
  *
  * Protected by JWT authentication via `requireAuth()`.
  *
- * @see admin-api/src/routes/drafts.ts                            — draft upload endpoint
- * @see bedrock-applications/article-pipeline/src/handlers/trigger-handler.ts — S3 event handler
+ * @see admin-api/src/routes/drafts.ts    — draft S3 upload endpoint
+ * @see admin-api/src/routes/pipelines.ts — K8s Job dispatch endpoint
  */
 
 import { createServerFn } from '@tanstack/react-start'
@@ -54,6 +50,7 @@ const publishDraftSchema = z.object({
 interface PublishDraftResult {
   readonly success: boolean
   readonly slug: string
+  readonly pipelineRunId?: string
   readonly message: string
   readonly error?: string
 }
@@ -63,20 +60,17 @@ interface PublishDraftResult {
 // =============================================================================
 
 /**
- * Uploads a markdown draft to S3 via admin-api and lets the S3 event
- * notification fire the article pipeline trigger Lambda automatically.
+ * Uploads a markdown draft to S3 and dispatches the article-pipeline K8s Job.
  *
  * Flow:
  *   1. Derives a slug from the filename (local — no network required)
- *   2. Uploads draft to `POST /api/admin/drafts/:slug` on admin-api,
- *      which writes `drafts/<slug>.md` to the assets S3 bucket.
- *   3. Returns the slug for frontend pipeline tracking.
- *      (The S3 event notification → trigger Lambda → Step Functions
- *       chain runs asynchronously in the background.)
+ *   2. Uploads draft: POST /api/admin/drafts/:slug → S3 drafts/<slug>.md
+ *   3. Triggers pipeline: POST /api/admin/pipelines/article-job/:slug →
+ *      inserts pipeline_run, upserts article placeholder, creates K8s Job
  *
  * @param data.fileName - Draft filename (e.g. `my-article.md`)
  * @param data.content - Raw markdown content
- * @returns Success response with slug for pipeline tracking
+ * @returns Success response with slug and pipelineRunId for tracking
  */
 export const publishDraftFn = createServerFn({ method: 'POST' })
   .inputValidator(publishDraftSchema)
@@ -94,10 +88,8 @@ export const publishDraftFn = createServerFn({ method: 'POST' })
     }
 
     try {
-      // Upload the draft to S3 at drafts/<slug>.md via the dedicated draft
-      // endpoint. The assets bucket has an S3 event notification that fires
-      // the article pipeline trigger Lambda automatically on PUT to drafts/*.
-      await apiFetch<{ uploaded: boolean; slug: string; key: string }>(
+      // Step 1 — upload draft to S3 at drafts/<slug>.md.
+      const upload = await apiFetch<{ uploaded: boolean; slug: string; key: string }>(
         `/drafts/${encodeURIComponent(slug)}`,
         {
           method: 'POST',
@@ -106,9 +98,22 @@ export const publishDraftFn = createServerFn({ method: 'POST' })
         },
       )
 
+      // Step 2 — dispatch the article-pipeline K8s Job. The admin-api derives
+      // s3Bucket from its own config and s3SourceKey from the slug convention
+      // (drafts/<slug>.md) — no body fields required.
+      const trigger = await apiFetch<{ status: string; pipelineRunId: string }>(
+        `/pipelines/article-job/${encodeURIComponent(slug)}`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ mode: 'kb-augmented' }),
+          pathTemplate: '/pipelines/article-job/:slug',
+        },
+      )
+
       return {
         success: true,
         slug,
+        pipelineRunId: trigger.pipelineRunId,
         message: `Draft "${slug}" uploaded — pipeline triggered!`,
       }
     } catch (err: unknown) {
@@ -116,7 +121,7 @@ export const publishDraftFn = createServerFn({ method: 'POST' })
       return {
         success: false,
         slug,
-        message: 'Draft upload failed',
+        message: 'Draft upload or pipeline trigger failed',
         error: message,
       }
     }
