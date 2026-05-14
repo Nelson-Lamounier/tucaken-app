@@ -1,4 +1,3 @@
-"use client"
 import type { ArticleMetadata, ArticleVersion } from '@/hooks/use-admin-articles'
 
 interface VersionData {
