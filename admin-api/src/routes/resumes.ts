@@ -34,6 +34,19 @@ import {
     setActiveResume,
 } from '../lib/repositories/resumes.js';
 import type { AdminApiBindings } from '../lib/types.js';
+import type { Resume } from '../lib/repositories/resumes.js';
+
+function toDto(resume: Resume) {
+    const iso = resume.generatedAt?.toISOString() ?? new Date(0).toISOString();
+    return {
+        resumeId:  resume.id,
+        label:     resume.label,
+        isActive:  resume.isActive,
+        createdAt: iso,
+        updatedAt: iso,
+        data:      resume.contentJson,
+    };
+}
 
 export function createResumesRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
   const router = new Hono<AdminApiBindings>();
@@ -47,7 +60,8 @@ export function createResumesRouter(config: AdminApiConfig): Hono<AdminApiBindin
 
     return withUser(getPool(config), userId, async (db) => {
       const resumes = await listResumes(db);
-      return ctx.json({ resumes, count: resumes.length });
+      const dtos = resumes.map(toDto);
+      return ctx.json({ resumes: dtos, count: dtos.length });
     });
   });
 
@@ -62,7 +76,7 @@ export function createResumesRouter(config: AdminApiConfig): Hono<AdminApiBindin
     return withUser(getPool(config), userId, async (db) => {
       const resume = await getActiveResume(db);
       if (!resume) return ctx.json({ error: 'No active resume configured' }, 404);
-      return ctx.json({ resume });
+      return ctx.json({ resume: toDto(resume) });
     });
   });
 
@@ -78,7 +92,7 @@ export function createResumesRouter(config: AdminApiConfig): Hono<AdminApiBindin
     return withUser(getPool(config), userId, async (db) => {
       const resume = await pgGetResume(db, id);
       if (!resume) return ctx.json({ error: `Resume not found: ${id}` }, 404);
-      return ctx.json({ resume });
+      return ctx.json({ resume: toDto(resume) });
     });
   });
 
@@ -111,7 +125,7 @@ export function createResumesRouter(config: AdminApiConfig): Hono<AdminApiBindin
         renderedHtml:     null,
       });
       const created = await pgGetResume(db, resumeId);
-      return ctx.json({ resume: created }, 201);
+      return ctx.json({ resume: created ? toDto(created) : null }, 201);
     });
   });
 
@@ -139,7 +153,7 @@ export function createResumesRouter(config: AdminApiConfig): Hono<AdminApiBindin
         contentJson: body.data          ?? existing.contentJson,
       });
       const updated = await pgGetResume(db, id);
-      return ctx.json({ resume: updated });
+      return ctx.json({ resume: updated ? toDto(updated) : null });
     });
   });
 
@@ -184,7 +198,7 @@ export function createResumesRouter(config: AdminApiConfig): Hono<AdminApiBindin
 
       await setActiveResume(db, userId, id);
       const activated = await pgGetResume(db, id);
-      return ctx.json({ resume: activated });
+      return ctx.json({ resume: activated ? toDto(activated) : null });
     });
   });
 
