@@ -189,7 +189,7 @@ jobs:
     
     needs: [deploy]
     runs-on: k8s-runner
-    timeout-minutes: 20
+    timeout-minutes: 35
     environment: development
     permissions:
       id-token: write
@@ -206,18 +206,29 @@ jobs:
 
       - name: Set up in-cluster kubeconfig
         run: |
-          # The runner pod runs inside EKS — build kubectl config directly from
-          # the mounted service account token and cluster CA. No SSM kubeconfig
-          # needed (SSM still holds the stale kubeadm endpoint 127.0.0.1:6443).
+          # Use tokenFile so kubectl re-reads the projected SA token on every
+          # API call — avoids 401s when the job outlives the token snapshot.
           SA=/var/run/secrets/kubernetes.io/serviceaccount
-          kubectl config set-cluster in-cluster \
-            --server=https://kubernetes.default.svc:443 \
-            --certificate-authority="${SA}/ca.crt"
-          kubectl config set-credentials arc-runner \
-            --token="$(cat ${SA}/token)"
-          kubectl config set-context in-cluster \
-            --cluster=in-cluster --user=arc-runner
-          kubectl config use-context in-cluster
+          mkdir -p ~/.kube
+          cat > ~/.kube/config <<EOF
+          apiVersion: v1
+          kind: Config
+          clusters:
+          - cluster:
+              certificate-authority: ${SA}/ca.crt
+              server: https://kubernetes.default.svc:443
+            name: in-cluster
+          contexts:
+          - context:
+              cluster: in-cluster
+              user: arc-runner
+            name: in-cluster
+          current-context: in-cluster
+          users:
+          - name: arc-runner
+            user:
+              tokenFile: ${SA}/token
+          EOF
 
       # ── 0. Prometheus pre-flight ─────────────────────────────────────────────
       # The pre-promotion analysis queries Prometheus for error rate and P95
@@ -360,6 +371,10 @@ jobs:
           echo "──────────────── analysis runs ─────────────────"
           kubectl get analysisrun -n "$NAMESPACE" \
             --sort-by='.metadata.creationTimestamp' 2>/dev/null | tail -5 || true
+
+          echo "──────────────── argocd image updater (last 50 lines) ──────────────"
+          kubectl logs -n argocd -l app.kubernetes.io/name=argocd-image-updater \
+            --tail=50 2>/dev/null || true
 
           # Post failure status to GitHub Environments tab via ARC GitHub App token.
           DEPLOY_ID=$(gh api "/repos/${GH_REPO}/deployments" \

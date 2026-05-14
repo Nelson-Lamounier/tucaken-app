@@ -201,7 +201,7 @@ jobs:
     name: Promote Rollout
     needs: [push-admin-api]
     runs-on: k8s-runner
-    timeout-minutes: 20
+    timeout-minutes: 35
     environment: development
     permissions:
       id-token: write
@@ -220,14 +220,26 @@ jobs:
       - name: Set up in-cluster kubeconfig
         run: |
           SA=/var/run/secrets/kubernetes.io/serviceaccount
-          kubectl config set-cluster in-cluster \
-            --server=https://kubernetes.default.svc:443 \
-            --certificate-authority="${SA}/ca.crt"
-          kubectl config set-credentials arc-runner \
-            --token="$(cat ${SA}/token)"
-          kubectl config set-context in-cluster \
-            --cluster=in-cluster --user=arc-runner
-          kubectl config use-context in-cluster
+          mkdir -p ~/.kube
+          cat > ~/.kube/config <<EOF
+          apiVersion: v1
+          kind: Config
+          clusters:
+          - cluster:
+              certificate-authority: ${SA}/ca.crt
+              server: https://kubernetes.default.svc:443
+            name: in-cluster
+          contexts:
+          - context:
+              cluster: in-cluster
+              user: arc-runner
+            name: in-cluster
+          current-context: in-cluster
+          users:
+          - name: arc-runner
+            user:
+              tokenFile: ${SA}/token
+          EOF
 
       # ── 0. Prometheus pre-flight ─────────────────────────────────────────────
       # Verifies Prometheus is healthy and the admin-api SLO recording rule
@@ -350,6 +362,10 @@ jobs:
           echo "──────────────── analysis runs ─────────────────"
           kubectl get analysisrun -n "$NAMESPACE" \
             --sort-by='.metadata.creationTimestamp' 2>/dev/null | tail -5 || true
+
+          echo "──────────────── argocd image updater (last 50 lines) ──────────────"
+          kubectl logs -n argocd -l app.kubernetes.io/name=argocd-image-updater \
+            --tail=50 2>/dev/null || true
 
           DEPLOY_ID=$(gh api "/repos/${GH_REPO}/deployments" \
             --jq ".[] | select(.sha == \"${GH_SHA}\" and .environment == \"development\") | .id" \
