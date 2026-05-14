@@ -6,15 +6,17 @@ import {
   getArticlesFn,
   getArticleContentFn,
   getArticleVersionsFn,
+  getArticleMetadataFn,
   publishArticleFn,
   unpublishArticleFn,
   deleteArticleFn,
   saveArticleMetadataFn,
   saveArticleContentFn,
   type ArticleVersion,
+  type ArticleMetadata,
 } from '../server/articles'
 
-export type { ArticleVersion }
+export type { ArticleVersion, ArticleMetadata }
 
 // =============================================================================
 // Types
@@ -214,5 +216,19 @@ export function useArticleVersions(slug: string | null) {
     queryFn: () => getArticleVersionsFn({ data: slug! }),
     enabled: slug !== null,
     staleTime: 30_000, // 30s — version history rarely changes mid-session
+  })
+}
+
+/**
+ * Fetches article metadata (slug, title, status, tags, etc.) from admin-api.
+ *
+ * @param slug - Article slug identifier
+ * @returns TanStack Query result with ArticleMetadata or null
+ */
+export function useArticleMetadata(slug: string) {
+  return useQuery({
+    queryKey: adminKeys.articles.metadata(slug),
+    queryFn: () => getArticleMetadataFn({ data: slug }),
+    staleTime: 30_000,
   })
 }

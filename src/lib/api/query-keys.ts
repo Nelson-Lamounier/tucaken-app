@@ -33,6 +33,8 @@ export const adminKeys = {
     list: (status: string) => ['admin', 'articles', 'list', status] as const,
     /** Individual article content for the editor */
     content: (slug: string) => ['admin', 'articles', 'content', slug] as const,
+    /** Individual article metadata from GET /articles/:slug */
+    metadata: (slug: string) => ['admin', 'articles', 'metadata', slug] as const,
   },
 
   /** Comment-related query keys */
