@@ -180,8 +180,8 @@ export function ArticlePreviewMeta({
               </span>
               {latestVersion.qaIssues && latestVersion.qaIssues.length > 0 && (
                 <ul className="mt-2 space-y-1">
-                  {latestVersion.qaIssues.map((issue, i) => (
-                    <li key={`qa-${i}`} className="text-xs text-zinc-400 flex gap-1.5">
+                  {[...new Set(latestVersion.qaIssues)].map((issue) => (
+                    <li key={issue} className="text-xs text-zinc-400 flex gap-1.5">
                       <span className="mt-0.5 shrink-0 text-amber-500">·</span>
                       {issue}
                     </li>
