@@ -208,6 +208,14 @@ export interface AdminApiConfig {
    */
   readonly researchModel: string;
 
+  /**
+   * Bedrock model ID forwarded to article-pipeline K8s Jobs as FOUNDATION_MODEL
+   * (writer agent) and QA_MODEL (QA agent). Optional — falls back to the EU
+   * cross-region inference profile for Claude Sonnet 4.6.
+   * Injected via admin-api ConfigMap (FOUNDATION_MODEL key).
+   */
+  readonly foundationModel: string;
+
   // Note: image URIs are NOT in this config object. Use getJobImage(name)
   // from this same module — it reads from the file mount on each call (with
   // a 30s cache) so a Secret rotation by ESO is picked up without restart.
@@ -286,5 +294,6 @@ export function loadConfig(): AdminApiConfig {
     resumeImportNamespace:           process.env['RESUME_IMPORT_NAMESPACE'] ?? 'resume-import',
     resumeImportServiceAccount:      process.env['RESUME_IMPORT_SERVICE_ACCOUNT'] ?? 'resume-import-sa',
     researchModel:                   required['RESEARCH_MODEL']!,
+    foundationModel:                 process.env['FOUNDATION_MODEL'] ?? 'eu.anthropic.claude-sonnet-4-6',
   };
 }

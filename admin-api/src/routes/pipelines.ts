@@ -117,6 +117,8 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
           { name: 'USER_ID',          value: userId },
           { name: 'MODE',             value: mode },
           { name: 'RESEARCH_MODEL',   value: config.researchModel },
+          { name: 'FOUNDATION_MODEL', value: config.foundationModel },
+          { name: 'QA_MODEL',         value: config.foundationModel },
           { name: 'AWS_REGION',       value: config.awsRegion },
         ],
         envFromSecretRefs:   ['platform-rds-credentials'],
