@@ -82,7 +82,7 @@ function Callout({ variant, type, title, children }: CalloutProps) {
     variant === 'error' || type === 'error'
       ? 'security'
       : variant ?? type ?? 'info'
-  const config = CALLOUT_CONFIG[resolvedVariant]
+  const config = CALLOUT_CONFIG[resolvedVariant] ?? CALLOUT_CONFIG.info
   const displayTitle = title ?? config.defaultTitle
 
   return (
