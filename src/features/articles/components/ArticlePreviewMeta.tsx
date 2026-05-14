@@ -35,9 +35,10 @@ export function ArticlePreviewMeta({
   metaIsLoading,
   versionsIsLoading,
 }: ArticlePreviewMetaProps) {
-  const latestVersion = versionData?.versions
-    ? [...versionData.versions].sort((a, b) => b.version - a.version)[0]
+  const sortedVersions = versionData?.versions
+    ? [...versionData.versions].sort((a, b) => b.version - a.version)
     : null
+  const latestVersion = sortedVersions?.[0] ?? null
 
   function renderVersions() {
     if (versionsIsLoading) {
@@ -53,8 +54,7 @@ export function ArticlePreviewMeta({
     }
     return (
       <div className="space-y-2">
-        {[...versionData.versions]
-          .sort((a, b) => b.version - a.version)
+        {(sortedVersions ?? [])
           .map((v) => (
             <div
               key={v.sk}
@@ -180,8 +180,8 @@ export function ArticlePreviewMeta({
               </span>
               {latestVersion.qaIssues && latestVersion.qaIssues.length > 0 && (
                 <ul className="mt-2 space-y-1">
-                  {latestVersion.qaIssues.map((issue) => (
-                    <li key={issue} className="text-xs text-zinc-400 flex gap-1.5">
+                  {latestVersion.qaIssues.map((issue, i) => (
+                    <li key={i} className="text-xs text-zinc-400 flex gap-1.5">
                       <span className="mt-0.5 shrink-0 text-amber-500">·</span>
                       {issue}
                     </li>
