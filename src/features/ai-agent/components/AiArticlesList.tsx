@@ -162,7 +162,7 @@ export function AiArticlesList() {
         </div>
       )}
 
-      <ul role="list" className="divide-y divide-white/5">
+      <ul className="divide-y divide-white/5">
         {paginatedArticles.map((article) => (
         <li key={article.slug} className="flex items-center justify-between gap-x-6 py-5">
           <div className="min-w-0">
