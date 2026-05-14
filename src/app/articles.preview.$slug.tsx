@@ -40,6 +40,31 @@ function ArticlePreviewPage() {
     void navigate({ to: '/ai-agent' })
   }
 
+  function renderContent() {
+    if (contentLoading) {
+      return (
+        <div className="space-y-4 animate-pulse">
+          <div className="h-8 w-2/3 rounded bg-zinc-800" />
+          <div className="h-4 w-full rounded bg-zinc-800" />
+          <div className="h-4 w-5/6 rounded bg-zinc-800" />
+          <div className="h-4 w-4/5 rounded bg-zinc-800" />
+        </div>
+      )
+    }
+    if (contentData === null) {
+      return (
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 px-8 py-12 text-center">
+          <p className="text-sm font-medium text-zinc-300">Content not found</p>
+          <p className="mt-1 text-xs text-zinc-500">
+            No S3 content exists yet for <code className="font-mono text-zinc-400">{slug}</code>.
+            The article may still be in an early pipeline stage.
+          </p>
+        </div>
+      )
+    }
+    return <MdxPreview content={contentData?.content ?? ''} />
+  }
+
   return (
     <div className="flex h-screen flex-col bg-zinc-950 text-zinc-100">
 
@@ -83,24 +108,7 @@ function ArticlePreviewPage() {
         {/* Prose area */}
         <main className="flex-1 overflow-y-auto px-6 py-12">
           <div className="mx-auto max-w-3xl">
-            {contentLoading ? (
-              <div className="space-y-4 animate-pulse">
-                <div className="h-8 w-2/3 rounded bg-zinc-800" />
-                <div className="h-4 w-full rounded bg-zinc-800" />
-                <div className="h-4 w-5/6 rounded bg-zinc-800" />
-                <div className="h-4 w-4/5 rounded bg-zinc-800" />
-              </div>
-            ) : contentData === null ? (
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 px-8 py-12 text-center">
-                <p className="text-sm font-medium text-zinc-300">Content not found</p>
-                <p className="mt-1 text-xs text-zinc-500">
-                  No S3 content exists yet for <code className="font-mono text-zinc-400">{slug}</code>.
-                  The article may still be in an early pipeline stage.
-                </p>
-              </div>
-            ) : (
-              <MdxPreview content={contentData?.content ?? ''} />
-            )}
+            {renderContent()}
           </div>
         </main>
 
