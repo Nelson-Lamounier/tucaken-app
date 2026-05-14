@@ -190,7 +190,7 @@ function Mermaid({ chart, children, caption }: MermaidProps) {
           theme: 'dark',
           securityLevel: 'loose',
           fontFamily: 'ui-sans-serif, system-ui, -apple-system, sans-serif',
-          flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis', padding: 24, nodeSpacing: 40, rankSpacing: 50 },
+          flowchart: { useMaxWidth: true, htmlLabels: false, curve: 'basis', padding: 24, nodeSpacing: 40, rankSpacing: 50 },
           themeVariables: {
             primaryColor: '#6366f1',
             primaryTextColor: '#f1f5f9',
@@ -216,7 +216,10 @@ function Mermaid({ chart, children, caption }: MermaidProps) {
         const { svg } = await mermaid.render(id, resolvedChart)
 
         if (!cancelled) {
-          setSafeSvg(DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true } }))
+          setSafeSvg(DOMPurify.sanitize(svg, {
+            USE_PROFILES: { svg: true, svgFilters: true },
+            ADD_ATTR: ['style', 'dominant-baseline', 'text-anchor', 'marker-end', 'marker-start'],
+          }))
           setError(null)
         }
       } catch (err: unknown) {
