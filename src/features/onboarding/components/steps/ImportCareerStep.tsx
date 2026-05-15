@@ -21,12 +21,14 @@ import {
   getUploadUrlFn,
   completeUploadFn,
   getImportProgressFn,
+  getGapReportFn,
   listCareerEntriesFn,
   retryImportFn,
   updateCareerEntryFn,
 } from '@/server/resume-imports'
 import type { CareerEntry, ImportPhase } from '@/server/resume-imports'
 import { EnhanceRoleCard } from './EnhanceRoleCard'
+import { GapAnalysisReport } from './GapAnalysisReport'
 
 type Phase =
   | 'idle'
@@ -106,6 +108,15 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
     queryKey: adminKeys.resumeImports.entries(),
     queryFn:  () => listCareerEntriesFn({ data: {} }),
     enabled:  phase === 'review',
+    staleTime: Infinity,
+  })
+
+  // Write-once gap-analysis artifact — fetched a single time when the server
+  // says it's ready. Non-fatal upstream, so a null report just renders nothing.
+  const { data: gapReport = null } = useQuery({
+    queryKey: adminKeys.resumeImports.gapReport(importId ?? ''),
+    queryFn:  () => getGapReportFn({ data: importId as string }),
+    enabled:  phase === 'review' && !!importId && progress?.gapReportReady === true,
     staleTime: Infinity,
   })
 
@@ -457,6 +468,8 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
           Tucaken extracted the following from your resume. You can edit individual entries later from your profile.
         </p>
       </div>
+
+      <GapAnalysisReport report={gapReport} />
 
       <div className="space-y-4 max-h-[420px] overflow-y-auto pr-1">
 
