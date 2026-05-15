@@ -98,6 +98,10 @@ export const adminKeys = {
     all: ['admin', 'resumeImports'] as const,
     /** Import status polling for a specific import */
     status: (importId: string) => ['admin', 'resumeImports', 'status', importId] as const,
+    /** Server-driven progress polling for a specific import */
+    progress: (importId: string) => ['admin', 'resumeImports', 'progress', importId] as const,
+    /** Write-once gap-analysis report for a specific import */
+    gapReport: (importId: string) => ['admin', 'resumeImports', 'gapReport', importId] as const,
     /** Career entries list (optional type filter) */
     entries: (type?: string) => ['admin', 'resumeImports', 'entries', type ?? 'all'] as const,
     /** Past imports list */

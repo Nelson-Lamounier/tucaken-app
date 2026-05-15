@@ -28,10 +28,53 @@ export type ImportStatus =
   | 'queued'
   | 'parsing'
   | 'extracting_career'
+  | 'analyzing'
   | 'ready_for_review'
+  | 'confirmed'
   | 'enriching'
   | 'completed'
   | 'failed'
+
+export type ImportPhase =
+  | 'uploading' | 'parsing' | 'extracting' | 'analyzing'
+  | 'review' | 'enriching' | 'done' | 'error'
+
+/** Server-driven progress contract. The client honours retryAfterMs and
+ *  stops on terminal — no client-side timeout guesswork. */
+export interface ImportProgress {
+  v:              1
+  status:         ImportStatus
+  phase:          ImportPhase
+  step:           number
+  totalSteps:     number
+  terminal:       boolean
+  error:          { code: string; message: string } | null
+  gapReportReady: boolean
+  heartbeatAt:    string
+  retryAfterMs:   number
+}
+
+export interface PerRoleGap {
+  roleId:                      string
+  company:                     string
+  title:                       string
+  period:                      string
+  completenessScore:           number
+  coveredResponsibilities:     string[]
+  missingResponsibilities:     string[]
+  suggestedAdditions:          Array<{ bullet: string; rationale: string }>
+  quantificationOpportunities: string[]
+  keywordsForATS:              string[]
+  externalValidation:          'full' | 'limited'
+}
+
+export interface GapAnalysisReport {
+  overallScore:      number
+  perRole:           PerRoleGap[]
+  skillsGap:         { present: string[]; missing: string[]; emerging: string[] }
+  narrativeFeedback: string
+  freeTierLimit:     { rolesSkipped: number; upgradeCta: string | null }
+}
 
 export interface UploadUrlResponse {
   importId:  string
@@ -147,6 +190,36 @@ export const getImportStatusFn = createServerFn({ method: 'GET' })
       { pathTemplate: '/resume-imports/:id' },
     )
     return response.import
+  })
+
+/**
+ * Server-driven progress. Poll on the cadence the server returns
+ * (progress.retryAfterMs); stop when progress.terminal is true.
+ */
+export const getImportProgressFn = createServerFn({ method: 'GET' })
+  .inputValidator(importIdSchema)
+  .handler(async ({ data: importId }) => {
+    await requireAuth()
+    const response = await apiFetch<{ progress: ImportProgress }>(
+      `/resume-imports/${importId}/progress`,
+      { pathTemplate: '/resume-imports/:id/progress' },
+    )
+    return response.progress
+  })
+
+/**
+ * Fetch the gap-analysis report once — call only when
+ * progress.gapReportReady is true. Returns null if no report exists.
+ */
+export const getGapReportFn = createServerFn({ method: 'GET' })
+  .inputValidator(importIdSchema)
+  .handler(async ({ data: importId }) => {
+    await requireAuth()
+    const response = await apiFetch<{ gapReport: GapAnalysisReport | null }>(
+      `/resume-imports/${importId}/gap-report`,
+      { pathTemplate: '/resume-imports/:id/gap-report' },
+    )
+    return response.gapReport
   })
 
 /**

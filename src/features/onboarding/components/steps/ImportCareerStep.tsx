@@ -20,12 +20,12 @@ import { adminKeys } from '@/lib/api/query-keys'
 import {
   getUploadUrlFn,
   completeUploadFn,
-  getImportStatusFn,
+  getImportProgressFn,
   listCareerEntriesFn,
   retryImportFn,
   updateCareerEntryFn,
 } from '@/server/resume-imports'
-import type { CareerEntry } from '@/server/resume-imports'
+import type { CareerEntry, ImportPhase } from '@/server/resume-imports'
 import { EnhanceRoleCard } from './EnhanceRoleCard'
 
 type Phase =
@@ -38,12 +38,22 @@ type Phase =
   | 'saved'
   | 'error'
 
-const TERMINAL_STATUSES = new Set(['ready_for_review', 'completed', 'failed'])
+// Server owns terminal authority via progress.terminal — no client set needed.
+const PHASE_LABELS: Record<ImportPhase, string> = {
+  uploading:  'Job queued…',
+  parsing:    'Parsing document…',
+  extracting: 'Extracting career history…',
+  analyzing:  'Analyzing your experience…',
+  review:     'Ready for review',
+  enriching:  'Enriching roles…',
+  done:       'Complete',
+  error:      'Failed',
+}
 
-const STEP_LABELS: Record<string, string> = {
-  parsing:          'Parsing document…',
-  extracting_career: 'Extracting career history…',
-  queued:           'Job queued…',
+// Progress-bar fill per phase (the processing screen only renders pre-review).
+const PHASE_PROGRESS: Record<ImportPhase, number> = {
+  uploading: 55, parsing: 65, extracting: 80, analyzing: 90,
+  review: 100, enriching: 95, done: 100, error: 0,
 }
 
 interface ImportCareerStepProps {
@@ -59,71 +69,37 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
   const [dragOver, setDragOver] = useState(false)
   const [retrying, setRetrying] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
-  const processingStartedAt = useRef<number | null>(null)
   const queryClient = useQueryClient()
-
-  const PROCESSING_TIMEOUT_MS = 120_000 // 2 min — job crashes before touching DB on image errors
 
   const accept = '.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
-  // ── Status polling — enabled once we have an importId and are processing ──
-  const { data: importStatus } = useQuery({
-    queryKey: adminKeys.resumeImports.status(importId ?? ''),
-    queryFn:  () => getImportStatusFn({ data: importId! }),
+  // ── Server-driven progress ────────────────────────────────────────────────
+  // The server owns cadence (retryAfterMs), terminal authority and timeout
+  // semantics. No client-side timeout guesswork: a dead job stays non-terminal
+  // and the server can widen retryAfterMs; the UI just honours what it's told.
+  const { data: progress } = useQuery({
+    queryKey: adminKeys.resumeImports.progress(importId ?? ''),
+    queryFn:  () => getImportProgressFn({ data: importId as string }),
     enabled:  !!importId && phase === 'processing',
+    refetchIntervalInBackground: true,
     refetchInterval: (query) => {
-      const status = query.state.data?.status
-      if (status && TERMINAL_STATUSES.has(status)) return false
-
-      // Stop polling and surface timeout if job hasn't progressed — guards against
-      // pods that crash before writing to DB (e.g. MODULE_NOT_FOUND at startup)
-      if (processingStartedAt.current !== null) {
-        const elapsed = Date.now() - processingStartedAt.current
-        if (elapsed > PROCESSING_TIMEOUT_MS) return false
-      }
-      return 3000
+      const p = query.state.data
+      if (!p || p.terminal) return false
+      return p.retryAfterMs
     },
   })
 
-  // ── Transition out of processing once extraction is done ──────────────────
+  // ── Transition out of processing from the server's progress signal ────────
   useEffect(() => {
-    if (phase !== 'processing') return
-
-    if (!importStatus) {
-      // No data yet — check if we've been waiting too long (job likely dead)
-      if (
-        processingStartedAt.current !== null &&
-        Date.now() - processingStartedAt.current > PROCESSING_TIMEOUT_MS
-      ) {
-        setErrorMsg('Processing timed out — the import job may have failed to start. Please retry.')
-        setPhase('error')
-      }
-      return
-    }
-
-    if (importStatus.status === 'failed') {
-      setErrorMsg(importStatus.statusMessage ?? 'Extraction failed — please try a different file.')
+    if (phase !== 'processing' || !progress) return
+    if (progress.error) {
+      setErrorMsg(progress.error.message || 'Extraction failed — please try a different file.')
       setPhase('error')
-    } else if (importStatus.status === 'ready_for_review' || importStatus.status === 'completed') {
+    } else if (progress.terminal) {
+      // terminal && no error ⇒ ready_for_review / completed
       setPhase('review')
-    } else if (
-      processingStartedAt.current !== null &&
-      Date.now() - processingStartedAt.current > PROCESSING_TIMEOUT_MS
-    ) {
-      setErrorMsg('Processing timed out — the import job may have failed to start. Please retry.')
-      setPhase('error')
     }
-  }, [importStatus?.status, phase])
-
-  // ── Hard timeout timer — fires once polling stops due to timeout ──────────
-  useEffect(() => {
-    if (phase !== 'processing') return
-    const timer = setTimeout(() => {
-      setErrorMsg('Processing timed out — the import job may have failed to start. Please retry.')
-      setPhase('error')
-    }, PROCESSING_TIMEOUT_MS + 3000) // +3s grace for last poll to land
-    return () => clearTimeout(timer)
-  }, [phase])
+  }, [progress?.status, progress?.terminal, phase])
 
   // ── Career entries — fetched once we reach 'review' ───────────────────────
   const { data: entries = [] } = useQuery<CareerEntry[]>({
@@ -190,7 +166,6 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
 
       // 3. Signal upload complete — dispatches K8s Job
       await completeUploadFn({ data: id })
-      processingStartedAt.current = Date.now()
       setPhase('processing')
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err)
@@ -220,7 +195,6 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
       await retryImportFn({ data: importId })
       setErrorMsg('')
       setRetrying(false)
-      processingStartedAt.current = Date.now()
       setPhase('processing')
     } catch (err) {
       setRetrying(false)
@@ -258,8 +232,8 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
     !['experience', 'education', 'skill'].includes(e.entryType)
   ).length
 
-  const processingLabel = importStatus?.currentStep
-    ? STEP_LABELS[importStatus.currentStep] ?? `${importStatus.currentStep}…`
+  const processingLabel = progress?.phase
+    ? PHASE_LABELS[progress.phase]
     : 'Processing resume…'
 
   // ── States ────────────────────────────────────────────────────────────────
@@ -318,17 +292,15 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
   }
 
   if (phase === 'requesting-url' || phase === 'uploading' || phase === 'processing') {
-    const label =
-      phase === 'requesting-url' ? 'Preparing upload…'
-      : phase === 'uploading'    ? `Uploading ${file?.name ?? 'file'}…`
-      : processingLabel
+    let label: string
+    if (phase === 'requesting-url') label = 'Preparing upload…'
+    else if (phase === 'uploading') label = `Uploading ${file?.name ?? 'file'}…`
+    else label = processingLabel
 
-    const progress =
-      phase === 'requesting-url' ? 15
-      : phase === 'uploading'    ? 45
-      : importStatus?.status === 'parsing' ? 65
-      : importStatus?.status === 'extracting_career' ? 80
-      : 55
+    let progressPct: number
+    if (phase === 'requesting-url') progressPct = 15
+    else if (phase === 'uploading') progressPct = 45
+    else progressPct = progress?.phase ? PHASE_PROGRESS[progress.phase] : 55
 
     return (
       <div className="space-y-6">
@@ -343,7 +315,7 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
             <div className="mt-2 h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
               <div
                 className="h-full rounded-full bg-indigo-500 transition-all duration-700"
-                style={{ width: `${progress}%` }}
+                style={{ width: `${progressPct}%` }}
               />
             </div>
           </div>
