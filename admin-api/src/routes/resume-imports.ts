@@ -40,6 +40,7 @@ import { getPool } from '../lib/pg.js';
 import {
   createResumeImport,
   markUploadComplete,
+  confirmImportForEnrichment,
   resetImportForRetry,
   getResumeImport,
   listResumeImports,
@@ -125,6 +126,74 @@ function buildJobSpec(
               { secretRef: { name: 'admin-api-bedrock' } },
               // TAVILY_API_KEY — ESO-synced from SSM /bedrock-{env}/tavily-api-key
               // Optional: if Secret absent, enrichment is skipped gracefully
+              { secretRef: { name: 'resume-import-secrets', optional: true } },
+            ],
+            resources: {
+              requests: { memory: '512Mi', cpu: '250m' },
+              limits:   { memory: '1Gi',   cpu: '500m' },
+            },
+          }],
+        },
+      },
+    },
+  };
+}
+
+/**
+ * Job spec for the resume-enrichment Job. Same image as the import processor
+ * but a different entrypoint (dist/run-enrichment.js) and no S3 inputs — it
+ * operates on already-extracted, user-confirmed career entries.
+ */
+function buildEnrichmentJobSpec(
+  cfg: Pick<AdminApiConfig, 'resumeImportNamespace' | 'resumeImportServiceAccount'>,
+  image: string,
+  importId: string,
+  userId: string,
+): V1Job {
+  const safeUserId = userId.slice(0, 20).replace(/[^a-z0-9-]/gi, '-').toLowerCase();
+  const suffix     = crypto.createHash('sha1')
+    .update(`enrich:${userId}:${importId}:${Date.now()}`)
+    .digest('hex')
+    .slice(0, 8);
+  const jobName = `resume-enrich-${safeUserId}-${suffix}`.slice(0, 63);
+
+  return {
+    apiVersion: 'batch/v1',
+    kind: 'Job',
+    metadata: {
+      name:      jobName,
+      namespace: cfg.resumeImportNamespace,
+      labels: { app: 'resume-enrichment-processor', userId: safeUserId, 'import-id': importId },
+    },
+    spec: {
+      ttlSecondsAfterFinished: 3600,
+      backoffLimit:            1,
+      // Enrichment fans out per role (Tavily + Bedrock + Titan). Allow more
+      // headroom than extraction — a senior with many roles takes longer.
+      activeDeadlineSeconds:   900,
+      template: {
+        metadata: { labels: { app: 'resume-enrichment-processor', userId: safeUserId, 'import-id': importId } },
+        spec: {
+          restartPolicy:      'Never',
+          serviceAccountName: cfg.resumeImportServiceAccount,
+          containers: [{
+            name:    'processor',
+            image:   image,
+            command: ['node', 'dist/run-enrichment.js'],
+            env: [
+              { name: 'IMPORT_ID', value: importId },
+              { name: 'USER_ID',   value: userId },
+              { name: 'OTEL_SERVICE_NAME',           value: 'resume-enrichment-processor' },
+              { name: 'OTEL_EXPORTER_OTLP_ENDPOINT', value: 'http://alloy.monitoring.svc.cluster.local:4318' },
+              { name: 'OTEL_RESOURCE_ATTRIBUTES',    value: `deployment.environment=${process.env['DEPLOY_ENV'] ?? 'dev'},k8s.namespace.name=resume-import,resume.import_id=${importId}` },
+              { name: 'PYROSCOPE_SERVER_ADDRESS',    value: 'http://pyroscope.monitoring.svc.cluster.local:4040' },
+              { name: 'PUSHGATEWAY_URL',             value: 'http://pushgateway.monitoring.svc.cluster.local:9091' },
+              { name: 'DEPLOY_ENV',                  value: process.env['DEPLOY_ENV'] ?? 'dev' },
+              { name: 'LOG_LEVEL',                   value: 'info' },
+            ],
+            envFrom: [
+              { secretRef: { name: 'platform-rds-credentials' } },
+              { secretRef: { name: 'admin-api-bedrock' } },
               { secretRef: { name: 'resume-import-secrets', optional: true } },
             ],
             resources: {
@@ -254,6 +323,43 @@ export function createResumeImportsRouter(config: AdminApiConfig): Hono<AdminApi
     }
 
     return ctx.json({ importId: importRecord.id, status: 'queued' }, 202);
+  });
+
+  // ─── POST /:id/confirm ─────────────────────────────────────────────────────
+  // User reviewed their extracted career history and accepted it. Transition
+  // ready_for_review → confirmed and dispatch the resume-enrichment Job.
+  // The DB status guard makes a double-submit safe — only the first call
+  // flips the row and dispatches a Job; subsequent calls 404.
+  // ──────────────────────────────────────────────────────────────────────────
+  router.post('/:id/confirm', async (ctx) => {
+    const userId = requireUserId(ctx);
+    if (!userId) return ctx.json({ error: 'Authenticated user not provisioned' }, 401);
+
+    const importId = ctx.req.param('id');
+
+    const importRecord = await confirmImportForEnrichment(pool, importId, userId);
+    if (!importRecord) {
+      return ctx.json({ error: 'Import not found or not awaiting review' }, 404);
+    }
+
+    const image = getJobImage('resume-import-processor');
+    if (!isImageConfigured(image)) {
+      console.error('[resume-imports] confirm: image URI unresolved', { image });
+      return ctx.json({ error: 'Resume processor image not configured' }, 502);
+    }
+
+    const job = buildEnrichmentJobSpec(config, image, importRecord.id, userId);
+
+    try {
+      await getBatchApi().createNamespacedJob({ namespace: config.resumeImportNamespace, body: job });
+    } catch (err) {
+      console.error('[resume-imports] confirm: failed to create enrichment Job', err);
+      // The row is already 'confirmed'. Surface the failure so the client can
+      // retry; a janitor/monitor can also re-dispatch stuck 'confirmed' rows.
+      return ctx.json({ error: 'Failed to schedule enrichment job' }, 502);
+    }
+
+    return ctx.json({ importId: importRecord.id, status: 'confirmed' }, 202);
   });
 
   // ─── POST /:id/retry ──────────────────────────────────────────────────────

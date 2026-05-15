@@ -21,6 +21,7 @@ export type ImportStatus =
   | 'parsing'
   | 'extracting_career'
   | 'ready_for_review'
+  | 'confirmed'
   | 'enriching'
   | 'completed'
   | 'failed';
@@ -144,6 +145,28 @@ export async function markUploadComplete(
     `UPDATE resume_imports
         SET status = 'queued', started_at = NOW()
       WHERE id = $1::uuid AND user_id = $2::uuid AND status = 'awaiting_upload'
+      RETURNING ${IMPORT_COLS}`,
+    [importId, userId],
+  );
+  return result.rows[0] ? rowToImport(result.rows[0]) : null;
+}
+
+/**
+ * Transitions a resume_import 'ready_for_review' → 'confirmed'.
+ * Called when the user accepts their reviewed career history. The status
+ * guard makes this idempotent-safe: a double-click can't re-confirm and
+ * the admin-api won't dispatch a second enrichment Job.
+ * Returns null if not found, not owned, or not in 'ready_for_review'.
+ */
+export async function confirmImportForEnrichment(
+  pool: Pool,
+  importId: string,
+  userId: string,
+): Promise<ResumeImport | null> {
+  const result = await pool.query<Record<string, unknown>>(
+    `UPDATE resume_imports
+        SET status = 'confirmed', updated_at = NOW()
+      WHERE id = $1::uuid AND user_id = $2::uuid AND status = 'ready_for_review'
       RETURNING ${IMPORT_COLS}`,
     [importId, userId],
   );

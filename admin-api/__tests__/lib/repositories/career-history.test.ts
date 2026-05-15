@@ -21,7 +21,9 @@ jest.unstable_mockModule('pg', () => {
   return { Pool, default: { Pool } };
 });
 
-const { updateCareerEntry } = await import('../../../src/lib/repositories/career-history.js');
+const { updateCareerEntry, confirmImportForEnrichment } = await import(
+  '../../../src/lib/repositories/career-history.js'
+);
 
 const fakePool = { connect: mockConnect } as unknown as import('pg').Pool;
 
@@ -157,5 +159,38 @@ describe('updateCareerEntry — correction logging', () => {
     expect(inserts[0]?.[4]).toBe('company');
     expect(inserts[0]?.[5]).toBeNull();                  // extracted_value
     expect(inserts[0]?.[6]).toBe(JSON.stringify('NewCo'));
+  });
+});
+
+describe('confirmImportForEnrichment', () => {
+  it('transitions ready_for_review → confirmed and returns the record', async () => {
+    const row = {
+      id: IMPORT_ID, user_id: USER_ID, s3_key: 'k', original_filename: 'cv.pdf',
+      content_type: 'application/pdf', file_size_bytes: 1, status: 'confirmed',
+      status_message: null, current_step: null, total_steps: null,
+      career_entries_created: [], embeddings_created_count: 0,
+      error_code: null, error_details: null, retry_count: 0,
+      created_at: new Date(), started_at: null, completed_at: null,
+    };
+    const query = jest.fn<() => Promise<{ rows: unknown[] }>>().mockResolvedValue({ rows: [row] });
+    const pool = { query } as unknown as import('pg').Pool;
+
+    const result = await confirmImportForEnrichment(pool, IMPORT_ID, USER_ID);
+
+    expect(result?.status).toBe('confirmed');
+    const [sql, params] = query.mock.calls[0] as unknown as [string, unknown[]];
+    expect(sql).toMatch(/UPDATE resume_imports/i);
+    expect(sql).toMatch(/status = 'confirmed'/i);
+    // Status guard makes a double-confirm safe — only ready_for_review flips.
+    expect(sql).toMatch(/status = 'ready_for_review'/i);
+    expect(params).toEqual([IMPORT_ID, USER_ID]);
+  });
+
+  it('returns null when the import is not in ready_for_review', async () => {
+    const query = jest.fn<() => Promise<{ rows: unknown[] }>>().mockResolvedValue({ rows: [] });
+    const pool = { query } as unknown as import('pg').Pool;
+
+    const result = await confirmImportForEnrichment(pool, IMPORT_ID, USER_ID);
+    expect(result).toBeNull();
   });
 });
