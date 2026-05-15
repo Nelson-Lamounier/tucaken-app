@@ -26,6 +26,8 @@ const isImageConfiguredMock   = jest.fn<(s: string) => boolean>().mockReturnValu
 jest.unstable_mockModule('../../src/lib/repositories/career-history.js', () => ({
   resetImportForRetry:  resetImportForRetryMock,
   confirmImportForEnrichment: jest.fn(),
+  getImportProgress:    jest.fn(),
+  getGapReport:         jest.fn(),
   markUploadComplete:   jest.fn(),
   getResumeImport:      jest.fn(),
   listResumeImports:    jest.fn(),

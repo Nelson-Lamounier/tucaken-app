@@ -20,6 +20,7 @@ export type ImportStatus =
   | 'queued'
   | 'parsing'
   | 'extracting_career'
+  | 'analyzing'
   | 'ready_for_review'
   | 'confirmed'
   | 'enriching'
@@ -45,6 +46,28 @@ export interface ResumeImport {
   createdAt:             Date;
   startedAt:             Date | null;
   completedAt:           Date | null;
+}
+
+/**
+ * Compact progress DTO for the polling contract. Deliberately excludes the
+ * heavy columns (raw_extracted_text, gap_report) — the frontend polls this
+ * cheaply and fetches heavy artifacts once, gated on the flags here.
+ */
+export type ImportPhase =
+  | 'uploading' | 'parsing' | 'extracting' | 'analyzing'
+  | 'review' | 'enriching' | 'done' | 'error';
+
+export interface ImportProgress {
+  v:              1;
+  status:         ImportStatus;
+  phase:          ImportPhase;
+  step:           number;
+  totalSteps:     number;
+  terminal:       boolean;
+  error:          { code: string; message: string } | null;
+  gapReportReady: boolean;
+  heartbeatAt:    string;   // server clock — client uses this, not its own
+  retryAfterMs:   number;   // server-driven poll cadence
 }
 
 export type CareerEntryType =
@@ -171,6 +194,93 @@ export async function confirmImportForEnrichment(
     [importId, userId],
   );
   return result.rows[0] ? rowToImport(result.rows[0]) : null;
+}
+
+const PHASE_BY_STATUS: Record<ImportStatus, ImportPhase> = {
+  awaiting_upload:   'uploading',
+  queued:            'uploading',
+  parsing:           'parsing',
+  extracting_career: 'extracting',
+  analyzing:         'analyzing',
+  ready_for_review:  'review',
+  confirmed:         'enriching',
+  enriching:         'enriching',
+  completed:         'done',
+  failed:            'error',
+};
+
+// Ordinal for the UI progress bar. ready_for_review is the Phase-1 finish
+// line (the user can act); enrichment is Phase 2 and counts beyond it.
+const STEP_BY_PHASE: Record<ImportPhase, number> = {
+  uploading: 1, parsing: 2, extracting: 3, analyzing: 4,
+  review: 5, enriching: 6, done: 7, error: 0,
+};
+const TOTAL_STEPS = 7;
+
+const TERMINAL = new Set<ImportStatus>(['ready_for_review', 'completed', 'failed']);
+
+/**
+ * Compact progress for the polling contract. Narrow query — deliberately
+ * omits raw_extracted_text and gap_report. The server owns poll cadence
+ * (retryAfterMs) and terminal authority so the client needs no timeout
+ * guesswork. Returns null if the import is absent / not owned.
+ */
+export async function getImportProgress(
+  pool: Pool,
+  importId: string,
+  userId: string,
+): Promise<ImportProgress | null> {
+  const result = await pool.query<{
+    status: ImportStatus;
+    error_code: string | null;
+    error_details: { message?: string } | null;
+    gap_report_generated_at: Date | null;
+  }>(
+    `SELECT status, error_code, error_details, gap_report_generated_at
+       FROM resume_imports
+      WHERE id = $1::uuid AND user_id = $2::uuid`,
+    [importId, userId],
+  );
+  const row = result.rows[0];
+  if (!row) return null;
+
+  const phase = PHASE_BY_STATUS[row.status];
+  const terminal = TERMINAL.has(row.status);
+  return {
+    v: 1,
+    status:         row.status,
+    phase,
+    step:           STEP_BY_PHASE[phase],
+    totalSteps:     TOTAL_STEPS,
+    terminal,
+    error: row.status === 'failed'
+      ? { code: row.error_code ?? 'UNKNOWN', message: row.error_details?.message ?? 'Import failed' }
+      : null,
+    gapReportReady: row.gap_report_generated_at != null,
+    heartbeatAt:    new Date().toISOString(),
+    // Terminal → client stops polling anyway; non-terminal → 1.5s cadence.
+    retryAfterMs:   terminal ? 0 : 1500,
+  };
+}
+
+/**
+ * Fetch the gap-analysis report once (write-once artifact). Distinguishes:
+ *   undefined → import not found / not owned
+ *   null      → import exists, no report yet (or gap analysis failed)
+ *   object    → the GapAnalysisReport JSON
+ */
+export async function getGapReport(
+  pool: Pool,
+  importId: string,
+  userId: string,
+): Promise<Record<string, unknown> | null | undefined> {
+  const result = await pool.query<{ gap_report: Record<string, unknown> | null }>(
+    `SELECT gap_report FROM resume_imports
+      WHERE id = $1::uuid AND user_id = $2::uuid`,
+    [importId, userId],
+  );
+  if (!result.rows[0]) return undefined;
+  return result.rows[0].gap_report ?? null;
 }
 
 /**

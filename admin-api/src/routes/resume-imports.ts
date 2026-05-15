@@ -41,6 +41,8 @@ import {
   createResumeImport,
   markUploadComplete,
   confirmImportForEnrichment,
+  getImportProgress,
+  getGapReport,
   resetImportForRetry,
   getResumeImport,
   listResumeImports,
@@ -471,9 +473,38 @@ export function createResumeImportsRouter(config: AdminApiConfig): Hono<AdminApi
     return ctx.json({ deleted: true }, 200);
   });
 
+  // ─── GET /:id/progress ────────────────────────────────────────────────────
+  // Lightweight, server-driven progress contract. The client polls this on
+  // the cadence the server returns (retryAfterMs) and stops when terminal —
+  // no client-side timeout guesswork, no heavy payload. Heavy artifacts
+  // (career-entries, gap-report) are fetched ONCE off the flags here.
+  // ──────────────────────────────────────────────────────────────────────────
+  router.get('/:id/progress', async (ctx) => {
+    const userId = requireUserId(ctx);
+    if (!userId) return ctx.json({ error: 'Authenticated user not provisioned' }, 401);
+
+    const progress = await getImportProgress(pool, ctx.req.param('id'), userId);
+    if (!progress) return ctx.json({ error: 'Import not found' }, 404);
+    return ctx.json({ progress });
+  });
+
+  // ─── GET /:id/gap-report ──────────────────────────────────────────────────
+  // Write-once artifact. The frontend calls this exactly once, when
+  // progress.gapReportReady flips true. 404 = import not found;
+  // { gapReport: null } = exists but no report (gap analysis failed/skipped).
+  // ──────────────────────────────────────────────────────────────────────────
+  router.get('/:id/gap-report', async (ctx) => {
+    const userId = requireUserId(ctx);
+    if (!userId) return ctx.json({ error: 'Authenticated user not provisioned' }, 401);
+
+    const report = await getGapReport(pool, ctx.req.param('id'), userId);
+    if (report === undefined) return ctx.json({ error: 'Import not found' }, 404);
+    return ctx.json({ gapReport: report });
+  });
+
   // ─── GET /:id ─────────────────────────────────────────────────────────────
-  // Status polling — frontend calls every 2-3s until status is
-  // 'ready_for_review' (fast) or 'completed' (after enrichment).
+  // Full import record. Retained for the list/detail views; the onboarding
+  // poll uses /:id/progress instead.
   // ──────────────────────────────────────────────────────────────────────────
   router.get('/:id', async (ctx) => {
     const userId = requireUserId(ctx);

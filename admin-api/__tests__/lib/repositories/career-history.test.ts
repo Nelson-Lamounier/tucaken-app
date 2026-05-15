@@ -21,9 +21,8 @@ jest.unstable_mockModule('pg', () => {
   return { Pool, default: { Pool } };
 });
 
-const { updateCareerEntry, confirmImportForEnrichment } = await import(
-  '../../../src/lib/repositories/career-history.js'
-);
+const { updateCareerEntry, confirmImportForEnrichment, getImportProgress, getGapReport } =
+  await import('../../../src/lib/repositories/career-history.js');
 
 const fakePool = { connect: mockConnect } as unknown as import('pg').Pool;
 
@@ -192,5 +191,70 @@ describe('confirmImportForEnrichment', () => {
 
     const result = await confirmImportForEnrichment(pool, IMPORT_ID, USER_ID);
     expect(result).toBeNull();
+  });
+});
+
+describe('getImportProgress', () => {
+  function poolReturning(row: Record<string, unknown> | undefined) {
+    const query = jest.fn<() => Promise<{ rows: unknown[] }>>()
+      .mockResolvedValue({ rows: row ? [row] : [] });
+    return { query } as unknown as import('pg').Pool;
+  }
+
+  it('returns null when the import is absent', async () => {
+    const p = await getImportProgress(poolReturning(undefined), IMPORT_ID, USER_ID);
+    expect(p).toBeNull();
+  });
+
+  it('maps extracting_career → phase extracting, non-terminal, 1500ms cadence', async () => {
+    const p = await getImportProgress(
+      poolReturning({ status: 'extracting_career', error_code: null, error_details: null, gap_report_generated_at: null }),
+      IMPORT_ID, USER_ID,
+    );
+    expect(p?.phase).toBe('extracting');
+    expect(p?.terminal).toBe(false);
+    expect(p?.retryAfterMs).toBe(1500);
+    expect(p?.gapReportReady).toBe(false);
+    expect(p?.error).toBeNull();
+  });
+
+  it('ready_for_review is terminal with retryAfterMs 0', async () => {
+    const p = await getImportProgress(
+      poolReturning({ status: 'ready_for_review', error_code: null, error_details: null, gap_report_generated_at: new Date() }),
+      IMPORT_ID, USER_ID,
+    );
+    expect(p?.terminal).toBe(true);
+    expect(p?.retryAfterMs).toBe(0);
+    expect(p?.gapReportReady).toBe(true);
+  });
+
+  it('failed surfaces error code + message from error_details', async () => {
+    const p = await getImportProgress(
+      poolReturning({ status: 'failed', error_code: 'PIPELINE_ERROR', error_details: { message: 'boom' }, gap_report_generated_at: null }),
+      IMPORT_ID, USER_ID,
+    );
+    expect(p?.phase).toBe('error');
+    expect(p?.terminal).toBe(true);
+    expect(p?.error).toEqual({ code: 'PIPELINE_ERROR', message: 'boom' });
+  });
+});
+
+describe('getGapReport', () => {
+  function poolReturning(rows: unknown[]) {
+    const query = jest.fn<() => Promise<{ rows: unknown[] }>>().mockResolvedValue({ rows });
+    return { query } as unknown as import('pg').Pool;
+  }
+
+  it('undefined when import not found', async () => {
+    expect(await getGapReport(poolReturning([]), IMPORT_ID, USER_ID)).toBeUndefined();
+  });
+
+  it('null when import exists but report is absent', async () => {
+    expect(await getGapReport(poolReturning([{ gap_report: null }]), IMPORT_ID, USER_ID)).toBeNull();
+  });
+
+  it('returns the report object when present', async () => {
+    const report = { overallScore: 80, perRole: [] };
+    expect(await getGapReport(poolReturning([{ gap_report: report }]), IMPORT_ID, USER_ID)).toEqual(report);
   });
 });
