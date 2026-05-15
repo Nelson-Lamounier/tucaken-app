@@ -299,7 +299,45 @@ export async function getCareerEntry(
 }
 
 /**
+ * Diff two raw_data objects and yield (field_path, before, after) triples for
+ * every changed top-level key. Arrays are diffed element-wise so individual
+ * highlight bullets surface as their own corrections (e.g. "highlights[2]").
+ *
+ * Nested objects (e.g. a future role with `metrics: { ... }`) are diffed as a
+ * single field — we don't recurse, because the extracted shapes are flat and
+ * the eval queries are simpler when paths are predictable.
+ */
+function* diffFields(
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+): Generator<{ path: string; before: unknown; after: unknown }> {
+  const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
+  for (const key of keys) {
+    const b = before[key];
+    const a = after[key];
+
+    if (Array.isArray(b) && Array.isArray(a)) {
+      const maxLen = Math.max(b.length, a.length);
+      for (let i = 0; i < maxLen; i++) {
+        if (JSON.stringify(b[i]) !== JSON.stringify(a[i])) {
+          yield { path: `${key}[${i}]`, before: b[i] ?? null, after: a[i] ?? null };
+        }
+      }
+      continue;
+    }
+
+    if (JSON.stringify(b) !== JSON.stringify(a)) {
+      yield { path: key, before: b ?? null, after: a ?? null };
+    }
+  }
+}
+
+/**
  * Update the raw_data for a career entry (user editing extracted data).
+ *
+ * Atomically logs every changed field to `resume_import_corrections`. The
+ * correction log is the eval dataset for extraction prompt iteration —
+ * pair (extracted, corrected) per field, with model_id provenance.
  */
 export async function updateCareerEntry(
   pool: Pool,
@@ -307,15 +345,78 @@ export async function updateCareerEntry(
   userId: string,
   rawData: Record<string, unknown>,
 ): Promise<CareerEntry | null> {
-  const result = await pool.query<Record<string, unknown>>(
-    `UPDATE user_career_history
-        SET raw_data   = $1,
-            updated_at = NOW()
-      WHERE id = $2::uuid AND user_id = $3::uuid
-      RETURNING ${ENTRY_COLS}`,
-    [JSON.stringify(rawData), entryId, userId],
-  );
-  return result.rows[0] ? rowToEntry(result.rows[0]) : null;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Read-then-update inside a tx so concurrent edits can't lose corrections.
+    // SELECT FOR UPDATE locks the row until COMMIT, so the diff we compute is
+    // against the value the UPDATE will actually replace.
+    const before = await client.query<{ raw_data: Record<string, unknown>; import_id: string; entry_type: string }>(
+      `SELECT raw_data, import_id, entry_type
+         FROM user_career_history
+        WHERE id = $1::uuid AND user_id = $2::uuid
+        FOR UPDATE`,
+      [entryId, userId],
+    );
+    if (!before.rows[0]) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+
+    const beforeRaw = before.rows[0].raw_data;
+    const importId = before.rows[0].import_id;
+    const entryType = before.rows[0].entry_type;
+
+    const result = await client.query<Record<string, unknown>>(
+      `UPDATE user_career_history
+          SET raw_data   = $1,
+              updated_at = NOW()
+        WHERE id = $2::uuid AND user_id = $3::uuid
+        RETURNING ${ENTRY_COLS}`,
+      [JSON.stringify(rawData), entryId, userId],
+    );
+
+    // Resolve the extraction model used for this import — best-effort.
+    // We pick the most recent extraction-pipeline invocation; if none exists
+    // (e.g. the cost-tracking write was lost), we log NULL and move on.
+    const modelLookup = await client.query<{ model_id: string }>(
+      `SELECT model_id
+         FROM prompt_invocations
+        WHERE import_id = $1::uuid AND pipeline = 'resume-import'
+        ORDER BY invoked_at ASC
+        LIMIT 1`,
+      [importId],
+    );
+    const modelId = modelLookup.rows[0]?.model_id ?? null;
+
+    for (const change of diffFields(beforeRaw, rawData)) {
+      await client.query(
+        `INSERT INTO resume_import_corrections
+              (import_id, career_entry_id, user_id, entry_type,
+               field_path, extracted_value, corrected_value, model_id)
+         VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6::jsonb, $7::jsonb, $8)`,
+        [
+          importId,
+          entryId,
+          userId,
+          entryType,
+          change.path,
+          change.before === null ? null : JSON.stringify(change.before),
+          change.after  === null ? null : JSON.stringify(change.after),
+          modelId,
+        ],
+      );
+    }
+
+    await client.query('COMMIT');
+    return result.rows[0] ? rowToEntry(result.rows[0]) : null;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 /**
