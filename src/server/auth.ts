@@ -23,6 +23,8 @@ import {
   generateRandomString,
   generateCodeChallenge,
 } from '@/lib/auth/tanstack-auth'
+import { MOCK_AUTH } from './_dev-mock'
+import { enforceAuthRateLimit } from './_rate-limit'
 
 // Re-export types from session.ts so existing import paths keep working.
 export type { AuthUser, AuthState } from './session'
@@ -173,6 +175,9 @@ export type SignInResult =
 export const signInWithPasswordFn = createServerFn({ method: 'POST' })
   .inputValidator(signInPasswordSchema)
   .handler(async ({ data }): Promise<SignInResult> => {
+    enforceAuthRateLimit('signin')
+    if (MOCK_AUTH) return { success: true, isNewUser: true }
+
     const { client, clientId } = makeCognitoClient()
 
     let res
@@ -242,6 +247,7 @@ const respondToMfaSchema = z.object({
 export const respondToMfaChallengeFn = createServerFn({ method: 'POST' })
   .inputValidator(respondToMfaSchema)
   .handler(async ({ data }) => {
+    enforceAuthRateLimit('mfa')
     const { client, clientId } = makeCognitoClient()
 
     const session = getCookie('mfa_session')
@@ -300,6 +306,9 @@ const ALREADY_HAS_ACCOUNT_MSG =
 export const signUpFn = createServerFn({ method: 'POST' })
   .inputValidator(signUpSchema)
   .handler(async ({ data }) => {
+    enforceAuthRateLimit('signup')
+    if (MOCK_AUTH) return { success: true }
+
     // ── Pre-check: email already in RDS (Google / GitHub account) ────────────
     // Catches cross-provider duplicates before Cognito creates a conflicting
     // native user. Best-effort — if admin-api is unavailable we fall through
@@ -366,6 +375,9 @@ const confirmSignUpSchema = z.object({
 export const confirmSignUpFn = createServerFn({ method: 'POST' })
   .inputValidator(confirmSignUpSchema)
   .handler(async ({ data }) => {
+    enforceAuthRateLimit('confirm')
+    if (MOCK_AUTH) return { success: true, isNewUser: true }
+
     const { client, clientId } = makeCognitoClient()
 
     try {
@@ -426,6 +438,7 @@ export const confirmSignUpFn = createServerFn({ method: 'POST' })
 export const resendConfirmationCodeFn = createServerFn({ method: 'POST' })
   .inputValidator(z.object({ email: z.string().email() }))
   .handler(async ({ data }) => {
+    enforceAuthRateLimit('resend_code')
     const { client, clientId } = makeCognitoClient()
     await client.send(new ResendConfirmationCodeCommand({ ClientId: clientId, Username: data.email }))
     return { success: true }
@@ -438,6 +451,7 @@ export const resendConfirmationCodeFn = createServerFn({ method: 'POST' })
 export const forgotPasswordFn = createServerFn({ method: 'POST' })
   .inputValidator(z.object({ email: z.string().email() }))
   .handler(async ({ data }) => {
+    enforceAuthRateLimit('forgot_password')
     const { client, clientId } = makeCognitoClient()
     try {
       await client.send(new ForgotPasswordCommand({ ClientId: clientId, Username: data.email }))
@@ -457,6 +471,7 @@ const resetPasswordSchema = z.object({
 export const confirmForgotPasswordFn = createServerFn({ method: 'POST' })
   .inputValidator(resetPasswordSchema)
   .handler(async ({ data }) => {
+    enforceAuthRateLimit('forgot_password')
     const { client, clientId } = makeCognitoClient()
     try {
       await client.send(

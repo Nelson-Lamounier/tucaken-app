@@ -48,6 +48,7 @@ import {
 import { getBatchApi } from '../lib/k8s.js';
 import { traceParentEnv, observabilityEnv } from '../lib/k8s-job-builder.js';
 import { getPool } from '../lib/pg.js';
+import { secondsUntilNextMonthUTC } from '../lib/retry-after.js';
 import { AdminApiBindings, requireUserId } from '../lib/types.js';
 
 // Push events: skip re-index if a job was already triggered within this window.
@@ -679,6 +680,7 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         const limit = getPlanLimit(plan);
         const allowed = await checkAndIncrementQuota(pool, uid, limit);
         if (!allowed) {
+            ctx.header('Retry-After', String(secondsUntilNextMonthUTC()));
             return ctx.json({ error: `Monthly ingestion limit of ${FREE_PLAN_LIMIT} reached. Upgrade to Pro for unlimited syncs.` }, 429);
         }
 
