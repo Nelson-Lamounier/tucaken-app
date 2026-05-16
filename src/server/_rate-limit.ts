@@ -1,41 +1,45 @@
 /**
  * @format
- * In-memory fixed-window rate limiter for auth server functions.
+ * In-memory token-bucket rate limiter for auth server functions.
+ *
+ * Token bucket (not fixed window): each key owns a bucket of `limit` tokens
+ * that refills continuously at `limit / windowMs` tokens per ms. A request
+ * costs one token; an empty bucket is rejected. This avoids the fixed-window
+ * burst edge (2× the limit straddling a reset boundary) and lets callers
+ * recover smoothly instead of all-at-once at a hard reset.
  *
  * Scope & limitations:
  *   - Per-process state (a Map). With >1 SSR replica the effective limit is
- *     `limit × replicas`. This is defence-in-depth on top of Cognito's own
- *     account lockout, NOT the sole control. A shared store (Redis) would be
- *     required for a strict global limit — out of scope here.
+ *     `limit × replicas`. Defence-in-depth on top of Cognito account lockout
+ *     and the edge WAF rate rule — NOT the sole control. A shared store
+ *     (Redis) would be required for a strict global limit.
  *   - Keyed by caller IP + action so a brute-force on one account/endpoint
  *     does not consume another's budget.
- *
- * The window is fixed (not sliding): the first request opens a window of
- * `windowMs`; the counter resets the instant `now >= resetAt`.
  */
 
 interface Bucket {
-  count: number
-  /** Epoch ms at which the window resets and the counter clears. */
-  resetAt: number
+  /** Fractional tokens currently available (0 .. capacity). */
+  tokens: number
+  /** Epoch ms of the last refill calculation. */
+  lastRefill: number
 }
 
 const buckets = new Map<string, Bucket>()
 
 export interface RateLimitResult {
   allowed: boolean
-  /** Seconds until the window resets — 0 when allowed. */
+  /** Seconds until the next whole token is available — 0 when allowed. */
   retryAfterSeconds: number
-  /** Remaining requests in the current window — 0 when blocked. */
+  /** Whole tokens left in the bucket after this call. */
   remaining: number
 }
 
 /**
- * Record an attempt against `key` and report whether it is allowed.
+ * Spend one token against `key`'s bucket and report whether it was allowed.
  *
  * @param key       Stable identifier, e.g. `signin:1.2.3.4`.
- * @param limit     Max attempts permitted per window.
- * @param windowMs  Window length in milliseconds.
+ * @param limit     Bucket capacity (max burst).
+ * @param windowMs  Time to refill a full bucket → rate = limit / windowMs.
  * @param now       Injectable clock (defaults to Date.now()) for tests.
  */
 export function checkRateLimit(
@@ -44,26 +48,32 @@ export function checkRateLimit(
   windowMs: number,
   now: number = Date.now(),
 ): RateLimitResult {
-  let bucket = buckets.get(key)
+  const refillPerMs = limit / windowMs
 
-  if (!bucket || now >= bucket.resetAt) {
-    bucket = { count: 0, resetAt: now + windowMs }
+  let bucket = buckets.get(key)
+  if (!bucket) {
+    bucket = { tokens: limit, lastRefill: now }
     buckets.set(key, bucket)
   }
 
-  if (bucket.count >= limit) {
+  // Continuous refill, capped at capacity (no hoarding while idle).
+  const elapsed = Math.max(0, now - bucket.lastRefill)
+  bucket.tokens = Math.min(limit, bucket.tokens + elapsed * refillPerMs)
+  bucket.lastRefill = now
+
+  if (bucket.tokens < 1) {
     return {
       allowed: false,
-      retryAfterSeconds: Math.ceil((bucket.resetAt - now) / 1000),
+      retryAfterSeconds: Math.ceil((1 - bucket.tokens) / refillPerMs / 1000),
       remaining: 0,
     }
   }
 
-  bucket.count += 1
-  return { allowed: true, retryAfterSeconds: 0, remaining: limit - bucket.count }
+  bucket.tokens -= 1
+  return { allowed: true, retryAfterSeconds: 0, remaining: Math.floor(bucket.tokens) }
 }
 
-/** Test-only: clear all windows so suites start from a known state. */
+/** Test-only: clear all buckets so suites start from a known state. */
 export function _resetRateLimits(): void {
   buckets.clear()
 }
