@@ -144,21 +144,42 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
   const requestId = (req.headers['x-request-id'] as string | undefined) ?? randomUUID();
   res.setHeader('x-request-id', requestId);
 
-  // Record RED on response close — covers static + SSR + observability paths.
-  res.on('finish', () => {
+  // Record RED on response end — covers static + SSR + observability paths.
+  // `finish` fires on a fully-flushed response; `close` fires on client abort
+  // or socket reset where `finish` never comes. Bind both (guarded so we
+  // record exactly once) so an aborted request still produces a metric + log
+  // instead of silently vanishing.
+  let recorded = false;
+  const record = () => {
+    if (recorded) return;
+    recorded = true;
     const durationSec = Number(process.hrtime.bigint() - start) / 1e9;
     const route = classifyRoute(req.url ?? '/');
     const method = req.method ?? 'GET';
-    const status = String(res.statusCode);
+    // res.statusCode is still 200 (the default) on a pre-header abort; mark
+    // those 499 (client closed request) so they don't pollute success rates.
+    const aborted = !res.writableEnded && !res.headersSent;
+    const code = aborted ? 499 : res.statusCode;
+    const status = String(code);
     ssrRequestsTotal.inc({ method, route, status_code: status });
     ssrRequestDurationSeconds.observe({ method, route, status_code: status }, durationSec);
-    const lvl = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info';
+    // SLA threshold: a slow 200 is invisible if we only level by status.
+    // Escalate any response slower than SSR_SLA_SECONDS to warn so slow
+    // paths surface in log-based alerts without a separate metric query.
+    const slaSec = Number(process.env['SSR_SLA_SECONDS'] ?? 2);
+    let lvl: 'error' | 'warn' | 'info' = 'info';
+    if (code >= 500) lvl = 'error';
+    else if (code >= 400 || durationSec > slaSec) lvl = 'warn';
     logger[lvl]({
-      method, route, status: res.statusCode,
+      method, route, status: code,
       duration_ms: Math.round(durationSec * 1000),
       request_id: requestId,
+      ...(aborted ? { aborted: true } : {}),
+      ...(durationSec > slaSec ? { sla_exceeded: true } : {}),
     }, 'ssr request');
-  });
+  };
+  res.on('finish', record);
+  res.on('close', record);
 
   try {
     const urlPath = req.url?.split('?')[0] ?? '/';

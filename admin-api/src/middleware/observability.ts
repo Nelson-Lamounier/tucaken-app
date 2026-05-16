@@ -61,14 +61,34 @@ export const observabilityMiddleware: MiddlewareHandler = async (ctx, next) => {
 
     ctx.header('Server-Timing', `app;dur=${(durationSec * 1000).toFixed(1)}`);
 
-    const logFn = errorThrown || ctx.res.status >= 500 ? reqLogger.error.bind(reqLogger)
-                : ctx.res.status >= 400 ? reqLogger.warn.bind(reqLogger)
-                : reqLogger.info.bind(reqLogger);
+    // SLA threshold: a slow 2xx is invisible if we only level by status.
+    // Escalate anything slower than ADMIN_API_SLA_SECONDS to warn so slow
+    // paths surface in log-based alerts, not just the latency histogram.
+    const slaSec = Number(process.env['ADMIN_API_SLA_SECONDS'] ?? 2);
+    const slaExceeded = durationSec > slaSec;
+
+    let logFn = reqLogger.info.bind(reqLogger);
+    if (errorThrown || ctx.res.status >= 500) logFn = reqLogger.error.bind(reqLogger);
+    else if (ctx.res.status >= 400 || slaExceeded) logFn = reqLogger.warn.bind(reqLogger);
+
+    // Coerce non-Error throws (string/object rejections) so failure detail
+    // is never dropped from the log line. Objects go through JSON to avoid
+    // the '[object Object]' default stringification.
+    let errField: Record<string, unknown> = {};
+    if (errorThrown instanceof Error) {
+      errField = { err: errorThrown };
+    } else if (errorThrown !== undefined) {
+      errField = {
+        err: typeof errorThrown === 'object' ? JSON.stringify(errorThrown) : String(errorThrown),
+      };
+    }
+
     logFn({
       status:      ctx.res.status,
       duration_ms: Math.round(durationSec * 1000),
       route,
-      ...(errorThrown instanceof Error ? { err: errorThrown } : {}),
+      ...errField,
+      ...(slaExceeded ? { sla_exceeded: true } : {}),
     }, 'request');
   }
 };
