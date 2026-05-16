@@ -120,14 +120,14 @@ describe('GET / — list all resume summaries', () => {
     expect(body.count).toBe(1);
   });
 
-  it('PG resume has id and label fields (no DynamoDB keys)', async () => {
+  it('PG resume has resumeId and label fields (no DynamoDB keys)', async () => {
     pgListResumesMock.mockResolvedValue([PG_RESUME]);
     const res = await buildApp().request('/');
     const body = (await res.json()) as { resumes: Record<string, unknown>[] };
     const resume = body.resumes[0] as Record<string, unknown>;
     expect(resume['pk']).toBeUndefined();
     expect(resume['sk']).toBeUndefined();
-    expect(resume['id']).toBe('resume-uuid-1');
+    expect(resume['resumeId']).toBe('resume-uuid-1');
     expect(resume['label']).toBe('Senior Engineer 2026');
   });
 
@@ -154,15 +154,15 @@ describe('GET /active — get active resume', () => {
     const res = await buildApp().request('/active');
     const body = (await res.json()) as { resume: Record<string, unknown> };
     expect(res.status).toBe(200);
-    expect(body.resume['id']).toBe('active-uuid');
+    expect(body.resume['resumeId']).toBe('active-uuid');
     expect(body.resume['isActive']).toBe(true);
   });
 
-  it('includes the full contentJson payload in the active resume response', async () => {
+  it('includes the full data payload in the active resume response', async () => {
     pgGetActiveResumeMock.mockResolvedValue(PG_ACTIVE_RESUME);
     const res = await buildApp().request('/active');
     const body = (await res.json()) as { resume: Record<string, unknown> };
-    expect(body.resume['contentJson']).toEqual({ basics: { name: 'Nelson Lamounier' } });
+    expect(body.resume['data']).toEqual({ basics: { name: 'Nelson Lamounier' } });
   });
 
   it('returns 404 when no active resume exists', async () => {
@@ -183,13 +183,13 @@ describe('GET /:id — get resume by ID', () => {
     pgGetResumeMock.mockReset();
   });
 
-  it('returns 200 with full resume including contentJson', async () => {
+  it('returns 200 with full resume including data', async () => {
     pgGetResumeMock.mockResolvedValue(PG_RESUME);
     const res = await buildApp().request('/resume-uuid-1');
     const body = (await res.json()) as { resume: Record<string, unknown> };
     expect(res.status).toBe(200);
-    expect(body.resume['id']).toBe('resume-uuid-1');
-    expect(body.resume['contentJson']).toEqual({ basics: { name: 'Nelson Lamounier' } });
+    expect(body.resume['resumeId']).toBe('resume-uuid-1');
+    expect(body.resume['data']).toEqual({ basics: { name: 'Nelson Lamounier' } });
   });
 
   it('calls getResume with the correct id', async () => {
@@ -235,7 +235,7 @@ describe('POST / — create resume', () => {
     expect(res.status).toBe(201);
     expect(body.resume['label']).toBe('New CV 2026');
     expect(body.resume['isActive']).toBe(false);
-    expect(typeof body.resume['id']).toBe('string');
+    expect(typeof body.resume['resumeId']).toBe('string');
     expect(pgUpsertResumeMock).toHaveBeenCalledTimes(1);
   });
 

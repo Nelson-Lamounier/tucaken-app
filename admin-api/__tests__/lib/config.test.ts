@@ -37,6 +37,7 @@ const VALID_ENV: Record<string, string> = {
   PG_DATABASE: 'tucaken',
   PG_USER: 'postgres',
   PG_PASSWORD: 'secret',
+  RESEARCH_MODEL: 'eu.anthropic.claude-sonnet-4-6',
 };
 
 // ---------------------------------------------------------------------------

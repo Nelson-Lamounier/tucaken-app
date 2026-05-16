@@ -28,11 +28,13 @@ const mockListInstallationRepos     = jest.fn<() => Promise<object[]>>().mockRes
     { id: 1, full_name: 'Nelson-Lamounier/cdk-monitoring',        owner: { login: 'Nelson-Lamounier' }, name: 'cdk-monitoring',        default_branch: 'develop', private: false, updated_at: '2026-04-29T00:00:00Z' },
     { id: 2, full_name: 'Nelson-Lamounier/kubernetes-bootstrap',   owner: { login: 'Nelson-Lamounier' }, name: 'kubernetes-bootstrap',  default_branch: 'develop', private: false, updated_at: '2026-04-29T00:00:00Z' },
 ]);
+const mockDeleteInstallation        = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
 
 jest.unstable_mockModule('../../src/lib/github-app.js', () => ({
     generateInstallationToken: mockGenerateInstallationToken,
     getInstallationInfo:       mockGetInstallationInfo,
     listInstallationRepos:     mockListInstallationRepos,
+    deleteInstallation:        mockDeleteInstallation,
 }));
 
 // ---------------------------------------------------------------------------
