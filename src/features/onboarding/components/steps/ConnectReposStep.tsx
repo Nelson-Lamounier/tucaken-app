@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, X } from 'lucide-react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/Button'
 import { GitHubConnectionCard } from '@/features/onboarding/components/onboarding/GitHubConnectionCard'
 import { GitHubRepoPicker } from '@/features/github/components/GitHubRepoPicker'
-import { GitHubConnectedRepos } from '@/features/github/components/GitHubConnectedRepos'
 import { StepHeader } from '@/features/onboarding/components/onboarding/StepHeader'
 import { COPY } from '@/features/onboarding/components/onboarding/content'
+import { adminKeys } from '@/lib/api/query-keys'
+import { removeConnectedRepoFn } from '@/server/github'
 import type { GitHubInstallation, GitHubAccessibleRepo, ConnectedRepo } from '@/lib/types/github.types'
 
 const MAX_REPOS = 3
@@ -18,7 +20,7 @@ interface ConnectReposStepProps {
   readonly isLoadingRepos: boolean
   readonly connectedRepos: ConnectedRepo[] | undefined
   readonly onNext: () => void
-  /** When true, enforces the 3-repo cap and shows "Next: Start Indexing". */
+  /** When true, enforces the 3-repo cap during onboarding. */
   readonly enforceLimit?: boolean
 }
 
@@ -31,11 +33,20 @@ export function ConnectReposStep({
   onNext,
   enforceLimit = false,
 }: ConnectReposStepProps) {
-  const connectedCount = connectedRepos?.length ?? 0
-  const hasConnected = connectedCount > 0
-  const nextLabel = hasConnected ? (enforceLimit ? 'Next: Start Indexing' : 'Next') : 'Add a repo to continue'
-  // Body reveals only after the StepHeader typewriter finishes.
+  const queryClient = useQueryClient()
   const [introDone, setIntroDone] = useState(false)
+
+  // Queued = repos connected but not yet syncing (deferSync).
+  const queued = (connectedRepos ?? []).filter((r) => r.syncStatus === 'pending')
+  const hasQueued = queued.length > 0
+
+  const dequeue = useMutation({
+    mutationFn: (repoFullName: string) => removeConnectedRepoFn({ data: { repoFullName } }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.github.connectedRepos() })
+      void queryClient.invalidateQueries({ queryKey: adminKeys.github.accessibleRepos() })
+    },
+  })
 
   return (
     <div className="space-y-6">
@@ -49,7 +60,7 @@ export function ConnectReposStep({
         />
         {enforceLimit && (
           <p className="mt-1 text-xs text-zinc-600">
-            You can connect up to {MAX_REPOS} repositories during onboarding.
+            Queue up to {MAX_REPOS} repositories. Indexing starts after you click "Start indexing".
           </p>
         )}
       </div>
@@ -71,13 +82,34 @@ export function ConnectReposStep({
             />
             {installation && (
               <GitHubRepoPicker
+                mode="queue"
                 accessibleRepos={accessibleRepos}
                 isLoading={isLoadingRepos}
                 connectedRepos={connectedRepos}
                 maxRepos={enforceLimit ? MAX_REPOS : undefined}
               />
             )}
-            {installation && <GitHubConnectedRepos connectedRepos={connectedRepos} />}
+            {installation && hasQueued && (
+              <div className="flex flex-wrap gap-2">
+                {queued.map((r) => (
+                  <span
+                    key={r.repoFullName}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-2.5 py-1 text-xs text-indigo-200"
+                  >
+                    {r.repoFullName}
+                    <button
+                      type="button"
+                      aria-label={`Remove ${r.repoFullName} from queue`}
+                      onClick={() => dequeue.mutate(r.repoFullName)}
+                      disabled={dequeue.isPending}
+                      className="rounded-full p-0.5 text-indigo-300/70 transition hover:bg-indigo-500/20 hover:text-indigo-100"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -86,11 +118,11 @@ export function ConnectReposStep({
         <Button
           variant="primary"
           onClick={onNext}
-          disabled={!hasConnected}
+          disabled={!hasQueued}
           className="flex items-center gap-1.5"
         >
-          {nextLabel}
-          {hasConnected && <ChevronRight className="h-4 w-4" />}
+          {hasQueued ? 'Start indexing' : 'Add a repo to continue'}
+          {hasQueued && <ChevronRight className="h-4 w-4" />}
         </Button>
       </div>
     </div>
