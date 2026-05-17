@@ -83,13 +83,16 @@ export function ConnectStep({
         animate={reduce ? undefined : flowAnim}
         transition={reduce ? undefined : FLOW_TRANSITION}
       >
-      <div
+      <motion.div
         className={[
           'rounded-[11px] p-5',
           connected
-            ? 'bg-linear-to-br from-teal-950 via-zinc-950 to-black'
+            ? `bg-linear-to-br from-teal-950 via-zinc-950 to-black ${FLOW_CLASS}`
             : 'bg-zinc-950',
         ].join(' ')}
+        style={connected ? { willChange: 'background-position' } : undefined}
+        animate={connected && !reduce ? flowAnim : undefined}
+        transition={connected && !reduce ? FLOW_TRANSITION : undefined}
       >
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-start gap-3">
@@ -162,7 +165,7 @@ export function ConnectStep({
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+      </motion.div>
       </motion.div>
 
       {/* Coming-soon row */}
