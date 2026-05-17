@@ -167,9 +167,10 @@ smoke-test-fast:
 create-test-user:
     npx tsx scripts/create-test-user.ts
 
-# Delete test user from Cognito so sign-up can be tested end-to-end via the UI
-reset-test-user:
-    npx tsx scripts/reset-test-user.ts
+# Interactively pick a test user (from RDS + Cognito) and wipe them from both
+# Pass flags through: just reset-test-user --email=foo@bar.com --yes
+reset-test-user *ARGS:
+    npx tsx scripts/reset-test-user.ts {{ARGS}}
 
 # ── AWS / Cognito Setup ───────────────────────────────────────────────────────
 
