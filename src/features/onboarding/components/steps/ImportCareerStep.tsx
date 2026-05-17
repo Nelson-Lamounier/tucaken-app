@@ -462,7 +462,9 @@ function CompleteScreen({
           </div>
         </div>
 
-        <p className="w-full truncate text-center text-sm font-medium text-zinc-200">{fileName}</p>
+        {fileName && (
+          <p className="w-full truncate text-center text-sm font-medium text-zinc-200">{fileName}</p>
+        )}
       </div>
     </div>
   )
