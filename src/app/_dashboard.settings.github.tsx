@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { GitBranch, FileText, Plus, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 import { DashboardPage } from '@/components/layouts/DashboardPage'
 import { ImportCareerStep } from '@/features/onboarding/components/steps/ImportCareerStep'
+import { ReviewStep } from '@/features/onboarding/components/steps/ReviewStep'
 import { GitHubAccountSection } from '@/features/github/components/GitHubAccountSection'
 import { GitHubRepoPicker } from '@/features/github/components/GitHubRepoPicker'
 import { GitHubConnectedRepos } from '@/features/github/components/GitHubConnectedRepos'
@@ -39,6 +40,7 @@ function DatabaseSettingsPage() {
   const { addToast } = useToastStore()
 
   const [addingResume, setAddingResume] = useState(false)
+  const [resumeImportId, setResumeImportId] = useState<string | undefined>(undefined)
 
   const { data: installation, isLoading: isLoadingInstallation } = useGitHubInstallation()
   const { data: accessibleRepos, isLoading: isLoadingRepos }     = useGitHubAccessibleRepos(Boolean(installation))
@@ -147,10 +149,18 @@ function DatabaseSettingsPage() {
                 >
                   ← Back to resumes
                 </button>
-                <ImportCareerStep
-                  onNext={() => setAddingResume(false)}
-                  onSkip={() => setAddingResume(false)}
-                />
+                {resumeImportId ? (
+                  <ReviewStep
+                    importId={resumeImportId}
+                    onFinish={() => { setResumeImportId(undefined); setAddingResume(false) }}
+                  />
+                ) : (
+                  <ImportCareerStep
+                    onNext={() => {}}
+                    onSkip={() => setAddingResume(false)}
+                    onExtracted={setResumeImportId}
+                  />
+                )}
               </div>
             ) : (
               <>

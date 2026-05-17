@@ -37,4 +37,13 @@ describe('ReviewStep', () => {
     await userEvent.click(screen.getByRole('button', { name: /finish/i }))
     expect(navigateMock).toHaveBeenCalledWith({ to: '/overview', replace: true })
   })
+
+  it('calls onFinish instead of navigating when onFinish is provided', async () => {
+    const onFinish = vi.fn()
+    const { default: userEvent } = await import('@testing-library/user-event')
+    renderWithClient(<ReviewStep importId={undefined} onFinish={onFinish} />)
+    await userEvent.click(screen.getByRole('button', { name: /finish/i }))
+    expect(onFinish).toHaveBeenCalledTimes(1)
+    expect(navigateMock).not.toHaveBeenCalled()
+  })
 })

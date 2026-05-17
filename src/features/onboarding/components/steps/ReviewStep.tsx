@@ -28,14 +28,16 @@ type SubPhase = 'review' | 'enhance' | 'saved'
 
 interface ReviewStepProps {
   readonly importId?: string
+  /** Overrides the default "navigate to /overview" finish action. */
+  readonly onFinish?: () => void
 }
 
-export function ReviewStep({ importId }: ReviewStepProps) {
+export function ReviewStep({ importId, onFinish }: ReviewStepProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [sub, setSub] = useState<SubPhase>('review')
 
-  const finish = () => void navigate({ to: '/overview', replace: true })
+  const finish = onFinish ?? (() => void navigate({ to: '/overview', replace: true }))
 
   // Progress is read once to learn whether the gap report is ready.
   const { data: progress } = useQuery({
