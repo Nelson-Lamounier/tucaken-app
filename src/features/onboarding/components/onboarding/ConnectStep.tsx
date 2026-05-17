@@ -104,7 +104,10 @@ export function ConnectStep({
             )}
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-zinc-100">
+                <span className={[
+                  'text-sm font-semibold',
+                  connected ? 'text-teal-50' : 'text-zinc-100',
+                ].join(' ')}>
                   {connected ? installation?.accountLogin : 'GitHub'}
                 </span>
                 {connected ? (
@@ -117,7 +120,10 @@ export function ConnectStep({
                   </span>
                 )}
               </div>
-              <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+              <p className={[
+                'mt-1 text-xs leading-relaxed',
+                connected ? 'text-teal-100/90' : 'text-zinc-400',
+              ].join(' ')}>
                 {connected
                   ? `${installation?.repositoryCount ?? 0} repositories accessible via GitHub App`
                   : 'Index repos so resumes cite real commits and PRs. Tucaken installs as a GitHub App with read-only scopes.'}
@@ -146,9 +152,9 @@ export function ConnectStep({
               exit={{ opacity: 0, height: 0 }}
               className="overflow-hidden"
             >
-              <div className="mt-4 border-t border-white/5 pt-4 text-xs text-zinc-500">
+              <div className="mt-4 border-t border-teal-400/15 pt-4 text-xs text-teal-100/80">
                 Repositories visible in{' '}
-                <span className="text-zinc-400">Settings → GitHub</span>.
+                <span className="font-medium text-teal-50">Settings → GitHub</span>.
                 Tucaken will index them in the background.
               </div>
             </motion.div>
