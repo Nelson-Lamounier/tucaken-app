@@ -32,6 +32,8 @@ import { EnhanceRoleCard } from './EnhanceRoleCard'
 import { GapAnalysisReport } from './GapAnalysisReport'
 import { StepHeader } from '@/features/onboarding/components/onboarding/StepHeader'
 import { COPY } from '@/features/onboarding/components/onboarding/content'
+import { FillText } from '@/components/ui/FillText'
+import { Typewriter } from '@/components/ui/Typewriter'
 
 type Phase =
   | 'idle'
@@ -60,6 +62,10 @@ const PHASE_PROGRESS: Record<ImportPhase, number> = {
   uploading: 55, parsing: 65, extracting: 80, analyzing: 90,
   review: 100, enriching: 95, done: 100, error: 0,
 }
+
+// Progress-ring geometry: r=44 in a 96×96 viewBox.
+const RING_RADIUS = 44
+const RING_CIRC = 2 * Math.PI * RING_RADIUS
 
 interface ImportCareerStepProps {
   readonly onNext: () => void
@@ -332,24 +338,85 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
     else progressPct = progress?.phase ? PHASE_PROGRESS[progress.phase] : 55
 
     return (
-      <div className="space-y-6">
-        <div>
-          <h3 className="text-base font-semibold text-zinc-100">Import your career history</h3>
-          <p className="mt-1 text-sm text-zinc-500">{label}</p>
-        </div>
-        <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-4">
-          <FileText className="h-5 w-5 shrink-0 text-zinc-400" />
-          <div className="flex-1 min-w-0">
-            <p className="truncate text-sm font-medium text-zinc-200">{file?.name}</p>
-            <div className="mt-2 h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-indigo-500 transition-all duration-700"
-                style={{ width: `${progressPct}%` }}
+      <div className="space-y-8">
+        <Typewriter
+          // Static key: types once when the processing screen mounts,
+          // matching the Step 1–5 StepHeader typewriter treatment.
+          key="import-title"
+          as="h3"
+          text="Import your career history"
+          className="text-3xl font-bold leading-[1.1] text-zinc-50 md:text-4xl"
+          speed={45}
+          cursor={false}
+        />
+
+        {/* Processing status — the leading element of this screen */}
+        <FillText
+          as="p"
+          text={label}
+          className="text-lg font-semibold leading-snug md:text-xl"
+          baseClassName="text-zinc-700"
+          fillClassName="text-indigo-300"
+          duration={1.6}
+        />
+
+        {/* Document card — narrower + taller, vertical layout. The circular
+            gradient ring assembles as the processing stages advance. */}
+        <div className="mx-auto flex w-full max-w-[16rem] flex-col items-center gap-6 px-6 py-12">
+          <div className="relative h-28 w-28">
+            {/* Rotating conic-gradient glow — conveys live processing. */}
+            <motion.div
+              aria-hidden
+              className="absolute inset-0 rounded-full opacity-70 blur-[2px]"
+              style={{
+                willChange: 'transform',
+                background:
+                  'conic-gradient(from 0deg, transparent 0deg, rgba(20,184,166,0.55) 110deg, rgba(16,185,129,0.55) 230deg, transparent 360deg)',
+              }}
+              animate={{ rotate: 360 }}
+              transition={{ duration: 6, ease: 'linear', repeat: Infinity }}
+            />
+
+            {/* Stage-driven progress ring. */}
+            <svg viewBox="0 0 96 96" className="absolute inset-0 h-full w-full -rotate-90">
+              <defs>
+                <linearGradient id="proc-ring" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#2dd4bf" />
+                  <stop offset="100%" stopColor="#10b981" />
+                </linearGradient>
+              </defs>
+              <circle
+                cx="48"
+                cy="48"
+                r={RING_RADIUS}
+                fill="none"
+                stroke="rgba(255,255,255,0.08)"
+                strokeWidth="4"
               />
+              <motion.circle
+                cx="48"
+                cy="48"
+                r={RING_RADIUS}
+                fill="none"
+                stroke="url(#proc-ring)"
+                strokeWidth="4"
+                strokeLinecap="round"
+                strokeDasharray={RING_CIRC}
+                initial={false}
+                animate={{ strokeDashoffset: RING_CIRC * (1 - progressPct / 100) }}
+                transition={{ type: 'spring', bounce: 0.2, visualDuration: 0.6 }}
+              />
+            </svg>
+
+            {/* Document icon, centred inside the ring. */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <FileText className="h-9 w-9 text-teal-300" />
             </div>
           </div>
-          <Loader2 className="h-4 w-4 shrink-0 text-indigo-400 animate-spin" />
+
+          <p className="w-full truncate text-center text-sm font-medium text-zinc-200">{file?.name}</p>
         </div>
+
         <p className="text-xs text-zinc-600 text-center">
           {phase === 'processing'
             ? 'AI extraction takes 20–40 seconds. You can leave this page — we\'ll notify you when it\'s ready.'
