@@ -17,11 +17,12 @@ const FLOW_TRANSITION = {
   duration: 6,
   ease: 'linear' as const,
 }
-import { Github, Cloud, Figma, Check, Lock, Loader2 } from 'lucide-react'
+import { Github, Cloud, Figma, Lock } from 'lucide-react'
 import { COPY } from './content'
 import { StepHeader } from './StepHeader'
 import { StepFooter } from './StepFooter'
 import { GitHubOAuthModal } from './GitHubOAuthModal'
+import { GitHubConnectionCard } from './GitHubConnectionCard'
 import type { GitHubInstallation } from '@/lib/types/github.types'
 
 interface Props {
@@ -42,7 +43,6 @@ export function ConnectStep({
   const [oauthOpen, setOauthOpen] = useState(false)
   // Body reveals only after the StepHeader typewriter finishes.
   const [introDone, setIntroDone] = useState(false)
-  const reduce = useReducedMotion()
 
   const connected = !!installation
 
@@ -71,102 +71,29 @@ export function ConnectStep({
             style={{ willChange: 'transform, opacity' }}
             className="mt-6"
           >
-      {/* Featured GitHub card — animated gradient border */}
-      <motion.div
-        className={[
-          'rounded-xl bg-linear-to-r p-px',
-          FLOW_CLASS,
-          connected
-            ? 'from-teal-400/80 via-emerald-400/50 to-cyan-400/80'
-            : 'from-teal-400/50 via-emerald-400/25 to-cyan-400/50',
-        ].join(' ')}
-        animate={reduce ? undefined : flowAnim}
-        transition={reduce ? undefined : FLOW_TRANSITION}
-      >
-      <motion.div
-        className={[
-          'rounded-[11px] p-5',
-          connected
-            ? `bg-linear-to-br from-teal-950 via-zinc-950 to-black ${FLOW_CLASS}`
-            : 'bg-zinc-950',
-        ].join(' ')}
-        style={connected ? { willChange: 'background-position' } : undefined}
-        animate={connected && !reduce ? flowAnim : undefined}
-        transition={connected && !reduce ? FLOW_TRANSITION : undefined}
-      >
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-start gap-3">
-            {connected && installation?.accountAvatarUrl ? (
-              <img
-                src={installation.accountAvatarUrl}
-                alt={installation.accountLogin}
-                className="size-12 shrink-0 rounded-lg border border-white/10 object-cover"
-              />
-            ) : (
-              <div className="grid size-12 shrink-0 place-items-center rounded-lg bg-zinc-900 ring-1 ring-white/10">
-                <Github className="size-6 text-zinc-100" />
-              </div>
-            )}
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className={[
-                  'text-sm font-semibold',
-                  connected ? 'text-teal-50' : 'text-zinc-100',
-                ].join(' ')}>
-                  {connected ? installation?.accountLogin : 'GitHub'}
-                </span>
-                {connected ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-teal-500/15 px-2 py-0.5 text-[10px] font-medium text-teal-200 ring-1 ring-teal-400/30">
-                    <Check className="size-3" strokeWidth={3} /> Connected
-                  </span>
-                ) : (
-                  <span className="rounded-full border border-white/10 bg-white/2 px-2 py-0.5 text-[10px] font-medium text-zinc-400">
-                    Required
-                  </span>
-                )}
-              </div>
-              <p className={[
-                'mt-1 text-xs leading-relaxed',
-                connected ? 'text-teal-100/90' : 'text-zinc-400',
-              ].join(' ')}>
-                {connected
-                  ? `${installation?.repositoryCount ?? 0} repositories accessible via GitHub App`
-                  : 'Index repos so resumes cite real commits and PRs. Tucaken installs as a GitHub App with read-only scopes.'}
-              </p>
-            </div>
+      {/* Featured GitHub card — shared with Step 5 for consistency */}
+      <GitHubConnectionCard
+        connected={connected}
+        installation={installation}
+        isLoading={isLoadingInstallation}
+        action={
+          <button
+            type="button"
+            onClick={() => setOauthOpen(true)}
+            className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-zinc-100 px-3.5 py-1.5 text-xs font-semibold text-zinc-900 transition hover:bg-white"
+          >
+            <Github className="size-3.5" />
+            Connect GitHub
+          </button>
+        }
+        footer={
+          <div className="mt-4 border-t border-teal-400/15 pt-4 text-xs text-teal-100/80">
+            Repositories visible in{' '}
+            <span className="font-medium text-teal-50">Settings → GitHub</span>.
+            Tucaken will index them in the background.
           </div>
-
-          {isLoadingInstallation && <Loader2 className="size-4 animate-spin text-zinc-500" />}
-          {!isLoadingInstallation && !connected && (
-            <button
-              type="button"
-              onClick={() => setOauthOpen(true)}
-              className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-zinc-100 px-3.5 py-1.5 text-xs font-semibold text-zinc-900 transition hover:bg-white"
-            >
-              <Github className="size-3.5" />
-              Connect GitHub
-            </button>
-          )}
-        </div>
-
-        <AnimatePresence>
-          {connected && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden"
-            >
-              <div className="mt-4 border-t border-teal-400/15 pt-4 text-xs text-teal-100/80">
-                Repositories visible in{' '}
-                <span className="font-medium text-teal-50">Settings → GitHub</span>.
-                Tucaken will index them in the background.
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-      </motion.div>
+        }
+      />
 
       {/* Coming-soon row */}
       <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">

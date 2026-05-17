@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { GitHubAccountSection } from '@/features/github/components/GitHubAccountSection'
+import { GitHubConnectionCard } from '@/features/onboarding/components/onboarding/GitHubConnectionCard'
 import { GitHubRepoPicker } from '@/features/github/components/GitHubRepoPicker'
 import { GitHubConnectedRepos } from '@/features/github/components/GitHubConnectedRepos'
 import { StepHeader } from '@/features/onboarding/components/onboarding/StepHeader'
@@ -64,7 +64,11 @@ export function ConnectReposStep({
             style={{ willChange: 'transform, opacity' }}
             className="space-y-4"
           >
-            <GitHubAccountSection installation={installation} isLoading={isLoadingInstallation} />
+            <GitHubConnectionCard
+              connected={!!installation}
+              installation={installation}
+              isLoading={isLoadingInstallation}
+            />
             {installation && (
               <GitHubRepoPicker
                 accessibleRepos={accessibleRepos}
