@@ -26,15 +26,32 @@ describe('mockApiResponse — GitHub stateful flow', () => {
     const repos = mockApiResponse('/github/repos', 'GET') as { repos: unknown[] }
     expect(repos.repos.length).toBeGreaterThan(0)
 
-    const connected = mockApiResponse('/github/connected-repos', 'GET') as {
-      repos: Array<{ syncStatus: string }>
-    }
-    expect(connected.repos.length).toBeGreaterThan(0)
-    // ProcessingStep advances only when every connected repo is terminal.
-    expect(connected.repos.every((r) => ['complete', 'error'].includes(r.syncStatus))).toBe(true)
+    // Connected repos start empty — nothing connected until the user adds.
+    expect(mockApiResponse('/github/connected-repos', 'GET')).toEqual({ repos: [] })
 
-    // Connect/remove mutations resolve without throwing.
-    expect(mockApiResponse('/github/connected-repos', 'POST')).toMatchObject({ status: expect.any(String) })
-    expect(mockApiResponse('/github/connected-repos/:repoFullName', 'DELETE')).toEqual({ success: true })
+    // "Add" POSTs the repo (body carries repoFullName) — it appears as syncing.
+    expect(
+      mockApiResponse(
+        '/github/connected-repos',
+        'POST',
+        JSON.stringify({ repoFullName: 'dev-user/portfolio-api', defaultBranch: 'main' }),
+      ),
+    ).toMatchObject({ status: expect.any(String), repoFullName: 'dev-user/portfolio-api' })
+
+    const afterAdd = mockApiResponse('/github/connected-repos', 'GET') as {
+      repos: Array<{ repoFullName: string; syncStatus: string }>
+    }
+    expect(afterAdd.repos).toHaveLength(1)
+    expect(afterAdd.repos[0]!.repoFullName).toBe('dev-user/portfolio-api')
+    expect(afterAdd.repos[0]!.syncStatus).toBe('syncing')
+
+    // DELETE removes it by url-encoded repoFullName.
+    expect(
+      mockApiResponse(
+        `/github/connected-repos/${encodeURIComponent('dev-user/portfolio-api')}`,
+        'DELETE',
+      ),
+    ).toEqual({ success: true })
+    expect(mockApiResponse('/github/connected-repos', 'GET')).toEqual({ repos: [] })
   })
 })

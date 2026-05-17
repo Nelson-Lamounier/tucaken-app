@@ -199,12 +199,25 @@ const mockAccessibleRepos = [
   { id: 3, fullName: 'dev-user/infra',         owner: 'dev-user', name: 'infra',         defaultBranch: 'main', private: true,  updatedAt: '2026-04-20T12:00:00.000Z' },
 ]
 
-// syncStatus 'complete' so ProcessingStep (which advances only when every
-// connected repo is terminal) flows straight through to the review step.
-const mockConnectedRepos = [
-  { repoFullName: 'dev-user/portfolio-api', owner: 'dev-user', name: 'portfolio-api', defaultBranch: 'main', syncStatus: 'complete', lastSyncedAt: '2026-05-16T09:00:00.000Z', addedAt: '2026-05-16T08:00:00.000Z', qualityScore: 82, classification: 'project' },
-  { repoFullName: 'dev-user/tucaken-app',   owner: 'dev-user', name: 'tucaken-app',   defaultBranch: 'main', syncStatus: 'complete', lastSyncedAt: '2026-05-16T09:05:00.000Z', addedAt: '2026-05-16T08:00:00.000Z', qualityScore: 91, classification: 'project' },
-]
+// Connected repos are stateful so the Step 5 picker replicates the real
+// workflow: clicking "Add" POSTs the repo, it appears as `syncing`, then
+// flips to `complete` after SYNC_MS — driving the connected-repos poll and
+// letting ProcessingStep advance once every repo is terminal. Starts empty
+// (nothing connected until the user adds).
+const SYNC_MS = 6_000
+type MockConnected = {
+  repoFullName: string
+  owner:        string
+  name:         string
+  defaultBranch: string
+  addedAt:      number // epoch ms when "Add" was clicked
+}
+let mockConnectedRepos: MockConnected[] = []
+
+function parseBody(body: unknown): Record<string, unknown> {
+  if (typeof body !== 'string') return {}
+  try { return JSON.parse(body) as Record<string, unknown> } catch { return {} }
+}
 
 // ─── Dispatcher ──────────────────────────────────────────────────────────────
 
@@ -213,7 +226,7 @@ const mockConnectedRepos = [
  * unmapped (caller treats null as "no mock, fall through" — but in MOCK_AUTH
  * mode _api-client never falls through; unmapped paths get `{}`).
  */
-export function mockApiResponse(path: string, method = 'GET'): unknown {
+export function mockApiResponse(path: string, method = 'GET', body?: unknown): unknown {
   const p = normalise(path)
 
   if (p === '/me') return mockMe
@@ -294,12 +307,44 @@ export function mockApiResponse(path: string, method = 'GET'): unknown {
   }
   if (p === '/github/connected-repos') {
     if (method === 'POST') {
-      return { status: 'queued', repoFullName: 'dev-user/portfolio-api', jobName: 'mock-ingest-job' }
+      const repoFullName = String(parseBody(body)['repoFullName'] ?? '')
+      const defaultBranch = String(parseBody(body)['defaultBranch'] ?? 'main')
+      if (repoFullName && !mockConnectedRepos.some((r) => r.repoFullName === repoFullName)) {
+        const [owner, ...rest] = repoFullName.split('/')
+        mockConnectedRepos.push({
+          repoFullName,
+          owner: owner ?? '',
+          name: rest.join('/') || repoFullName,
+          defaultBranch,
+          addedAt: Date.now(),
+        })
+      }
+      return { status: 'queued', repoFullName, jobName: 'mock-ingest-job' }
     }
-    return { repos: githubInstalled ? mockConnectedRepos : [] }
+    if (!githubInstalled) return { repos: [] }
+    const now = Date.now()
+    return {
+      repos: mockConnectedRepos.map((r) => {
+        const syncing = now - r.addedAt < SYNC_MS
+        return {
+          repoFullName:  r.repoFullName,
+          owner:         r.owner,
+          name:          r.name,
+          defaultBranch: r.defaultBranch,
+          syncStatus:    syncing ? 'syncing' : 'complete',
+          lastSyncedAt:  syncing ? null : new Date(r.addedAt + SYNC_MS).toISOString(),
+          addedAt:       new Date(r.addedAt).toISOString(),
+          qualityScore:  syncing ? null : 85,
+          classification: syncing ? null : 'project',
+        }
+      }),
+    }
   }
-  if (p === '/github/connected-repos/:repoFullName') {
-    return { success: true } // DELETE remove-repo
+  // DELETE /github/connected-repos/<url-encoded repoFullName> — remove it.
+  if (p.startsWith('/github/connected-repos/')) {
+    const target = decodeURIComponent(p.slice('/github/connected-repos/'.length))
+    mockConnectedRepos = mockConnectedRepos.filter((r) => r.repoFullName !== target)
+    return { success: true }
   }
   // Any other github path (e.g. timed-out marker) — inert.
   if (p.includes('github')) return null
