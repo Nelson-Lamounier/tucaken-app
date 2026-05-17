@@ -36,7 +36,7 @@ describe('mockApiResponse — GitHub stateful flow', () => {
         'POST',
         JSON.stringify({ repoFullName: 'dev-user/portfolio-api', defaultBranch: 'main', deferSync: true }),
       ),
-    ).toMatchObject({ status: expect.any(String), repoFullName: 'dev-user/portfolio-api' })
+    ).toEqual({ status: 'queued', repoFullName: 'dev-user/portfolio-api', jobName: null })
 
     const queued = mockApiResponse('/github/connected-repos', 'GET') as {
       repos: Array<{ repoFullName: string; syncStatus: string }>

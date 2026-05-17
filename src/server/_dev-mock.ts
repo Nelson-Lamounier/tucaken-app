@@ -210,6 +210,7 @@ type MockConnected = {
   owner:        string
   name:         string
   defaultBranch: string
+  addedAt:       number        // epoch ms recorded at POST time; never drifts
   syncStartedAt: number | null // null = queued (pending); ms = sync started
 }
 let mockConnectedRepos: MockConnected[] = []
@@ -326,6 +327,7 @@ export function mockApiResponse(path: string, method = 'GET', body?: unknown): u
           owner: owner ?? '',
           name: rest.join('/') || repoFullName,
           defaultBranch,
+          addedAt: Date.now(),
           // deferSync (onboarding queue) → pending; otherwise (Settings
           // immediate add) → sync starts now.
           syncStartedAt: deferSync ? null : Date.now(),
@@ -350,7 +352,7 @@ export function mockApiResponse(path: string, method = 'GET', body?: unknown): u
           defaultBranch: r.defaultBranch,
           syncStatus,
           lastSyncedAt:  complete && started !== null ? new Date(started + SYNC_MS).toISOString() : null,
-          addedAt:       new Date(started ?? now).toISOString(),
+          addedAt:       new Date(r.addedAt).toISOString(),
           qualityScore:  complete ? 85 : null,
           classification: complete ? 'project' : null,
         }
