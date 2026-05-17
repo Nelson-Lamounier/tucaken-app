@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { GitHubRepoChip } from './GitHubRepoChip'
 import { UpgradeLimitBanner } from './UpgradeLimitBanner'
 import { useGitHubIngestion } from '../hooks/use-github-ingestion'
+import { useGitHubQueueRepo } from '../hooks/use-github-queue-repo'
 import type { GitHubAccessibleRepo, ConnectedRepo } from '@/lib/types/github.types'
 
 const PAGE_SIZE = 10
@@ -13,13 +14,17 @@ interface GitHubRepoPickerProps {
   readonly isLoading: boolean
   readonly connectedRepos: ConnectedRepo[] | undefined
   readonly maxRepos?: number
+  /** 'sync' = immediate ingestion (Settings, default). 'queue' = deferSync queue (onboarding). */
+  readonly mode?: 'sync' | 'queue'
 }
 
-export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos, maxRepos }: GitHubRepoPickerProps) {
+export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos, maxRepos, mode = 'sync' }: GitHubRepoPickerProps) {
   const [search, setSearch] = useState('')
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const [queuingRepos, setQueuingRepos] = useState<Set<string>>(new Set())
-  const ingestion = useGitHubIngestion()
+  const syncIngestion = useGitHubIngestion()
+  const queueIngestion = useGitHubQueueRepo()
+  const ingestion = mode === 'queue' ? queueIngestion : syncIngestion
 
   const connectedCount = connectedRepos?.length ?? 0
   const atCap = maxRepos !== undefined && connectedCount >= maxRepos
