@@ -5,7 +5,9 @@ import { getGitHubConnectedReposFn, markReposTimedOutFn } from '@/server/github'
 import type { ConnectedRepo } from '@/lib/types/github.types'
 
 const POLL_INTERVAL = 5_000
-const POLL_TIMEOUT_MS = 10 * 60 * 1_000
+// Production repo ingestion can take up to ~15 min; poll until then before
+// marking stuck repos errored.
+const POLL_TIMEOUT_MS = 15 * 60 * 1_000
 const ACTIVE_SYNC_STATUSES = new Set(['pending', 'syncing'])
 
 export function useGitHubConnectedRepos() {
