@@ -734,6 +734,158 @@ git commit -m "refactor(onboarding): shrink ImportCareerStep to upload+processin
 
 ---
 
+### Task 3.5: Preserve Settings resume-import review (second consumer)
+
+**Added during execution:** `ImportCareerStep` has a second consumer,
+`src/app/_dashboard.settings.github.tsx:150`, used as an "add resume"
+panel (`onNext`/`onSkip` just call `setAddingResume(false)`). Task 3 made
+`onExtracted` required and moved review/enhance out of `ImportCareerStep`,
+which would leave that panel as upload-only. User decision: Settings keeps
+full review/enhance parity via its own `ReviewStep`. This requires a
+configurable finish action on `ReviewStep` (Settings must return to the
+resumes list, not navigate to `/overview`).
+
+**Files:**
+- Modify: `src/features/onboarding/components/steps/ReviewStep.tsx`
+- Modify: `src/__tests__/features/onboarding/ReviewStep.test.tsx`
+- Modify: `src/app/_dashboard.settings.github.tsx`
+
+- [ ] **Step 1: Add a failing test for the `onFinish` override**
+
+In `src/__tests__/features/onboarding/ReviewStep.test.tsx`, append inside
+the `describe`:
+
+```tsx
+  it('calls onFinish instead of navigating when onFinish is provided', async () => {
+    const onFinish = vi.fn()
+    const { default: userEvent } = await import('@testing-library/user-event')
+    renderWithClient(<ReviewStep importId={undefined} onFinish={onFinish} />)
+    await userEvent.click(screen.getByRole('button', { name: /finish/i }))
+    expect(onFinish).toHaveBeenCalledTimes(1)
+    expect(navigateMock).not.toHaveBeenCalled()
+  })
+```
+
+- [ ] **Step 2: Run it, expect FAIL**
+
+Run: `yarn vitest run src/__tests__/features/onboarding/ReviewStep.test.tsx`
+Expected: FAIL — `onFinish` is not a prop; navigate still called.
+
+- [ ] **Step 3: Add the `onFinish` prop to `ReviewStep`**
+
+In `src/features/onboarding/components/steps/ReviewStep.tsx`, change the
+props interface:
+
+```tsx
+interface ReviewStepProps {
+  readonly importId?: string
+  /** Overrides the default "navigate to /overview" finish action. */
+  readonly onFinish?: () => void
+}
+```
+
+Change the component signature + `finish` definition:
+
+```tsx
+export function ReviewStep({ importId, onFinish }: ReviewStepProps) {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const [sub, setSub] = useState<SubPhase>('review')
+
+  const finish = onFinish ?? (() => void navigate({ to: '/overview', replace: true }))
+```
+
+(Everything else in `ReviewStep` is unchanged — all `onClick={finish}` /
+`onClick={() => ...finish}` sites keep working.)
+
+- [ ] **Step 4: Run the test to verify it passes**
+
+Run: `yarn vitest run src/__tests__/features/onboarding/ReviewStep.test.tsx`
+Expected: PASS (all `ReviewStep` tests, including the new one).
+
+- [ ] **Step 5: Wire Settings to capture importId + render ReviewStep**
+
+In `src/app/_dashboard.settings.github.tsx`:
+
+Add the `ReviewStep` import next to the existing `ImportCareerStep` import
+(line 7 area):
+
+```tsx
+import { ReviewStep } from '@/features/onboarding/components/steps/ReviewStep'
+```
+
+Find the component function that owns the `addingResume` state (it already
+calls `setAddingResume`). Add local import-id state next to it:
+
+```tsx
+  const [resumeImportId, setResumeImportId] = useState<string | undefined>(undefined)
+```
+
+Replace the existing block (around lines 150–153):
+
+```tsx
+                <ImportCareerStep
+                  onNext={() => setAddingResume(false)}
+                  onSkip={() => setAddingResume(false)}
+                />
+```
+
+with:
+
+```tsx
+                {resumeImportId ? (
+                  <ReviewStep
+                    importId={resumeImportId}
+                    onFinish={() => { setResumeImportId(undefined); setAddingResume(false) }}
+                  />
+                ) : (
+                  <ImportCareerStep
+                    onNext={() => setAddingResume(false)}
+                    onSkip={() => setAddingResume(false)}
+                    onExtracted={setResumeImportId}
+                  />
+                )}
+```
+
+Note: `ImportCareerStep`'s `complete` phase calls `onExtracted(id)` then
+`onNext()` after ~900ms. Here `onExtracted` sets `resumeImportId`, which
+swaps the panel to `<ReviewStep>`; the subsequent `onNext()`
+(`setAddingResume(false)`) is rendered moot because `ReviewStep` has
+already replaced the subtree and `addingResume` only gates the outer panel
+— verify in manual testing (Task 6) that the Settings panel shows
+ReviewStep after extraction and its Finish returns to the resumes list.
+If the `onNext` close fires destructively, change Settings `onNext` to a
+no-op `() => {}` (the panel is closed by `ReviewStep`'s `onFinish`
+instead).
+
+- [ ] **Step 6: Verify gates**
+
+Run: `yarn typecheck`
+Expected: errors ONLY in `OnboardingShell.tsx` (still missing
+`onExtracted`, fixed in Task 5). No `_dashboard.settings.github.tsx`
+errors, no `ReviewStep` errors.
+
+Run: `yarn test`
+Expected: PASS (full suite, including new `ReviewStep` test).
+
+Run: `yarn lint`
+Expected: 0 errors (pre-existing warnings acceptable).
+
+- [ ] **Step 7: Commit**
+
+Tests + lint green; typecheck has only the expected single OnboardingShell
+error (resolved Task 5). Then:
+
+```bash
+git add src/features/onboarding/components/steps/ReviewStep.tsx src/__tests__/features/onboarding/ReviewStep.test.tsx src/app/_dashboard.settings.github.tsx
+git commit -m "feat(settings): keep resume-import review via ReviewStep onFinish"
+```
+
+No Co-Authored-By / AI trailer. Conventional Commits. Stage only the 3
+listed files.
+
+---
+
 ### Task 4: `ProcessingStep` advances via `onNext` instead of redirecting
 
 **Files:**
