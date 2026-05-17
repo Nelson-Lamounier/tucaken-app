@@ -73,7 +73,7 @@ export function OnboardingShell({
     onConnectGithub?.()
   }
 
-  // processing step has no visible progress slot — clamp to last visible step
+  // processing & review steps have no visible progress slot — clamp to last visible step
   const visibleIndex = Math.min(s.stepIndex, VISIBLE_STEPS.length - 1)
   const isProcessing = s.stepId === 'processing'
   const isTerminal = isProcessing || s.stepId === 'review'
