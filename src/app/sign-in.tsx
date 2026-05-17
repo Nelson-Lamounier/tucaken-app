@@ -51,6 +51,8 @@ function AuthPage() {
       }}
       onSignUp={async (v) => {
         await signUpFn({ data: { email: v.email, password: v.password, name: v.name } })
+        // Dev mock: no real email is sent, so skip the verify-code screen.
+        if (import.meta.env.VITE_MOCK_AUTH === 'true') navigateAfterAuth(true)
       }}
       onConfirmSignUp={async (email, code, password) => {
         const result = await confirmSignUpFn({ data: { email, code, password } })

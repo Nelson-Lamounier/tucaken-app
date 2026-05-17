@@ -24,6 +24,7 @@ import {
   adminApiRequestsTotal,
   adminApiRequestDurationSeconds,
 } from '../lib/observability/metrics.js';
+import { MOCK_AUTH, mockApiResponse } from './_dev-mock';
 
 const ADMIN_API_URL =
   process.env['ADMIN_API_URL'] ?? 'http://admin-api.admin-api:3002';
@@ -56,6 +57,12 @@ export interface ApiFetchOptions extends Omit<RequestInit, 'headers'> {
 export async function apiFetch<T>(path: string, opts: ApiFetchOptions = {}): Promise<T> {
   const { pathTemplate = path, headers: extraHeaders, apiPrefix = '/api/admin', ...init } = opts;
   const method = (init.method ?? 'GET').toUpperCase();
+
+  // Dev-only: short-circuit to fixtures so /onboarding works without admin-api.
+  if (MOCK_AUTH) {
+    return mockApiResponse(path) as T;
+  }
+
   const token  = getSessionToken();
 
   // Reuse upstream request id if Faro/CDN forwarded one; otherwise mint a fresh one.

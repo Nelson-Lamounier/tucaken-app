@@ -15,6 +15,10 @@ default:
 dev:
     yarn dev
 
+# Dev server with fake auth + mocked admin-api (no Cognito/RDS) — for /onboarding UI work
+dev-mock:
+    MOCK_AUTH=true VITE_MOCK_AUTH=true yarn dev
+
 # Type-check without emitting
 typecheck:
     yarn typecheck

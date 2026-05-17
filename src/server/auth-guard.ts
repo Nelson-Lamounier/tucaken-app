@@ -10,6 +10,7 @@
 import { getCookie } from '@tanstack/react-start/server'
 import { verifyCognitoJwt } from '@/lib/auth/tanstack-auth'
 import type { AuthUser } from './session'
+import { MOCK_AUTH, MOCK_USER } from './_dev-mock'
 
 // =============================================================================
 // Error Types
@@ -42,6 +43,8 @@ export class AuthenticationError extends Error {
  * @throws {AuthenticationError} If the cookie is missing or the JWT is invalid
  */
 export async function requireAuth(): Promise<AuthUser> {
+  if (MOCK_AUTH) return MOCK_USER
+
   const token = getCookie('__session')
 
   if (!token) {
