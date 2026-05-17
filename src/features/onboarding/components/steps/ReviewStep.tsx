@@ -129,9 +129,11 @@ export function ReviewStep({ importId }: ReviewStepProps) {
     const enhanceExperience = enhancedEntries.filter(
       (e: CareerEntry) => e.entryType === 'experience',
     )
-    const allTerminal = enhanceExperience.every((e: CareerEntry) =>
-      ['complete', 'skipped', 'failed'].includes(e.enrichmentStatus),
-    )
+    const allTerminal =
+      enhanceExperience.length > 0 &&
+      enhanceExperience.every((e: CareerEntry) =>
+        ['complete', 'skipped', 'failed'].includes(e.enrichmentStatus),
+      )
 
     return (
       <div className="space-y-6">

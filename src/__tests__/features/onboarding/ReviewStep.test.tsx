@@ -2,7 +2,7 @@
  * @vitest-environment happy-dom
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
@@ -21,6 +21,10 @@ function renderWithClient(ui: React.ReactElement) {
 }
 
 describe('ReviewStep', () => {
+  beforeEach(() => {
+    navigateMock.mockReset()
+  })
+
   it('renders the all-set finish screen when no importId is present', () => {
     renderWithClient(<ReviewStep importId={undefined} />)
     expect(screen.getByText(/you're all set/i)).toBeTruthy()
