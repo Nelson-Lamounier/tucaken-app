@@ -70,6 +70,8 @@ export function ImportCareerStep({ onNext, onSkip, onExtracted }: ImportCareerSt
   const [retrying, setRetrying] = useState(false)
   // Idle upload UI reveals only after the StepHeader typewriter finishes.
   const [introDone, setIntroDone] = useState(false)
+  // Processing status + document reveal only after the heading types out.
+  const [procReady, setProcReady] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const accept = '.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -284,84 +286,98 @@ export function ImportCareerStep({ onNext, onSkip, onExtracted }: ImportCareerSt
           // matching the Step 1–5 StepHeader typewriter treatment.
           key="import-title"
           as="h3"
-          text="Import your career history"
+          text="Importing your career history"
           className="text-3xl font-bold leading-[1.1] text-zinc-50 md:text-4xl"
           speed={45}
-          cursor={false}
+          onComplete={() => setProcReady(true)}
         />
 
-        {/* Processing status — the leading element of this screen */}
-        <FillText
-          as="p"
-          text={label}
-          className="text-lg font-semibold leading-snug md:text-xl"
-          baseClassName="text-zinc-700"
-          fillClassName="text-indigo-300"
-          duration={1.6}
-        />
-
-        {/* Document card — narrower + taller, vertical layout. The circular
-            gradient ring assembles as the processing stages advance. */}
-        <div className="mx-auto flex w-full max-w-[16rem] flex-col items-center gap-6 px-6 py-12">
-          <div className="relative h-28 w-28">
-            {/* Rotating conic-gradient glow — conveys live processing. */}
+        {/* Status + document reveal only after the heading finishes typing. */}
+        <AnimatePresence>
+          {procReady && (
             <motion.div
-              aria-hidden
-              className="absolute inset-0 rounded-full opacity-70 blur-[2px]"
-              style={{
-                willChange: 'transform',
-                background:
-                  'conic-gradient(from 0deg, transparent 0deg, rgba(20,184,166,0.55) 110deg, rgba(16,185,129,0.55) 230deg, transparent 360deg)',
-              }}
-              animate={{ rotate: 360 }}
-              transition={{ duration: 6, ease: 'linear', repeat: Infinity }}
-            />
-
-            {/* Stage-driven progress ring. */}
-            <svg viewBox="0 0 96 96" className="absolute inset-0 h-full w-full -rotate-90">
-              <defs>
-                <linearGradient id="proc-ring" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#2dd4bf" />
-                  <stop offset="100%" stopColor="#10b981" />
-                </linearGradient>
-              </defs>
-              <circle
-                cx="48"
-                cy="48"
-                r={RING_RADIUS}
-                fill="none"
-                stroke="rgba(255,255,255,0.08)"
-                strokeWidth="4"
+              key="proc-body"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+              style={{ willChange: 'transform, opacity' }}
+              className="space-y-8"
+            >
+              {/* Processing status — the leading element of this screen */}
+              <FillText
+                as="p"
+                text={label}
+                className="text-lg font-semibold leading-snug md:text-xl"
+                baseClassName="text-zinc-700"
+                fillClassName="text-indigo-300"
+                duration={1.6}
               />
-              <motion.circle
-                cx="48"
-                cy="48"
-                r={RING_RADIUS}
-                fill="none"
-                stroke="url(#proc-ring)"
-                strokeWidth="4"
-                strokeLinecap="round"
-                strokeDasharray={RING_CIRC}
-                initial={false}
-                animate={{ strokeDashoffset: RING_CIRC * (1 - progressPct / 100) }}
-                transition={{ type: 'spring', bounce: 0.2, visualDuration: 0.6 }}
-              />
-            </svg>
 
-            {/* Document icon, centred inside the ring. */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <FileText className="h-9 w-9 text-teal-300" />
-            </div>
-          </div>
+              {/* Document card — narrower + taller, vertical layout. The
+                  circular gradient ring assembles as stages advance. */}
+              <div className="mx-auto flex w-full max-w-[16rem] flex-col items-center gap-6 px-6 py-12">
+                <div className="relative h-28 w-28">
+                  {/* Rotating conic-gradient glow — conveys live processing. */}
+                  <motion.div
+                    aria-hidden
+                    className="absolute inset-0 rounded-full opacity-70 blur-[2px]"
+                    style={{
+                      willChange: 'transform',
+                      background:
+                        'conic-gradient(from 0deg, transparent 0deg, rgba(20,184,166,0.55) 110deg, rgba(16,185,129,0.55) 230deg, transparent 360deg)',
+                    }}
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 6, ease: 'linear', repeat: Infinity }}
+                  />
 
-          <p className="w-full truncate text-center text-sm font-medium text-zinc-200">{file?.name}</p>
-        </div>
+                  {/* Stage-driven progress ring. */}
+                  <svg viewBox="0 0 96 96" className="absolute inset-0 h-full w-full -rotate-90">
+                    <defs>
+                      <linearGradient id="proc-ring" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#2dd4bf" />
+                        <stop offset="100%" stopColor="#10b981" />
+                      </linearGradient>
+                    </defs>
+                    <circle
+                      cx="48"
+                      cy="48"
+                      r={RING_RADIUS}
+                      fill="none"
+                      stroke="rgba(255,255,255,0.08)"
+                      strokeWidth="4"
+                    />
+                    <motion.circle
+                      cx="48"
+                      cy="48"
+                      r={RING_RADIUS}
+                      fill="none"
+                      stroke="url(#proc-ring)"
+                      strokeWidth="4"
+                      strokeLinecap="round"
+                      strokeDasharray={RING_CIRC}
+                      initial={false}
+                      animate={{ strokeDashoffset: RING_CIRC * (1 - progressPct / 100) }}
+                      transition={{ type: 'spring', bounce: 0.2, visualDuration: 0.6 }}
+                    />
+                  </svg>
 
-        <p className="text-xs text-zinc-600 text-center">
-          {phase === 'processing'
-            ? 'AI extraction takes 20–40 seconds. You can leave this page — we\'ll notify you when it\'s ready.'
-            : 'Do not close this tab during upload.'}
-        </p>
+                  {/* Document icon, centred inside the ring. */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <FileText className="h-9 w-9 text-teal-300" />
+                  </div>
+                </div>
+
+                <p className="w-full truncate text-center text-sm font-medium text-zinc-200">{file?.name}</p>
+              </div>
+
+              <p className="text-xs text-zinc-600 text-center">
+                {phase === 'processing'
+                  ? 'AI extraction takes 20–40 seconds. You can leave this page — we\'ll notify you when it\'s ready.'
+                  : 'Do not close this tab during upload.'}
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     )
   }
