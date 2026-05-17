@@ -69,6 +69,38 @@ export const triggerGitHubIngestionFn = createServerFn({ method: 'POST' })
     )
   })
 
+const queueSchema = z.object({
+  repoFullName:  z.string().min(1),
+  defaultBranch: z.string().optional(),
+})
+
+// Connect a repo WITHOUT dispatching the sync job (onboarding queue).
+// admin-api treats deferSync:true as connect-only (status 'pending').
+export const queueConnectedRepoFn = createServerFn({ method: 'POST' })
+  .inputValidator(queueSchema)
+  .handler(async ({ data }) => {
+    await requireAuth()
+    return apiFetch<{ status: string; repoFullName: string; jobName: string | null }>(
+      '/github/connected-repos',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          repoFullName:  data.repoFullName,
+          defaultBranch: data.defaultBranch,
+          deferSync:     true,
+        }),
+      },
+    )
+  })
+
+// Dispatch ingestion jobs for every 'pending' repo of the caller.
+export const startConnectedReposSyncFn = createServerFn({ method: 'POST' }).handler(async () => {
+  await requireAuth()
+  return apiFetch<{ started: number }>('/github/connected-repos/sync', {
+    method: 'POST',
+  })
+})
+
 const removeRepoSchema = z.object({ repoFullName: z.string().min(1) })
 
 export const removeConnectedRepoFn = createServerFn({ method: 'POST' })

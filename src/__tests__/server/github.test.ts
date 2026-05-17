@@ -35,6 +35,8 @@ import {
   getGitHubConnectedReposFn,
   triggerGitHubIngestionFn,
   removeConnectedRepoFn,
+  queueConnectedRepoFn,
+  startConnectedReposSyncFn,
 } from '../../server/github'
 
 const BASE = 'http://admin-api.admin-api:3002/api/admin'
@@ -175,6 +177,40 @@ describe('github server functions', () => {
           body: JSON.stringify({ repoFullName: 'owner/repo' }),
         }),
       )
+    })
+  })
+
+  describe('queueConnectedRepoFn', () => {
+    it('posts repoFullName with deferSync true (no job dispatched)', async () => {
+      const response = { status: 'queued', repoFullName: 'owner/repo', jobName: null }
+      mockResponse(response)
+
+      const handler = queueConnectedRepoFn as (input: { data: { repoFullName: string; defaultBranch?: string } }) => Promise<unknown>
+      const result = await handler({ data: { repoFullName: 'owner/repo', defaultBranch: 'main' } })
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/github/connected-repos`,
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ repoFullName: 'owner/repo', defaultBranch: 'main', deferSync: true }),
+        }),
+      )
+      expect(result).toEqual(response)
+    })
+  })
+
+  describe('startConnectedReposSyncFn', () => {
+    it('posts to the bulk sync endpoint', async () => {
+      mockResponse({ started: 2 })
+
+      const handler = startConnectedReposSyncFn as () => Promise<unknown>
+      const result = await handler()
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/github/connected-repos/sync`,
+        expect.objectContaining({ method: 'POST' }),
+      )
+      expect(result).toEqual({ started: 2 })
     })
   })
 })
