@@ -210,6 +210,8 @@ describe('github server functions', () => {
         `${BASE}/github/connected-repos/sync`,
         expect.objectContaining({ method: 'POST' }),
       )
+      const syncOpts = fetchMock.mock.calls.at(-1)![1] as Record<string, unknown>
+      expect('body' in syncOpts).toBe(false)
       expect(result).toEqual({ started: 2 })
     })
   })
