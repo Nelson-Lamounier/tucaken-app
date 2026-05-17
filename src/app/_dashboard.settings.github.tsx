@@ -14,7 +14,7 @@ import { useGitHubAccessibleRepos } from '@/features/github/hooks/use-github-acc
 import { useGitHubConnectedRepos } from '@/features/github/hooks/use-github-connected-repos'
 import { getResumesFn } from '@/server/resumes'
 import { listResumeImportsFn } from '@/server/resume-imports'
-import { handleGitHubInstallFn } from '@/server/github'
+import { handleGitHubInstallFn, getGitHubInstallationFn } from '@/server/github'
 import { adminKeys } from '@/lib/api/query-keys'
 import { useToastStore } from '@/lib/stores/toast-store'
 import { Button } from '@/components/ui/Button'
@@ -64,14 +64,28 @@ function DatabaseSettingsPage() {
         const msg = err instanceof Error ? err.message : 'GitHub installation failed'
         addToast('error', `GitHub connect failed: ${msg}`)
       } finally {
-        await queryClient.invalidateQueries({ queryKey: adminKeys.github.installation() })
-        // If the install was triggered from onboarding, return there (repos step).
+        // admin-api is eventually consistent: right after the install POST a
+        // GET /github/installation can still 404 (mapped to null) until the
+        // record is enriched. Poll until present (bounded) and SEED THE CACHE
+        // via fetchQuery so the destination reads a warm, non-null
+        // installation — no "No installation found" flash, no sticky null.
+        for (let i = 0; i < 6; i++) {
+          const inst = await queryClient.fetchQuery({
+            queryKey: adminKeys.github.installation(),
+            queryFn:  () => getGitHubInstallationFn(),
+            staleTime: 0,
+          })
+          if (inst) break
+          await new Promise((r) => setTimeout(r, 1500))
+        }
         // GitHub's App Setup URL is fixed to /settings/github, so we coordinate
-        // the return destination via localStorage.
+        // the return destination via localStorage. Onboarding returns to the
+        // CONNECT step (index 3 — see onboarding.tsx CONNECT_STEP_INDEX), which
+        // shows the connected account + Continue, not straight into repos.
         const returnTo = localStorage.getItem('github_install_return')
         localStorage.removeItem('github_install_return')
         if (returnTo === 'onboarding') {
-          void navigate({ to: '/onboarding', replace: true, search: { step: 4 } })
+          void navigate({ to: '/onboarding', replace: true, search: { step: 3 } })
         } else {
           void navigate({ to: '/settings/github', replace: true, search: { tab: 'repositories' } })
         }

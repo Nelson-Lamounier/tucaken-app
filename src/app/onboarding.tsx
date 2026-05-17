@@ -93,7 +93,7 @@ function OnboardingPage() {
                 await handleGitHubInstallFn({ data: { installationId: 'mock-installation' } })
               } finally {
                 await queryClient.invalidateQueries({ queryKey: adminKeys.github.installation() })
-                void navigate({ to: '/onboarding', replace: true, search: { step: 4 } })
+                void navigate({ to: '/onboarding', replace: true, search: { step: CONNECT_STEP_INDEX } })
               }
             })()
             return
