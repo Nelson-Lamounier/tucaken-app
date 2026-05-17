@@ -1,0 +1,36 @@
+/**
+ * @vitest-environment happy-dom
+ */
+
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+const navigateMock = vi.fn()
+vi.mock('@tanstack/react-router', () => ({
+  useNavigate: () => navigateMock,
+}))
+
+import { ReviewStep } from '@/features/onboarding/components/steps/ReviewStep'
+
+function renderWithClient(ui: React.ReactElement) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>)
+}
+
+describe('ReviewStep', () => {
+  it('renders the all-set finish screen when no importId is present', () => {
+    renderWithClient(<ReviewStep importId={undefined} />)
+    expect(screen.getByText(/you're all set/i)).toBeTruthy()
+    expect(screen.getByRole('button', { name: /finish/i })).toBeTruthy()
+  })
+
+  it('navigates to /overview when Finish is clicked (no-id path)', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event')
+    renderWithClient(<ReviewStep importId={undefined} />)
+    await userEvent.click(screen.getByRole('button', { name: /finish/i }))
+    expect(navigateMock).toHaveBeenCalledWith({ to: '/overview', replace: true })
+  })
+})
