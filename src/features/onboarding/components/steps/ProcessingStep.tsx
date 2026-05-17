@@ -113,36 +113,35 @@ export function ProcessingStep({ onNext }: ProcessingStepProps) {
         </div>
       </div>
 
-      {startError ? (
+      {startError && (
         <div className="mx-auto flex max-w-md flex-col items-center gap-3 text-center">
           <p className="text-sm text-red-300">{startError}</p>
           <Button variant="secondary" onClick={triggerSync} className="flex items-center gap-1.5">
             Retry
           </Button>
         </div>
-      ) : (
-        <div className="mx-auto w-full max-w-md space-y-2">
-          {repos.map((repo) => (
-            <div
-              key={repo.repoFullName}
-              className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2"
-            >
-              <span className="truncate text-xs font-medium text-zinc-200">{repo.repoFullName}</span>
-              {repo.syncStatus === 'pending' || repo.syncStatus === 'syncing' ? (
-                <SyncProgressBar />
-              ) : (
-                <GitHubSyncStatusBadge status={repo.syncStatus} />
-              )}
-            </div>
-          ))}
-          {total === 0 && (
-            <div className="flex items-center justify-center gap-2 py-6 text-xs text-zinc-500">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Preparing…
-            </div>
-          )}
-        </div>
       )}
+      <div className="mx-auto w-full max-w-md space-y-2">
+        {repos.map((repo) => (
+          <div
+            key={repo.repoFullName}
+            className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2"
+          >
+            <span className="truncate text-xs font-medium text-zinc-200">{repo.repoFullName}</span>
+            {repo.syncStatus === 'pending' || repo.syncStatus === 'syncing' ? (
+              <SyncProgressBar />
+            ) : (
+              <GitHubSyncStatusBadge status={repo.syncStatus} />
+            )}
+          </div>
+        ))}
+        {total === 0 && (
+          <div className="flex items-center justify-center gap-2 py-6 text-xs text-zinc-500">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Preparing…
+          </div>
+        )}
+      </div>
 
       <p className="text-center text-xs text-zinc-600">
         This can take several minutes (up to ~15 in some cases). You can leave this page — we'll keep indexing.
