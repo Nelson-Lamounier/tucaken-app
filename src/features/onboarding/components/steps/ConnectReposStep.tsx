@@ -9,6 +9,7 @@ import { StepHeader } from '@/features/onboarding/components/onboarding/StepHead
 import { COPY } from '@/features/onboarding/components/onboarding/content'
 import { adminKeys } from '@/lib/api/query-keys'
 import { removeConnectedRepoFn } from '@/server/github'
+import { useToastStore } from '@/lib/stores/toast-store'
 import type { GitHubInstallation, GitHubAccessibleRepo, ConnectedRepo } from '@/lib/types/github.types'
 
 const MAX_REPOS = 3
@@ -34,7 +35,9 @@ export function ConnectReposStep({
   enforceLimit = false,
 }: ConnectReposStepProps) {
   const queryClient = useQueryClient()
+  const { addToast } = useToastStore()
   const [introDone, setIntroDone] = useState(false)
+  const [removingRepos, setRemovingRepos] = useState<Set<string>>(new Set())
 
   // Queued = repos connected but not yet syncing (deferSync).
   const queued = (connectedRepos ?? []).filter((r) => r.syncStatus === 'pending')
@@ -42,9 +45,21 @@ export function ConnectReposStep({
 
   const dequeue = useMutation({
     mutationFn: (repoFullName: string) => removeConnectedRepoFn({ data: { repoFullName } }),
-    onSuccess: () => {
+    onMutate: (repoFullName) => {
+      setRemovingRepos((prev) => new Set(prev).add(repoFullName))
+    },
+    onError: (err: Error, repoFullName) => {
+      addToast('error', `Failed to remove ${repoFullName}: ${err.message}`)
+    },
+    onSettled: (_data, _err, repoFullName) => {
+      setRemovingRepos((prev) => {
+        const next = new Set(prev)
+        next.delete(repoFullName)
+        return next
+      })
+      // Only connected-repos changes on remove; accessible repos come from
+      // the GitHub installation and are unaffected.
       void queryClient.invalidateQueries({ queryKey: adminKeys.github.connectedRepos() })
-      void queryClient.invalidateQueries({ queryKey: adminKeys.github.accessibleRepos() })
     },
   })
 
@@ -101,7 +116,7 @@ export function ConnectReposStep({
                       type="button"
                       aria-label={`Remove ${r.repoFullName} from queue`}
                       onClick={() => dequeue.mutate(r.repoFullName)}
-                      disabled={dequeue.isPending}
+                      disabled={removingRepos.has(r.repoFullName)}
                       className="rounded-full p-0.5 text-indigo-300/70 transition hover:bg-indigo-500/20 hover:text-indigo-100"
                     >
                       <X className="h-3 w-3" />
