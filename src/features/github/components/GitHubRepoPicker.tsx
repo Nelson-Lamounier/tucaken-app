@@ -68,7 +68,20 @@ export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos, m
   return (
     <div className="space-y-3">
       {ingestion.needsUpgrade && (
-        <UpgradeLimitBanner onDismiss={ingestion.dismissUpgrade} />
+        mode === 'queue' ? (
+          <div className="flex items-start justify-between gap-3 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-300">
+            <span>Repository limit reached — remove a queued repo to add a different one.</span>
+            <button
+              type="button"
+              onClick={ingestion.dismissUpgrade}
+              className="shrink-0 text-amber-400/70 transition hover:text-amber-200"
+            >
+              Dismiss
+            </button>
+          </div>
+        ) : (
+          <UpgradeLimitBanner onDismiss={ingestion.dismissUpgrade} />
+        )
       )}
     <div className="rounded-lg border border-white/10 overflow-hidden">
       <div className="flex items-center justify-between border-b border-white/[0.08] px-4 py-3">
