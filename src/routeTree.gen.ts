@@ -29,6 +29,7 @@ import { Route as DashboardAiAgentRouteImport } from './app/_dashboard.ai-agent'
 import { Route as DashboardSplatRouteImport } from './app/_dashboard.$'
 import { Route as DashboardSettingsIndexRouteImport } from './app/_dashboard.settings.index'
 import { Route as DashboardApplicationsIndexRouteImport } from './app/_dashboard.applications.index'
+import { Route as ArticlesPreviewSlugRouteImport } from './app/articles.preview.$slug'
 import { Route as DashboardSettingsGithubRouteImport } from './app/_dashboard.settings.github'
 import { Route as DashboardResumesNewRouteImport } from './app/_dashboard.resumes.new'
 import { Route as DashboardApplicationsNewRouteImport } from './app/_dashboard.applications.new'
@@ -137,6 +138,11 @@ const DashboardApplicationsIndexRoute =
     path: '/applications/',
     getParentRoute: () => DashboardRoute,
   } as any)
+const ArticlesPreviewSlugRoute = ArticlesPreviewSlugRouteImport.update({
+  id: '/articles/preview/$slug',
+  path: '/articles/preview/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardSettingsGithubRoute = DashboardSettingsGithubRouteImport.update({
   id: '/settings/github',
   path: '/settings/github',
@@ -201,6 +207,7 @@ export interface FileRoutesByFullPath {
   '/applications/new': typeof DashboardApplicationsNewRoute
   '/resumes/new': typeof DashboardResumesNewRoute
   '/settings/github': typeof DashboardSettingsGithubRoute
+  '/articles/preview/$slug': typeof ArticlesPreviewSlugRoute
   '/applications/': typeof DashboardApplicationsIndexRoute
   '/settings/': typeof DashboardSettingsIndexRoute
   '/resumes/edit/$id': typeof DashboardResumesEditIdRoute
@@ -229,6 +236,7 @@ export interface FileRoutesByTo {
   '/applications/new': typeof DashboardApplicationsNewRoute
   '/resumes/new': typeof DashboardResumesNewRoute
   '/settings/github': typeof DashboardSettingsGithubRoute
+  '/articles/preview/$slug': typeof ArticlesPreviewSlugRoute
   '/applications': typeof DashboardApplicationsIndexRoute
   '/settings': typeof DashboardSettingsIndexRoute
   '/resumes/edit/$id': typeof DashboardResumesEditIdRoute
@@ -259,6 +267,7 @@ export interface FileRoutesById {
   '/_dashboard/applications/new': typeof DashboardApplicationsNewRoute
   '/_dashboard/resumes/new': typeof DashboardResumesNewRoute
   '/_dashboard/settings/github': typeof DashboardSettingsGithubRoute
+  '/articles/preview/$slug': typeof ArticlesPreviewSlugRoute
   '/_dashboard/applications/': typeof DashboardApplicationsIndexRoute
   '/_dashboard/settings/': typeof DashboardSettingsIndexRoute
   '/_dashboard/resumes/edit/$id': typeof DashboardResumesEditIdRoute
@@ -289,6 +298,7 @@ export interface FileRouteTypes {
     | '/applications/new'
     | '/resumes/new'
     | '/settings/github'
+    | '/articles/preview/$slug'
     | '/applications/'
     | '/settings/'
     | '/resumes/edit/$id'
@@ -317,6 +327,7 @@ export interface FileRouteTypes {
     | '/applications/new'
     | '/resumes/new'
     | '/settings/github'
+    | '/articles/preview/$slug'
     | '/applications'
     | '/settings'
     | '/resumes/edit/$id'
@@ -346,6 +357,7 @@ export interface FileRouteTypes {
     | '/_dashboard/applications/new'
     | '/_dashboard/resumes/new'
     | '/_dashboard/settings/github'
+    | '/articles/preview/$slug'
     | '/_dashboard/applications/'
     | '/_dashboard/settings/'
     | '/_dashboard/resumes/edit/$id'
@@ -357,6 +369,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
   SignInRoute: typeof SignInRouteWithChildren
+  ArticlesPreviewSlugRoute: typeof ArticlesPreviewSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -501,6 +514,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardApplicationsIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/articles/preview/$slug': {
+      id: '/articles/preview/$slug'
+      path: '/articles/preview/$slug'
+      fullPath: '/articles/preview/$slug'
+      preLoaderRoute: typeof ArticlesPreviewSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_dashboard/settings/github': {
       id: '/_dashboard/settings/github'
       path: '/settings/github'
@@ -632,6 +652,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
   SignInRoute: SignInRouteWithChildren,
+  ArticlesPreviewSlugRoute: ArticlesPreviewSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
