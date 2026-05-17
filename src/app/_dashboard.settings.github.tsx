@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useState, useEffect } from 'react'
-import { useQueryClient, useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { z } from 'zod'
 import { GitBranch, FileText, Plus, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 import { DashboardPage } from '@/components/layouts/DashboardPage'
@@ -14,17 +14,12 @@ import { useGitHubAccessibleRepos } from '@/features/github/hooks/use-github-acc
 import { useGitHubConnectedRepos } from '@/features/github/hooks/use-github-connected-repos'
 import { getResumesFn } from '@/server/resumes'
 import { listResumeImportsFn } from '@/server/resume-imports'
-import { handleGitHubInstallFn, getGitHubInstallationFn } from '@/server/github'
 import { adminKeys } from '@/lib/api/query-keys'
-import { useToastStore } from '@/lib/stores/toast-store'
 import { Button } from '@/components/ui/Button'
 
 type Tab = 'repositories' | 'resumes'
 
 const searchSchema = z.object({
-  installation_id: z.coerce.string().optional(),
-  // GitHub appends setup_action=install automatically — accepted but not used.
-  setup_action:    z.coerce.string().optional(),
   tab:             z.enum(['repositories', 'resumes']).default('repositories'),
 })
 
@@ -35,9 +30,7 @@ export const Route = createFileRoute('/_dashboard/settings/github')({
 
 function DatabaseSettingsPage() {
   const navigate    = useNavigate()
-  const queryClient = useQueryClient()
-  const { installation_id, tab } = Route.useSearch()
-  const { addToast } = useToastStore()
+  const { tab } = Route.useSearch()
 
   const [addingResume, setAddingResume] = useState(false)
   const [resumeImportId, setResumeImportId] = useState<string | undefined>(undefined)
@@ -54,55 +47,8 @@ function DatabaseSettingsPage() {
     queryFn:  () => listResumeImportsFn(),
   })
 
-  useEffect(() => {
-    if (!installation_id) return
-    const id = installation_id
-    async function handleInstall() {
-      try {
-        await handleGitHubInstallFn({ data: { installationId: id } })
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'GitHub installation failed'
-        addToast('error', `GitHub connect failed: ${msg}`)
-      } finally {
-        // admin-api is eventually consistent: right after the install POST a
-        // GET /github/installation can still 404 (mapped to null) until the
-        // record is enriched. Poll until present (bounded) and SEED THE CACHE
-        // via fetchQuery so the destination reads a warm, non-null
-        // installation — no "No installation found" flash, no sticky null.
-        for (let i = 0; i < 6; i++) {
-          const inst = await queryClient.fetchQuery({
-            queryKey: adminKeys.github.installation(),
-            queryFn:  () => getGitHubInstallationFn(),
-            staleTime: 0,
-          })
-          if (inst) break
-          await new Promise((r) => setTimeout(r, 1500))
-        }
-        // GitHub's App Setup URL is fixed to /settings/github, so we coordinate
-        // the return destination via localStorage. Onboarding returns to the
-        // CONNECT step (index 3 — see onboarding.tsx CONNECT_STEP_INDEX), which
-        // shows the connected account + Continue, not straight into repos.
-        const returnTo = localStorage.getItem('github_install_return')
-        localStorage.removeItem('github_install_return')
-        if (returnTo === 'onboarding') {
-          void navigate({ to: '/onboarding', replace: true, search: { step: 3 } })
-        } else {
-          void navigate({ to: '/settings/github', replace: true, search: { tab: 'repositories' } })
-        }
-      }
-    }
-    void handleInstall()
-  }, [installation_id, navigate, queryClient, addToast])
-
-  // Suppress page content while handling a GitHub App install callback to avoid
-  // a content flash before the redirect fires.
-  if (installation_id) {
-    return (
-      <div className="flex h-64 items-center justify-center text-sm text-zinc-500">
-        Connecting GitHub…
-      </div>
-    )
-  }
+  // The GitHub App install callback is handled by the dedicated
+  // /github/callback route — this page no longer receives ?installation_id.
 
   const tabs: Array<{ id: Tab; label: string; icon: React.ReactNode }> = [
     { id: 'repositories', label: 'Repositories', icon: <GitBranch className="size-4" /> },

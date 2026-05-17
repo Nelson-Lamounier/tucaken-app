@@ -15,6 +15,7 @@ import { Route as LoginRouteImport } from './app/login'
 import { Route as DashboardRouteImport } from './app/_dashboard'
 import { Route as IndexRouteImport } from './app/index'
 import { Route as SignInCallbackRouteImport } from './app/sign-in.callback'
+import { Route as GithubCallbackRouteImport } from './app/github.callback'
 import { Route as DashboardTestRouteImport } from './app/_dashboard.test'
 import { Route as DashboardResumesRouteImport } from './app/_dashboard.resumes'
 import { Route as DashboardResumeThemeRouteImport } from './app/_dashboard.resume-theme'
@@ -66,6 +67,11 @@ const SignInCallbackRoute = SignInCallbackRouteImport.update({
   id: '/callback',
   path: '/callback',
   getParentRoute: () => SignInRoute,
+} as any)
+const GithubCallbackRoute = GithubCallbackRouteImport.update({
+  id: '/github/callback',
+  path: '/github/callback',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardTestRoute = DashboardTestRouteImport.update({
   id: '/test',
@@ -200,6 +206,7 @@ export interface FileRoutesByFullPath {
   '/resume-theme': typeof DashboardResumeThemeRoute
   '/resumes': typeof DashboardResumesRouteWithChildren
   '/test': typeof DashboardTestRoute
+  '/github/callback': typeof GithubCallbackRoute
   '/sign-in/callback': typeof SignInCallbackRoute
   '/applications/$slug': typeof DashboardApplicationsSlugRoute
   '/applications/interview-prep': typeof DashboardApplicationsInterviewPrepRoute
@@ -229,6 +236,7 @@ export interface FileRoutesByTo {
   '/resume-theme': typeof DashboardResumeThemeRoute
   '/resumes': typeof DashboardResumesRouteWithChildren
   '/test': typeof DashboardTestRoute
+  '/github/callback': typeof GithubCallbackRoute
   '/sign-in/callback': typeof SignInCallbackRoute
   '/applications/$slug': typeof DashboardApplicationsSlugRoute
   '/applications/interview-prep': typeof DashboardApplicationsInterviewPrepRoute
@@ -260,6 +268,7 @@ export interface FileRoutesById {
   '/_dashboard/resume-theme': typeof DashboardResumeThemeRoute
   '/_dashboard/resumes': typeof DashboardResumesRouteWithChildren
   '/_dashboard/test': typeof DashboardTestRoute
+  '/github/callback': typeof GithubCallbackRoute
   '/sign-in/callback': typeof SignInCallbackRoute
   '/_dashboard/applications/$slug': typeof DashboardApplicationsSlugRoute
   '/_dashboard/applications/interview-prep': typeof DashboardApplicationsInterviewPrepRoute
@@ -291,6 +300,7 @@ export interface FileRouteTypes {
     | '/resume-theme'
     | '/resumes'
     | '/test'
+    | '/github/callback'
     | '/sign-in/callback'
     | '/applications/$slug'
     | '/applications/interview-prep'
@@ -320,6 +330,7 @@ export interface FileRouteTypes {
     | '/resume-theme'
     | '/resumes'
     | '/test'
+    | '/github/callback'
     | '/sign-in/callback'
     | '/applications/$slug'
     | '/applications/interview-prep'
@@ -350,6 +361,7 @@ export interface FileRouteTypes {
     | '/_dashboard/resume-theme'
     | '/_dashboard/resumes'
     | '/_dashboard/test'
+    | '/github/callback'
     | '/sign-in/callback'
     | '/_dashboard/applications/$slug'
     | '/_dashboard/applications/interview-prep'
@@ -369,6 +381,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
   SignInRoute: typeof SignInRouteWithChildren
+  GithubCallbackRoute: typeof GithubCallbackRoute
   ArticlesPreviewSlugRoute: typeof ArticlesPreviewSlugRoute
 }
 
@@ -415,6 +428,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/sign-in/callback'
       preLoaderRoute: typeof SignInCallbackRouteImport
       parentRoute: typeof SignInRoute
+    }
+    '/github/callback': {
+      id: '/github/callback'
+      path: '/github/callback'
+      fullPath: '/github/callback'
+      preLoaderRoute: typeof GithubCallbackRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_dashboard/test': {
       id: '/_dashboard/test'
@@ -652,6 +672,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
   SignInRoute: SignInRouteWithChildren,
+  GithubCallbackRoute: GithubCallbackRoute,
   ArticlesPreviewSlugRoute: ArticlesPreviewSlugRoute,
 }
 export const routeTree = rootRouteImport
