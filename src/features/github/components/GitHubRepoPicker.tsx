@@ -26,7 +26,12 @@ export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos, m
   const queueIngestion = useGitHubQueueRepo()
   const ingestion = mode === 'queue' ? queueIngestion : syncIngestion
 
-  const connectedCount = connectedRepos?.length ?? 0
+  // In queue mode the cap applies to QUEUED (pending) repos only; in sync
+  // mode it's the total connected count (Settings behaviour unchanged).
+  const connectedCount =
+    mode === 'queue'
+      ? (connectedRepos ?? []).filter((r) => r.syncStatus === 'pending').length
+      : connectedRepos?.length ?? 0
   const atCap = maxRepos !== undefined && connectedCount >= maxRepos
 
   const connectedSet = useMemo(
