@@ -10,6 +10,7 @@ import { ImportCareerStep } from '../steps/ImportCareerStep'
 import { ConnectStep } from './ConnectStep'
 import { ConnectReposStep } from '../steps/ConnectReposStep'
 import { ProcessingStep } from '../steps/ProcessingStep'
+import { ReviewStep } from '../steps/ReviewStep'
 import { useOnboardingState } from './useOnboardingState'
 import { useGitHubAccessibleRepos } from '@/features/github/hooks/use-github-accessible-repos'
 import { useGitHubConnectedRepos } from '@/features/github/hooks/use-github-connected-repos'
@@ -75,6 +76,7 @@ export function OnboardingShell({
   // processing step has no visible progress slot — clamp to last visible step
   const visibleIndex = Math.min(s.stepIndex, VISIBLE_STEPS.length - 1)
   const isProcessing = s.stepId === 'processing'
+  const isTerminal = isProcessing || s.stepId === 'review'
 
   return (
     <div className="dark relative flex min-h-screen w-full items-stretch justify-center overflow-hidden bg-zinc-950 px-3.75 py-8 text-zinc-200">
@@ -85,10 +87,10 @@ export function OnboardingShell({
           <div className="flex items-center gap-2.5">
             <LogoBadge />
             <span className="ml-2 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-zinc-400">
-              {isProcessing ? 'Setting up…' : 'Get started'}
+              {isTerminal ? (isProcessing ? 'Setting up…' : 'Almost done') : 'Get started'}
             </span>
           </div>
-          {!isProcessing && (
+          {!isTerminal && (
             <OnboardingProgress
               steps={VISIBLE_STEPS}
               current={visibleIndex}
@@ -122,7 +124,11 @@ export function OnboardingShell({
                 )}
 
                 {s.stepId === 'resume' && (
-                  <ImportCareerStep onNext={s.next} onSkip={s.next} />
+                  <ImportCareerStep
+                    onNext={s.next}
+                    onSkip={s.next}
+                    onExtracted={s.setResumeImportId}
+                  />
                 )}
 
                 {s.stepId === 'connect' && (
@@ -147,7 +153,11 @@ export function OnboardingShell({
                   />
                 )}
 
-                {s.stepId === 'processing' && <ProcessingStep />}
+                {s.stepId === 'processing' && <ProcessingStep onNext={s.next} />}
+
+                {s.stepId === 'review' && (
+                  <ReviewStep importId={s.data.resumeImportId} />
+                )}
               </motion.div>
             </AnimatePresence>
           </div>

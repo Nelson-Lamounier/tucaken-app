@@ -1,27 +1,28 @@
 // src/features/onboarding/components/steps/ProcessingStep.tsx
 //
-// Onboarding step 5 — polls repo sync status and navigates to /overview
-// once all connected repos reach a terminal state (complete or error).
-// No user controls — StepFooter is suppressed for this step by OnboardingShell.
+// Onboarding step 5 — polls repo sync status and advances to the terminal
+// review step once all connected repos reach a terminal state (complete or
+// error). No user controls — StepFooter is suppressed for this step by
+// OnboardingShell.
 
 import { useEffect } from 'react'
-import { useNavigate } from '@tanstack/react-router'
 import { motion } from 'motion/react'
 import { useGitHubConnectedRepos } from '@/features/github/hooks/use-github-connected-repos'
 
 const TERMINAL_STATUSES = new Set(['complete', 'error'])
 
-export function ProcessingStep() {
-  const navigate = useNavigate()
+interface ProcessingStepProps {
+  readonly onNext: () => void
+}
+
+export function ProcessingStep({ onNext }: ProcessingStepProps) {
   const { data: connectedRepos } = useGitHubConnectedRepos()
 
   useEffect(() => {
     if (!connectedRepos || connectedRepos.length === 0) return
     const allTerminal = connectedRepos.every((r) => TERMINAL_STATUSES.has(r.syncStatus))
-    if (allTerminal) {
-      void navigate({ to: '/overview', replace: true })
-    }
-  }, [connectedRepos, navigate])
+    if (allTerminal) onNext()
+  }, [connectedRepos, onNext])
 
   return (
     <div className="flex h-120 flex-col items-center justify-center gap-6 text-center">
