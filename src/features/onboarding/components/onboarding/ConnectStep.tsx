@@ -106,12 +106,12 @@ export function ConnectStep({
               <div className="flex items-center gap-2">
                 <span className={[
                   'text-sm font-semibold',
-                  connected ? 'text-teal-50' : 'text-zinc-100',
+                  connected ? 'text-zinc-900' : 'text-zinc-100',
                 ].join(' ')}>
                   {connected ? installation?.accountLogin : 'GitHub'}
                 </span>
                 {connected ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-teal-500/15 px-2 py-0.5 text-[10px] font-medium text-teal-200 ring-1 ring-teal-400/30">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-teal-500/25 px-2 py-0.5 text-[10px] font-semibold text-teal-950 ring-1 ring-teal-700/30">
                     <Check className="size-3" strokeWidth={3} /> Connected
                   </span>
                 ) : (
@@ -122,7 +122,7 @@ export function ConnectStep({
               </div>
               <p className={[
                 'mt-1 text-xs leading-relaxed',
-                connected ? 'text-teal-100/90' : 'text-zinc-400',
+                connected ? 'text-zinc-800' : 'text-zinc-400',
               ].join(' ')}>
                 {connected
                   ? `${installation?.repositoryCount ?? 0} repositories accessible via GitHub App`
@@ -152,9 +152,9 @@ export function ConnectStep({
               exit={{ opacity: 0, height: 0 }}
               className="overflow-hidden"
             >
-              <div className="mt-4 border-t border-teal-400/15 pt-4 text-xs text-teal-100/80">
+              <div className="mt-4 border-t border-zinc-900/15 pt-4 text-xs text-zinc-800">
                 Repositories visible in{' '}
-                <span className="font-medium text-teal-50">Settings → GitHub</span>.
+                <span className="font-medium text-zinc-900">Settings → GitHub</span>.
                 Tucaken will index them in the background.
               </div>
             </motion.div>
