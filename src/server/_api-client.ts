@@ -60,7 +60,7 @@ export async function apiFetch<T>(path: string, opts: ApiFetchOptions = {}): Pro
 
   // Dev-only: short-circuit to fixtures so /onboarding works without admin-api.
   if (MOCK_AUTH) {
-    return mockApiResponse(path) as T;
+    return mockApiResponse(path, method) as T;
   }
 
   const token  = getSessionToken();

@@ -154,6 +154,58 @@ const mockMe = {
   },
 }
 
+// Stateful progress walk so the dev UI renders the processing screen
+// (Job queued → Parsing → Extracting → Analyzing) before review, instead
+// of jumping straight to the review/gap UI. Each /progress poll advances
+// one step; the walk resets when the job is (re)queued via /complete or
+// /retry. retryAfterMs sets the poll cadence the UI honours.
+// Dev knob: how long the processing screen stays up before going terminal.
+// Time-based (not poll-count) so it's an exact wall-clock target and the
+// timer restarts per job. Drop to ~6_000 once the UI work is done.
+const PROCESSING_MS = 6_000 // shippable default; bump locally to troubleshoot
+
+// Phase boundaries as fractions of PROCESSING_MS — drives the label/bar.
+const PROGRESS_PHASES = [
+  { until: 0.1, status: 'processing', phase: 'uploading',  step: 1 },
+  { until: 0.4, status: 'processing', phase: 'parsing',    step: 2 },
+  { until: 0.7, status: 'processing', phase: 'extracting', step: 3 },
+  { until: 1.0, status: 'processing', phase: 'analyzing',  step: 4 },
+] as const
+
+// Wall-clock start of the current mock job. Reset whenever a job is
+// (re)queued or a brand-new upload begins (covers page reload → re-upload).
+let progressStartedAt = 0
+
+// ─── GitHub (stateful) ───────────────────────────────────────────────────────
+// The onboarding connect/repos/processing steps must run offline. github
+// stays "not installed" until the App-install POST /github/installation
+// fires (simulated by onboarding's onConnectGithub under VITE_MOCK_AUTH),
+// then a fixture installation + accessible/connected repos appear. Persists
+// for the dev-server process lifetime; restart the server to test the
+// not-connected state again.
+let githubInstalled = false
+
+const mockInstallation = {
+  installationId:   '90000001',
+  accountLogin:     'dev-user',
+  accountAvatarUrl: 'https://avatars.githubusercontent.com/u/0?v=4',
+  repositoryCount:  3,
+  connectedAt:      '2026-01-10T09:00:00.000Z',
+}
+
+const mockAccessibleRepos = [
+  { id: 1, fullName: 'dev-user/portfolio-api', owner: 'dev-user', name: 'portfolio-api', defaultBranch: 'main', private: false, updatedAt: '2026-05-01T12:00:00.000Z' },
+  { id: 2, fullName: 'dev-user/tucaken-app',   owner: 'dev-user', name: 'tucaken-app',   defaultBranch: 'main', private: true,  updatedAt: '2026-05-15T12:00:00.000Z' },
+  { id: 3, fullName: 'dev-user/infra',         owner: 'dev-user', name: 'infra',         defaultBranch: 'main', private: true,  updatedAt: '2026-04-20T12:00:00.000Z' },
+]
+
+// syncStatus 'complete' so ProcessingStep (which advances only when every
+// connected repo is terminal) flows straight through to the review step.
+const mockConnectedRepos = [
+  { repoFullName: 'dev-user/portfolio-api', owner: 'dev-user', name: 'portfolio-api', defaultBranch: 'main', syncStatus: 'complete', lastSyncedAt: '2026-05-16T09:00:00.000Z', addedAt: '2026-05-16T08:00:00.000Z', qualityScore: 82, classification: 'project' },
+  { repoFullName: 'dev-user/tucaken-app',   owner: 'dev-user', name: 'tucaken-app',   defaultBranch: 'main', syncStatus: 'complete', lastSyncedAt: '2026-05-16T09:05:00.000Z', addedAt: '2026-05-16T08:00:00.000Z', qualityScore: 91, classification: 'project' },
+]
+
 // ─── Dispatcher ──────────────────────────────────────────────────────────────
 
 /**
@@ -161,12 +213,15 @@ const mockMe = {
  * unmapped (caller treats null as "no mock, fall through" — but in MOCK_AUTH
  * mode _api-client never falls through; unmapped paths get `{}`).
  */
-export function mockApiResponse(path: string): unknown {
+export function mockApiResponse(path: string, method = 'GET'): unknown {
   const p = normalise(path)
 
   if (p === '/me') return mockMe
 
   if (p === '/resume-imports/upload-url') {
+    // First signal of a fresh attempt (covers page reload → re-upload):
+    // restart the wall-clock so the 2-min timer resets, not resumes.
+    progressStartedAt = Date.now()
     return {
       importId: MOCK_IMPORT_ID,
       uploadUrl: MOCK_UPLOAD_URL,
@@ -175,22 +230,29 @@ export function mockApiResponse(path: string): unknown {
     }
   }
   if (p === '/resume-imports/:id/complete' || p === '/resume-imports/:id/retry') {
+    progressStartedAt = Date.now() // restart the timer for this (re)queued job
     return { importId: MOCK_IMPORT_ID, status: 'queued' }
   }
   if (p === '/resume-imports/:id/progress') {
-    // Jump straight to terminal review so the review/gap UI renders fast.
+    if (progressStartedAt === 0) progressStartedAt = Date.now()
+    const elapsed  = Date.now() - progressStartedAt
+    const fraction = elapsed / PROCESSING_MS
+    const terminal = fraction >= 1
+    const snap =
+      PROGRESS_PHASES.find((ph) => fraction < ph.until) ??
+      PROGRESS_PHASES[PROGRESS_PHASES.length - 1]!
     return {
       progress: {
         v: 1,
-        status: 'ready_for_review',
-        phase: 'review',
-        step: 5,
+        status: terminal ? 'ready_for_review' : snap.status,
+        phase: terminal ? 'review' : snap.phase,
+        step: terminal ? 5 : snap.step,
         totalSteps: 5,
-        terminal: true,
+        terminal,
         error: null,
-        gapReportReady: true,
+        gapReportReady: terminal,
         heartbeatAt: new Date().toISOString(),
-        retryAfterMs: 2000,
+        retryAfterMs: 3000,
       },
     }
   }
@@ -219,6 +281,27 @@ export function mockApiResponse(path: string): unknown {
   if (p === '/resume-imports') return { imports: [] }
 
   // GitHub installation check (Connect step) — no installation in mock.
+  // ── GitHub (stateful) ──────────────────────────────────────────────────
+  if (p === '/github/installation') {
+    if (method === 'POST') {
+      githubInstalled = true // App-install callback
+      return { success: true }
+    }
+    return { installation: githubInstalled ? mockInstallation : null }
+  }
+  if (p === '/github/repos') {
+    return { repos: githubInstalled ? mockAccessibleRepos : [] }
+  }
+  if (p === '/github/connected-repos') {
+    if (method === 'POST') {
+      return { status: 'queued', repoFullName: 'dev-user/portfolio-api', jobName: 'mock-ingest-job' }
+    }
+    return { repos: githubInstalled ? mockConnectedRepos : [] }
+  }
+  if (p === '/github/connected-repos/:repoFullName') {
+    return { success: true } // DELETE remove-repo
+  }
+  // Any other github path (e.g. timed-out marker) — inert.
   if (p.includes('github')) return null
 
   // Unknown admin path — empty object keeps other carousel steps from crashing.

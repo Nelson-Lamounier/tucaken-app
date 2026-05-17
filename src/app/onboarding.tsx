@@ -84,6 +84,20 @@ function OnboardingPage() {
       )}
       <OnboardingShell
         onConnectGithub={() => {
+          // Dev-mock: don't leave the app for github.com — simulate the
+          // App-install callback locally so connect → repos → processing
+          // is testable offline.
+          if (import.meta.env.VITE_MOCK_AUTH === 'true') {
+            void (async () => {
+              try {
+                await handleGitHubInstallFn({ data: { installationId: 'mock-installation' } })
+              } finally {
+                await queryClient.invalidateQueries({ queryKey: adminKeys.github.installation() })
+                void navigate({ to: '/onboarding', replace: true, search: { step: 4 } })
+              }
+            })()
+            return
+          }
           if (appSlug) {
             // Flag so the settings-page callback handler redirects back to onboarding
             // instead of staying on /settings/github (GitHub App Setup URL is fixed).
