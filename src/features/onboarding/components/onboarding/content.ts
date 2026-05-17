@@ -28,6 +28,11 @@ export const COPY = {
     title: 'Connect your GitHub.',
     sub: "We index your repos so resumes cite real commits and pull requests. Read-only — you can revoke access anytime.",
   },
+  repos: {
+    eyebrow: 'Step 5 of 5',
+    title: 'Connect your repositories.',
+    sub: 'Select which GitHub repos to index. Tucaken kicks off ingestion and enriches each previous role against your actual commit history.',
+  },
 } as const
 
 export interface CarouselSlide {

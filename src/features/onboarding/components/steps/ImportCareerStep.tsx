@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
 import {
   Upload,
   FileText,
@@ -29,6 +30,8 @@ import {
 import type { CareerEntry, ImportPhase } from '@/server/resume-imports'
 import { EnhanceRoleCard } from './EnhanceRoleCard'
 import { GapAnalysisReport } from './GapAnalysisReport'
+import { StepHeader } from '@/features/onboarding/components/onboarding/StepHeader'
+import { COPY } from '@/features/onboarding/components/onboarding/content'
 
 type Phase =
   | 'idle'
@@ -70,6 +73,8 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
   const [errorMsg, setErrorMsg] = useState<string>('')
   const [dragOver, setDragOver] = useState(false)
   const [retrying, setRetrying] = useState(false)
+  // Idle upload UI reveals only after the StepHeader typewriter finishes.
+  const [introDone, setIntroDone] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
 
@@ -252,52 +257,65 @@ export function ImportCareerStep({ onNext, onSkip }: ImportCareerStepProps) {
   if (phase === 'idle') {
     return (
       <div className="space-y-6">
-        <div>
-          <h3 className="text-base font-semibold text-zinc-100">Import your career history</h3>
-          <p className="mt-1 text-sm text-zinc-500">
-            Upload your current resume. Tucaken extracts your employment history and education so
-            your tailored resumes are grounded in real evidence.
-          </p>
-        </div>
+        <StepHeader
+          eyebrow={COPY.resume.eyebrow}
+          title={COPY.resume.title}
+          sub={COPY.resume.sub}
+          typewriter
+          onTypingComplete={() => setIntroDone(true)}
+        />
 
-        <div
-          role="button"
-          tabIndex={0}
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={handleDrop}
-          onClick={() => inputRef.current?.click()}
-          onKeyDown={(e) => e.key === 'Enter' && inputRef.current?.click()}
-          className={[
-            'flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-14 cursor-pointer transition-colors',
-            dragOver
-              ? 'border-indigo-500 bg-indigo-500/5'
-              : 'border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]',
-          ].join(' ')}
-        >
-          <Upload className="h-8 w-8 text-zinc-500" />
-          <div className="text-center">
-            <p className="text-sm font-medium text-zinc-300">
-              Drop your resume here or <span className="text-indigo-400">browse</span>
-            </p>
-            <p className="mt-1 text-xs text-zinc-600">PDF or DOCX · max 20 MB</p>
-          </div>
-          <input
-            ref={inputRef}
-            type="file"
-            accept={accept}
-            className="hidden"
-            onChange={handleInputChange}
-          />
-        </div>
+        <AnimatePresence>
+          {introDone && (
+            <motion.div
+              key="resume-body"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+              style={{ willChange: 'transform, opacity' }}
+              className="space-y-6"
+            >
+              <div
+                role="button"
+                tabIndex={0}
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={handleDrop}
+                onClick={() => inputRef.current?.click()}
+                onKeyDown={(e) => e.key === 'Enter' && inputRef.current?.click()}
+                className={[
+                  'flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-6 py-14 cursor-pointer transition-colors',
+                  dragOver
+                    ? 'border-indigo-500 bg-indigo-500/5'
+                    : 'border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]',
+                ].join(' ')}
+              >
+                <Upload className="h-8 w-8 text-zinc-500" />
+                <div className="text-center">
+                  <p className="text-sm font-medium text-zinc-300">
+                    Drop your resume here or <span className="text-indigo-400">browse</span>
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-600">PDF or DOCX · max 20 MB</p>
+                </div>
+                <input
+                  ref={inputRef}
+                  type="file"
+                  accept={accept}
+                  className="hidden"
+                  onChange={handleInputChange}
+                />
+              </div>
 
-        <div className="flex items-center justify-between pt-2">
-          <p className="text-xs text-zinc-600">Step 1 is optional — you can import later from your profile.</p>
-          <Button variant="ghost" onClick={onSkip} className="flex items-center gap-1.5 text-xs">
-            <SkipForward className="h-3.5 w-3.5" />
-            Skip for now
-          </Button>
-        </div>
+              <div className="flex items-center justify-between pt-2">
+                <p className="text-xs text-zinc-600">Step 1 is optional — you can import later from your profile.</p>
+                <Button variant="ghost" onClick={onSkip} className="flex items-center gap-1.5 text-xs">
+                  <SkipForward className="h-3.5 w-3.5" />
+                  Skip for now
+                </Button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     )
   }

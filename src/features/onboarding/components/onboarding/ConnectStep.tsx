@@ -5,7 +5,18 @@
 // Settings → GitHub). onConnectGithub is a sync redirect — no await needed.
 
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'motion/react'
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
+
+// Flowing gradient-border animation shared by the cards below.
+const FLOW_CLASS = 'bg-[length:200%_200%]'
+const flowAnim = {
+  backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
+}
+const FLOW_TRANSITION = {
+  repeat: Infinity,
+  duration: 6,
+  ease: 'linear' as const,
+}
 import { Github, Cloud, Figma, Check, Lock, Loader2 } from 'lucide-react'
 import { COPY } from './content'
 import { StepHeader } from './StepHeader'
@@ -29,6 +40,9 @@ export function ConnectStep({
   onBack,
 }: Props) {
   const [oauthOpen, setOauthOpen] = useState(false)
+  // Body reveals only after the StepHeader typewriter finishes.
+  const [introDone, setIntroDone] = useState(false)
+  const reduce = useReducedMotion()
 
   const connected = !!installation
 
@@ -38,18 +52,41 @@ export function ConnectStep({
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex flex-1 flex-col">
       <StepHeader
         eyebrow={COPY.connect.eyebrow}
         title={COPY.connect.title}
         sub={COPY.connect.sub}
+        typewriter
+        onTypingComplete={() => setIntroDone(true)}
       />
 
-      {/* Featured GitHub card */}
+      <AnimatePresence>
+        {introDone && (
+          <motion.div
+            key="connect-body"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            style={{ willChange: 'transform, opacity' }}
+            className="mt-6"
+          >
+      {/* Featured GitHub card — animated gradient border */}
+      <motion.div
+        className={[
+          'rounded-xl bg-linear-to-r p-px',
+          FLOW_CLASS,
+          connected
+            ? 'from-teal-400/80 via-emerald-400/50 to-cyan-400/80'
+            : 'from-teal-400/50 via-emerald-400/25 to-cyan-400/50',
+        ].join(' ')}
+        animate={reduce ? undefined : flowAnim}
+        transition={reduce ? undefined : FLOW_TRANSITION}
+      >
       <div
         className={[
-          'rounded-xl border p-5 transition',
-          connected ? 'border-teal-400/30 bg-teal-500/4' : 'border-white/10 bg-white/2',
+          'rounded-[11px] p-5',
+          connected ? 'bg-teal-500/4' : 'bg-zinc-950',
         ].join(' ')}
       >
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -118,9 +155,10 @@ export function ConnectStep({
           )}
         </AnimatePresence>
       </div>
+      </motion.div>
 
       {/* Coming-soon row */}
-      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
         <ComingSoonCard
           icon={<Cloud className="size-5 text-zinc-400" strokeWidth={1.75} />}
           label="AWS"
@@ -132,6 +170,9 @@ export function ConnectStep({
           sub="Cite design work in your resume"
         />
       </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="mt-auto">
         <StepFooter
@@ -158,11 +199,15 @@ interface ComingSoonCardProps {
 }
 
 function ComingSoonCard({ icon, label, sub }: ComingSoonCardProps) {
+  const reduce = useReducedMotion()
   return (
-    <div
+    <motion.div
       aria-disabled
-      className="flex items-start gap-3 rounded-xl border border-dashed border-white/10 bg-white/1 p-4 opacity-70"
+      className={`rounded-xl bg-linear-to-r from-teal-400/50 via-emerald-400/25 to-cyan-400/50 p-px opacity-70 ${FLOW_CLASS}`}
+      animate={reduce ? undefined : flowAnim}
+      transition={reduce ? undefined : FLOW_TRANSITION}
     >
+    <div className="flex items-start gap-3 rounded-[11px] bg-zinc-950 p-4">
       <div className="grid size-10 shrink-0 place-items-center rounded-md bg-white/2 ring-1 ring-white/10">
         {icon}
       </div>
@@ -176,5 +221,6 @@ function ComingSoonCard({ icon, label, sub }: ComingSoonCardProps) {
         <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">{sub}</p>
       </div>
     </div>
+    </motion.div>
   )
 }

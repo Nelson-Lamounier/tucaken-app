@@ -23,7 +23,7 @@ export function WelcomeCarousel() {
   const current = CAROUSEL_SLIDES[slide]
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-white/10 bg-white/[0.02]">
+    <div className="relative overflow-hidden rounded-xl p-3 md:p-4">
       <AnimatePresence mode="wait">
         <motion.div
           key={slide}
@@ -31,7 +31,7 @@ export function WelcomeCarousel() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.35 }}
-          className="grid min-h-[220px] grid-cols-1 gap-5 p-5 md:grid-cols-2"
+          className="grid min-h-55 grid-cols-1 gap-8 p-8 md:grid-cols-2 md:p-10"
         >
           <div className="flex flex-col justify-center">
             <h3 className="mb-1.5 text-balance text-base font-semibold text-zinc-100">
@@ -66,9 +66,9 @@ export function WelcomeCarousel() {
 
       {/* Dots */}
       <div className="absolute bottom-3 right-3 flex items-center gap-1.5">
-        {CAROUSEL_SLIDES.map((_, i) => (
+        {CAROUSEL_SLIDES.map((sl, i) => (
           <button
-            key={i}
+            key={sl.title}
             type="button"
             onClick={() => setSlide(i)}
             aria-label={`Go to slide ${i + 1}`}

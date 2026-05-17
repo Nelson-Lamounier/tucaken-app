@@ -1,6 +1,7 @@
 // src/features/onboarding/components/OnboardingShell.tsx
 
 import { AnimatePresence, motion } from 'motion/react'
+import logo from '@/images/logo.png'
 import { OnboardingBackground } from './OnboardingBackground'
 import { OnboardingProgress } from './OnboardingProgress'
 import { WelcomeStep } from './WelcomeStep'
@@ -22,6 +23,25 @@ const VISIBLE_STEPS = [
   { id: 'connect'   as const, name: 'Connect' },
   { id: 'repos'     as const, name: 'Repositories' },
 ]
+
+/**
+ * Large logo with NO card/border. A static green glow behind the dark
+ * logo keeps it legible against the dark page — no motion.
+ *
+ * Brand green tokens: teal-400 #2dd4bf, emerald-500 #10b981,
+ * tinted highlight teal-100 #ccfbf1.
+ */
+function LogoBadge() {
+  return (
+    <div className="relative grid size-28 place-items-center">
+      <div
+        aria-hidden
+        className="absolute size-36 rounded-full bg-[radial-gradient(circle,rgba(204,251,241,0.6),rgba(45,212,191,0.4)_40%,rgba(16,185,129,0)_70%)] blur-lg"
+      />
+      <img src={logo} alt="Tucaken" className="relative h-24 w-auto" />
+    </div>
+  )
+}
 
 export function OnboardingShell({
   onSubmitPortfolio,
@@ -57,16 +77,13 @@ export function OnboardingShell({
   const isProcessing = s.stepId === 'processing'
 
   return (
-    <div className="dark relative flex min-h-screen w-full items-stretch justify-center overflow-hidden bg-zinc-950 px-4 py-8 text-zinc-200">
+    <div className="dark relative flex min-h-screen w-full items-stretch justify-center overflow-hidden bg-zinc-950 px-3.75 py-8 text-zinc-200">
       <OnboardingBackground />
 
-      <div className="relative flex w-full max-w-3xl flex-col">
+      <div className="relative flex w-full max-w-5xl flex-col">
         <header className="mb-8 flex flex-col gap-6">
           <div className="flex items-center gap-2.5">
-            <div className="grid size-7 place-items-center rounded-lg bg-linear-to-br from-teal-400 to-emerald-600 font-mono text-xs font-bold text-white">
-              t
-            </div>
-            <span className="font-mono text-sm font-semibold tracking-tight text-white">tucaken</span>
+            <LogoBadge />
             <span className="ml-2 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-zinc-400">
               {isProcessing ? 'Setting up…' : 'Get started'}
             </span>
@@ -81,7 +98,7 @@ export function OnboardingShell({
         </header>
 
         <main className="flex-1">
-          <div className="rounded-2xl border border-white/10 bg-zinc-900/40 p-6 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.6)] backdrop-blur-sm md:p-10">
+          <div className="rounded-2xl p-6 md:p-10">
             <AnimatePresence mode="wait">
               <motion.div
                 key={s.stepId}
@@ -90,7 +107,7 @@ export function OnboardingShell({
                 animate="center"
                 exit="exit"
                 transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-                className="min-h-120"
+                className="flex min-h-160 flex-col"
               >
                 {s.stepId === 'welcome' && <WelcomeStep onNext={s.next} />}
 
