@@ -144,7 +144,7 @@ function DatabaseSettingsPage() {
               <div>
                 <button
                   type="button"
-                  onClick={() => setAddingResume(false)}
+                  onClick={() => { setResumeImportId(undefined); setAddingResume(false) }}
                   className="mb-4 text-xs text-zinc-500 transition-colors hover:text-zinc-300"
                 >
                   ← Back to resumes
