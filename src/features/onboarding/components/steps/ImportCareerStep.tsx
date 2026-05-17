@@ -241,7 +241,7 @@ export function ImportCareerStep({ onNext, onSkip, onExtracted }: ImportCareerSt
                   <p className="text-sm font-medium text-zinc-300">
                     Drop your resume here or <span className="text-indigo-400">browse</span>
                   </p>
-                  <p className="mt-1 text-xs text-zinc-600">PDF or DOCX · max 20 MB</p>
+                  <p className="mt-1 text-xs text-zinc-600">PDF or DOCX · max 50 MB</p>
                 </div>
                 <input
                   ref={inputRef}

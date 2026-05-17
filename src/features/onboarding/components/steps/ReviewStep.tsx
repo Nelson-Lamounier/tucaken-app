@@ -39,12 +39,13 @@ export function ReviewStep({ importId, onFinish }: ReviewStepProps) {
 
   const finish = onFinish ?? (() => void navigate({ to: '/overview', replace: true }))
 
-  // Progress is read once to learn whether the gap report is ready.
   const { data: progress } = useQuery({
     queryKey: adminKeys.resumeImports.progress(importId ?? ''),
     queryFn:  () => getImportProgressFn({ data: importId as string }),
     enabled:  !!importId,
-    staleTime: Infinity,
+    // Poll until the gap report is ready, then stop — covers the Settings
+    // path where ReviewStep mounts before gapReportReady flips true.
+    refetchInterval: (query) => (query.state.data?.gapReportReady ? false : 4000),
   })
 
   const { data: entries = [] } = useQuery<CareerEntry[]>({
