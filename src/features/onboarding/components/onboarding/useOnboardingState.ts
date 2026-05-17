@@ -15,6 +15,7 @@ const STEP_INDEX: Record<StepId, number> = {
   connect:    3,
   repos:      4,
   processing: 5,
+  review:     6,
 }
 
 const ID_BY_INDEX: StepId[] = STEPS.map((s) => s.id)
@@ -58,6 +59,10 @@ export function useOnboardingState(initialStepIndex = 0) {
     setData((d) => ({ ...d, reposConnected: connected }))
   }, [])
 
+  const setResumeImportId = useCallback((id: string) => {
+    setData((d) => ({ ...d, resumeImportId: id }))
+  }, [])
+
   return {
     stepIndex,
     stepId,
@@ -69,5 +74,6 @@ export function useOnboardingState(initialStepIndex = 0) {
     setResume,
     setGithubConnected,
     setReposConnected,
+    setResumeImportId,
   }
 }

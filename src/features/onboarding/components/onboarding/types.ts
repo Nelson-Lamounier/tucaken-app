@@ -4,7 +4,7 @@
 
 import type { GitHubInstallation } from '@/lib/types/github.types'
 
-export type StepId = 'welcome' | 'portfolio' | 'resume' | 'connect' | 'repos' | 'processing'
+export type StepId = 'welcome' | 'portfolio' | 'resume' | 'connect' | 'repos' | 'processing' | 'review'
 
 export const STEPS: Array<{ id: StepId; name: string; required: boolean }> = [
   { id: 'welcome',    name: 'Welcome',       required: false },
@@ -13,6 +13,7 @@ export const STEPS: Array<{ id: StepId; name: string; required: boolean }> = [
   { id: 'connect',    name: 'Connect',       required: true  },
   { id: 'repos',      name: 'Repositories',  required: true  },
   { id: 'processing', name: 'Processing',    required: true  },
+  { id: 'review',     name: 'Review',        required: true  },
 ]
 
 export interface ResumeSummary {
@@ -26,6 +27,7 @@ export interface OnboardingData {
   resume?: { fileName: string; summary: ResumeSummary }
   githubConnected: boolean
   reposConnected: boolean
+  resumeImportId?: string
 }
 
 export interface OnboardingShellProps {
