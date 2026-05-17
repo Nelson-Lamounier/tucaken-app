@@ -86,7 +86,9 @@ export function ConnectStep({
       <div
         className={[
           'rounded-[11px] p-5',
-          connected ? 'bg-teal-500/4' : 'bg-zinc-950',
+          connected
+            ? 'bg-linear-to-br from-teal-950 via-zinc-950 to-black'
+            : 'bg-zinc-950',
         ].join(' ')}
       >
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
