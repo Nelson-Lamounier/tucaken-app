@@ -199,18 +199,18 @@ const mockAccessibleRepos = [
   { id: 3, fullName: 'dev-user/infra',         owner: 'dev-user', name: 'infra',         defaultBranch: 'main', private: true,  updatedAt: '2026-04-20T12:00:00.000Z' },
 ]
 
-// Connected repos are stateful so the Step 5 picker replicates the real
-// workflow: clicking "Add" POSTs the repo, it appears as `syncing`, then
-// flips to `complete` after SYNC_MS — driving the connected-repos poll and
-// letting ProcessingStep advance once every repo is terminal. Starts empty
-// (nothing connected until the user adds).
+// Connected repos are stateful so onboarding runs offline: "Add" queues a
+// repo with deferSync (status 'pending', syncStartedAt null); the bulk
+// /connected-repos/sync stamps syncStartedAt so each repo goes
+// pending → syncing → complete (after SYNC_MS), driving the poll and
+// letting ProcessingStep advance once every repo is terminal.
 const SYNC_MS = 6_000
 type MockConnected = {
   repoFullName: string
   owner:        string
   name:         string
   defaultBranch: string
-  addedAt:      number // epoch ms when "Add" was clicked
+  syncStartedAt: number | null // null = queued (pending); ms = sync started
 }
 let mockConnectedRepos: MockConnected[] = []
 
@@ -305,10 +305,20 @@ export function mockApiResponse(path: string, method = 'GET', body?: unknown): u
   if (p === '/github/repos') {
     return { repos: githubInstalled ? mockAccessibleRepos : [] }
   }
+  if (p === '/github/connected-repos/sync' && method === 'POST') {
+    let started = 0
+    const now = Date.now()
+    for (const r of mockConnectedRepos) {
+      if (r.syncStartedAt === null) { r.syncStartedAt = now; started++ }
+    }
+    return { started }
+  }
   if (p === '/github/connected-repos') {
     if (method === 'POST') {
-      const repoFullName = String(parseBody(body)['repoFullName'] ?? '')
-      const defaultBranch = String(parseBody(body)['defaultBranch'] ?? 'main')
+      const parsed = parseBody(body)
+      const repoFullName = String(parsed['repoFullName'] ?? '')
+      const defaultBranch = String(parsed['defaultBranch'] ?? 'main')
+      const deferSync = parsed['deferSync'] === true
       if (repoFullName && !mockConnectedRepos.some((r) => r.repoFullName === repoFullName)) {
         const [owner, ...rest] = repoFullName.split('/')
         mockConnectedRepos.push({
@@ -316,26 +326,33 @@ export function mockApiResponse(path: string, method = 'GET', body?: unknown): u
           owner: owner ?? '',
           name: rest.join('/') || repoFullName,
           defaultBranch,
-          addedAt: Date.now(),
+          // deferSync (onboarding queue) → pending; otherwise (Settings
+          // immediate add) → sync starts now.
+          syncStartedAt: deferSync ? null : Date.now(),
         })
       }
-      return { status: 'queued', repoFullName, jobName: 'mock-ingest-job' }
+      return { status: deferSync ? 'queued' : 'syncing', repoFullName, jobName: deferSync ? null : 'mock-ingest-job' }
     }
     if (!githubInstalled) return { repos: [] }
     const now = Date.now()
     return {
       repos: mockConnectedRepos.map((r) => {
-        const syncing = now - r.addedAt < SYNC_MS
+        const started = r.syncStartedAt
+        let syncStatus: 'pending' | 'syncing' | 'complete'
+        if (started === null) syncStatus = 'pending'
+        else if (now - started < SYNC_MS) syncStatus = 'syncing'
+        else syncStatus = 'complete'
+        const complete = syncStatus === 'complete'
         return {
           repoFullName:  r.repoFullName,
           owner:         r.owner,
           name:          r.name,
           defaultBranch: r.defaultBranch,
-          syncStatus:    syncing ? 'syncing' : 'complete',
-          lastSyncedAt:  syncing ? null : new Date(r.addedAt + SYNC_MS).toISOString(),
-          addedAt:       new Date(r.addedAt).toISOString(),
-          qualityScore:  syncing ? null : 85,
-          classification: syncing ? null : 'project',
+          syncStatus,
+          lastSyncedAt:  complete && started !== null ? new Date(started + SYNC_MS).toISOString() : null,
+          addedAt:       new Date(started ?? now).toISOString(),
+          qualityScore:  complete ? 85 : null,
+          classification: complete ? 'project' : null,
         }
       }),
     }
