@@ -1,5 +1,4 @@
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
-import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { motion } from 'motion/react'
 import { AlertTriangle } from 'lucide-react'
@@ -11,10 +10,8 @@ import { adminKeys } from '@/lib/api/query-keys'
 import { getMeFn } from '@/server/me'
 
 const searchSchema = z.object({
-  installation_id: z.coerce.string().optional(),
-  setup_action:    z.coerce.string().optional(),
-  // Step index (0-based) to restore after GitHub redirects back.
-  // The callback handler sets this to 3 (connect step) so the user lands there.
+  // Step index (0-based) to restore. The /github/callback route sends the
+  // user back here at the connect step after a successful App install.
   step:            z.coerce.number().min(0).max(5).optional(),
 })
 
@@ -41,30 +38,10 @@ function OnboardingPage() {
   const navigate                         = useNavigate()
   const queryClient                      = useQueryClient()
   const { provisioningReady }            = Route.useLoaderData()
-  const { installation_id, step }        = Route.useSearch()
+  const { step }                         = Route.useSearch()
   const { data: installation, isLoading: isLoadingInstallation } = useGitHubInstallation()
 
   const appSlug = import.meta.env.VITE_GITHUB_APP_SLUG as string | undefined
-
-  // Handle the GitHub App installation callback — same pattern as /settings/github.
-  // GitHub redirects here with ?installation_id=...&setup_action=install after the user
-  // completes the App installation flow.
-  useEffect(() => {
-    if (!installation_id) return
-    const id = installation_id
-    async function handleInstall() {
-      try {
-        await handleGitHubInstallFn({ data: { installationId: id } })
-      } catch {
-        // callback error is non-fatal — installation may still have succeeded
-      } finally {
-        await queryClient.invalidateQueries({ queryKey: adminKeys.github.installation() })
-        // Remove installation_id from the URL and land on the connect step.
-        void navigate({ to: '/onboarding', replace: true, search: { step: CONNECT_STEP_INDEX } })
-      }
-    }
-    void handleInstall()
-  }, [installation_id, navigate, queryClient])
 
   return (
     <div className="relative">
@@ -84,6 +61,20 @@ function OnboardingPage() {
       )}
       <OnboardingShell
         onConnectGithub={() => {
+          // Dev-mock: don't leave the app for github.com — simulate the
+          // App-install callback locally so connect → repos → processing
+          // is testable offline.
+          if (import.meta.env.VITE_MOCK_AUTH === 'true') {
+            void (async () => {
+              try {
+                await handleGitHubInstallFn({ data: { installationId: 'mock-installation' } })
+              } finally {
+                await queryClient.invalidateQueries({ queryKey: adminKeys.github.installation() })
+                void navigate({ to: '/onboarding', replace: true, search: { step: CONNECT_STEP_INDEX } })
+              }
+            })()
+            return
+          }
           if (appSlug) {
             // Flag so the settings-page callback handler redirects back to onboarding
             // instead of staying on /settings/github (GitHub App Setup URL is fixed).

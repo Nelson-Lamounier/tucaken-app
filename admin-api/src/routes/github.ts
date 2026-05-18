@@ -48,6 +48,7 @@ import {
 import { getBatchApi } from '../lib/k8s.js';
 import { traceParentEnv, observabilityEnv } from '../lib/k8s-job-builder.js';
 import { getPool } from '../lib/pg.js';
+import { secondsUntilNextMonthUTC } from '../lib/retry-after.js';
 import { AdminApiBindings, requireUserId } from '../lib/types.js';
 
 // Push events: skip re-index if a job was already triggered within this window.
@@ -657,7 +658,7 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         const conn = await getConnection(pool, uid);
         if (!conn?.installation_id) return ctx.json({ error: 'GitHub not connected' }, 400);
 
-        let body: { repoFullName?: string; defaultBranch?: string; forceReindex?: boolean };
+        let body: { repoFullName?: string; defaultBranch?: string; forceReindex?: boolean; deferSync?: boolean };
         try { body = await ctx.req.json(); }
         catch { return ctx.json({ error: 'Body must be valid JSON' }, 400); }
 
@@ -667,6 +668,15 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         }
         const defaultBranch = body.defaultBranch?.trim() || 'main';
         const forceReindex  = body.forceReindex === true;
+
+        // deferSync (onboarding queue): connect the repo as 'pending' only —
+        // no quota consumed, no Job dispatched. POST /connected-repos/sync
+        // dispatches the actual ingestion for every queued repo later.
+        if (body.deferSync === true) {
+            await insertRepository(pool, uid, repoFullName, defaultBranch);
+            await markRepoPending(pool, uid, repoFullName);
+            return ctx.json({ status: 'queued', repoFullName, jobName: null }, 202);
+        }
 
         const [appId, key] = requireGitHubConfig(config);
 
@@ -679,6 +689,7 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         const limit = getPlanLimit(plan);
         const allowed = await checkAndIncrementQuota(pool, uid, limit);
         if (!allowed) {
+            ctx.header('Retry-After', String(secondsUntilNextMonthUTC()));
             return ctx.json({ error: `Monthly ingestion limit of ${FREE_PLAN_LIMIT} reached. Upgrade to Pro for unlimited syncs.` }, 429);
         }
 
@@ -700,6 +711,42 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
             await decrementQuota(pool, uid).catch(() => {});
             throw err;
         }
+    });
+
+    // -------------------------------------------------------------------------
+    // POST /connected-repos/sync — dispatch ingestion Jobs for every repo the
+    // caller queued via deferSync (status 'pending', never sync-triggered).
+    // Quota is consumed here, at dispatch time — not at deferred connect.
+    // Returns { started } = how many Jobs were actually dispatched.
+    // -------------------------------------------------------------------------
+    router.post('/connected-repos/sync', async (ctx) => {
+        const pool = getPool(config);
+        const uid  = requireUserId(ctx);
+        if (!uid) return ctx.json({ error: 'Authenticated subject missing' }, 401);
+        const conn = await getConnection(pool, uid);
+        if (!conn?.installation_id) return ctx.json({ error: 'GitHub not connected' }, 400);
+
+        const { rows: pending } = await pool.query<{ full_name: string; default_branch: string }>(
+            `SELECT r.full_name, r.default_branch
+             FROM repositories r
+             JOIN repo_sync_state s
+               ON s.user_id = r.user_id AND s.repo_full_name = r.full_name
+             WHERE r.user_id = $1::uuid AND r.provider = 'github'
+               AND s.sync_status = 'pending' AND s.last_sync_triggered_at IS NULL`,
+            [uid],
+        );
+        if (pending.length === 0) return ctx.json({ started: 0 });
+
+        const [appId, key] = requireGitHubConfig(config);
+        const { rows: planRows } = await pool.query<{ plan: string }>(
+            `SELECT plan FROM users WHERE id = $1::uuid`,
+            [uid],
+        );
+        const plan  = planRows[0]?.plan ?? 'free';
+        const token = await generateInstallationToken(appId, key, conn.installation_id);
+        const queued = await autoDispatchRepos(config, pool, uid, plan, pending, token, false);
+
+        return ctx.json({ started: queued.length });
     });
 
     // -------------------------------------------------------------------------

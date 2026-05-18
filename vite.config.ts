@@ -43,6 +43,23 @@ function copyStylesFixedName(isSsrBuild: boolean): Plugin {
   }
 }
 
+// Dev-only: when MOCK_AUTH=true the mocked presigned upload URL is
+// `/__mock-s3`. The browser PUTs the file bytes there; this middleware
+// answers 204 so ImportCareerStep's upload step resolves without S3.
+function mockS3Upload(): Plugin {
+  return {
+    name: 'mock-s3-upload',
+    apply: 'serve',
+    configureServer(server) {
+      if (process.env['MOCK_AUTH'] !== 'true') return
+      server.middlewares.use('/__mock-s3', (_req, res) => {
+        res.statusCode = 204
+        res.end()
+      })
+    },
+  }
+}
+
 const config = defineConfig(({ isSsrBuild }) => ({
   base: '/',
   resolve: {
@@ -65,6 +82,7 @@ const config = defineConfig(({ isSsrBuild }) => ({
     tanstackStart({ router: { routesDirectory: 'app' } }),
     viteReact(),
     copyStylesFixedName(isSsrBuild ?? false),
+    mockS3Upload(),
   ].filter(Boolean),
 }))
 

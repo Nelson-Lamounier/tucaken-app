@@ -3,35 +3,51 @@
 // Step 1 of the first-run flow. Greets the new user, runs the
 // auto-advancing carousel, and offers a single "Get started" CTA.
 
+import { useState } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
 import { COPY } from './content'
 import { StepHeader } from './StepHeader'
 import { WelcomeCarousel } from './WelcomeCarousel'
 import { ArrowRight } from 'lucide-react'
+import { MotionButton } from '@/components/ui/MotionButton'
 
 interface Props {
   onNext: () => void
 }
 
-export function WelcomeStep({ onNext }: Props) {
+export function WelcomeStep({ onNext }: Readonly<Props>) {
+  // Carousel stays hidden until the intro copy has finished typing.
+  const [introDone, setIntroDone] = useState(false)
+
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex flex-1 flex-col">
       <StepHeader
         eyebrow={COPY.welcome.eyebrow}
         title={COPY.welcome.title}
         sub={COPY.welcome.sub}
+        typewriter
+        onTypingComplete={() => setIntroDone(true)}
       />
 
-      <WelcomeCarousel />
+      <AnimatePresence>
+        {introDone && (
+          <motion.div
+            key="welcome-carousel"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+            style={{ willChange: 'transform, opacity' }}
+          >
+            <WelcomeCarousel />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <div className="mt-8 flex justify-end">
-        <button
-          type="button"
-          onClick={onNext}
-          className="inline-flex items-center gap-2 whitespace-nowrap rounded-md bg-teal-500 px-5 py-2 text-xs font-semibold text-zinc-950 shadow-[0_8px_30px_-12px_rgba(20,184,166,0.6)] transition hover:bg-teal-400"
-        >
+      <div className="mt-auto flex justify-end pt-8">
+        <MotionButton variant="primary" size="lg" onClick={onNext}>
           {COPY.welcome.cta}
           <ArrowRight className="size-3.5" strokeWidth={2.5} />
-        </button>
+        </MotionButton>
       </div>
     </div>
   )

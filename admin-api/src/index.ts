@@ -49,6 +49,24 @@ import { createDraftsRouter } from './routes/drafts.js';
 // ArgoCD) rather than a runtime error hours later on the first request.
 const config = loadConfig();
 
+// ── Global crash safety nets ─────────────────────────────────────────────────
+// Hono's onError only catches errors thrown inside the request lifecycle. A
+// rejection or throw escaping that path (background task, event callback)
+// would kill the process with no structured log. Log with full context, then
+// exit non-zero — the process state is undefined after an uncaught exception,
+// so Kubernetes should restart a clean pod rather than keep serving.
+process.on('unhandledRejection', (reason) => {
+  appLogger.fatal(
+    { err: reason instanceof Error ? reason : new Error(String(reason)) },
+    'unhandledRejection — exiting',
+  );
+  process.exit(1);
+});
+process.on('uncaughtException', (err) => {
+  appLogger.fatal({ err }, 'uncaughtException — exiting');
+  process.exit(1);
+});
+
 // ── Application ──────────────────────────────────────────────────────────────
 const app = new Hono();
 

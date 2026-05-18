@@ -15,6 +15,7 @@ import { Route as LoginRouteImport } from './app/login'
 import { Route as DashboardRouteImport } from './app/_dashboard'
 import { Route as IndexRouteImport } from './app/index'
 import { Route as SignInCallbackRouteImport } from './app/sign-in.callback'
+import { Route as GithubCallbackRouteImport } from './app/github.callback'
 import { Route as DashboardTestRouteImport } from './app/_dashboard.test'
 import { Route as DashboardResumesRouteImport } from './app/_dashboard.resumes'
 import { Route as DashboardResumeThemeRouteImport } from './app/_dashboard.resume-theme'
@@ -29,6 +30,7 @@ import { Route as DashboardAiAgentRouteImport } from './app/_dashboard.ai-agent'
 import { Route as DashboardSplatRouteImport } from './app/_dashboard.$'
 import { Route as DashboardSettingsIndexRouteImport } from './app/_dashboard.settings.index'
 import { Route as DashboardApplicationsIndexRouteImport } from './app/_dashboard.applications.index'
+import { Route as ArticlesPreviewSlugRouteImport } from './app/articles.preview.$slug'
 import { Route as DashboardSettingsGithubRouteImport } from './app/_dashboard.settings.github'
 import { Route as DashboardResumesNewRouteImport } from './app/_dashboard.resumes.new'
 import { Route as DashboardApplicationsNewRouteImport } from './app/_dashboard.applications.new'
@@ -65,6 +67,11 @@ const SignInCallbackRoute = SignInCallbackRouteImport.update({
   id: '/callback',
   path: '/callback',
   getParentRoute: () => SignInRoute,
+} as any)
+const GithubCallbackRoute = GithubCallbackRouteImport.update({
+  id: '/github/callback',
+  path: '/github/callback',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardTestRoute = DashboardTestRouteImport.update({
   id: '/test',
@@ -137,6 +144,11 @@ const DashboardApplicationsIndexRoute =
     path: '/applications/',
     getParentRoute: () => DashboardRoute,
   } as any)
+const ArticlesPreviewSlugRoute = ArticlesPreviewSlugRouteImport.update({
+  id: '/articles/preview/$slug',
+  path: '/articles/preview/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardSettingsGithubRoute = DashboardSettingsGithubRouteImport.update({
   id: '/settings/github',
   path: '/settings/github',
@@ -194,6 +206,7 @@ export interface FileRoutesByFullPath {
   '/resume-theme': typeof DashboardResumeThemeRoute
   '/resumes': typeof DashboardResumesRouteWithChildren
   '/test': typeof DashboardTestRoute
+  '/github/callback': typeof GithubCallbackRoute
   '/sign-in/callback': typeof SignInCallbackRoute
   '/applications/$slug': typeof DashboardApplicationsSlugRoute
   '/applications/interview-prep': typeof DashboardApplicationsInterviewPrepRoute
@@ -201,6 +214,7 @@ export interface FileRoutesByFullPath {
   '/applications/new': typeof DashboardApplicationsNewRoute
   '/resumes/new': typeof DashboardResumesNewRoute
   '/settings/github': typeof DashboardSettingsGithubRoute
+  '/articles/preview/$slug': typeof ArticlesPreviewSlugRoute
   '/applications/': typeof DashboardApplicationsIndexRoute
   '/settings/': typeof DashboardSettingsIndexRoute
   '/resumes/edit/$id': typeof DashboardResumesEditIdRoute
@@ -222,6 +236,7 @@ export interface FileRoutesByTo {
   '/resume-theme': typeof DashboardResumeThemeRoute
   '/resumes': typeof DashboardResumesRouteWithChildren
   '/test': typeof DashboardTestRoute
+  '/github/callback': typeof GithubCallbackRoute
   '/sign-in/callback': typeof SignInCallbackRoute
   '/applications/$slug': typeof DashboardApplicationsSlugRoute
   '/applications/interview-prep': typeof DashboardApplicationsInterviewPrepRoute
@@ -229,6 +244,7 @@ export interface FileRoutesByTo {
   '/applications/new': typeof DashboardApplicationsNewRoute
   '/resumes/new': typeof DashboardResumesNewRoute
   '/settings/github': typeof DashboardSettingsGithubRoute
+  '/articles/preview/$slug': typeof ArticlesPreviewSlugRoute
   '/applications': typeof DashboardApplicationsIndexRoute
   '/settings': typeof DashboardSettingsIndexRoute
   '/resumes/edit/$id': typeof DashboardResumesEditIdRoute
@@ -252,6 +268,7 @@ export interface FileRoutesById {
   '/_dashboard/resume-theme': typeof DashboardResumeThemeRoute
   '/_dashboard/resumes': typeof DashboardResumesRouteWithChildren
   '/_dashboard/test': typeof DashboardTestRoute
+  '/github/callback': typeof GithubCallbackRoute
   '/sign-in/callback': typeof SignInCallbackRoute
   '/_dashboard/applications/$slug': typeof DashboardApplicationsSlugRoute
   '/_dashboard/applications/interview-prep': typeof DashboardApplicationsInterviewPrepRoute
@@ -259,6 +276,7 @@ export interface FileRoutesById {
   '/_dashboard/applications/new': typeof DashboardApplicationsNewRoute
   '/_dashboard/resumes/new': typeof DashboardResumesNewRoute
   '/_dashboard/settings/github': typeof DashboardSettingsGithubRoute
+  '/articles/preview/$slug': typeof ArticlesPreviewSlugRoute
   '/_dashboard/applications/': typeof DashboardApplicationsIndexRoute
   '/_dashboard/settings/': typeof DashboardSettingsIndexRoute
   '/_dashboard/resumes/edit/$id': typeof DashboardResumesEditIdRoute
@@ -282,6 +300,7 @@ export interface FileRouteTypes {
     | '/resume-theme'
     | '/resumes'
     | '/test'
+    | '/github/callback'
     | '/sign-in/callback'
     | '/applications/$slug'
     | '/applications/interview-prep'
@@ -289,6 +308,7 @@ export interface FileRouteTypes {
     | '/applications/new'
     | '/resumes/new'
     | '/settings/github'
+    | '/articles/preview/$slug'
     | '/applications/'
     | '/settings/'
     | '/resumes/edit/$id'
@@ -310,6 +330,7 @@ export interface FileRouteTypes {
     | '/resume-theme'
     | '/resumes'
     | '/test'
+    | '/github/callback'
     | '/sign-in/callback'
     | '/applications/$slug'
     | '/applications/interview-prep'
@@ -317,6 +338,7 @@ export interface FileRouteTypes {
     | '/applications/new'
     | '/resumes/new'
     | '/settings/github'
+    | '/articles/preview/$slug'
     | '/applications'
     | '/settings'
     | '/resumes/edit/$id'
@@ -339,6 +361,7 @@ export interface FileRouteTypes {
     | '/_dashboard/resume-theme'
     | '/_dashboard/resumes'
     | '/_dashboard/test'
+    | '/github/callback'
     | '/sign-in/callback'
     | '/_dashboard/applications/$slug'
     | '/_dashboard/applications/interview-prep'
@@ -346,6 +369,7 @@ export interface FileRouteTypes {
     | '/_dashboard/applications/new'
     | '/_dashboard/resumes/new'
     | '/_dashboard/settings/github'
+    | '/articles/preview/$slug'
     | '/_dashboard/applications/'
     | '/_dashboard/settings/'
     | '/_dashboard/resumes/edit/$id'
@@ -357,6 +381,8 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
   SignInRoute: typeof SignInRouteWithChildren
+  GithubCallbackRoute: typeof GithubCallbackRoute
+  ArticlesPreviewSlugRoute: typeof ArticlesPreviewSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -402,6 +428,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/sign-in/callback'
       preLoaderRoute: typeof SignInCallbackRouteImport
       parentRoute: typeof SignInRoute
+    }
+    '/github/callback': {
+      id: '/github/callback'
+      path: '/github/callback'
+      fullPath: '/github/callback'
+      preLoaderRoute: typeof GithubCallbackRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_dashboard/test': {
       id: '/_dashboard/test'
@@ -500,6 +533,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/applications/'
       preLoaderRoute: typeof DashboardApplicationsIndexRouteImport
       parentRoute: typeof DashboardRoute
+    }
+    '/articles/preview/$slug': {
+      id: '/articles/preview/$slug'
+      path: '/articles/preview/$slug'
+      fullPath: '/articles/preview/$slug'
+      preLoaderRoute: typeof ArticlesPreviewSlugRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_dashboard/settings/github': {
       id: '/_dashboard/settings/github'
@@ -632,6 +672,8 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
   SignInRoute: SignInRouteWithChildren,
+  GithubCallbackRoute: GithubCallbackRoute,
+  ArticlesPreviewSlugRoute: ArticlesPreviewSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

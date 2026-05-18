@@ -13,6 +13,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { getCookie, deleteCookie } from '@tanstack/react-start/server'
 import { verifyCognitoJwt } from '@/lib/auth/tanstack-auth'
 import { securityHeadersMiddleware } from './security-headers'
+import { MOCK_AUTH, MOCK_USER } from './_dev-mock'
 
 // =============================================================================
 // Types
@@ -41,6 +42,8 @@ export interface AuthState {
 export const getUserSessionFn = createServerFn({ method: 'GET' })
   .middleware([securityHeadersMiddleware])
   .handler(async (): Promise<AuthUser | null> => {
+    if (MOCK_AUTH) return MOCK_USER
+
     const token = getCookie('__session')
     if (!token) return null
 

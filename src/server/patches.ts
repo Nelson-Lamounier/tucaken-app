@@ -22,6 +22,26 @@ import {
 } from '../lib/observability/metrics';
 
 // ---------------------------------------------------------------------------
+// Global crash safety nets
+// ---------------------------------------------------------------------------
+// Without these, an unhandled rejection or thrown error escaping the request
+// path terminates the process with no structured log — invisible in Loki and
+// indistinguishable from an OOM kill. Log with full context, then exit non-zero
+// so Kubernetes restarts a clean pod (the process state is undefined after an
+// uncaught exception; continuing to serve is unsafe).
+process.on('unhandledRejection', (reason) => {
+  logger.fatal(
+    { err: reason instanceof Error ? reason : new Error(String(reason)) },
+    'unhandledRejection — exiting',
+  );
+  process.exit(1);
+});
+process.on('uncaughtException', (err) => {
+  logger.fatal({ err }, 'uncaughtException — exiting');
+  process.exit(1);
+});
+
+// ---------------------------------------------------------------------------
 // SSR server export type
 // ---------------------------------------------------------------------------
 /**

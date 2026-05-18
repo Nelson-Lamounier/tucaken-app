@@ -20,7 +20,7 @@ describe('useOnboardingState', () => {
 
   it('clamps initialStepIndex to valid range', () => {
     const { result } = renderHook(() => useOnboardingState(99))
-    expect(result.current.stepIndex).toBe(5) // processing is last
+    expect(result.current.stepIndex).toBe(6) // review is last
   })
 
   it('advances through steps with next()', () => {
@@ -30,9 +30,9 @@ describe('useOnboardingState', () => {
   })
 
   it('does not advance past the last step', () => {
-    const { result } = renderHook(() => useOnboardingState(5))
+    const { result } = renderHook(() => useOnboardingState(6))
     act(() => result.current.next())
-    expect(result.current.stepIndex).toBe(5)
+    expect(result.current.stepIndex).toBe(6)
   })
 
   it('goes back with back()', () => {
@@ -59,5 +59,25 @@ describe('useOnboardingState', () => {
     expect(result.current.data.reposConnected).toBe(false)
     act(() => result.current.setReposConnected(true))
     expect(result.current.data.reposConnected).toBe(true)
+  })
+
+  it('jumpTo navigates to the review step', () => {
+    const { result } = renderHook(() => useOnboardingState())
+    act(() => result.current.jumpTo('review'))
+    expect(result.current.stepId).toBe('review')
+    expect(result.current.stepIndex).toBe(6)
+  })
+
+  it('reaches review as the terminal step via next()', () => {
+    const { result } = renderHook(() => useOnboardingState(5))
+    act(() => result.current.next())
+    expect(result.current.stepId).toBe('review')
+  })
+
+  it('setResumeImportId updates data', () => {
+    const { result } = renderHook(() => useOnboardingState())
+    expect(result.current.data.resumeImportId).toBeUndefined()
+    act(() => result.current.setResumeImportId('imp-123'))
+    expect(result.current.data.resumeImportId).toBe('imp-123')
   })
 })

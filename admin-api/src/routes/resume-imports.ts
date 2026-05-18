@@ -37,6 +37,7 @@ import type { AdminApiConfig } from '../lib/config.js';
 import { getJobImage, isImageConfigured, isAssetsBucketConfigured } from '../lib/config.js';
 import { getBatchApi } from '../lib/k8s.js';
 import { getPool } from '../lib/pg.js';
+import { secondsUntilNextMonthUTC } from '../lib/retry-after.js';
 import {
   createResumeImport,
   markUploadComplete,
@@ -246,6 +247,7 @@ export function createResumeImportsRouter(config: AdminApiConfig): Hono<AdminApi
     if (!isAdmin && planStatus?.effectivePlan === 'free') {
       const used = await countImportsThisMonth(pool, userId);
       if (used >= FREE_TIER_IMPORTS_PER_MONTH) {
+        ctx.header('Retry-After', String(secondsUntilNextMonthUTC()));
         return ctx.json({
           error: 'Free tier allows 1 resume import per month. Upgrade to Pro for unlimited imports.',
           upgradeUrl: '/pricing',

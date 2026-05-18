@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/Button'
 import { GitHubRepoChip } from './GitHubRepoChip'
 import { GitHubSyncStatusBadge } from './GitHubSyncStatusBadge'
+import { SyncProgressBar } from './SyncProgressBar'
 import { adminKeys } from '@/lib/api/query-keys'
 import { triggerGitHubIngestionFn, removeConnectedRepoFn } from '@/server/github'
 import { useToastStore } from '@/lib/stores/toast-store'
@@ -78,7 +79,11 @@ export function GitHubConnectedRepos({ connectedRepos }: GitHubConnectedReposPro
               >
                 <div className="flex items-center gap-2 flex-wrap">
                   <GitHubRepoChip fullName={repo.repoFullName} />
-                  <GitHubSyncStatusBadge status={repo.syncStatus} />
+                  {isSyncing ? (
+                    <SyncProgressBar />
+                  ) : (
+                    <GitHubSyncStatusBadge status={repo.syncStatus} />
+                  )}
                   {repo.syncStatus === 'complete' && lastSynced && (
                     <span className="text-[10px] text-zinc-600">{lastSynced}</span>
                   )}

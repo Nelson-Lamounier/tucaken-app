@@ -81,14 +81,31 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 })
 
 function ErrorComponent({ error }: { error: unknown }) {
+  // Stack traces and raw error payloads can leak internal paths, env, and
+  // dependency versions. Show them only in dev; production gets a generic
+  // message so nothing sensitive reaches the browser.
+  const isDev = import.meta.env.DEV
+
   return (
     <RootDocument>
       <div className="p-4 bg-red-50 dark:bg-red-950 text-red-900 dark:text-red-200 h-screen w-screen overflow-auto">
-        <h1 className="text-xl font-bold">Root Error Boundary</h1>
-        <p className="mt-2 font-semibold">{error instanceof Error ? error.message : 'Unknown error'}</p>
-        <pre className="mt-4 p-4 bg-black/10 dark:bg-white/5 rounded overflow-x-auto text-sm">
-          {error instanceof Error ? error.stack : JSON.stringify(error)}
-        </pre>
+        <h1 className="text-xl font-bold">Something went wrong</h1>
+        <p className="mt-2 font-semibold">
+          {isDev && error instanceof Error
+            ? error.message
+            : 'An unexpected error occurred. Please try again or return to the dashboard.'}
+        </p>
+        {isDev && (
+          <pre className="mt-4 p-4 bg-black/10 dark:bg-white/5 rounded overflow-x-auto text-sm">
+            {error instanceof Error ? error.stack : JSON.stringify(error)}
+          </pre>
+        )}
+        <Link
+          to="/overview"
+          className="inline-block mt-6 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-lg font-medium transition-colors"
+        >
+          Return to Dashboard
+        </Link>
       </div>
     </RootDocument>
   )

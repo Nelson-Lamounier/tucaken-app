@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { GitHubRepoChip } from './GitHubRepoChip'
 import { UpgradeLimitBanner } from './UpgradeLimitBanner'
 import { useGitHubIngestion } from '../hooks/use-github-ingestion'
+import { useGitHubQueueRepo } from '../hooks/use-github-queue-repo'
 import type { GitHubAccessibleRepo, ConnectedRepo } from '@/lib/types/github.types'
 
 const PAGE_SIZE = 10
@@ -13,15 +14,24 @@ interface GitHubRepoPickerProps {
   readonly isLoading: boolean
   readonly connectedRepos: ConnectedRepo[] | undefined
   readonly maxRepos?: number
+  /** 'sync' = immediate ingestion (Settings, default). 'queue' = deferSync queue (onboarding). */
+  readonly mode?: 'sync' | 'queue'
 }
 
-export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos, maxRepos }: GitHubRepoPickerProps) {
+export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos, maxRepos, mode = 'sync' }: GitHubRepoPickerProps) {
   const [search, setSearch] = useState('')
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const [queuingRepos, setQueuingRepos] = useState<Set<string>>(new Set())
-  const ingestion = useGitHubIngestion()
+  const syncIngestion = useGitHubIngestion()
+  const queueIngestion = useGitHubQueueRepo()
+  const ingestion = mode === 'queue' ? queueIngestion : syncIngestion
 
-  const connectedCount = connectedRepos?.length ?? 0
+  // In queue mode the cap applies to QUEUED (pending) repos only; in sync
+  // mode it's the total connected count (Settings behaviour unchanged).
+  const connectedCount =
+    mode === 'queue'
+      ? (connectedRepos ?? []).filter((r) => r.syncStatus === 'pending').length
+      : connectedRepos?.length ?? 0
   const atCap = maxRepos !== undefined && connectedCount >= maxRepos
 
   const connectedSet = useMemo(
@@ -63,7 +73,20 @@ export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos, m
   return (
     <div className="space-y-3">
       {ingestion.needsUpgrade && (
-        <UpgradeLimitBanner onDismiss={ingestion.dismissUpgrade} />
+        mode === 'queue' ? (
+          <div className="flex items-start justify-between gap-3 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-300">
+            <span>Repository limit reached — remove a queued repo to add a different one.</span>
+            <button
+              type="button"
+              onClick={ingestion.dismissUpgrade}
+              className="shrink-0 text-amber-400/70 transition hover:text-amber-200"
+            >
+              Dismiss
+            </button>
+          </div>
+        ) : (
+          <UpgradeLimitBanner onDismiss={ingestion.dismissUpgrade} />
+        )
       )}
     <div className="rounded-lg border border-white/10 overflow-hidden">
       <div className="flex items-center justify-between border-b border-white/[0.08] px-4 py-3">

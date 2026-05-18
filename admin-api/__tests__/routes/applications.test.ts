@@ -159,11 +159,30 @@ describe('GET /:slug — application detail', () => {
   it('returns 200 with assembled application detail', async () => {
     pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
     poolQueryMock
-      // pipeline_runs (analysis)
+      // pipeline_runs (analysis + research, raw pipeline field names)
       .mockResolvedValueOnce({
         rows: [{
           id: 'run-1',
-          metadata: { analysis: { fitRating: 'STRONG' } },
+          metadata: {
+            analysis: {
+              analysisXml:       '<analysis/>',
+              coverLetter:       'Dear hiring team',
+              resumeSuggestions: ['Add Kubernetes'],
+              tailoredResumeData: { basics: { name: 'Raw Blob' } },
+            },
+            research: {
+              fitSummary:       'Strong fit',
+              overallFitRating: 'STRONG MATCH',
+              verifiedMatches:  [{ skill: 'AWS', sourceCitation: 'cv', depth: 'deep', recency: 'current' }],
+              gaps:             [{ skill: 'Go', gapType: 'missing', impactSeverity: 'blocking' }],
+              experienceSignals: {
+                yearsExpected:        5,
+                domainExperience:     'fintech',
+                leadershipExpectation: 'tech-lead',
+                scaleIndicators:      'hyperscale',
+              },
+            },
+          },
           created_at: new Date('2026-04-02T00:00:00Z'),
         }],
       })
@@ -193,9 +212,38 @@ describe('GET /:slug — application detail', () => {
     expect(body.application['targetCompany']).toBe('Acme');
     expect(body.application['targetRole']).toBe('Senior Engineer');
     expect(body.application['status']).toBe('analysing');
-    expect(body.application['analysis']).toEqual({ fitRating: 'STRONG' });
+    // analysis: raw strategist output mapped to AnalysisOutput shape;
+    // tailoredResume prefers the validated resumes row over the raw blob.
+    expect(body.application['analysis']).toEqual({
+      analysisXml:       '<analysis/>',
+      coverLetter:       'Dear hiring team',
+      metadata:          null,
+      resumeSuggestions: ['Add Kubernetes'],
+      tailoredResume:    { basics: { name: 'Nelson' } },
+    });
+    // research: pipeline field names normalised to UI ResearchOutput shape.
+    expect(body.application['research']).toEqual({
+      fitSummary:     'Strong fit',
+      fitRating:      'STRONG_MATCH',
+      verifiedMatches: [{ skill: 'AWS', sourceCitation: 'cv', depthBadge: 'deep', recency: 'current' }],
+      partialMatches: [],
+      gaps:           [{ skill: 'Go', gapType: 'missing', severity: 'blocking', isDisqualifying: true }],
+      experienceSignals: {
+        yearsExpected: 5,
+        domain:        'fintech',
+        leadership:    'tech-lead',
+        scale:         'hyperscale',
+      },
+      technologyInventory: null,
+    });
     expect(body.application['latestAnalysisRunId']).toBe('run-1');
-    expect(body.application['tailoredResume']).toEqual({ basics: { name: 'Nelson' } });
+    expect(body.application['context']).toEqual({
+      pipelineId:               'run-1',
+      cumulativeInputTokens:    0,
+      cumulativeOutputTokens:   0,
+      cumulativeThinkingTokens: 0,
+      cumulativeCostUsd:        0,
+    });
     expect(body.application['coaching']).toEqual({
       technical: {
         topics:    { topics: ['x'] },
@@ -215,8 +263,8 @@ describe('GET /:slug — application detail', () => {
     const res = await buildApp().request('/app-uuid-1');
     const body = (await res.json()) as { application: Record<string, unknown> };
     expect(body.application['analysis']).toBeNull();
+    expect(body.application['research']).toBeNull();
     expect(body.application['latestAnalysisRunId']).toBeNull();
-    expect(body.application['tailoredResume']).toBeNull();
     expect(body.application['coaching']).toEqual({});
   });
 });

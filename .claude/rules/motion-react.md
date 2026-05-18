@@ -12,6 +12,13 @@ You're an expert in React, TypeScript, Framer Motion, Motion for React and web a
 
 Framer Motion is now called Motion for React. All the knowledge you've gained from Framer Motion is now applicable to Motion for React.
 
+## Reference sources (use before guessing)
+
+1. **`motion` skill** (`~/.claude/skills/motion/`) — Motion+ guidance for React/Vue/Vanilla. Auto-triggers on animation tasks.
+2. **Motion Studio MCP** — registered as `motion` in `~/.claude.json`. Exposes AI context (full docs, 330+ examples, saved transitions) + CSS spring generation. Use its tools for paid examples and spring tuning.
+3. **Sibling skills**: `css-spring`, `motion-audit`, `see-transition` for spring curves, perf audits, and easing visualisation.
+4. **context7 MCP** — fallback for live `motion/react` API docs.
+
 ## Importing
 
 - Never import from `framer-motion`.

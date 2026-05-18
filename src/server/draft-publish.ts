@@ -88,8 +88,9 @@ export const publishDraftFn = createServerFn({ method: 'POST' })
     }
 
     try {
-      // Step 1 — upload draft to S3 at drafts/<slug>.md.
-      const upload = await apiFetch<{ uploaded: boolean; slug: string; key: string }>(
+      // Step 1 — upload draft to S3 at drafts/<slug>.md. Awaited for the
+      // side effect; the response body is unused.
+      await apiFetch<{ uploaded: boolean; slug: string; key: string }>(
         `/drafts/${encodeURIComponent(slug)}`,
         {
           method: 'POST',
