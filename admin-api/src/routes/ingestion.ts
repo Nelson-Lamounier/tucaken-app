@@ -15,16 +15,12 @@ import { createHash } from 'node:crypto';
 
 import type { V1Job } from '@kubernetes/client-node';
 import { Hono } from 'hono';
-import type { JWTPayload } from 'jose';
 
+import type { AdminApiBindings } from '../lib/types.js';
 import type { AdminApiConfig } from '../lib/config.js';
 import { getJobImage, isImageConfigured } from '../lib/config.js';
 import { getBatchApi } from '../lib/k8s.js';
 import { traceParentEnv, observabilityEnv } from '../lib/k8s-job-builder.js';
-
-type AdminApiBindings = {
-    Variables: { jwtPayload: JWTPayload };
-};
 
 const REPO_FULL_NAME_RE = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/;
 const MAX_NAME_LEN = 63;
