@@ -7,7 +7,7 @@
  *
  * Routes:
  *   POST /api/admin/ingestion/trigger — accepts { repoFullName, forceReindex? }
- *                                       (userId is sourced from the JWT subject)
+ *                                       (userId = provisioned platform users.id)
  *                                       creates a Job in the ingestion namespace,
  *                                       returns 202 { status, jobName }.
  */
@@ -113,9 +113,12 @@ export function createIngestionRouter(config: AdminApiConfig): Hono<AdminApiBind
     const router = new Hono<AdminApiBindings>();
 
     router.post('/trigger', async (ctx) => {
-        const jwtPayload = ctx.get('jwtPayload');
-        const userId = typeof jwtPayload?.sub === 'string' ? jwtPayload.sub : '';
-        if (!userId) return ctx.json({ error: 'Authenticated subject missing' }, 401);
+        // The provisioned platform users.id (set by userProvisionMiddleware),
+        // NOT the Cognito sub. repository_profiles.user_id FKs to users.id,
+        // so passing the sub here violates the FK on every run. Matches the
+        // strategist/article pipeline routes.
+        const userId = ctx.get('userId');
+        if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
 
         let body: TriggerBody;
         try {
