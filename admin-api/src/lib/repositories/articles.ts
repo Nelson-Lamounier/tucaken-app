@@ -15,6 +15,9 @@ export interface Article {
     aiModel:     string | null;
     publishedAt: Date | null;
     coverImage:  string | null;
+    /** users.id of the owner. Set on the article-job placeholder so
+     *  AI-generated articles are attributed; preserved on re-upsert. */
+    authorId?:   string | null;
     createdAt?:  Date | undefined;
     updatedAt?:  Date | undefined;
 }
@@ -34,6 +37,7 @@ function rowToArticle(row: Record<string, unknown>): Article {
         aiModel:     row['ai_model']     as string | null,
         publishedAt: row['published_at'] ? new Date(row['published_at'] as string) : null,
         coverImage:  row['cover_image']  as string | null,
+        authorId:    (row['author_id']   as string | null) ?? null,
         createdAt:   row['created_at']   ? new Date(row['created_at']   as string) : undefined,
         updatedAt:   row['updated_at']   ? new Date(row['updated_at']   as string) : undefined,
     };
@@ -43,8 +47,8 @@ export async function upsertArticle(pool: Queryable, article: Article): Promise<
     await pool.query(
         `INSERT INTO articles
              (slug, title, excerpt, content_md, tags, status, ai_generated, ai_model,
-              published_at, cover_image)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+              published_at, cover_image, author_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          ON CONFLICT (slug) DO UPDATE SET
              title        = EXCLUDED.title,
              excerpt      = EXCLUDED.excerpt,
@@ -55,6 +59,9 @@ export async function upsertArticle(pool: Queryable, article: Article): Promise<
              ai_model     = EXCLUDED.ai_model,
              published_at = EXCLUDED.published_at,
              cover_image  = EXCLUDED.cover_image,
+             -- Preserve the owner once set: the article-job placeholder
+             -- sets author_id; later content upserts must not null it.
+             author_id    = COALESCE(articles.author_id, EXCLUDED.author_id),
              updated_at   = NOW()`,
         [
             article.slug,
@@ -67,6 +74,7 @@ export async function upsertArticle(pool: Queryable, article: Article): Promise<
             article.aiModel ?? null,
             article.publishedAt ?? null,
             article.coverImage ?? null,
+            article.authorId ?? null,
         ],
     );
 }
