@@ -56,6 +56,9 @@ function buildApp() {
   app.use('*', async (ctx, next) => {
      
     (ctx as any).set('jwtPayload', { sub: 'test-user' });
+    // userProvisionMiddleware sets the provisioned platform users.id;
+    // the ingestion route reads ctx userId (not the JWT sub).
+    (ctx as any).set('userId', 'test-user');
     await next();
   });
    
