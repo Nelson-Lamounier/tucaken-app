@@ -477,6 +477,86 @@ describe('POST /connected-repos', () => {
         expect(envMap['USER_ID']).toBe(TEST_USER_UUID);
         expect(envMap['REPO_FULL_NAME']).toBe('Nelson-Lamounier/cdk-monitoring');
     });
+
+    it('deferSync:true connects as pending without quota or Job dispatch', async () => {
+        seedQuery([connectedRow]);   // 1. getConnection
+        // 2. insertRepository, 3. markRepoPending → default { rows: [] }
+
+        const res  = await buildApp().request('/connected-repos', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ repoFullName: 'Nelson-Lamounier/cdk-monitoring', defaultBranch: 'develop', deferSync: true }),
+        });
+        const body = await res.json() as { status: string; repoFullName: string; jobName: string | null };
+
+        expect(res.status).toBe(202);
+        expect(body).toEqual({ status: 'queued', repoFullName: 'Nelson-Lamounier/cdk-monitoring', jobName: null });
+
+        // getConnection + insertRepository + markRepoPending only — no plan
+        // SELECT, no quota INSERT, no markSyncTriggered.
+        expect(poolQueryMock).toHaveBeenCalledTimes(3);
+        const calls = poolQueryMock.mock.calls.map(c => (c[0] as string));
+        expect(calls.some(s => /usage_quotas/.test(s))).toBe(false);
+        expect(calls.some(s => /last_sync_triggered_at/.test(s))).toBe(false);
+
+        // No token, no Job — sync is deferred to POST /connected-repos/sync.
+        expect(mockGenerateInstallationToken).not.toHaveBeenCalled();
+        expect(createNamespacedJobMock).not.toHaveBeenCalled();
+    });
+});
+
+// ===========================================================================
+// POST /connected-repos/sync
+// ===========================================================================
+
+describe('POST /connected-repos/sync', () => {
+    it('returns 400 when GitHub is not connected', async () => {
+        seedQuery([]);   // getConnection → empty
+
+        const res = await buildApp().request('/connected-repos/sync', { method: 'POST' });
+        expect(res.status).toBe(400);
+        const body = await res.json() as { error: string };
+        expect(body.error).toMatch(/not connected/i);
+    });
+
+    it('returns { started: 0 } when no repos are queued', async () => {
+        seedQuery([connectedRow]);   // 1. getConnection
+        seedQuery([]);               // 2. pending-repos SELECT → none
+
+        const res  = await buildApp().request('/connected-repos/sync', { method: 'POST' });
+        const body = await res.json() as { started: number };
+
+        expect(res.status).toBe(200);
+        expect(body).toEqual({ started: 0 });
+        expect(mockGenerateInstallationToken).not.toHaveBeenCalled();
+        expect(createNamespacedJobMock).not.toHaveBeenCalled();
+    });
+
+    it('dispatches Jobs for every queued repo and returns the count', async () => {
+        seedQuery([connectedRow]);                                                  // 1. getConnection
+        seedQuery([                                                                 // 2. pending-repos SELECT
+            { full_name: 'Nelson-Lamounier/cdk-monitoring',      default_branch: 'develop' },
+            { full_name: 'Nelson-Lamounier/kubernetes-bootstrap', default_branch: 'develop' },
+        ]);
+        seedQuery([]);                 // 3. plan SELECT → free
+        seedQuery([{ count: 1 }]);     // 4. quota INSERT…RETURNING repo 1 → allowed
+        seedQuery([]); seedQuery([]); seedQuery([]); // 5-7 insert/markPending/markTriggered repo 1
+        seedQuery([{ count: 2 }]);     // 8. quota INSERT…RETURNING repo 2 → allowed
+        seedQuery([]); seedQuery([]); seedQuery([]); // 9-11 insert/markPending/markTriggered repo 2
+
+        const res  = await buildApp().request('/connected-repos/sync', { method: 'POST' });
+        const body = await res.json() as { started: number };
+
+        expect(res.status).toBe(200);
+        expect(body).toEqual({ started: 2 });
+
+        expect(mockGenerateInstallationToken).toHaveBeenCalledWith('999999', testConfig.githubPrivateKey, '12345');
+        expect(createNamespacedJobMock).toHaveBeenCalledTimes(2);
+
+        const pendingSelect = (poolQueryMock.mock.calls[1]![0] as string);
+        expect(pendingSelect).toMatch(/sync_status\s*=\s*'pending'/);
+        expect(pendingSelect).toMatch(/last_sync_triggered_at\s+IS\s+NULL/);
+    });
 });
 
 // ===========================================================================
