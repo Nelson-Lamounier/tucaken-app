@@ -582,6 +582,72 @@ describe('POST /connected-repos/sync', () => {
 });
 
 // ===========================================================================
+// PATCH /connected-repos/:fullName/featured
+// ===========================================================================
+
+describe('PATCH /connected-repos/:fullName/featured', () => {
+    it('enables: is_featured TRUE + feature_rank from MAX+1, 200', async () => {
+        // Pool mock: UPDATE … RETURNING feature_rank resolves { rows:[{feature_rank:4}], rowCount:1 }
+        poolQueryMock.mockResolvedValueOnce({ rows: [{ feature_rank: 4 }], rowCount: 1 });
+
+        const app = buildApp();
+        const res = await app.request('/connected-repos/octo%2Fapp/featured', {
+            method: 'PATCH', body: JSON.stringify({ useInResume: true }),
+        });
+        expect(res.status).toBe(200);
+        expect(await res.json()).toMatchObject({ repoFullName: 'octo/app', isFeatured: true, featureRank: 4 });
+        const lastCall = poolQueryMock.mock.calls.at(-1);
+        expect(String(lastCall?.[0])).toMatch(/UPDATE repository_profiles[\s\S]*is_featured\s*=\s*TRUE/i);
+        expect(lastCall?.[1]).toEqual(expect.arrayContaining([expect.any(String), 'octo/app']));
+    });
+
+    it('disables: is_featured FALSE, feature_rank NULL, 200', async () => {
+        // Pool mock: { rows:[{feature_rank:null}], rowCount:1 }
+        poolQueryMock.mockResolvedValueOnce({ rows: [{ feature_rank: null }], rowCount: 1 });
+
+        const app = buildApp();
+        const res = await app.request('/connected-repos/octo%2Fapp/featured', {
+            method: 'PATCH', body: JSON.stringify({ useInResume: false }),
+        });
+        expect(res.status).toBe(200);
+        expect(await res.json()).toMatchObject({ isFeatured: false, featureRank: null });
+    });
+
+    it('404 when no profile row matches (rowCount 0)', async () => {
+        // Pool mock: { rows:[], rowCount:0 }
+        poolQueryMock.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+        const app = buildApp();
+        const res = await app.request('/connected-repos/octo%2Fapp/featured', {
+            method: 'PATCH', body: JSON.stringify({ useInResume: true }),
+        });
+        expect(res.status).toBe(404);
+    });
+
+    it('400 on non-JSON body', async () => {
+        const app = buildApp();
+        const res = await app.request('/connected-repos/octo%2Fapp/featured', { method: 'PATCH', body: 'nope' });
+        expect(res.status).toBe(400);
+    });
+
+    it('400 on non-boolean useInResume', async () => {
+        const app = buildApp();
+        const res = await app.request('/connected-repos/octo%2Fapp/featured', {
+            method: 'PATCH', body: JSON.stringify({ useInResume: 'yes' }),
+        });
+        expect(res.status).toBe(400);
+    });
+
+    it('400 on bad repo name', async () => {
+        const app = buildApp();
+        const res = await app.request('/connected-repos/not-a-repo/featured', {
+            method: 'PATCH', body: JSON.stringify({ useInResume: true }),
+        });
+        expect(res.status).toBe(400);
+    });
+});
+
+// ===========================================================================
 // DELETE /connected-repos/:fullName
 // ===========================================================================
 
