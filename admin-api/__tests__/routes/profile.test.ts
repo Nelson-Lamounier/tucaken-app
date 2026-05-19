@@ -132,4 +132,21 @@ describe('GET /summary', () => {
         const body = await (await app.request('/summary')).json();
         expect(body).toMatchObject({ mirror: null, reveal: null, synthesisRefreshedAt: null });
     });
+
+    it('GET /summary includes direction (and maps null)', async () => {
+        poolQueryMock.mockResolvedValueOnce({ rows: [{
+            rollup: { version: 1 }, mirror: null, reveal: null,
+            direction: { archetypes: [{ archetype:'platform', fit:'strong', rationale:'domain mix' }], seniority: [], whatToDeepen: [] },
+            refreshed_at: new Date('2026-01-02T00:00:00Z'), synthesis_refreshed_at: null,
+        }] });
+        const app = buildApp();
+        const body = await (await app.request('/summary')).json();
+        expect(body).toMatchObject({ direction: { archetypes: [{ archetype:'platform' }] } });
+    });
+
+    it('GET /summary maps null direction', async () => {
+        poolQueryMock.mockResolvedValueOnce({ rows: [{ rollup:{version:1}, mirror:null, reveal:null, direction:null, refreshed_at:new Date(), synthesis_refreshed_at:null }] });
+        const app = buildApp();
+        expect((await (await app.request('/summary')).json()).direction).toBeNull();
+    });
 });

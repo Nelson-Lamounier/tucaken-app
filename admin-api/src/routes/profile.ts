@@ -37,7 +37,7 @@ export function createProfileRouter(config: AdminApiConfig): Hono<AdminApiBindin
         if (!uid) return ctx.json({ error: 'Authenticated subject missing' }, 401);
 
         const { rows } = await pool.query(
-            `SELECT rollup, mirror, reveal, refreshed_at, synthesis_refreshed_at
+            `SELECT rollup, mirror, reveal, direction, refreshed_at, synthesis_refreshed_at
                FROM user_profile_rollup WHERE user_id = $1::uuid`,
             [uid],
         );
@@ -49,6 +49,7 @@ export function createProfileRouter(config: AdminApiConfig): Hono<AdminApiBindin
             rollup:               r.rollup,
             mirror:               r.mirror ?? null,
             reveal:               r.reveal ?? null,
+            direction:            r.direction ?? null,
             refreshedAt:          r.refreshed_at ? r.refreshed_at.toISOString() : null,
             synthesisRefreshedAt: r.synthesis_refreshed_at ? r.synthesis_refreshed_at.toISOString() : null,
         });
