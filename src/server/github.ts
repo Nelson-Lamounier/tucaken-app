@@ -128,7 +128,11 @@ export const setRepoFeaturedFn = createServerFn({ method: 'POST' })
     await requireAuth()
     return apiFetch<{ repoFullName: string; isFeatured: boolean; featureRank: number | null }>(
       `/github/connected-repos/${encodeURIComponent(data.repoFullName)}/featured`,
-      { method: 'PATCH', body: JSON.stringify({ useInResume: data.useInResume }) },
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ useInResume: data.useInResume }),
+        pathTemplate: '/github/connected-repos/:repoFullName/featured',
+      },
     )
   })
 
