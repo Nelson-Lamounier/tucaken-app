@@ -12,7 +12,7 @@ import { getMeFn } from '@/server/me'
 const searchSchema = z.object({
   // Step index (0-based) to restore. The /github/callback route sends the
   // user back here at the connect step after a successful App install.
-  step:            z.coerce.number().min(0).max(5).optional(),
+  step:            z.coerce.number().min(0).max(7).optional(),
 })
 
 export const Route = createFileRoute('/onboarding')({
@@ -31,7 +31,7 @@ export const Route = createFileRoute('/onboarding')({
   component: OnboardingPage,
 })
 
-// connect step is index 3 in the STEPS array (welcome/portfolio/resume/connect/repos/processing)
+// connect step is index 3 in the STEPS array (welcome/portfolio/resume/connect/repos/processing/distill/review)
 const CONNECT_STEP_INDEX = 3
 
 function OnboardingPage() {

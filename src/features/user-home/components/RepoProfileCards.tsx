@@ -3,6 +3,7 @@
 import { Link } from '@tanstack/react-router'
 import { GitBranch, RefreshCw } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { DistillationCard } from '@/features/github/components/DistillationCard'
 import { GitHubRepoChip } from '@/features/github/components/GitHubRepoChip'
 import { GitHubSyncStatusBadge } from '@/features/github/components/GitHubSyncStatusBadge'
 import { triggerGitHubIngestionFn } from '@/server/github'
@@ -144,11 +145,6 @@ function RepoCard({ repo }: { readonly repo: ConnectedRepo }) {
         </button>
       </div>
 
-      {/* One-liner */}
-      {repo.oneLiner && (
-        <p className="text-sm leading-relaxed text-zinc-400">{repo.oneLiner}</p>
-      )}
-
       {/* Profile body */}
       {hasProfile && repo.qualityScore != null ? (
         <ScoreSection score={repo.qualityScore} breakdown={repo.qualityBreakdown} />
@@ -169,27 +165,8 @@ function RepoCard({ repo }: { readonly repo: ConnectedRepo }) {
         </p>
       )}
 
-      {/* Tech stack + domain + complexity */}
-      {hasProfile && ((repo.techStack?.length ?? 0) > 0 || !!repo.domain || !!repo.complexity) && (
-        <div className="flex flex-wrap items-center gap-2">
-          {repo.domain && (
-            <span className="rounded border border-indigo-500/20 bg-indigo-500/8 px-1.5 py-0.5 text-[10px] font-medium text-indigo-300">
-              {repo.domain}
-            </span>
-          )}
-          {[...new Set(repo.techStack ?? [])].slice(0, 6).map(tech => (
-            <span
-              key={tech}
-              className="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-zinc-400"
-            >
-              {tech}
-            </span>
-          ))}
-          {repo.complexity && (
-            <span className="ml-auto text-[10px] text-zinc-600">{repo.complexity}</span>
-          )}
-        </div>
-      )}
+      {/* Distillation card: one-liner, highlights, tech stack */}
+      {hasProfile && <DistillationCard repo={repo} />}
 
       {/* Footer */}
       <div className="flex items-center gap-2">

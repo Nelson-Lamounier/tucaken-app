@@ -150,6 +150,10 @@ interface ConnectedRepoRow {
     tech_stack:         string[] | null;
     complexity:         string | null;
     confidence:         number | null;
+    highlights:         string[] | null;
+    is_featured:        boolean | null;
+    feature_rank:       number | null;
+    is_hidden:          boolean | null;
 }
 
 async function listConnectedRepos(pool: Pool, userId: string): Promise<ConnectedRepoRow[]> {
@@ -161,7 +165,11 @@ async function listConnectedRepos(pool: Pool, userId: string): Promise<Connected
                 p.extracted->>'domain'                AS domain,
                 p.extracted->'tech_stack'             AS tech_stack,
                 p.extracted->>'complexity'            AS complexity,
-                (p.extracted->>'confidence')::float   AS confidence
+                (p.extracted->>'confidence')::float   AS confidence,
+                p.extracted->'highlights'             AS highlights,
+                p.is_featured                         AS is_featured,
+                p.feature_rank                        AS feature_rank,
+                p.is_hidden                           AS is_hidden
          FROM repositories r
          LEFT JOIN repo_sync_state s
            ON s.user_id = r.user_id AND s.repo_full_name = r.full_name
@@ -641,6 +649,13 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
                 techStack:         r.tech_stack         ?? null,
                 complexity:        r.complexity         ?? null,
                 confidence:        r.confidence         ?? null,
+                // is_featured/is_hidden are NOT NULL DEFAULT FALSE in repository_profiles;
+                // a NULL here only means LEFT-JOIN miss (no profile yet) → default false.
+                // Profile display values stay nullable (?? null) so the UI can omit them.
+                highlights:        r.highlights         ?? null,
+                isFeatured:        r.is_featured        ?? false,
+                featureRank:       r.feature_rank       ?? null,
+                isHidden:          r.is_hidden          ?? false,
             };
         });
 
@@ -786,6 +801,53 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         );
 
         return ctx.json({ updated: result.rowCount ?? 0 });
+    });
+
+    // -------------------------------------------------------------------------
+    // PATCH /connected-repos/:fullName/featured — toggle "use in resume"
+    // :fullName is URL-encoded "owner%2Frepo" (same convention as DELETE)
+    // -------------------------------------------------------------------------
+    router.patch('/connected-repos/:fullName/featured', async (ctx) => {
+        const pool = getPool(config);
+        const uid  = requireUserId(ctx);
+        if (!uid) return ctx.json({ error: 'Authenticated subject missing' }, 401);
+
+        const repoFullName = decodeURIComponent(ctx.req.param('fullName'));
+        if (!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(repoFullName)) {
+            return ctx.json({ error: 'Invalid repo name' }, 400);
+        }
+
+        let body: { useInResume?: unknown };
+        try { body = await ctx.req.json(); }
+        catch { return ctx.json({ error: 'Body must be valid JSON' }, 400); }
+        if (typeof body.useInResume !== 'boolean') {
+            return ctx.json({ error: '"useInResume" must be a boolean' }, 400);
+        }
+        const useInResume = body.useInResume;
+
+        const sql = useInResume
+            ? `UPDATE repository_profiles
+                  SET is_featured = TRUE,
+                      feature_rank = COALESCE(
+                        (SELECT MAX(feature_rank) + 1 FROM repository_profiles
+                          WHERE user_id = $1::uuid AND is_featured = TRUE), 0)
+                WHERE user_id = $1::uuid AND repo_full_name = $2
+            RETURNING feature_rank`
+            : `UPDATE repository_profiles
+                  SET is_featured = FALSE, feature_rank = NULL
+                WHERE user_id = $1::uuid AND repo_full_name = $2
+            RETURNING feature_rank`;
+
+        const { rows, rowCount } = await pool.query<{ feature_rank: number | null }>(
+            sql, [uid, repoFullName],
+        );
+        if (!rowCount) return ctx.json({ error: 'Profile not found for repo' }, 404);
+
+        return ctx.json({
+            repoFullName,
+            isFeatured:  useInResume,
+            featureRank: rows[0]?.feature_rank ?? null,
+        });
     });
 
     // -------------------------------------------------------------------------
