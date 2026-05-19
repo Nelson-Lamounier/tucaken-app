@@ -20,8 +20,8 @@ export function DirectionPanel({ summary }: { readonly summary: ProfileSummary }
   return (
     <section className="flex flex-col gap-4 rounded-xl border border-white/10 bg-white/2 p-5">
       <div className="flex flex-wrap gap-2">
-        {d.archetypes.map(a => (
-          <span key={a.archetype} title={a.rationale}
+        {d.archetypes.map((a, i) => (
+          <span key={`${a.archetype}-${i}`} title={a.rationale}
             className={`rounded border px-1.5 py-0.5 text-[10px] ${TIER[a.fit] ?? TIER.weak}`}>
             {a.archetype} · {a.fit}
           </span>
