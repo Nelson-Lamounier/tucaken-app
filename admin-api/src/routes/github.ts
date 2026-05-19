@@ -150,6 +150,10 @@ interface ConnectedRepoRow {
     tech_stack:         string[] | null;
     complexity:         string | null;
     confidence:         number | null;
+    highlights:         string[] | null;
+    is_featured:        boolean | null;
+    feature_rank:       number | null;
+    is_hidden:          boolean | null;
 }
 
 async function listConnectedRepos(pool: Pool, userId: string): Promise<ConnectedRepoRow[]> {
@@ -161,7 +165,11 @@ async function listConnectedRepos(pool: Pool, userId: string): Promise<Connected
                 p.extracted->>'domain'                AS domain,
                 p.extracted->'tech_stack'             AS tech_stack,
                 p.extracted->>'complexity'            AS complexity,
-                (p.extracted->>'confidence')::float   AS confidence
+                (p.extracted->>'confidence')::float   AS confidence,
+                p.extracted->'highlights'             AS highlights,
+                p.is_featured                         AS is_featured,
+                p.feature_rank                        AS feature_rank,
+                p.is_hidden                           AS is_hidden
          FROM repositories r
          LEFT JOIN repo_sync_state s
            ON s.user_id = r.user_id AND s.repo_full_name = r.full_name
@@ -641,6 +649,10 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
                 techStack:         r.tech_stack         ?? null,
                 complexity:        r.complexity         ?? null,
                 confidence:        r.confidence         ?? null,
+                highlights:        r.highlights         ?? null,
+                isFeatured:        r.is_featured        ?? false,
+                featureRank:       r.feature_rank       ?? null,
+                isHidden:          r.is_hidden          ?? false,
             };
         });
 

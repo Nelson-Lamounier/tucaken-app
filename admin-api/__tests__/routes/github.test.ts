@@ -404,6 +404,28 @@ describe('GET /connected-repos', () => {
         expect(repo['complexity']).toBeNull();
         expect(repo['confidence']).toBeNull();
     });
+
+    it('GET /connected-repos exposes highlights/isFeatured/featureRank/isHidden', async () => {
+        const rowWithFlags: Row = {
+            ...connectedRepoRow,
+            highlights:   ['Built X', 'Shipped Y'],
+            is_featured:  true,
+            feature_rank: 2,
+            is_hidden:    false,
+        };
+        seedQuery([rowWithFlags]);
+
+        const app = buildApp();
+        const res = await app.request('/connected-repos');
+        expect(res.status).toBe(200);
+        const body = await res.json() as { repos: Array<Record<string, unknown>> };
+        expect(body.repos[0]).toMatchObject({
+            highlights:  ['Built X', 'Shipped Y'],
+            isFeatured:  true,
+            featureRank: 2,
+            isHidden:    false,
+        });
+    });
 });
 
 // ===========================================================================
