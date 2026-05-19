@@ -6,8 +6,10 @@ import { DashboardPage } from '@/components/layouts/DashboardPage'
 import { Stats } from '@/components/ui/Stats'
 import { Button } from '@/components/ui/Button'
 import { useGitHubConnectedRepos } from '@/features/github/hooks/use-github-connected-repos'
+import { useProfileSummary } from '@/features/profile/hooks/use-profile-summary'
 import { adminKeys } from '@/lib/api/query-keys'
 import { listResumeImportsFn, listCareerEntriesFn } from '@/server/resume-imports'
+import { MirrorPanel } from '@/features/profile/components/MirrorPanel'
 import { RepoProfileCards } from './RepoProfileCards'
 import { CareerDataBreakdown } from './CareerDataBreakdown'
 import { ResumeFilesList } from './ResumeFilesList'
@@ -64,6 +66,7 @@ function buildHeroStats(isLoading: boolean, stats: KbStats): Stat[] {
 
 export function UserDashboard() {
   const { data: repos = [], isLoading: loadingRepos } = useGitHubConnectedRepos()
+  const { data: profileSummary } = useProfileSummary()
 
   const { data: imports = [], isLoading: loadingImports } = useQuery({
     queryKey: adminKeys.resumeImports.list(),
@@ -92,6 +95,7 @@ export function UserDashboard() {
     >
       <div className="space-y-8">
         <Stats stats={heroStats} />
+        {profileSummary && <MirrorPanel summary={profileSummary} />}
         <RepoProfileCards repos={repos} isLoading={loadingRepos} />
         <CareerDataBreakdown
           entries={entries}
