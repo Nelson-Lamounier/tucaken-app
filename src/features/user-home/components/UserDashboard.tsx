@@ -10,6 +10,7 @@ import { useProfileSummary } from '@/features/profile/hooks/use-profile-summary'
 import { adminKeys } from '@/lib/api/query-keys'
 import { listResumeImportsFn, listCareerEntriesFn } from '@/server/resume-imports'
 import { MirrorPanel } from '@/features/profile/components/MirrorPanel'
+import { DirectionPanel } from '@/features/profile/components/DirectionPanel'
 import { RepoProfileCards } from './RepoProfileCards'
 import { CareerDataBreakdown } from './CareerDataBreakdown'
 import { ResumeFilesList } from './ResumeFilesList'
@@ -96,6 +97,7 @@ export function UserDashboard() {
       <div className="space-y-8">
         <Stats stats={heroStats} />
         {profileSummary && <MirrorPanel summary={profileSummary} />}
+        {profileSummary && <DirectionPanel summary={profileSummary} />}
         <RepoProfileCards repos={repos} isLoading={loadingRepos} />
         <CareerDataBreakdown
           entries={entries}
