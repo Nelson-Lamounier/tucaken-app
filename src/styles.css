@@ -50,6 +50,19 @@
 .item-state-anim {
   animation: item-state 32s linear infinite;
 }
+@keyframes pipe-pulse {
+  to { stroke-dashoffset: -64; }
+}
+@keyframes node-glow {
+  0%, 100% { opacity: 0.35; filter: drop-shadow(0 0 0 transparent); }
+  50% { opacity: 1; filter: drop-shadow(0 0 6px oklch(0.8 0.15 175)); }
+}
+.pipe-pulse-anim {
+  animation: pipe-pulse 1.6s linear infinite;
+}
+.node-glow-anim {
+  animation: node-glow 2s ease-in-out infinite;
+}
 @media (prefers-reduced-motion: reduce) {
-  .belt-scroll-anim, .scan-sweep-anim, .item-state-anim { animation: none !important; }
+  .belt-scroll-anim, .scan-sweep-anim, .item-state-anim, .pipe-pulse-anim, .node-glow-anim { animation: none !important; }
 }
