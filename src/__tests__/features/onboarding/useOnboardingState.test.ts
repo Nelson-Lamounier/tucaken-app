@@ -20,7 +20,7 @@ describe('useOnboardingState', () => {
 
   it('clamps initialStepIndex to valid range', () => {
     const { result } = renderHook(() => useOnboardingState(99))
-    expect(result.current.stepIndex).toBe(6) // review is last
+    expect(result.current.stepIndex).toBe(7) // review is last
   })
 
   it('advances through steps with next()', () => {
@@ -30,9 +30,9 @@ describe('useOnboardingState', () => {
   })
 
   it('does not advance past the last step', () => {
-    const { result } = renderHook(() => useOnboardingState(6))
+    const { result } = renderHook(() => useOnboardingState(7))
     act(() => result.current.next())
-    expect(result.current.stepIndex).toBe(6)
+    expect(result.current.stepIndex).toBe(7)
   })
 
   it('goes back with back()', () => {
@@ -65,11 +65,18 @@ describe('useOnboardingState', () => {
     const { result } = renderHook(() => useOnboardingState())
     act(() => result.current.jumpTo('review'))
     expect(result.current.stepId).toBe('review')
+    expect(result.current.stepIndex).toBe(7)
+  })
+
+  it('reaches distill from processing via next()', () => {
+    const { result } = renderHook(() => useOnboardingState(5))
+    act(() => result.current.next())
+    expect(result.current.stepId).toBe('distill')
     expect(result.current.stepIndex).toBe(6)
   })
 
   it('reaches review as the terminal step via next()', () => {
-    const { result } = renderHook(() => useOnboardingState(5))
+    const { result } = renderHook(() => useOnboardingState(6))
     act(() => result.current.next())
     expect(result.current.stepId).toBe('review')
   })

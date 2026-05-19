@@ -11,6 +11,7 @@ import { ConnectStep } from './ConnectStep'
 import { ConnectReposStep } from '../steps/ConnectReposStep'
 import { ProcessingStep } from '../steps/ProcessingStep'
 import { ReviewStep } from '../steps/ReviewStep'
+import { DistillStep } from '../steps/DistillStep'
 import { useOnboardingState } from './useOnboardingState'
 import { useGitHubAccessibleRepos } from '@/features/github/hooks/use-github-accessible-repos'
 import { useGitHubConnectedRepos } from '@/features/github/hooks/use-github-connected-repos'
@@ -76,7 +77,7 @@ export function OnboardingShell({
   // processing & review steps have no visible progress slot — clamp to last visible step
   const visibleIndex = Math.min(s.stepIndex, VISIBLE_STEPS.length - 1)
   const isProcessing = s.stepId === 'processing'
-  const isTerminal = isProcessing || s.stepId === 'review'
+  const isTerminal = isProcessing || s.stepId === 'distill' || s.stepId === 'review'
 
   return (
     <div className="dark relative flex min-h-screen w-full items-stretch justify-center overflow-hidden bg-zinc-950 px-3.75 py-8 text-zinc-200">
@@ -154,6 +155,10 @@ export function OnboardingShell({
                 )}
 
                 {s.stepId === 'processing' && <ProcessingStep onNext={s.next} />}
+
+                {s.stepId === 'distill' && (
+                  <DistillStep onNext={s.next} onBack={s.back} />
+                )}
 
                 {s.stepId === 'review' && (
                   <ReviewStep importId={s.data.resumeImportId} />
