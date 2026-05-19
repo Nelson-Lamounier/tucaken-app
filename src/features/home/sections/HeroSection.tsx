@@ -31,6 +31,7 @@ export function HeroSection() {
                 initial={{ opacity: 0, y: 24, filter: 'blur(8px)' }}
                 animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                 transition={{ delay: 0.1, duration: 0.7 }}
+                style={{ willChange: 'transform, filter' }}
                 className="block text-white"
               >
                 Your GitHub already proves
@@ -39,6 +40,7 @@ export function HeroSection() {
                 initial={{ opacity: 0, y: 24, filter: 'blur(8px)' }}
                 animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                 transition={{ delay: 0.22, duration: 0.7 }}
+                style={{ willChange: 'transform, filter' }}
                 className="block text-white"
               >
                 you can do the job.
@@ -47,6 +49,7 @@ export function HeroSection() {
                 initial={{ opacity: 0, y: 24, filter: 'blur(8px)' }}
                 animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                 transition={{ delay: 0.34, duration: 0.7 }}
+                style={{ willChange: 'transform, filter' }}
                 className="block bg-gradient-to-r from-teal-300 via-emerald-300 to-cyan-300 bg-clip-text text-transparent"
               >
                 Now your resume can.

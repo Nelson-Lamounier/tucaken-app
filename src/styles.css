@@ -38,6 +38,12 @@
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-10px); }
 }
+.pipe-pulse-anim {
+  animation: pipe-pulse 1.6s linear infinite;
+}
+.node-glow-anim {
+  animation: node-glow 2s ease-in-out infinite;
+}
 @media (prefers-reduced-motion: reduce) {
   .pipe-pulse-anim, .node-glow-anim, .card-float-anim { animation: none !important; }
 }

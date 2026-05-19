@@ -16,7 +16,7 @@ export function CardLayer({ reduce }: { reduce: boolean }) {
           key={c.label}
           className={`${reduce ? '' : 'card-float-anim'} absolute ${c.pos} rounded-lg border border-white/10 bg-zinc-900/80 px-3 py-2 backdrop-blur-md`}
           style={{
-            willChange: 'transform',
+            willChange: reduce ? 'auto' : 'transform',
             animationName: reduce ? undefined : 'card-float',
             animationDuration: c.dur,
             animationDelay: c.delay,
