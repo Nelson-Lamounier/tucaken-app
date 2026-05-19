@@ -2,8 +2,13 @@
 // src/features/home/lib/PipelineScene.tsx
 // Static layered 3D-depth pipeline panel. Fixed camera — NO pointer, NO
 // rotate, NO MotionValues. The only hook is useReducedMotion(), used purely
-// to pass `reduce` to children (not an interaction). Depth comes from fixed
-// per-layer translateZ inside a perspective + preserve-3d container.
+// to pass `reduce` to children (not an interaction).
+//
+// Depth for the SVG layers comes from fixed translateZ inside a
+// perspective + preserve-3d container. CardLayer is deliberately a SIBLING
+// of (not inside) the preserve-3d stage and layered in front via z-index:
+// Chrome/Edge do not render backdrop-filter (the cards' glassmorphism blur)
+// inside a preserve-3d ancestor (crbug 323735424).
 
 import { useReducedMotion } from 'motion/react'
 import { BgLayer, CoreLayer } from './pipeline-svg'
@@ -32,13 +37,9 @@ export function PipelineScene() {
         >
           <CoreLayer reduce={reduce} />
         </div>
-        <div
-          data-scene="cards"
-          className="absolute inset-0"
-          style={{ transform: 'translateZ(120px)' }}
-        >
-          <CardLayer reduce={reduce} />
-        </div>
+      </div>
+      <div data-scene="cards" className="absolute inset-0 z-10">
+        <CardLayer reduce={reduce} />
       </div>
     </div>
   )
