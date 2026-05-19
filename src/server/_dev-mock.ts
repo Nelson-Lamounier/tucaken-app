@@ -368,6 +368,35 @@ export function mockApiResponse(path: string, method = 'GET', body?: unknown): u
   // Any other github path (e.g. timed-out marker) — inert.
   if (p.includes('github')) return null
 
+  if (p === '/profile/summary') {
+    return {
+      rollup: {
+        languages: [
+          { language: 'TypeScript', repoCount: 4, commitVolumeProxy: 120, sharePct: 64 },
+          { language: 'Python', repoCount: 2, commitVolumeProxy: 40, sharePct: 21 },
+        ],
+        domains: { counts: { infra: 3, web: 2 }, dominant: 'infra' },
+        complexity: { simple: 1, moderate: 3, complex: 1 },
+        roles: { creator: 3, maintainer: 1, contributor: 1 },
+        techStackTop: [{ tech: 'AWS', repoCount: 3 }, { tech: 'React', repoCount: 2 }],
+        activityArc: [
+          { repoFullName: 'me/infra', lastActiveAt: '2024-03-01T00:00:00Z', primaryLanguage: 'TypeScript', domain: 'infra' },
+          { repoFullName: 'me/app', lastActiveAt: '2026-01-15T00:00:00Z', primaryLanguage: 'TypeScript', domain: 'web' },
+        ],
+        totals: { projectRepoCount: 5, totalCommitVolumeProxy: 160, earliestActivity: '2024-03-01T00:00:00Z', latestActivity: '2026-01-15T00:00:00Z', activeYearsApprox: 2 },
+        classificationCounts: { project: 5, hiddenCount: 0 },
+        methodology: { version: 1, commitVolume: 'proxy', domainMix: 'repo-count share', scope: 'project,!hidden,completed', confidence: 'derived from per-repo signals' },
+      },
+      mirror: { paragraph: 'You are an infrastructure-focused engineer who operates primarily as a creator across AWS and TypeScript projects, with roughly two years of sustained activity skewing toward infra and platform work.' },
+      reveal: { reveals: [
+        { insight: 'You operate as a builder-creator, not a generalist contributor.', evidence: 'role distribution (creator-heavy)' },
+        { insight: 'Your work concentrates in infrastructure rather than spread thin.', evidence: 'domain mix (infra dominant)' },
+      ] },
+      refreshedAt: '2026-01-15T00:05:00Z',
+      synthesisRefreshedAt: '2026-01-15T00:06:00Z',
+    }
+  }
+
   // Unknown admin path — empty object keeps other carousel steps from crashing.
   return {}
 }

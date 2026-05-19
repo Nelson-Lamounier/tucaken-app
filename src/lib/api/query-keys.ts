@@ -92,6 +92,12 @@ export const adminKeys = {
     detail: () => ['admin', 'me'] as const,
   },
 
+  /** Profile summary (mirror + reveal synthesis) */
+  profile: {
+    /** Aggregated profile summary (rollup, mirror, reveal) */
+    summary: () => ['admin', 'profile', 'summary'] as const,
+  },
+
   /** Resume import pipeline query keys */
   resumeImports: {
     /** All resume import queries */
