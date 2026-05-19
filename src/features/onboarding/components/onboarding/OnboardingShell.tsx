@@ -76,7 +76,7 @@ export function OnboardingShell({
     onConnectGithub?.()
   }
 
-  // processing & review steps have no visible progress slot — clamp to last visible step
+  // mirror, direction, distill, processing, and review are terminal — no progress-bar slot; clamp to the last visible step
   const visibleIndex = Math.min(s.stepIndex, VISIBLE_STEPS.length - 1)
   const isProcessing = s.stepId === 'processing'
   const isTerminal = isProcessing || s.stepId === 'mirror' || s.stepId === 'direction' || s.stepId === 'distill' || s.stepId === 'review'
