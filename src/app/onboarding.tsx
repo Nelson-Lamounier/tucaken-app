@@ -31,7 +31,7 @@ export const Route = createFileRoute('/onboarding')({
   component: OnboardingPage,
 })
 
-// connect step is index 3 in the STEPS array (welcome/portfolio/resume/connect/repos/processing)
+// connect step is index 3 in the STEPS array (welcome/portfolio/resume/connect/repos/processing/distill/review)
 const CONNECT_STEP_INDEX = 3
 
 function OnboardingPage() {
