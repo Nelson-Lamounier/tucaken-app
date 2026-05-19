@@ -56,4 +56,8 @@ export interface ConnectedRepo {
   readonly techStack?:       string[] | null
   readonly complexity?:      string | null
   readonly confidence?:      number | null
+  readonly highlights?:      string[] | null
+  readonly isFeatured?:      boolean
+  readonly featureRank?:     number | null
+  readonly isHidden?:        boolean
 }

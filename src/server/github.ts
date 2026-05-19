@@ -117,6 +117,21 @@ export const removeConnectedRepoFn = createServerFn({ method: 'POST' })
     )
   })
 
+const setRepoFeaturedSchema = z.object({
+  repoFullName: z.string().min(1),
+  useInResume:  z.boolean(),
+})
+
+export const setRepoFeaturedFn = createServerFn({ method: 'POST' })
+  .inputValidator(setRepoFeaturedSchema)
+  .handler(async ({ data }) => {
+    await requireAuth()
+    return apiFetch<{ repoFullName: string; isFeatured: boolean; featureRank: number | null }>(
+      `/github/connected-repos/${encodeURIComponent(data.repoFullName)}/featured`,
+      { method: 'PATCH', body: JSON.stringify({ useInResume: data.useInResume }) },
+    )
+  })
+
 const markTimedOutSchema = z.object({
   repoFullNames: z.array(z.string().min(1)).min(1),
 })
