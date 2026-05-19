@@ -4,6 +4,7 @@ import { motion } from 'motion/react'
 import { useNavigate } from '@tanstack/react-router'
 import { MagneticButton } from '../lib/MagneticButton'
 import { ConveyorBelt } from '../lib/ConveyorBelt'
+import { PipelineScene } from '../lib/PipelineScene'
 import { hero } from '../content'
 
 export function HeroSection() {
@@ -13,8 +14,8 @@ export function HeroSection() {
     <div className="relative overflow-hidden border-b border-white/5 bg-zinc-950">
       <ConveyorBelt />
 
-      <div className="relative mx-auto flex min-h-[560px] max-w-6xl flex-col justify-center px-6 py-24 md:px-12 md:py-32">
-        <div className="max-w-2xl">
+      <div className="relative mx-auto grid min-h-[560px] max-w-6xl items-center gap-12 px-6 py-24 md:grid-cols-12 md:px-12 md:py-32">
+        <div className="md:col-span-6">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -42,6 +43,10 @@ export function HeroSection() {
             </MagneticButton>
           </div>
           <div className="mt-5 font-mono text-[11px] text-zinc-500">{hero.founderNote}</div>
+        </div>
+
+        <div className="hidden md:col-span-6 md:block">
+          <PipelineScene />
         </div>
       </div>
     </div>

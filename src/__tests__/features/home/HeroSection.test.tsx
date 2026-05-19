@@ -31,9 +31,10 @@ describe('HeroSection', () => {
     expect(navigateMock).toHaveBeenCalledWith({ to: '/sign-in' })
   })
 
-  it('renders the conveyor backdrop and no pointer-tilt stage', () => {
+  it('renders conveyor backdrop AND the static depth pipeline panel', () => {
     const { container } = render(<HeroSection />)
     expect(container.querySelector('[data-belt="root"]')).toBeTruthy()
+    expect(container.querySelector('[data-scene="stage"]')).toBeTruthy()
     expect(container.querySelector('[data-layer="copy"]')).toBeNull()
   })
 })
