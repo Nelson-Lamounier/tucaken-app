@@ -88,6 +88,16 @@ function buildJobSpec(
                                 name:  'ENRICHMENT_MODEL_ID',
                                 value: process.env['ENRICHMENT_MODEL_ID'] ?? 'eu.anthropic.claude-haiku-4-5-20251001-v1:0',
                             },
+                            // RetrievalProbe.fromEnvironment reads RETRIEVAL_PROBE_MODEL_ID
+                            // to enable the best-effort retrieval-quality probe. It reads
+                            // process.env directly (no env.ts default), so without this the
+                            // probe silently no-ops. Same eu.* cross-region inference-profile
+                            // constraint as ENRICHMENT_MODEL_ID. Overridable via admin-api's
+                            // own RETRIEVAL_PROBE_MODEL_ID env var.
+                            {
+                                name:  'RETRIEVAL_PROBE_MODEL_ID',
+                                value: process.env['RETRIEVAL_PROBE_MODEL_ID'] ?? 'eu.anthropic.claude-haiku-4-5-20251001-v1:0',
+                            },
                             ...(() => { const tp = traceParentEnv(); return tp ? [tp] : []; })(),
                         ],
                         envFrom: [
