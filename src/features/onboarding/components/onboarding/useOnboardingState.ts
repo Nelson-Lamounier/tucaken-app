@@ -16,8 +16,9 @@ const STEP_INDEX: Record<StepId, number> = {
   repos:      4,
   processing: 5,
   mirror:     6,
-  distill:    7,
-  review:     8,
+  direction:  7,
+  distill:    8,
+  review:     9,
 }
 
 const ID_BY_INDEX: StepId[] = STEPS.map((s) => s.id)

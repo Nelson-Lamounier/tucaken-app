@@ -4,7 +4,7 @@
 
 import type { GitHubInstallation } from '@/lib/types/github.types'
 
-export type StepId = 'welcome' | 'portfolio' | 'resume' | 'connect' | 'repos' | 'processing' | 'mirror' | 'distill' | 'review'
+export type StepId = 'welcome' | 'portfolio' | 'resume' | 'connect' | 'repos' | 'processing' | 'mirror' | 'direction' | 'distill' | 'review'
 
 export const STEPS: Array<{ id: StepId; name: string; required: boolean }> = [
   { id: 'welcome',    name: 'Welcome',       required: false },
@@ -14,6 +14,7 @@ export const STEPS: Array<{ id: StepId; name: string; required: boolean }> = [
   { id: 'repos',      name: 'Repositories',  required: true  },
   { id: 'processing', name: 'Processing',    required: true  },
   { id: 'mirror',     name: 'Profile',       required: false },
+  { id: 'direction',  name: 'Direction',     required: false },
   { id: 'distill',    name: 'Distill',       required: false },
   { id: 'review',     name: 'Review',        required: true  },
 ]

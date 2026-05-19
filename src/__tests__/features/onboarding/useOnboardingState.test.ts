@@ -20,7 +20,7 @@ describe('useOnboardingState', () => {
 
   it('clamps initialStepIndex to valid range', () => {
     const { result } = renderHook(() => useOnboardingState(99))
-    expect(result.current.stepIndex).toBe(8) // review is last
+    expect(result.current.stepIndex).toBe(9) // review is last
   })
 
   it('advances through steps with next()', () => {
@@ -30,9 +30,9 @@ describe('useOnboardingState', () => {
   })
 
   it('does not advance past the last step', () => {
-    const { result } = renderHook(() => useOnboardingState(8))
+    const { result } = renderHook(() => useOnboardingState(9))
     act(() => result.current.next())
-    expect(result.current.stepIndex).toBe(8)
+    expect(result.current.stepIndex).toBe(9)
   })
 
   it('goes back with back()', () => {
@@ -65,7 +65,7 @@ describe('useOnboardingState', () => {
     const { result } = renderHook(() => useOnboardingState())
     act(() => result.current.jumpTo('review'))
     expect(result.current.stepId).toBe('review')
-    expect(result.current.stepIndex).toBe(8)
+    expect(result.current.stepIndex).toBe(9)
   })
 
   it('reaches mirror from processing via next()', () => {
@@ -75,18 +75,46 @@ describe('useOnboardingState', () => {
     expect(result.current.stepIndex).toBe(6)
   })
 
-  it('reaches distill from mirror via next()', () => {
+  it('reaches direction from mirror via next()', () => {
     const { result } = renderHook(() => useOnboardingState(6))
     act(() => result.current.next())
-    expect(result.current.stepId).toBe('distill')
+    expect(result.current.stepId).toBe('direction')
     expect(result.current.stepIndex).toBe(7)
   })
 
-  it('reaches review as the terminal step via next()', () => {
+  it('reaches distill from direction via next()', () => {
     const { result } = renderHook(() => useOnboardingState(7))
     act(() => result.current.next())
-    expect(result.current.stepId).toBe('review')
+    expect(result.current.stepId).toBe('distill')
     expect(result.current.stepIndex).toBe(8)
+  })
+
+  it('reaches review as the terminal step via next()', () => {
+    const { result } = renderHook(() => useOnboardingState(8))
+    act(() => result.current.next())
+    expect(result.current.stepId).toBe('review')
+    expect(result.current.stepIndex).toBe(9)
+  })
+
+  it('orders processing → mirror → direction → distill → review', () => {
+    const { result } = renderHook(() => useOnboardingState(5))
+    expect(result.current.stepId).toBe('processing')
+    act(() => result.current.next())
+    expect(result.current.stepId).toBe('mirror')
+    act(() => result.current.next())
+    expect(result.current.stepId).toBe('direction')
+    expect(result.current.stepIndex).toBe(7)
+    act(() => result.current.next())
+    expect(result.current.stepId).toBe('distill')
+    act(() => result.current.next())
+    expect(result.current.stepId).toBe('review')
+  })
+
+  it('back() from distill returns to direction', () => {
+    const { result } = renderHook(() => useOnboardingState(8))
+    act(() => result.current.back())
+    expect(result.current.stepId).toBe('direction')
+    expect(result.current.stepIndex).toBe(7)
   })
 
   it('jumpTo navigates to mirror step', () => {
@@ -94,6 +122,13 @@ describe('useOnboardingState', () => {
     act(() => result.current.jumpTo('mirror'))
     expect(result.current.stepId).toBe('mirror')
     expect(result.current.stepIndex).toBe(6)
+  })
+
+  it('jumpTo navigates to direction step', () => {
+    const { result } = renderHook(() => useOnboardingState())
+    act(() => result.current.jumpTo('direction'))
+    expect(result.current.stepId).toBe('direction')
+    expect(result.current.stepIndex).toBe(7)
   })
 
   it('setResumeImportId updates data', () => {
