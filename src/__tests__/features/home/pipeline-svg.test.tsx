@@ -16,8 +16,9 @@ describe('pipeline-svg', () => {
     expect(container.querySelectorAll('[data-pipeline="node"]').length).toBeGreaterThan(0)
   })
 
-  it('CoreLayer drops pulse animation class when reduce=true', () => {
+  it('CoreLayer drops pulse and glow animation classes when reduce=true', () => {
     const { container } = render(<CoreLayer reduce />)
     expect(container.querySelector('.pipe-pulse-anim')).toBeNull()
+    expect(container.querySelector('.node-glow-anim')).toBeNull()
   })
 })
