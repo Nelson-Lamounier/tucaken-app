@@ -392,6 +392,19 @@ export function mockApiResponse(path: string, method = 'GET', body?: unknown): u
         { insight: 'You operate as a builder-creator, not a generalist contributor.', evidence: 'role distribution (creator-heavy)' },
         { insight: 'Your work concentrates in infrastructure rather than spread thin.', evidence: 'domain mix (infra dominant)' },
       ] },
+      direction: {
+        archetypes: [
+          { archetype: 'platform', fit: 'strong', rationale: 'infra-dominant domain mix + AWS tech stack' },
+          { archetype: 'devops', fit: 'strong', rationale: 'IaC/CI tech stack + role distribution' },
+          { archetype: 'backend', fit: 'moderate', rationale: 'TypeScript language share, fewer product repos' },
+          { archetype: 'ml', fit: 'weak', rationale: 'no ML domain in domain mix' },
+        ],
+        seniority: [
+          { area: 'infrastructure', level: 'senior', evidence: 'complexity distribution skews complex + ~2 active years' },
+          { area: 'application', level: 'mid-senior', evidence: 'role distribution mostly creator on infra repos' },
+        ],
+        whatToDeepen: ['Surface incident-response evidence in repo docs.', 'Add public technical writing links.'],
+      },
       refreshedAt: '2026-01-15T00:05:00Z',
       synthesisRefreshedAt: '2026-01-15T00:06:00Z',
     }
