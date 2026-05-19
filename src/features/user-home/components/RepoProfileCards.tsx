@@ -166,7 +166,7 @@ function RepoCard({ repo }: { readonly repo: ConnectedRepo }) {
       )}
 
       {/* Distillation card: one-liner, highlights, tech stack */}
-      <DistillationCard repo={repo} />
+      {hasProfile && <DistillationCard repo={repo} />}
 
       {/* Footer */}
       <div className="flex items-center gap-2">
