@@ -3,7 +3,7 @@
  * admin-api — User profile summary route.
  *
  * Routes:
- *   GET /summary — return the aggregated rollup, mirror, reveal, and timestamps
+ *   GET /summary — return the aggregated rollup, mirror, reveal, direction, and timestamps
  *                  for the authenticated user's profile.
  *
  * RLS: every query is scoped to user_id = $1::uuid (users.id UUID) derived

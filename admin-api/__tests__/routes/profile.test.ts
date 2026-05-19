@@ -3,7 +3,7 @@
  * End-to-end tests for admin-api routes/profile.ts
  *
  * Coverage:
- *   GET /summary — rollup/mirror/reveal/timestamps
+ *   GET /summary — rollup/mirror/reveal/direction/timestamps
  *   GET /summary — 404 when no row
  *   GET /summary — null mirror/reveal/synthesis_refreshed_at mapping
  *
