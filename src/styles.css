@@ -26,3 +26,18 @@
 }
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+@keyframes pipe-pulse {
+  to { stroke-dashoffset: -64; }
+}
+@keyframes node-glow {
+  0%, 100% { opacity: 0.35; filter: drop-shadow(0 0 0 transparent); }
+  50% { opacity: 1; filter: drop-shadow(0 0 6px oklch(0.8 0.15 175)); }
+}
+@keyframes card-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pipe-pulse-anim, .node-glow-anim, .card-float-anim { animation: none !important; }
+}
