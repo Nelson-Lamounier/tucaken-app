@@ -649,6 +649,9 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
                 techStack:         r.tech_stack         ?? null,
                 complexity:        r.complexity         ?? null,
                 confidence:        r.confidence         ?? null,
+                // is_featured/is_hidden are NOT NULL DEFAULT FALSE in repository_profiles;
+                // a NULL here only means LEFT-JOIN miss (no profile yet) → default false.
+                // Profile display values stay nullable (?? null) so the UI can omit them.
                 highlights:        r.highlights         ?? null,
                 isFeatured:        r.is_featured        ?? false,
                 featureRank:       r.feature_rank       ?? null,
