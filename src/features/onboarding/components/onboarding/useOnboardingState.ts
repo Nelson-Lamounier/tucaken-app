@@ -9,16 +9,17 @@ import type { OnboardingData, ResumeSummary, StepId } from './types'
 import { STEPS } from './types'
 
 const STEP_INDEX: Record<StepId, number> = {
-  welcome:    0,
-  portfolio:  1,
-  resume:     2,
-  connect:    3,
-  repos:      4,
-  processing: 5,
-  mirror:     6,
-  direction:  7,
-  distill:    8,
-  review:     9,
+  welcome:        0,
+  portfolio:      1,
+  resume:         2,
+  connect:        3,
+  repos:          4,
+  processing:     5,
+  mirror:         6,
+  direction:      7,
+  reconciliation: 8,
+  distill:        9,
+  review:         10,
 }
 
 const ID_BY_INDEX: StepId[] = STEPS.map((s) => s.id)

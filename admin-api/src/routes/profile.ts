@@ -3,7 +3,7 @@
  * admin-api — User profile summary route.
  *
  * Routes:
- *   GET /summary — return the aggregated rollup, mirror, reveal, direction, and timestamps
+ *   GET /summary — return the aggregated rollup, mirror, reveal, direction, reconciliation, and timestamps
  *                  for the authenticated user's profile.
  *
  * RLS: every query is scoped to user_id = $1::uuid (users.id UUID) derived
@@ -37,7 +37,7 @@ export function createProfileRouter(config: AdminApiConfig): Hono<AdminApiBindin
         if (!uid) return ctx.json({ error: 'Authenticated subject missing' }, 401);
 
         const { rows } = await pool.query(
-            `SELECT rollup, mirror, reveal, direction, refreshed_at, synthesis_refreshed_at
+            `SELECT rollup, mirror, reveal, direction, reconciliation, refreshed_at, synthesis_refreshed_at
                FROM user_profile_rollup WHERE user_id = $1::uuid`,
             [uid],
         );
@@ -50,6 +50,7 @@ export function createProfileRouter(config: AdminApiConfig): Hono<AdminApiBindin
             mirror:               r.mirror ?? null,
             reveal:               r.reveal ?? null,
             direction:            r.direction ?? null,
+            reconciliation:       r.reconciliation ?? null,
             refreshedAt:          r.refreshed_at ? r.refreshed_at.toISOString() : null,
             synthesisRefreshedAt: r.synthesis_refreshed_at ? r.synthesis_refreshed_at.toISOString() : null,
         });

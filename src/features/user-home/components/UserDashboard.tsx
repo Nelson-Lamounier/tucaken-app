@@ -11,6 +11,7 @@ import { adminKeys } from '@/lib/api/query-keys'
 import { listResumeImportsFn, listCareerEntriesFn } from '@/server/resume-imports'
 import { MirrorPanel } from '@/features/profile/components/MirrorPanel'
 import { DirectionPanel } from '@/features/profile/components/DirectionPanel'
+import { ReconciliationPanel } from '@/features/profile/components/ReconciliationPanel'
 import { RepoProfileCards } from './RepoProfileCards'
 import { CareerDataBreakdown } from './CareerDataBreakdown'
 import { ResumeFilesList } from './ResumeFilesList'
@@ -98,6 +99,7 @@ export function UserDashboard() {
         <Stats stats={heroStats} />
         {profileSummary && <MirrorPanel summary={profileSummary} />}
         {profileSummary && <DirectionPanel summary={profileSummary} />}
+        {profileSummary && <ReconciliationPanel summary={profileSummary} />}
         <RepoProfileCards repos={repos} isLoading={loadingRepos} />
         <CareerDataBreakdown
           entries={entries}

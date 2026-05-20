@@ -58,6 +58,7 @@ describe('profile server functions', () => {
         mirror: { paragraph: 'You are a builder.' },
         reveal: { reveals: [{ insight: 'Systems thinker', evidence: 'K8s pipelines' }] },
         direction: null,
+        reconciliation: null,
         refreshedAt: '2026-05-18T00:00:00Z',
         synthesisRefreshedAt: '2026-05-18T01:00:00Z',
       }
@@ -73,6 +74,28 @@ describe('profile server functions', () => {
         }),
       )
       expect(result).toEqual(summary)
+    })
+
+    it('passes a populated reconciliation through unchanged', async () => {
+      const summary = {
+        rollup: { total: 5 },
+        mirror: { paragraph: 'You are a builder.' },
+        reveal: { reveals: [{ insight: 'Systems thinker', evidence: 'K8s pipelines' }] },
+        direction: null,
+        reconciliation: {
+          unsupportedClaims: [{ claim: 'A claim text here', resumeRef: 'Acme', whyUnsupported: 'no domain evidence' }],
+          undersold: [{ evidence: 'TS depth across repos', rollupDimension: 'language share', suggestion: 'add a TS bullet here' }],
+        },
+        refreshedAt: '2026-05-18T00:00:00Z',
+        synthesisRefreshedAt: '2026-05-18T01:00:00Z',
+      }
+      mockResponse(summary)
+
+      const handler = getProfileSummaryFn as () => Promise<unknown>
+      const result = await handler() as typeof summary
+
+      expect(result.reconciliation?.unsupportedClaims[0]?.claim).toBe('A claim text here')
+      expect(result.reconciliation?.undersold[0]?.rollupDimension).toBe('language share')
     })
   })
 })

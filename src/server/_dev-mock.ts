@@ -405,6 +405,17 @@ export function mockApiResponse(path: string, method = 'GET', body?: unknown): u
         ],
         whatToDeepen: ['Surface incident-response evidence in repo docs.', 'Add public technical writing links.'],
       },
+      reconciliation: {
+        unsupportedClaims: [
+          { claim: 'Led a 12-person ML platform team', resumeRef: 'Acme — Staff Engineer', whyUnsupported: 'No ML domain in the GitHub domain mix; role distribution is creator-heavy solo work' },
+          { claim: 'Expert in Kubernetes at scale', resumeRef: 'Cloud skills', whyUnsupported: 'No Kubernetes/infra signal beyond a single infra repo in the activity arc' },
+          { claim: 'Drove $2M cost savings', resumeRef: 'Acme — Staff Engineer', whyUnsupported: 'Business outcomes are not derivable from repository evidence' },
+        ],
+        undersold: [
+          { evidence: 'Strong, sustained TypeScript output across infra repos', rollupDimension: 'language share', suggestion: 'Add a TypeScript infrastructure bullet — it is your dominant evidenced strength' },
+          { evidence: 'Creator role on the majority of project repos', rollupDimension: 'role distribution', suggestion: 'Surface ownership/initiative explicitly in the résumé summary' },
+        ],
+      },
       refreshedAt: '2026-01-15T00:05:00Z',
       synthesisRefreshedAt: '2026-01-15T00:06:00Z',
     }
