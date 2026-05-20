@@ -44,6 +44,9 @@ export function ReconciliationPanel({ summary }: { readonly summary: ProfileSumm
           )}
         </div>
       )}
+      {rc.unsupportedClaims.length === 0 && rc.undersold.length === 0 && (
+        <p className="text-sm text-zinc-500">Your résumé is well-aligned with the evidence.</p>
+      )}
     </section>
   )
 }
