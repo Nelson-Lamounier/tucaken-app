@@ -3,7 +3,7 @@
  * End-to-end tests for admin-api routes/profile.ts
  *
  * Coverage:
- *   GET /summary — rollup/mirror/reveal/direction/timestamps
+ *   GET /summary — rollup/mirror/reveal/direction/reconciliation/timestamps
  *   GET /summary — 404 when no row
  *   GET /summary — null mirror/reveal/synthesis_refreshed_at mapping
  *
@@ -148,5 +148,22 @@ describe('GET /summary', () => {
         poolQueryMock.mockResolvedValueOnce({ rows: [{ rollup:{version:1}, mirror:null, reveal:null, direction:null, refreshed_at:new Date(), synthesis_refreshed_at:null }] });
         const app = buildApp();
         expect((await (await app.request('/summary')).json()).direction).toBeNull();
+    });
+
+    it('GET /summary includes reconciliation (and maps null)', async () => {
+        poolQueryMock.mockResolvedValueOnce({ rows: [{
+            rollup: { version: 1 }, mirror: null, reveal: null, direction: null,
+            reconciliation: { unsupportedClaims: [{ claim:'c', resumeRef:'Acme', whyUnsupported:'w' }], undersold: [] },
+            refreshed_at: new Date('2026-01-02T00:00:00Z'), synthesis_refreshed_at: null,
+        }] });
+        const app = buildApp();
+        const body = await (await app.request('/summary')).json();
+        expect(body).toMatchObject({ reconciliation: { unsupportedClaims: [{ claim:'c' }] } });
+    });
+
+    it('GET /summary maps null reconciliation', async () => {
+        poolQueryMock.mockResolvedValueOnce({ rows: [{ rollup:{version:1}, mirror:null, reveal:null, direction:null, reconciliation:null, refreshed_at:new Date(), synthesis_refreshed_at:null }] });
+        const app = buildApp();
+        expect((await (await app.request('/summary')).json()).reconciliation).toBeNull();
     });
 });
