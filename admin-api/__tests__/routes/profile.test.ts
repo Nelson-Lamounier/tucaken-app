@@ -3,7 +3,7 @@
  * End-to-end tests for admin-api routes/profile.ts
  *
  * Coverage:
- *   GET /summary — rollup/mirror/reveal/direction/reconciliation/timestamps
+ *   GET /summary — rollup/mirror/reveal/direction/reconciliation/diagnostic/timestamps
  *   GET /summary — 404 when no row
  *   GET /summary — null mirror/reveal/synthesis_refreshed_at mapping
  *
@@ -165,5 +165,35 @@ describe('GET /summary', () => {
         poolQueryMock.mockResolvedValueOnce({ rows: [{ rollup:{version:1}, mirror:null, reveal:null, direction:null, reconciliation:null, refreshed_at:new Date(), synthesis_refreshed_at:null }] });
         const app = buildApp();
         expect((await (await app.request('/summary')).json()).reconciliation).toBeNull();
+    });
+
+    it('GET /summary includes diagnostic (and maps null)', async () => {
+        poolQueryMock.mockResolvedValueOnce({ rows: [{
+            rollup: { version: 1 }, mirror: null, reveal: null, direction: null, reconciliation: null,
+            diagnostic: {
+                overall: 78,
+                components: {
+                    profileDepth:            { score: 86, blockers: [] },
+                    ragDepth:                { score: 70, blockers: ['No project repos with high KB quality'] },
+                    directionConfidence:     { score: 80, blockers: [] },
+                    reconciliationAlignment: { score: 80, blockers: [] },
+                    resumeCoverage:          { score: 75, blockers: [] },
+                },
+                methodology: { version: 1, weights: { profileDepth:20, ragDepth:20, directionConfidence:20, reconciliationAlignment:20, resumeCoverage:20 }, notes: 'v1' },
+                explanation: 'You score 78 because…',
+            },
+            refreshed_at: new Date('2026-01-02T00:00:00Z'), synthesis_refreshed_at: null,
+        }] });
+        const app = buildApp();
+        const body = await (await app.request('/summary')).json();
+        expect(body).toMatchObject({ diagnostic: { overall: 78 } });
+        expect(body.diagnostic.components.ragDepth.blockers[0]).toBe('No project repos with high KB quality');
+        expect(body.diagnostic.explanation).toBe('You score 78 because…');
+    });
+
+    it('GET /summary maps null diagnostic', async () => {
+        poolQueryMock.mockResolvedValueOnce({ rows: [{ rollup:{version:1}, mirror:null, reveal:null, direction:null, reconciliation:null, diagnostic:null, refreshed_at:new Date(), synthesis_refreshed_at:null }] });
+        const app = buildApp();
+        expect((await (await app.request('/summary')).json()).diagnostic).toBeNull();
     });
 });

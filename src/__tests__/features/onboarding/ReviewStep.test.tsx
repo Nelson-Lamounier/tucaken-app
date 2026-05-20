@@ -11,6 +11,18 @@ vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
 }))
 
+const useProfileSummaryMock = vi.fn()
+vi.mock('@/features/profile/hooks/use-profile-summary', () => ({
+  useProfileSummary: () => useProfileSummaryMock(),
+}))
+
+vi.mock('@/server/resume-imports', () => ({
+  getImportProgressFn:   vi.fn(() => Promise.resolve({ gapReportReady: false })),
+  getGapReportFn:        vi.fn(() => Promise.resolve(null)),
+  listCareerEntriesFn:   vi.fn(() => Promise.resolve([])),
+  updateCareerEntryFn:   vi.fn(() => Promise.resolve(undefined)),
+}))
+
 import { ReviewStep } from '@/features/onboarding/components/steps/ReviewStep'
 
 function renderWithClient(ui: React.ReactElement) {
@@ -23,6 +35,8 @@ function renderWithClient(ui: React.ReactElement) {
 describe('ReviewStep', () => {
   beforeEach(() => {
     navigateMock.mockReset()
+    useProfileSummaryMock.mockReset()
+    useProfileSummaryMock.mockReturnValue({ data: undefined })
   })
 
   it('renders the all-set finish screen when no importId is present', () => {
@@ -45,5 +59,27 @@ describe('ReviewStep', () => {
     await userEvent.click(screen.getByRole('button', { name: /finish/i }))
     expect(onFinish).toHaveBeenCalledTimes(1)
     expect(navigateMock).not.toHaveBeenCalled()
+  })
+
+  it('renders the DiagnosticPanel overall score in the review path', async () => {
+    useProfileSummaryMock.mockReturnValue({
+      data: {
+        diagnostic: {
+          overall: 78,
+          components: {
+            profileDepth:            { score: 80, blockers: [] },
+            ragDepth:                { score: 70, blockers: [] },
+            directionConfidence:     { score: 80, blockers: [] },
+            reconciliationAlignment: { score: 80, blockers: [] },
+            resumeCoverage:          { score: 80, blockers: [] },
+          },
+          methodology: { version: 1, weights: {}, notes: '' },
+          explanation: 'Solid baseline.',
+        },
+      },
+    })
+    renderWithClient(<ReviewStep importId="import-123" />)
+    expect(await screen.findByText('78')).toBeTruthy()
+    expect(screen.getByText('/100')).toBeTruthy()
   })
 })

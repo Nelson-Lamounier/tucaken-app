@@ -13,6 +13,8 @@ import {
 } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/Button'
+import { useProfileSummary } from '@/features/profile/hooks/use-profile-summary'
+import { DiagnosticPanel } from '@/features/profile/components/DiagnosticPanel'
 import { adminKeys } from '@/lib/api/query-keys'
 import {
   getImportProgressFn,
@@ -36,6 +38,7 @@ export function ReviewStep({ importId, onFinish }: ReviewStepProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [sub, setSub] = useState<SubPhase>('review')
+  const { data: profileSummary } = useProfileSummary()
 
   const finish = onFinish ?? (() => void navigate({ to: '/overview', replace: true }))
 
@@ -202,6 +205,11 @@ export function ReviewStep({ importId, onFinish }: ReviewStepProps) {
 
   return (
     <div className="space-y-6">
+      {profileSummary ? (
+        <DiagnosticPanel summary={profileSummary} />
+      ) : (
+        <p className="py-10 text-center text-sm text-zinc-500">Generating your readiness diagnostic…</p>
+      )}
       <div>
         <h3 className="text-base font-semibold text-zinc-100">Review extracted career history</h3>
         <p className="mt-1 text-sm text-zinc-500">

@@ -12,6 +12,7 @@ import { listResumeImportsFn, listCareerEntriesFn } from '@/server/resume-import
 import { MirrorPanel } from '@/features/profile/components/MirrorPanel'
 import { DirectionPanel } from '@/features/profile/components/DirectionPanel'
 import { ReconciliationPanel } from '@/features/profile/components/ReconciliationPanel'
+import { DiagnosticPanel } from '@/features/profile/components/DiagnosticPanel'
 import { RepoProfileCards } from './RepoProfileCards'
 import { CareerDataBreakdown } from './CareerDataBreakdown'
 import { ResumeFilesList } from './ResumeFilesList'
@@ -97,6 +98,7 @@ export function UserDashboard() {
     >
       <div className="space-y-8">
         <Stats stats={heroStats} />
+        {profileSummary && <DiagnosticPanel summary={profileSummary} />}
         {profileSummary && <MirrorPanel summary={profileSummary} />}
         {profileSummary && <DirectionPanel summary={profileSummary} />}
         {profileSummary && <ReconciliationPanel summary={profileSummary} />}

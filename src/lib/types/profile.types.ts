@@ -11,12 +11,20 @@ export interface DirectionJson { readonly archetypes: ArchetypeFit[]; readonly s
 export interface UnsupportedClaim { readonly claim: string; readonly resumeRef: string; readonly whyUnsupported: string }
 export interface UndersoldStrength { readonly evidence: string; readonly rollupDimension: string; readonly suggestion: string }
 export interface ReconciliationJson { readonly unsupportedClaims: UnsupportedClaim[]; readonly undersold: UndersoldStrength[] }
+export interface DiagnosticComponentScore { readonly score: number; readonly blockers: ReadonlyArray<string> }
+export interface DiagnosticJson {
+  readonly overall:    number;
+  readonly components: Readonly<Record<string, DiagnosticComponentScore>>;
+  readonly methodology: { readonly version: number; readonly weights: Readonly<Record<string, number>>; readonly notes: string };
+  readonly explanation: string | null;
+}
 export interface ProfileSummary {
   readonly rollup: JsonValue
   readonly mirror: MirrorJson | null
   readonly reveal: RevealJson | null
   readonly direction: DirectionJson | null
   readonly reconciliation: ReconciliationJson | null
+  readonly diagnostic: DiagnosticJson | null
   readonly refreshedAt: string | null
   readonly synthesisRefreshedAt: string | null
 }
