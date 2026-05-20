@@ -129,6 +129,7 @@ describe('profile server functions', () => {
 
       expect(result.diagnostic?.overall).toBe(78)
       expect(result.diagnostic?.components.ragDepth.blockers[0]).toBe('No project repos with high KB quality')
+      expect(result.diagnostic?.explanation).toBe('You score 78 because…')
     })
   })
 })

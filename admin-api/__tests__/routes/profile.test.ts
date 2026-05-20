@@ -187,6 +187,8 @@ describe('GET /summary', () => {
         const app = buildApp();
         const body = await (await app.request('/summary')).json();
         expect(body).toMatchObject({ diagnostic: { overall: 78 } });
+        expect(body.diagnostic.components.ragDepth.blockers[0]).toBe('No project repos with high KB quality');
+        expect(body.diagnostic.explanation).toBe('You score 78 because…');
     });
 
     it('GET /summary maps null diagnostic', async () => {
