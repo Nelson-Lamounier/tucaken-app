@@ -6,7 +6,9 @@ import { adminKeys } from '@/lib/api/query-keys'
 import { getMeFn } from '@/server/me'
 
 function planFromApi(raw: string): PlanId {
-  if (raw === 'pro' || raw === 'team') return raw
+  if (raw === 'pro' || raw === 'premium') return raw
+  // Accept legacy 'team' from backend until admin-api migrates the column.
+  if (raw === 'team') return 'premium'
   return 'free'
 }
 
@@ -28,10 +30,17 @@ export function useBilling() {
     const p = me.plan
     return {
       ...DEFAULT_BILLING,
-      plan:         planFromApi(p.plan),
-      status:       statusFromApi(p.subscriptionStatus, p.trialEndsAt),
-      trialEndsAt:  p.trialEndsAt ?? null,
-      billingEmail: me.email,
+      plan:               planFromApi(p.plan),
+      status:             statusFromApi(p.subscriptionStatus, p.trialEndsAt),
+      trialEndsAt:        p.trialEndsAt ?? null,
+      billingEmail:       me.email,
+      stripeCustomerId:     p.stripeCustomerId ?? null,
+      stripeSubscriptionId: p.stripeSubscriptionId ?? null,
+      cancelAtPeriodEnd:    Boolean(p.cancelAtPeriodEnd),
+      // `current_period_end` is the cliff date for both "renews on" and
+      // "cancels on" — same column, different label depending on
+      // cancelAtPeriodEnd. We populate renewsAt; the UI re-uses it.
+      renewsAt:           p.currentPeriodEnd ?? DEFAULT_BILLING.renewsAt,
     }
   }, [me])
 

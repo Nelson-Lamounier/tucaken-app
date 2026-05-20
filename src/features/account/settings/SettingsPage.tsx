@@ -4,6 +4,7 @@
 // host AppLayout supplies its own.
 
 import {
+  AlertTriangle,
   Archive,
   Building2,
   Cpu,
@@ -12,6 +13,7 @@ import {
   Layout,
   Zap,
 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import type { PageNavSection, Settings, SettingsPageProps } from '../types'
 import { PageSection, PageShell } from '../components/PageShell'
 import { AppearanceSection } from './AppearanceSection'
@@ -21,18 +23,28 @@ import { WorkspaceSection } from './WorkspaceSection'
 import { TokensSection } from './TokensSection'
 import { WebhooksSection } from './WebhooksSection'
 import { DataSection } from './DataSection'
+import { DangerZoneSection } from './DangerZoneSection'
+import { adminKeys } from '@/lib/api/query-keys'
+import { getMeFn } from '@/server/me'
 
 const SECTIONS: PageNavSection[] = [
-  { id: 'appearance', label: 'Appearance',      icon: Layout    },
-  { id: 'locale',     label: 'Locale & time',   icon: Globe     },
-  { id: 'resumes',    label: 'Resume defaults', icon: FileText  },
-  { id: 'workspace',  label: 'Workspace',       icon: Building2 },
-  { id: 'tokens',     label: 'API tokens',      icon: Cpu       },
-  { id: 'webhooks',   label: 'Webhooks',        icon: Zap       },
-  { id: 'data',       label: 'Data & privacy',  icon: Archive   },
+  { id: 'appearance', label: 'Appearance',      icon: Layout         },
+  { id: 'locale',     label: 'Locale & time',   icon: Globe          },
+  { id: 'resumes',    label: 'Resume defaults', icon: FileText       },
+  { id: 'workspace',  label: 'Workspace',       icon: Building2      },
+  { id: 'tokens',     label: 'API tokens',      icon: Cpu            },
+  { id: 'webhooks',   label: 'Webhooks',        icon: Zap            },
+  { id: 'data',       label: 'Data & privacy',  icon: Archive        },
+  { id: 'danger',     label: 'Danger zone',     icon: AlertTriangle  },
 ]
 
 export function SettingsPage({ settings, onUpdateSettings }: SettingsPageProps) {
+  // The danger zone needs the canonical email for the type-to-confirm step.
+  // useQuery shares cache with use-billing → /me is fetched at most once.
+  const { data: me } = useQuery({
+    queryKey: adminKeys.me.detail(),
+    queryFn:  getMeFn,
+  })
   // Helpers — patch a single nested slice without callers having to spread.
   function patch<K extends keyof Settings>(
     key: K,
@@ -122,6 +134,14 @@ export function SettingsPage({ settings, onUpdateSettings }: SettingsPageProps) 
         sub="Export everything we have on you, or wipe it."
       >
         <DataSection />
+      </PageSection>
+
+      <PageSection
+        id="danger"
+        label="Danger zone"
+        sub="Permanent actions. 30-day grace before data is erased — restorable via support during that window."
+      >
+        <DangerZoneSection email={me?.email ?? ''} />
       </PageSection>
     </PageShell>
   )

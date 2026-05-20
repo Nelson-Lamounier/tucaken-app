@@ -5,7 +5,8 @@ import { motion } from 'motion/react'
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { MagneticButton } from '../lib/MagneticButton'
-import { problems, steps, comparison, founder, pricing, faq } from '../content'
+import { problems, steps, comparison, founder, faq } from '../content'
+import { TIERS } from '@/features/billing/catalog'
 
 function Section({ children, id, className = '' }: { children: ReactNode; id?: string; className?: string }) {
   return (
@@ -157,50 +158,144 @@ export function FounderSection() {
 
 export function PricingSection() {
   const navigate = useNavigate()
+  // Adapted from TailwindPlus "Three tiers with emphasized tier" — re-skinned
+  // to repo palette (zinc/teal, no indigo) and wired to the central TIERS
+  // catalog + /checkout flow. The CSS-only monthly/annual toggle uses
+  // `group/tiers` + `group-not-has-[...]:hidden` so the two price lines swap
+  // without any JS state.
   return (
     <Section id="pricing" className="border-t border-white/5">
-      <div className="mx-auto max-w-4xl">
-        <Eyebrow>Pricing</Eyebrow>
-        <h2 className="text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl">
-          Free until it's worth paying for.
-        </h2>
-        <div className="mt-10 grid gap-5 md:grid-cols-2">
-          {pricing.map((p) => (
+      <form className="group/tiers mx-auto max-w-7xl">
+        <div className="mx-auto max-w-3xl text-center">
+          <Eyebrow>Pricing</Eyebrow>
+          <h2 className="mt-3 text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl">
+            Free until it's worth paying for.
+          </h2>
+          <p className="mx-auto mt-5 max-w-xl text-pretty text-sm text-zinc-400 md:text-base">
+            Pick a tier that matches how often you ship. Switch or cancel any
+            time — we prorate down to the day.
+          </p>
+        </div>
+
+        {/* Monthly / Annual frequency toggle (radio-driven, no JS) */}
+        <div className="mt-10 flex justify-center">
+          <fieldset aria-label="Billing frequency">
+            <div className="grid grid-cols-2 gap-x-1 rounded-full p-1 text-center font-mono text-[11px] uppercase tracking-widest inset-ring inset-ring-white/10">
+              <label className="group relative cursor-pointer rounded-full px-4 py-1.5 has-checked:bg-teal-500">
+                <input
+                  defaultValue="monthly"
+                  defaultChecked
+                  name="frequency"
+                  type="radio"
+                  className="absolute inset-0 appearance-none rounded-full"
+                />
+                <span className="text-zinc-400 group-has-checked:text-zinc-950">
+                  Monthly
+                </span>
+              </label>
+              <label className="group relative cursor-pointer rounded-full px-4 py-1.5 has-checked:bg-teal-500">
+                <input
+                  defaultValue="annually"
+                  name="frequency"
+                  type="radio"
+                  className="absolute inset-0 appearance-none rounded-full"
+                />
+                <span className="text-zinc-400 group-has-checked:text-zinc-950">
+                  Annually
+                </span>
+              </label>
+            </div>
+          </fieldset>
+        </div>
+
+        {/* Tier cards */}
+        <div className="isolate mx-auto mt-10 grid max-w-md grid-cols-1 gap-6 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+          {TIERS.map((t) => (
             <div
-              key={p.name}
-              className={[
-                'relative rounded-2xl border p-6 md:p-8',
-                p.hl ? 'border-teal-500/40 bg-gradient-to-br from-teal-500/10 to-emerald-600/5' : 'border-white/10 bg-white/[0.02]',
-              ].join(' ')}
+              key={t.id}
+              data-featured={t.highlighted ? 'true' : undefined}
+              className="group/tier relative rounded-3xl bg-white/[0.02] p-8 ring-1 ring-white/10 data-featured:ring-2 data-featured:ring-teal-500/60 xl:p-10"
             >
-              {p.hl && (
-                <div className="absolute -top-3 right-6 rounded-full bg-gradient-to-r from-teal-500 to-emerald-500 px-3 py-0.5 font-mono text-[10px] uppercase tracking-widest text-white">
+              {t.highlighted && (
+                <div className="absolute -top-3 right-6 rounded-full bg-gradient-to-r from-teal-500 to-emerald-500 px-3 py-0.5 font-mono text-[10px] uppercase tracking-widest text-zinc-950">
                   Recommended
                 </div>
               )}
-              <div className="font-mono text-xs uppercase tracking-widest text-zinc-400">{p.name}</div>
-              <div className="mt-4 flex items-baseline gap-2">
-                <span className="text-4xl font-semibold text-white">{p.price}</span>
-                <span className="text-sm text-zinc-500">{p.period}</span>
-              </div>
-              <ul className="mt-6 space-y-2.5 text-sm">
-                {p.items.map((it) => (
-                  <li key={it} className="flex items-start gap-2 text-zinc-300">
-                    <span className={p.hl ? 'text-teal-400' : 'text-zinc-500'}>✓</span>
-                    <span>{it}</span>
+              <h3
+                id={`tier-${t.id}`}
+                className="font-mono text-xs uppercase tracking-widest text-zinc-400 group-data-featured/tier:text-teal-300"
+              >
+                {t.name}
+              </h3>
+              <p className="mt-3 text-sm/6 text-zinc-300">{t.blurb}</p>
+
+              {t.free ? (
+                <p className="mt-6 text-4xl font-semibold tracking-tight text-white">
+                  Free
+                </p>
+              ) : (
+                <>
+                  <p className="mt-6 flex items-baseline gap-x-1 group-not-has-[[name=frequency][value=monthly]:checked]/tiers:hidden">
+                    <span className="text-4xl font-semibold tracking-tight text-white">
+                      ${t.priceMonthly}
+                    </span>
+                    <span className="text-sm/6 font-semibold text-zinc-500">
+                      /month
+                    </span>
+                  </p>
+                  <p className="mt-6 flex items-baseline gap-x-1 group-not-has-[[name=frequency][value=annually]:checked]/tiers:hidden">
+                    <span className="text-4xl font-semibold tracking-tight text-white">
+                      ${t.priceAnnual}
+                    </span>
+                    <span className="text-sm/6 font-semibold text-zinc-500">
+                      /year
+                    </span>
+                  </p>
+                </>
+              )}
+
+              <MagneticButton
+                primary={t.highlighted}
+                className="mt-7 w-full"
+                onClick={() =>
+                  t.free
+                    ? navigate({ to: '/sign-in' })
+                    : navigate({
+                        to: '/checkout/$tier',
+                        // `t.free` short-circuited above — t.id is guaranteed
+                        // to be 'pro' | 'premium' here, but TS can't narrow.
+                        params: { tier: t.id as 'pro' | 'premium' },
+                      })
+                }
+              >
+                {t.cta}
+              </MagneticButton>
+
+              <ul className="mt-8 space-y-3 text-sm/6 text-zinc-300 xl:mt-10">
+                {t.features.map((feature) => (
+                  <li key={feature} className="flex gap-x-3">
+                    <span
+                      aria-hidden="true"
+                      className={
+                        t.highlighted
+                          ? 'mt-0.5 text-teal-400'
+                          : 'mt-0.5 text-zinc-500'
+                      }
+                    >
+                      ✓
+                    </span>
+                    {feature}
                   </li>
                 ))}
               </ul>
-              <MagneticButton primary={p.hl} className="mt-7 w-full" onClick={() => navigate({ to: '/sign-in' })}>
-                {p.cta}
-              </MagneticButton>
             </div>
           ))}
         </div>
-      </div>
+      </form>
     </Section>
   )
 }
+
 
 export function FAQSection() {
   const [open, setOpen] = useState<number>(0)

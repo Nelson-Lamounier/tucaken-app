@@ -24,6 +24,8 @@ import { loadConfig } from './lib/config.js';
 import { logger as appLogger } from './lib/observability/logger.js';
 import { getPool } from './lib/pg.js';
 import { cognitoJwtAuth, requireAdminGroup } from './middleware/auth.js';
+import { deletedUserGate } from './middleware/deleted-user-gate.js';
+import { cognitoM2MAuth } from './middleware/m2m-auth.js';
 import { observabilityMiddleware } from './middleware/observability.js';
 import { userProvisionMiddleware } from './middleware/user-provision.js';
 import { createApplicationsRouter } from './routes/applications.js';
@@ -33,7 +35,9 @@ import { createBedrockUsageRouter } from './routes/bedrock-usage.js';
 import { createFinopsRouter } from './routes/finops.js';
 import { createGitHubRouter, createGitHubWebhookRouter } from './routes/github.js';
 import { createHealthRouter } from './routes/health.js';
+import { createAdminUsersRouter } from './routes/admin-users.js';
 import { createIngestionRouter } from './routes/ingestion.js';
+import { createInternalBillingRouter } from './routes/internal-billing.js';
 import { createMeRouter } from './routes/me.js';
 import { createObservabilityRouter } from './routes/observability.js';
 import { createPipelinesRouter } from './routes/pipelines.js';
@@ -120,6 +124,24 @@ app.route('/api/github', createGitHubWebhookRouter(config));
 // without a session token (e.g. email-exists check before Cognito SignUp).
 app.route('/api/public', createPublicRouter(config));
 
+// ── Internal service-to-service routes (Cognito M2M client_credentials) ──────
+// Called only by Tucaken-owned pods (currently the tucaken-app SSR Stripe
+// webhook handler) with a service-account access token. Mounted BEFORE the
+// user-JWT middleware so requests with `Bearer <m2m-token>` are routed here
+// without triggering user provisioning. See docs/billing-integration.md.
+const requiredM2MScope =
+  process.env['M2M_REQUIRED_SCOPE'] ?? 'tucaken-internal/write:billing';
+app.use(
+  '/api/internal/*',
+  cognitoM2MAuth({
+    userPoolId:    config.cognitoUserPoolId,
+    issuerUrl:     config.cognitoIssuerUrl,
+    region:        config.awsRegion,
+    requiredScope: requiredM2MScope,
+  }),
+);
+app.route('/api/internal/billing', createInternalBillingRouter(config));
+
 // ── Cognito JWT guard — applied to all /api/admin/* routes ───────────────────
 const jwtMiddleware = cognitoJwtAuth(
   config.cognitoUserPoolId,
@@ -135,10 +157,19 @@ app.use('/api/admin/*', jwtMiddleware);
 // resolved users.id UUID in ctx for downstream handlers.
 app.use('/api/admin/*', userProvisionMiddleware(getPool(config)));
 
+// ── Deleted-user gate — runs after provisioning, blocks soft-deleted users ───
+// Returns 410 Gone for all admin-api routes EXCEPT /api/admin/me/* so the
+// frontend can still surface "account being deleted" state and re-trigger
+// the delete request idempotently.
+app.use('/api/admin/*', deletedUserGate(getPool(config)));
+
 // ── Staff-only gates ──────────────────────────────────────────────────────────
 app.use('/api/admin/bedrock-usage/*', requireAdminGroup());
 app.use('/api/admin/finops/*',        requireAdminGroup());
 app.use('/api/admin/ingestion/*',     requireAdminGroup());
+// `/api/admin/users/*` is the support tool surface — restore deleted users,
+// future ops actions. Locked behind the `admin` Cognito group.
+app.use('/api/admin/users/*',         requireAdminGroup());
 
 // ── Protected routes ─────────────────────────────────────────────────────────
 app.route('/api/admin/bedrock-usage', createBedrockUsageRouter(config));
@@ -155,6 +186,7 @@ app.route('/api/admin/resume-imports', createResumeImportsRouter(config));
 app.route('/api/admin/prompt-feedback', createPromptFeedbackRouter(config));
 app.route('/api/admin/drafts',         createDraftsRouter(config));
 app.route('/api/admin/profile',        createProfileRouter(config));
+app.route('/api/admin/users',          createAdminUsersRouter(config));
 
 // ── 404 handler ──────────────────────────────────────────────────────────────
 app.notFound((ctx) => ctx.json({ error: 'Not found' }, 404));

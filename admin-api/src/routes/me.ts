@@ -8,10 +8,11 @@
  */
 import { Hono } from 'hono';
 
+import { adminDisableUser } from '../lib/cognito-admin.js';
 import type { AdminApiConfig } from '../lib/config.js';
 import { logger } from '../lib/observability/logger.js';
 import { getPool } from '../lib/pg.js';
-import { getUserPlanStatus } from '../lib/repositories/users.js';
+import { getUserPlanStatus, softDeleteUser } from '../lib/repositories/users.js';
 import type { AdminApiBindings } from '../lib/types.js';
 
 export function createMeRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
@@ -58,8 +59,74 @@ export function createMeRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
         subscriptionStatus:   null,
         stripeCustomerId:     null,
         stripeSubscriptionId: null,
+        cancelAtPeriodEnd:    false,
+        currentPeriodEnd:     null,
       },
     });
+  });
+
+  /**
+   * POST /api/admin/me/delete
+   *
+   * Initiates account termination. Caller (tucaken-app deleteAccountFn) has
+   * already cancelled the Stripe subscription and disabled the Cognito user;
+   * this endpoint is the DB side of the transaction.
+   *
+   * Idempotent — calling twice keeps the original `deleted_at` timestamp so
+   * the 30-day grace clock does not restart.
+   *
+   * Body: { reason?: string }   (free-text, max 1000 chars)
+   * Returns: { ok: true, deletedAt: ISO8601 }
+   */
+  router.post('/delete', async (ctx) => {
+    const userId  = ctx.get('userId');
+    const payload = ctx.get('jwtPayload');
+    if (!userId) return ctx.json({ error: 'Not provisioned' }, 503);
+
+    let body: { reason?: unknown } = {};
+    try {
+      body = await ctx.req.json();
+    } catch {
+      // No body is acceptable — reason is optional.
+    }
+    const reason =
+      typeof body.reason === 'string' ? body.reason.slice(0, 1000) : null;
+
+    // Disable Cognito login BEFORE the DB write. If this throws, the DB
+    // stays clean and the caller can retry. If the DB write throws after,
+    // the user is locked out but their data is intact — recoverable via
+    // the support restore path.
+    const sub = payload?.sub;
+    if (typeof sub === 'string' && sub) {
+      try {
+        await adminDisableUser(
+          config.cognitoUserPoolId,
+          config.awsRegion,
+          sub,
+        );
+      } catch (err) {
+        logger.error(
+          { event: 'cognito_disable_failed', userId, sub, err },
+          'AdminDisableUser threw — refusing to proceed with DB soft-delete',
+        );
+        return ctx.json(
+          { error: 'CognitoDisableFailed', detail: (err as Error).message },
+          502,
+        );
+      }
+    }
+
+    const wasNewlyDeleted = await softDeleteUser(getPool(config), userId, reason);
+    logger.warn(
+      {
+        event:    wasNewlyDeleted ? 'account_soft_deleted' : 'account_already_deleted',
+        userId,
+        hasReason: Boolean(reason),
+      },
+      'account termination completed',
+    );
+
+    return ctx.json({ ok: true, alreadyDeleted: !wasNewlyDeleted });
   });
 
   return router;

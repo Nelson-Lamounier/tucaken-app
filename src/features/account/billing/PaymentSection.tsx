@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { Check, Edit2, X } from 'lucide-react'
 import type { Billing, PaymentMethod } from '../types'
 import { Card, Field, inputCls } from '../components/primitives'
+import { PortalButton } from './PortalButton'
 
 interface Props {
   billing: Billing
@@ -58,13 +59,27 @@ export function PaymentSection({ billing, onUpdateBilling }: Props) {
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setEditing((v) => !v)}
-          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-white/10 bg-white/[0.02] px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:border-white/20 hover:bg-white/[0.04]"
-        >
-          <Edit2 className="size-3.5" /> {editing ? 'Cancel' : 'Update card'}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Real updates flow through the Stripe Customer Portal (PCI SAQ-A,
+              maintained by Stripe). The inline edit form below stays for the
+              mock/preview state until a Stripe customer exists. */}
+          {billing.stripeCustomerId ? (
+            <PortalButton
+              customerId={billing.stripeCustomerId}
+              returnPath="/billing"
+            >
+              Update card
+            </PortalButton>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setEditing((v) => !v)}
+              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-white/10 bg-white/[0.02] px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:border-white/20 hover:bg-white/[0.04]"
+            >
+              <Edit2 className="size-3.5" /> {editing ? 'Cancel' : 'Update card'}
+            </button>
+          )}
+        </div>
       </div>
 
       {editing && (

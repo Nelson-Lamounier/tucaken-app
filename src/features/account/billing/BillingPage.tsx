@@ -19,6 +19,7 @@ import { UsageSection } from './UsageSection'
 import { InvoicesSection } from './InvoicesSection'
 import { DetailsSection } from './DetailsSection'
 import { CancelSection } from './CancelSection'
+import { PortalButton } from './PortalButton'
 
 const SECTIONS: PageNavSection[] = [
   { id: 'plan',     label: 'Plan',             icon: Sparkles    },
@@ -37,6 +38,32 @@ export function BillingPage({ billing, onUpdateBilling }: BillingPageProps) {
       sub="Manage your plan, payment method, and invoice history. Switching plans takes effect immediately and is prorated."
       sections={SECTIONS}
     >
+      {/* Past-due banner: surface unpaid invoices at the top of the page with
+          a one-click route into the Stripe Customer Portal to pay them. */}
+      {billing.status === 'past_due' && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 size-5 flex-none text-amber-300" />
+            <div>
+              <p className="text-sm font-medium text-amber-100">
+                Your last invoice is past due.
+              </p>
+              <p className="mt-1 text-xs text-amber-200/80">
+                Pay it from the Stripe customer portal to keep your subscription
+                active. We never see your card details.
+              </p>
+            </div>
+          </div>
+          <PortalButton
+            customerId={billing.stripeCustomerId}
+            returnPath="/billing"
+            className="border-amber-500/40 bg-amber-500/15 text-amber-100 hover:bg-amber-500/25"
+          >
+            Pay past-due invoice
+          </PortalButton>
+        </div>
+      )}
+
       <PageSection
         id="plan"
         label="Plan"

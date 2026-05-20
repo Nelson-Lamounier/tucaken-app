@@ -1,13 +1,22 @@
 // src/features/account/billing/PlanSection.tsx
 //
 // "Plan" section on the Billing page. Current-plan banner with renew date and
-// monthly/annual toggle, followed by a 3-tier plan grid (Free / Pro / Team)
+// monthly/annual toggle, followed by a 3-tier plan grid (Free / Pro / Premium)
 // with upgrade/downgrade affordance.
+//
+// Routing behaviour for the CTA buttons:
+//   · Free → Pro / Premium  : navigate to /checkout/$tier (new subscription)
+//   · Paid → other paid     : open Stripe Billing Portal (Stripe handles
+//                             prorated mid-cycle plan change)
+//   · Paid → Free           : open Stripe Billing Portal cancel flow
 
-import { ArrowDown, ArrowUp, Check } from 'lucide-react'
-import type { Billing, BillingInterval } from '../types'
+import { ArrowDown, ArrowUp, Check, ExternalLink, Loader2 } from 'lucide-react'
+import { useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
+import type { Billing, BillingInterval, PlanId } from '../types'
 import { fmtDate, fmtMoney } from '../components/primitives'
 import { PLANS, planRank } from './plans'
+import { createPortalSessionFn } from '@/server/billing'
 
 interface Props {
   billing: Billing
@@ -18,12 +27,50 @@ export function PlanSection({ billing, onUpdateBilling }: Props) {
   const interval = billing.interval
   const currentPlan = PLANS.find((p) => p.id === billing.plan)!
   const renews = fmtDate(billing.renewsAt)
+  const navigate = useNavigate()
+  const [portalLoading, setPortalLoading] = useState<PlanId | null>(null)
+  const [portalError, setPortalError] = useState<string | null>(null)
 
   function setInterval_(v: BillingInterval) {
     onUpdateBilling({ interval: v })
   }
-  function selectPlan(id: typeof currentPlan.id) {
-    onUpdateBilling({ plan: id, status: 'active', cancelAtPeriodEnd: false })
+
+  async function selectPlan(id: PlanId) {
+    if (id === billing.plan) return
+    setPortalError(null)
+
+    // Free → paid: fresh subscription via Embedded Checkout. Stripe creates
+    // the customer record at checkout completion; webhook links it to this
+    // user account.
+    if (billing.plan === 'free' && id !== 'free') {
+      await navigate({
+        to: '/checkout/$tier',
+        params: { tier: id as 'pro' | 'premium' },
+      })
+      return
+    }
+
+    // Any change involving an existing Stripe customer goes through the
+    // Billing Portal — Stripe handles proration, taxes, dunning correctly.
+    if (!billing.stripeCustomerId) {
+      setPortalError(
+        'No Stripe customer linked yet. Finish the initial subscription first.',
+      )
+      return
+    }
+    setPortalLoading(id)
+    try {
+      const { url } = await createPortalSessionFn({
+        data: {
+          customerId: billing.stripeCustomerId,
+          returnPath: '/billing',
+        },
+      })
+      window.location.assign(url)
+    } catch (e) {
+      setPortalError(e instanceof Error ? e.message : 'Could not open portal.')
+      setPortalLoading(null)
+    }
   }
 
   return (
@@ -158,9 +205,9 @@ export function PlanSection({ billing, onUpdateBilling }: Props) {
               <button
                 type="button"
                 onClick={() => selectPlan(p.id)}
-                disabled={isCurrent}
+                disabled={isCurrent || portalLoading === p.id}
                 className={[
-                  'mt-4 inline-flex w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition',
+                  'mt-4 inline-flex w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition disabled:opacity-60',
                   isCurrent
                     ? 'cursor-default border border-white/5 bg-white/[0.02] text-zinc-500'
                     : isUpgrade
@@ -170,6 +217,15 @@ export function PlanSection({ billing, onUpdateBilling }: Props) {
               >
                 {isCurrent ? (
                   'Your plan'
+                ) : portalLoading === p.id ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin" /> Opening…
+                  </>
+                ) : billing.plan !== 'free' ? (
+                  <>
+                    <ExternalLink className="size-3.5" />{' '}
+                    {isUpgrade ? 'Upgrade' : 'Change'}
+                  </>
                 ) : isUpgrade ? (
                   <>
                     <ArrowUp className="size-3.5" /> Upgrade
@@ -184,6 +240,11 @@ export function PlanSection({ billing, onUpdateBilling }: Props) {
           )
         })}
       </div>
+      {portalError && (
+        <p className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-200">
+          {portalError}
+        </p>
+      )}
     </div>
   )
 }
