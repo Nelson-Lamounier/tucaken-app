@@ -20,7 +20,7 @@ describe('useOnboardingState', () => {
 
   it('clamps initialStepIndex to valid range', () => {
     const { result } = renderHook(() => useOnboardingState(99))
-    expect(result.current.stepIndex).toBe(9) // review is last
+    expect(result.current.stepIndex).toBe(10) // review is last
   })
 
   it('advances through steps with next()', () => {
@@ -30,9 +30,9 @@ describe('useOnboardingState', () => {
   })
 
   it('does not advance past the last step', () => {
-    const { result } = renderHook(() => useOnboardingState(9))
+    const { result } = renderHook(() => useOnboardingState(10))
     act(() => result.current.next())
-    expect(result.current.stepIndex).toBe(9)
+    expect(result.current.stepIndex).toBe(10)
   })
 
   it('goes back with back()', () => {
@@ -65,7 +65,7 @@ describe('useOnboardingState', () => {
     const { result } = renderHook(() => useOnboardingState())
     act(() => result.current.jumpTo('review'))
     expect(result.current.stepId).toBe('review')
-    expect(result.current.stepIndex).toBe(9)
+    expect(result.current.stepIndex).toBe(10)
   })
 
   it('reaches mirror from processing via next()', () => {
@@ -82,21 +82,28 @@ describe('useOnboardingState', () => {
     expect(result.current.stepIndex).toBe(7)
   })
 
-  it('reaches distill from direction via next()', () => {
+  it('reaches reconciliation from direction via next()', () => {
     const { result } = renderHook(() => useOnboardingState(7))
     act(() => result.current.next())
-    expect(result.current.stepId).toBe('distill')
+    expect(result.current.stepId).toBe('reconciliation')
     expect(result.current.stepIndex).toBe(8)
   })
 
-  it('reaches review as the terminal step via next()', () => {
+  it('reaches distill from reconciliation via next()', () => {
     const { result } = renderHook(() => useOnboardingState(8))
     act(() => result.current.next())
-    expect(result.current.stepId).toBe('review')
+    expect(result.current.stepId).toBe('distill')
     expect(result.current.stepIndex).toBe(9)
   })
 
-  it('orders processing → mirror → direction → distill → review', () => {
+  it('reaches review as the terminal step via next()', () => {
+    const { result } = renderHook(() => useOnboardingState(9))
+    act(() => result.current.next())
+    expect(result.current.stepId).toBe('review')
+    expect(result.current.stepIndex).toBe(10)
+  })
+
+  it('orders processing → mirror → direction → reconciliation → distill → review', () => {
     const { result } = renderHook(() => useOnboardingState(5))
     expect(result.current.stepId).toBe('processing')
     act(() => result.current.next())
@@ -105,12 +112,22 @@ describe('useOnboardingState', () => {
     expect(result.current.stepId).toBe('direction')
     expect(result.current.stepIndex).toBe(7)
     act(() => result.current.next())
+    expect(result.current.stepId).toBe('reconciliation')
+    expect(result.current.stepIndex).toBe(8)
+    act(() => result.current.next())
     expect(result.current.stepId).toBe('distill')
     act(() => result.current.next())
     expect(result.current.stepId).toBe('review')
   })
 
-  it('back() from distill returns to direction', () => {
+  it('back() from distill returns to reconciliation', () => {
+    const { result } = renderHook(() => useOnboardingState(9))
+    act(() => result.current.back())
+    expect(result.current.stepId).toBe('reconciliation')
+    expect(result.current.stepIndex).toBe(8)
+  })
+
+  it('back() from reconciliation returns to direction', () => {
     const { result } = renderHook(() => useOnboardingState(8))
     act(() => result.current.back())
     expect(result.current.stepId).toBe('direction')
@@ -129,6 +146,13 @@ describe('useOnboardingState', () => {
     act(() => result.current.jumpTo('direction'))
     expect(result.current.stepId).toBe('direction')
     expect(result.current.stepIndex).toBe(7)
+  })
+
+  it('jumpTo navigates to reconciliation step', () => {
+    const { result } = renderHook(() => useOnboardingState())
+    act(() => result.current.jumpTo('reconciliation'))
+    expect(result.current.stepId).toBe('reconciliation')
+    expect(result.current.stepIndex).toBe(8)
   })
 
   it('setResumeImportId updates data', () => {

@@ -14,6 +14,7 @@ import { ReviewStep } from '../steps/ReviewStep'
 import { DistillStep } from '../steps/DistillStep'
 import { MirrorStep } from '../steps/MirrorStep'
 import { DirectionStep } from '../steps/DirectionStep'
+import { ReconciliationStep } from '../steps/ReconciliationStep'
 import { useOnboardingState } from './useOnboardingState'
 import { useGitHubAccessibleRepos } from '@/features/github/hooks/use-github-accessible-repos'
 import { useGitHubConnectedRepos } from '@/features/github/hooks/use-github-connected-repos'
@@ -76,10 +77,10 @@ export function OnboardingShell({
     onConnectGithub?.()
   }
 
-  // mirror, direction, distill, processing, and review are terminal — no progress-bar slot; clamp to the last visible step
+  // mirror, direction, reconciliation, distill, processing, and review are terminal — no progress-bar slot; clamp to the last visible step
   const visibleIndex = Math.min(s.stepIndex, VISIBLE_STEPS.length - 1)
   const isProcessing = s.stepId === 'processing'
-  const isTerminal = isProcessing || s.stepId === 'mirror' || s.stepId === 'direction' || s.stepId === 'distill' || s.stepId === 'review'
+  const isTerminal = isProcessing || s.stepId === 'mirror' || s.stepId === 'direction' || s.stepId === 'reconciliation' || s.stepId === 'distill' || s.stepId === 'review'
 
   return (
     <div className="dark relative flex min-h-screen w-full items-stretch justify-center overflow-hidden bg-zinc-950 px-3.75 py-8 text-zinc-200">
@@ -164,6 +165,10 @@ export function OnboardingShell({
 
                 {s.stepId === 'direction' && (
                   <DirectionStep onNext={s.next} onBack={s.back} />
+                )}
+
+                {s.stepId === 'reconciliation' && (
+                  <ReconciliationStep onNext={s.next} onBack={s.back} />
                 )}
 
                 {s.stepId === 'distill' && (
