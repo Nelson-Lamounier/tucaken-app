@@ -58,6 +58,7 @@ describe('profile server functions', () => {
         mirror: { paragraph: 'You are a builder.' },
         reveal: { reveals: [{ insight: 'Systems thinker', evidence: 'K8s pipelines' }] },
         direction: null,
+        reconciliation: null,
         refreshedAt: '2026-05-18T00:00:00Z',
         synthesisRefreshedAt: '2026-05-18T01:00:00Z',
       }
