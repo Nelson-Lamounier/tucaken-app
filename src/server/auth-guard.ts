@@ -63,3 +63,31 @@ export async function requireAuth(): Promise<AuthUser> {
     throw new AuthenticationError('Session expired or invalid')
   }
 }
+
+/**
+ * Non-throwing variant for server functions that work in BOTH authenticated
+ * and guest contexts (e.g. createCheckoutSessionFn — the home /pricing page
+ * lets unauthenticated buyers pay, then the post-checkout flow asks them to
+ * sign up to claim the subscription).
+ *
+ * Returns null when there is no session cookie OR the JWT is invalid. Logs
+ * verification failures (they may indicate tampering) but does not throw.
+ */
+export async function tryAuth(): Promise<AuthUser | null> {
+  if (MOCK_AUTH) return MOCK_USER
+
+  const token = getCookie('__session')
+  if (!token) return null
+
+  try {
+    const payload = await verifyCognitoJwt(token)
+    return {
+      id: payload.sub as string,
+      email: payload.email as string,
+    }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.warn('[auth-guard] tryAuth: invalid session cookie ignored —', message)
+    return null
+  }
+}

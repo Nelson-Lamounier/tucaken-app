@@ -4,7 +4,7 @@
 
 // ---- Billing ---------------------------------------------------------------
 
-export type PlanId = 'free' | 'pro' | 'team'
+export type PlanId = 'free' | 'pro' | 'premium'
 export type BillingStatus = 'active' | 'trialing' | 'past_due' | 'canceled'
 export type BillingInterval = 'monthly' | 'annual'
 
@@ -61,6 +61,10 @@ export interface Billing {
   address: BillingAddress
   usage: UsageBlock
   invoices: Invoice[]
+  /** Stripe Customer ID once a subscription has been created. */
+  stripeCustomerId?: string | null
+  /** Stripe Subscription ID once a subscription has been created. */
+  stripeSubscriptionId?: string | null
 }
 
 // ---- Settings --------------------------------------------------------------

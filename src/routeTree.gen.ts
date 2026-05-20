@@ -10,12 +10,15 @@
 
 import { Route as rootRouteImport } from './app/__root'
 import { Route as SignInRouteImport } from './app/sign-in'
+import { Route as PricingRouteImport } from './app/pricing'
 import { Route as OnboardingRouteImport } from './app/onboarding'
 import { Route as LoginRouteImport } from './app/login'
 import { Route as DashboardRouteImport } from './app/_dashboard'
 import { Route as IndexRouteImport } from './app/index'
 import { Route as SignInCallbackRouteImport } from './app/sign-in.callback'
 import { Route as GithubCallbackRouteImport } from './app/github.callback'
+import { Route as CheckoutReturnRouteImport } from './app/checkout.return'
+import { Route as CheckoutTierRouteImport } from './app/checkout.$tier'
 import { Route as DashboardTestRouteImport } from './app/_dashboard.test'
 import { Route as DashboardResumesRouteImport } from './app/_dashboard.resumes'
 import { Route as DashboardResumeThemeRouteImport } from './app/_dashboard.resume-theme'
@@ -42,6 +45,11 @@ import { Route as DashboardResumesEditIdRouteImport } from './app/_dashboard.res
 const SignInRoute = SignInRouteImport.update({
   id: '/sign-in',
   path: '/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OnboardingRoute = OnboardingRouteImport.update({
@@ -71,6 +79,16 @@ const SignInCallbackRoute = SignInCallbackRouteImport.update({
 const GithubCallbackRoute = GithubCallbackRouteImport.update({
   id: '/github/callback',
   path: '/github/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckoutReturnRoute = CheckoutReturnRouteImport.update({
+  id: '/checkout/return',
+  path: '/checkout/return',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckoutTierRoute = CheckoutTierRouteImport.update({
+  id: '/checkout/$tier',
+  path: '/checkout/$tier',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardTestRoute = DashboardTestRouteImport.update({
@@ -193,6 +211,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
+  '/pricing': typeof PricingRoute
   '/sign-in': typeof SignInRouteWithChildren
   '/$': typeof DashboardSplatRoute
   '/ai-agent': typeof DashboardAiAgentRoute
@@ -206,6 +225,8 @@ export interface FileRoutesByFullPath {
   '/resume-theme': typeof DashboardResumeThemeRoute
   '/resumes': typeof DashboardResumesRouteWithChildren
   '/test': typeof DashboardTestRoute
+  '/checkout/$tier': typeof CheckoutTierRoute
+  '/checkout/return': typeof CheckoutReturnRoute
   '/github/callback': typeof GithubCallbackRoute
   '/sign-in/callback': typeof SignInCallbackRoute
   '/applications/$slug': typeof DashboardApplicationsSlugRoute
@@ -223,6 +244,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
+  '/pricing': typeof PricingRoute
   '/sign-in': typeof SignInRouteWithChildren
   '/$': typeof DashboardSplatRoute
   '/ai-agent': typeof DashboardAiAgentRoute
@@ -236,6 +258,8 @@ export interface FileRoutesByTo {
   '/resume-theme': typeof DashboardResumeThemeRoute
   '/resumes': typeof DashboardResumesRouteWithChildren
   '/test': typeof DashboardTestRoute
+  '/checkout/$tier': typeof CheckoutTierRoute
+  '/checkout/return': typeof CheckoutReturnRoute
   '/github/callback': typeof GithubCallbackRoute
   '/sign-in/callback': typeof SignInCallbackRoute
   '/applications/$slug': typeof DashboardApplicationsSlugRoute
@@ -255,6 +279,7 @@ export interface FileRoutesById {
   '/_dashboard': typeof DashboardRouteWithChildren
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
+  '/pricing': typeof PricingRoute
   '/sign-in': typeof SignInRouteWithChildren
   '/_dashboard/$': typeof DashboardSplatRoute
   '/_dashboard/ai-agent': typeof DashboardAiAgentRoute
@@ -268,6 +293,8 @@ export interface FileRoutesById {
   '/_dashboard/resume-theme': typeof DashboardResumeThemeRoute
   '/_dashboard/resumes': typeof DashboardResumesRouteWithChildren
   '/_dashboard/test': typeof DashboardTestRoute
+  '/checkout/$tier': typeof CheckoutTierRoute
+  '/checkout/return': typeof CheckoutReturnRoute
   '/github/callback': typeof GithubCallbackRoute
   '/sign-in/callback': typeof SignInCallbackRoute
   '/_dashboard/applications/$slug': typeof DashboardApplicationsSlugRoute
@@ -287,6 +314,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/onboarding'
+    | '/pricing'
     | '/sign-in'
     | '/$'
     | '/ai-agent'
@@ -300,6 +328,8 @@ export interface FileRouteTypes {
     | '/resume-theme'
     | '/resumes'
     | '/test'
+    | '/checkout/$tier'
+    | '/checkout/return'
     | '/github/callback'
     | '/sign-in/callback'
     | '/applications/$slug'
@@ -317,6 +347,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/onboarding'
+    | '/pricing'
     | '/sign-in'
     | '/$'
     | '/ai-agent'
@@ -330,6 +361,8 @@ export interface FileRouteTypes {
     | '/resume-theme'
     | '/resumes'
     | '/test'
+    | '/checkout/$tier'
+    | '/checkout/return'
     | '/github/callback'
     | '/sign-in/callback'
     | '/applications/$slug'
@@ -348,6 +381,7 @@ export interface FileRouteTypes {
     | '/_dashboard'
     | '/login'
     | '/onboarding'
+    | '/pricing'
     | '/sign-in'
     | '/_dashboard/$'
     | '/_dashboard/ai-agent'
@@ -361,6 +395,8 @@ export interface FileRouteTypes {
     | '/_dashboard/resume-theme'
     | '/_dashboard/resumes'
     | '/_dashboard/test'
+    | '/checkout/$tier'
+    | '/checkout/return'
     | '/github/callback'
     | '/sign-in/callback'
     | '/_dashboard/applications/$slug'
@@ -380,7 +416,10 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRouteWithChildren
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
+  PricingRoute: typeof PricingRoute
   SignInRoute: typeof SignInRouteWithChildren
+  CheckoutTierRoute: typeof CheckoutTierRoute
+  CheckoutReturnRoute: typeof CheckoutReturnRoute
   GithubCallbackRoute: typeof GithubCallbackRoute
   ArticlesPreviewSlugRoute: typeof ArticlesPreviewSlugRoute
 }
@@ -392,6 +431,13 @@ declare module '@tanstack/react-router' {
       path: '/sign-in'
       fullPath: '/sign-in'
       preLoaderRoute: typeof SignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/onboarding': {
@@ -434,6 +480,20 @@ declare module '@tanstack/react-router' {
       path: '/github/callback'
       fullPath: '/github/callback'
       preLoaderRoute: typeof GithubCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checkout/return': {
+      id: '/checkout/return'
+      path: '/checkout/return'
+      fullPath: '/checkout/return'
+      preLoaderRoute: typeof CheckoutReturnRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checkout/$tier': {
+      id: '/checkout/$tier'
+      path: '/checkout/$tier'
+      fullPath: '/checkout/$tier'
+      preLoaderRoute: typeof CheckoutTierRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_dashboard/test': {
@@ -671,7 +731,10 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRouteWithChildren,
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
+  PricingRoute: PricingRoute,
   SignInRoute: SignInRouteWithChildren,
+  CheckoutTierRoute: CheckoutTierRoute,
+  CheckoutReturnRoute: CheckoutReturnRoute,
   GithubCallbackRoute: GithubCallbackRoute,
   ArticlesPreviewSlugRoute: ArticlesPreviewSlugRoute,
 }

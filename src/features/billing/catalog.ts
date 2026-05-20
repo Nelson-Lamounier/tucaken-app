@@ -1,0 +1,98 @@
+// src/features/billing/catalog.ts
+//
+// Single source of truth for subscription tiers across the app:
+//   - Home PricingSection ("Free until it's worth paying for.")
+//   - Public /pricing route
+//   - Dashboard /_dashboard/billing PlanSection
+//   - Server-side createCheckoutSession (looks up Stripe price by tier)
+//
+// Stripe price IDs are read from env at runtime (server-only). The tier
+// catalog itself (display copy, features, dollar prices) is safe to ship
+// to the client.
+
+import type { PlanId } from '@/features/account/types'
+
+export type BillingInterval = 'monthly' | 'annual'
+
+export interface Tier {
+  id: PlanId
+  name: string
+  /** Display price in USD per month. 0 = Free. */
+  priceMonthly: number
+  /** Display price in USD per year (usually ~10x monthly with discount). */
+  priceAnnual: number
+  /** Marketing one-liner. */
+  blurb: string
+  /** Feature bullets shown on pricing cards. */
+  features: string[]
+  /** CTA label on home / pricing pages. */
+  cta: string
+  /** Visually emphasised tier (Recommended badge). */
+  highlighted?: boolean
+  /** No Stripe checkout for $0 tier — CTA goes to /sign-in instead. */
+  free?: boolean
+}
+
+export const TIERS: readonly Tier[] = [
+  {
+    id: 'free',
+    name: 'Free',
+    priceMonthly: 0,
+    priceAnnual: 0,
+    blurb: 'Try the basics. Hand-tuned resumes, no card required.',
+    features: [
+      'Connect 3 repositories',
+      '5 resumes per month',
+      'PDF & web exports',
+      'Community support',
+    ],
+    cta: 'Start free',
+    free: true,
+  },
+  {
+    id: 'pro',
+    name: 'Pro',
+    priceMonthly: 19,
+    priceAnnual: 190,
+    blurb: 'For developers actively job-hunting.',
+    features: [
+      '50 generated resumes / month',
+      '10 GitHub repos synced',
+      'AI-rewritten bullets grounded in commits',
+      'Custom domain on web resumes',
+      'Priority support',
+    ],
+    cta: 'Go Pro',
+    highlighted: true,
+  },
+  {
+    id: 'premium',
+    name: 'Premium',
+    priceMonthly: 49,
+    priceAnnual: 490,
+    blurb: 'Career-services orgs and bootcamps.',
+    features: [
+      'Unlimited resumes & articles',
+      'Shared workspace + roles',
+      'SSO via Google / GitHub',
+      'Admin audit log',
+      'Dedicated CSM',
+    ],
+    cta: 'Get Premium',
+  },
+] as const
+
+export function findTier(id: PlanId): Tier | undefined {
+  return TIERS.find((t) => t.id === id)
+}
+
+export function tierRank(id: PlanId): number {
+  return TIERS.findIndex((t) => t.id === id)
+}
+
+/** Format a USD price for display ("$19" / "Free"). */
+export function formatPrice(t: Tier, interval: BillingInterval = 'monthly'): string {
+  if (t.free) return 'Free'
+  const n = interval === 'monthly' ? t.priceMonthly : t.priceAnnual
+  return `$${n}`
+}

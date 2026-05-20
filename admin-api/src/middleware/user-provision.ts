@@ -25,7 +25,7 @@ import type { Pool } from 'pg';
 
 import { logger } from '../lib/observability/logger.js';
 import { authProvisionTotal } from '../lib/observability/metrics.js';
-import { upsertUser } from '../lib/repositories/users.js';
+import { provisionUserWithPendingLink } from '../lib/repositories/users.js';
 import type { AdminApiBindings } from '../lib/types.js';
 
 interface CognitoIdentity {
@@ -92,15 +92,23 @@ export function userProvisionMiddleware(pool: Pool): MiddlewareHandler<AdminApiB
       const groups = (payload['cognito:groups'] as string[] | undefined) ?? [];
       const role   = groups.includes('admin') ? 'admin' : 'user';
 
-      const { id, isNew } = await upsertUser(pool, {
-        cognitoSub:      sub as string,
-        provider,
-        providerUserId,
-        email:           (payload['email']   as string) ?? '',
-        fullName:        (payload['name']    as string) ?? undefined,
-        avatarUrl:       (payload['picture'] as string) ?? undefined,
-        role,
-      });
+      // Atomic provisioning: user upsert + (optional) Stripe pending-link in
+      // ONE transaction. If either step throws, both are rolled back, the
+      // sub→id cache is NOT populated (we set it below only on success), and
+      // the next request retries from scratch. This makes the previously
+      // documented race window (user committed, link failed) impossible.
+      const { id, isNew, linkedSubscription } = await provisionUserWithPendingLink(
+        pool,
+        {
+          cognitoSub:      sub as string,
+          provider,
+          providerUserId,
+          email:           (payload['email']   as string) ?? '',
+          fullName:        (payload['name']    as string) ?? undefined,
+          avatarUrl:       (payload['picture'] as string) ?? undefined,
+          role,
+        },
+      );
 
       subToUserId.set(sub as string, id);
       ctx.set('userId', id);
@@ -113,6 +121,22 @@ export function userProvisionMiddleware(pool: Pool): MiddlewareHandler<AdminApiB
         logger.info(
           { event: 'user_provisioned', userId: id, provider, role, outcome: 'new_user' },
           'new user provisioned on first sign-in',
+        );
+      }
+      if (linkedSubscription) {
+        // Logged for BOTH new and returning users — covers two paths:
+        //   · new user paid as guest before signup
+        //   · returning user paid as guest after signup (e.g. signed up via
+        //     marketing email, then bought from /pricing without re-auth)
+        logger.info(
+          {
+            event:      'pending_subscription_linked',
+            userId:     id,
+            customerId: linkedSubscription.stripeCustomerId,
+            plan:       linkedSubscription.plan,
+            isNew,
+          },
+          'pending Stripe subscription linked to user',
         );
       }
     } catch (err) {

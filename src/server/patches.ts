@@ -218,6 +218,45 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
       return;
     }
 
+    // Stripe webhook endpoint — requires the RAW body bytes to verify the
+    // `Stripe-Signature` header. We route it BEFORE the SSR handler so the
+    // body never gets parsed/buffered by TanStack Start. The handler is in
+    // src/server/stripe-webhook.ts and posts to admin-api via M2M.
+    if (req.method === 'POST' && urlPath === '/api/stripe/webhook') {
+      // Dynamically import the handler — keeps Stripe SDK off the SSR cold
+      // path for the 99 % of requests that aren't webhooks.
+      const { handleStripeWebhook } = await import('./stripe-webhook');
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) chunks.push(chunk as Buffer);
+      const rawBody = Buffer.concat(chunks);
+      const signature = req.headers['stripe-signature'];
+      if (typeof signature !== 'string') {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Missing Stripe-Signature header' }));
+        return;
+      }
+      try {
+        const result = await handleStripeWebhook({ rawBody, signature });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      } catch (err) {
+        // 400 on signature failures, 500 on downstream errors. Stripe only
+        // retries 5xx — we want it to GIVE UP on a bad signature (tampering
+        // or a misconfigured secret), and we want it to RETRY on transient
+        // admin-api failures.
+        const message = err instanceof Error ? err.message : String(err);
+        const isSig   = message.startsWith('Webhook signature verification failed');
+        const status  = isSig ? 400 : 500;
+        logger.error(
+          { err, status, request_id: requestId },
+          'stripe webhook handler error',
+        );
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: message }));
+      }
+      return;
+    }
+
     // 1. Fast-path: serve Vite-built static assets directly from disk.
     //    Only GET/HEAD can produce a static file — everything else goes to SSR.
     if ((req.method === 'GET' || req.method === 'HEAD') && tryServeStatic(urlPath, res)) {
@@ -290,6 +329,7 @@ function classifyRoute(url: string): string {
   if (path.startsWith('/assets/'))   return '/assets/*';
   if (path.startsWith('/_serverFn')) return '/_serverFn/*';
   if (path.startsWith('/_build/'))   return '/_build/*';
+  if (path === '/api/stripe/webhook') return '/api/stripe/webhook';
   // App no longer serves under /admin — basepath removed; all routes start at /.
   if (path === '/') return path;
   return 'other';

@@ -28,6 +28,10 @@ export interface MeResponse {
     subscriptionStatus:   string | null
     stripeCustomerId:     string | null
     stripeSubscriptionId: string | null
+    /** TRUE once user clicked Cancel; access remains until currentPeriodEnd. */
+    cancelAtPeriodEnd:    boolean
+    /** ISO 8601 — end of current Stripe billing period. */
+    currentPeriodEnd:     string | null
   }
 }
 

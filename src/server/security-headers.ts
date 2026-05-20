@@ -17,14 +17,22 @@ import { setResponseHeader } from '@tanstack/react-start/server'
  *
  * - `unsafe-inline`/`unsafe-eval` — required for Vite HMR and TanStack hydration
  * - `connect-src` — wide to support Cognito OAuth, AWS services, and Faro RUM
+ * - Stripe Embedded Checkout requires:
+ *     · script-src  https://js.stripe.com   (loadStripe injects <script src>)
+ *     · frame-src   https://js.stripe.com https://hooks.stripe.com
+ *                                            (the embedded payment form iframe)
+ *     · connect-src https://api.stripe.com  (telemetry + tokenisation)
+ *     · img-src     https://*.stripe.com    (card brand icons; already covered
+ *                                            by the wider `https:` allow)
  */
 const CSP_DIRECTIVES = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https:",
   "font-src 'self' https:",
-  "connect-src 'self' https://*.nelsonlamounier.com https://*.amazonaws.com https://*.amazoncognito.com",
+  "connect-src 'self' https://*.nelsonlamounier.com https://*.amazonaws.com https://*.amazoncognito.com https://api.stripe.com",
+  "frame-src https://js.stripe.com https://hooks.stripe.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
