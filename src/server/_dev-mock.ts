@@ -416,6 +416,22 @@ export function mockApiResponse(path: string, method = 'GET', body?: unknown): u
           { evidence: 'Creator role on the majority of project repos', rollupDimension: 'role distribution', suggestion: 'Surface ownership/initiative explicitly in the résumé summary' },
         ],
       },
+      diagnostic: {
+        overall: 78,
+        components: {
+          profileDepth:            { score: 86, blockers: [] },
+          ragDepth:                { score: 70, blockers: ['No project repos with high KB quality'] },
+          directionConfidence:     { score: 80, blockers: [] },
+          reconciliationAlignment: { score: 80, blockers: ['Led a 12-person ML platform team'] },
+          resumeCoverage:          { score: 75, blockers: [] },
+        },
+        methodology: {
+          version: 1,
+          weights: { profileDepth: 20, ragDepth: 20, directionConfidence: 20, reconciliationAlignment: 20, resumeCoverage: 20 },
+          notes:   'Equal-weight v1: each component contributes up to 20.',
+        },
+        explanation: 'Your readiness score reflects strong infrastructure evidence offset by one unsupported résumé claim and an underdeveloped retrieval area.',
+      },
       refreshedAt: '2026-01-15T00:05:00Z',
       synthesisRefreshedAt: '2026-01-15T00:06:00Z',
     }
