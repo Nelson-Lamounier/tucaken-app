@@ -1,11 +1,24 @@
 /**
  * @format
- * admin-api — Projects domain routes (Phase 3a).
+ * admin-api — Projects domain routes (Phase 3a + 3b).
  *
- * User-scoped reads + user-edit writes. K8s Job dispatch routes
- * (clustering/run, :id/regenerate) land in a follow-on PR alongside the
- * onboarding orchestrator (Phase 4) so the dispatch contract is decided
- * once.
+ * User-scoped reads, user-edit writes, plus K8s Job dispatch endpoints
+ * for the clustering and case-study services. Routes follow the same
+ * RLS pattern as the rest of admin-api: every DB read/write is wrapped
+ * in `withUser(pool, userId, fn)` so the connection runs as
+ * `tucaken_app` with `app.current_user_id` set.
+ *
+ * Job dispatch (Phase 3b):
+ *   - POST /clustering/run            — fire-and-forget clustering Job
+ *                                       (queues one row in pipeline_runs
+ *                                       type='clustering', creates K8s Job
+ *                                       running `node dist/run-clustering.js`)
+ *   - POST /:id/regenerate            — case-study Job for a confirmed
+ *                                       project. Resets case_study_status
+ *                                       to 'pending', requests a fresh
+ *                                       GitHub installation token (case
+ *                                       study mines commits), dispatches
+ *                                       `node dist/run-case-study.js`.
  *
  * Routes (all mounted under `/api/admin/projects/`):
  *
@@ -37,9 +50,14 @@
 import { randomUUID } from 'node:crypto';
 
 import { Hono } from 'hono';
+import type { Pool } from 'pg';
 
-import type { AdminApiConfig } from '../lib/config.js';
+import { getJobImage, isImageConfigured, type AdminApiConfig } from '../lib/config.js';
+import { generateInstallationToken } from '../lib/github-app.js';
+import { buildPipelineJob, sanitizeLabel } from '../lib/k8s-job-builder.js';
+import { getBatchApi } from '../lib/k8s.js';
 import { getPool, withUser } from '../lib/pg.js';
+import { insertPipelineRun } from '../lib/repositories/pipeline-runs.js';
 import {
     archiveProject,
     confirmProject,
@@ -434,9 +452,195 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
         }
     });
 
-    // Defensive: keep the randomUUID import live in case future routes need
-    // it locally (split uses randomUUID inside the repository).
-    void randomUUID;
+    // ────────────────────────────────────────────────────────────────────
+    // POST /clustering/run               — fire-and-forget clustering Job
+    // ────────────────────────────────────────────────────────────────────
+    router.post('/clustering/run', async (ctx) => {
+        const uid = requireUserId(ctx);
+        if (!uid) return ctx.json({ error: 'Authenticated subject missing' }, 401);
+
+        const image = getJobImage('job-strategist');
+        if (!isImageConfigured(image)) {
+            console.error('[projects/clustering] image URI unresolved');
+            return ctx.json({ error: 'Strategist pipeline image not yet configured — wait ~60s for ESO/kubelet sync' }, 502);
+        }
+
+        const pipelineRunId = randomUUID();
+        const pool = getPool(config);
+
+        try {
+            await withUser(pool, uid, async (db) => {
+                await insertPipelineRun(db, {
+                    id:           pipelineRunId,
+                    userId:       uid,
+                    pipelineType: 'clustering',
+                    referenceId:  null,
+                    metadata:     { triggeredBy: 'manual' },
+                });
+            });
+        } catch (err) {
+            console.error('[projects/clustering] failed to insert pipeline_run', err);
+            return ctx.json({ error: 'Failed to record pipeline run' }, 500);
+        }
+
+        const job = buildPipelineJob({
+            namespace:          config.strategistPipelineNamespace,
+            image,
+            serviceAccountName: config.strategistPipelineServiceAccount,
+            nameStem:           `proj-cluster-${sanitizeLabel(uid).slice(0, 16)}`,
+            suffixInput:        `${pipelineRunId}:${Date.now()}`,
+            labels: {
+                app:    'project-clustering',
+                userId: sanitizeLabel(uid),
+            },
+            command: ['node', 'dist/run-clustering.js'],
+            env: [
+                { name: 'CLUSTERING_PIPELINE_RUN_ID', value: pipelineRunId },
+                { name: 'USER_ID',                    value: uid },
+            ],
+            envFromSecretRefs: ['platform-rds-credentials'],
+        });
+
+        try {
+            await getBatchApi().createNamespacedJob({
+                namespace: config.strategistPipelineNamespace,
+                body:      job,
+            });
+        } catch (err) {
+            console.error('[projects/clustering] failed to create K8s Job', err);
+            return ctx.json({ error: 'Failed to schedule clustering Job' }, 502);
+        }
+
+        return ctx.json({
+            status:        'queued',
+            pipelineRunId,
+            jobName:       job.metadata!.name!,
+        }, 202);
+    });
+
+    // ────────────────────────────────────────────────────────────────────
+    // POST /:id/regenerate               — case-study Job for one project
+    // ────────────────────────────────────────────────────────────────────
+    router.post('/:id/regenerate', async (ctx) => {
+        const uid = requireUserId(ctx);
+        if (!uid) return ctx.json({ error: 'Authenticated subject missing' }, 401);
+        const id = ctx.req.param('id');
+        if (!isUuid(id)) return ctx.json({ error: 'invalid id' }, 400);
+
+        const { githubAppId, githubPrivateKey } = config;
+        if (!githubAppId || !githubPrivateKey) {
+            return ctx.json({ error: 'GitHub App not configured' }, 503);
+        }
+
+        const image = getJobImage('job-strategist');
+        if (!isImageConfigured(image)) {
+            console.error('[projects/regenerate] image URI unresolved');
+            return ctx.json({ error: 'Strategist pipeline image not yet configured' }, 502);
+        }
+
+        const pool = getPool(config);
+
+        // Guard: project must exist, be confirmed, and the user must have
+        // an active GitHub installation so the Job can mine commits.
+        const guarded = await withUser(pool, uid, async (db) => {
+            const r = await db.query<{ is_user_confirmed: boolean; status: string }>(
+                `SELECT is_user_confirmed, status FROM projects WHERE id = $1`,
+                [id],
+            );
+            if (r.rows.length === 0) return { ok: false, code: 404 as const, msg: 'Not found' };
+            const row = r.rows[0]!;
+            if (!row.is_user_confirmed) return { ok: false, code: 409 as const, msg: 'Project must be confirmed before regeneration' };
+            if (row.status === 'archived') return { ok: false, code: 409 as const, msg: 'Cannot regenerate an archived project' };
+            await db.query(
+                `UPDATE projects
+                    SET case_study_status = 'pending', updated_at = NOW()
+                  WHERE id = $1`,
+                [id],
+            );
+            return { ok: true as const };
+        });
+        if (!guarded.ok) return ctx.json({ error: guarded.msg }, guarded.code);
+
+        const installation = await getGitHubInstallation(pool, uid);
+        if (!installation) return ctx.json({ error: 'GitHub connection missing — connect your repos first' }, 412);
+
+        const githubToken = await generateInstallationToken(
+            githubAppId, githubPrivateKey, installation.installation_id,
+        );
+
+        const pipelineRunId = randomUUID();
+        try {
+            await withUser(pool, uid, async (db) => {
+                await insertPipelineRun(db, {
+                    id:           pipelineRunId,
+                    userId:       uid,
+                    pipelineType: 'case_study',
+                    referenceId:  id,
+                    metadata:     { projectId: id, triggeredBy: 'manual' },
+                });
+            });
+        } catch (err) {
+            console.error('[projects/regenerate] failed to insert pipeline_run', err);
+            return ctx.json({ error: 'Failed to record pipeline run' }, 500);
+        }
+
+        const job = buildPipelineJob({
+            namespace:          config.strategistPipelineNamespace,
+            image,
+            serviceAccountName: config.strategistPipelineServiceAccount,
+            nameStem:           `proj-cs-${sanitizeLabel(id).slice(0, 16)}`,
+            suffixInput:        `${pipelineRunId}:${id}:${Date.now()}`,
+            labels: {
+                app:       'project-case-study',
+                userId:    sanitizeLabel(uid),
+                projectId: sanitizeLabel(id),
+            },
+            command: ['node', 'dist/run-case-study.js'],
+            env: [
+                { name: 'CASE_STUDY_PIPELINE_RUN_ID', value: pipelineRunId },
+                { name: 'PROJECT_ID',                 value: id },
+                { name: 'USER_ID',                    value: uid },
+                { name: 'GITHUB_TOKEN',               value: githubToken },
+            ],
+            envFromSecretRefs: ['platform-rds-credentials'],
+        });
+
+        try {
+            await getBatchApi().createNamespacedJob({
+                namespace: config.strategistPipelineNamespace,
+                body:      job,
+            });
+        } catch (err) {
+            console.error('[projects/regenerate] failed to create K8s Job', err);
+            return ctx.json({ error: 'Failed to schedule case-study Job' }, 502);
+        }
+
+        return ctx.json({
+            status:        'queued',
+            pipelineRunId,
+            jobName:       job.metadata!.name!,
+            projectId:     id,
+        }, 202);
+    });
 
     return router;
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// GitHub installation lookup (mirror of github.ts helper).
+// Connection rows live outside RLS-scoped tables; the helper queries the
+// pool directly using the superuser connection.
+// ───────────────────────────────────────────────────────────────────────────
+async function getGitHubInstallation(
+    pool: Pool,
+    userId: string,
+): Promise<{ installation_id: string } | null> {
+    const r = await pool.query<{ installation_id: string | null }>(
+        `SELECT installation_id FROM oauth_connections
+          WHERE user_id = $1::uuid AND provider = 'github'`,
+        [userId],
+    );
+    const row = r.rows[0];
+    if (!row || !row.installation_id) return null;
+    return { installation_id: row.installation_id };
 }
