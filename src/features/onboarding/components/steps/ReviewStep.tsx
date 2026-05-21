@@ -10,6 +10,7 @@ import {
   GraduationCap,
   Wrench,
   Award,
+  Sparkles,
 } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/Button'
@@ -34,11 +35,53 @@ interface ReviewStepProps {
   readonly onFinish?: () => void
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// Presentational primitives — match TailwindPlus dark-theme idioms (inset-ring,
+// divide-white/5, hairline section headers). Kept local so the file stays
+// self-contained without leaking a half-baked design system.
+// ────────────────────────────────────────────────────────────────────────────
+
+function SectionHeader({
+  icon: Icon,
+  title,
+  count,
+}: {
+  readonly icon: React.ComponentType<{ className?: string }>
+  readonly title: string
+  readonly count?: number
+}) {
+  return (
+    <div className="flex items-center gap-2 px-5 pt-4 pb-2">
+      <span className="flex size-6 items-center justify-center rounded-md bg-white/5 text-zinc-400 inset-ring inset-ring-white/10">
+        <Icon className="size-3.5" />
+      </span>
+      <h4 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-300">
+        {title}
+      </h4>
+      {typeof count === 'number' && (
+        <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-medium text-zinc-400 inset-ring inset-ring-white/10">
+          {count}
+        </span>
+      )}
+    </div>
+  )
+}
+
+function Panel({ children }: { readonly children: React.ReactNode }) {
+  return (
+    <section className="overflow-hidden rounded-2xl bg-white/2 inset-ring inset-ring-white/10">
+      {children}
+    </section>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+
 export function ReviewStep({ importId, onFinish }: ReviewStepProps) {
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
-  const [sub, setSub] = useState<SubPhase>('review')
-  const { data: profileSummary } = useProfileSummary()
+  const navigate                  = useNavigate()
+  const queryClient               = useQueryClient()
+  const [sub, setSub]             = useState<SubPhase>('review')
+  const { data: profileSummary }  = useProfileSummary()
 
   const finish = onFinish ?? (() => void navigate({ to: '/overview', replace: true }))
 
@@ -52,16 +95,16 @@ export function ReviewStep({ importId, onFinish }: ReviewStepProps) {
   })
 
   const { data: entries = [] } = useQuery<CareerEntry[]>({
-    queryKey: adminKeys.resumeImports.entries(),
-    queryFn:  () => listCareerEntriesFn({ data: {} }),
-    enabled:  !!importId && sub === 'review',
+    queryKey:  adminKeys.resumeImports.entries(),
+    queryFn:   () => listCareerEntriesFn({ data: {} }),
+    enabled:   !!importId && sub === 'review',
     staleTime: Infinity,
   })
 
   const { data: gapReport = null } = useQuery({
-    queryKey: adminKeys.resumeImports.gapReport(importId ?? ''),
-    queryFn:  () => getGapReportFn({ data: importId as string }),
-    enabled:  !!importId && sub === 'review' && progress?.gapReportReady === true,
+    queryKey:  adminKeys.resumeImports.gapReport(importId ?? ''),
+    queryFn:   () => getGapReportFn({ data: importId as string }),
+    enabled:   !!importId && sub === 'review' && progress?.gapReportReady === true,
     staleTime: Infinity,
   })
 
@@ -90,20 +133,24 @@ export function ReviewStep({ importId, onFinish }: ReviewStepProps) {
     await queryClient.invalidateQueries({ queryKey: adminKeys.resumeImports.entries('enhance') })
   }
 
-  // No resume was imported (user skipped Step 3) — nothing to review.
+  // ── No-import: user skipped Step 3 ─────────────────────────────────────────
   if (!importId) {
     return (
-      <div className="flex flex-col items-center gap-4 py-16 text-center">
-        <CheckCircle2 className="h-10 w-10 text-emerald-400" />
-        <p className="text-base font-semibold text-zinc-100">You're all set</p>
-        <p className="max-w-sm text-sm text-zinc-500">
-          Your workspace is ready. You can import your career history any time from your profile.
-        </p>
-        <Button variant="primary" onClick={finish} className="mt-2 flex items-center gap-1.5">
-          Finish
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      </div>
+      <Panel>
+        <div className="flex flex-col items-center gap-3 px-6 py-14 text-center">
+          <span className="flex size-12 items-center justify-center rounded-full bg-emerald-400/10 inset-ring inset-ring-emerald-400/30">
+            <CheckCircle2 className="size-6 text-emerald-300" />
+          </span>
+          <h3 className="text-base font-semibold text-zinc-100">You're all set</h3>
+          <p className="max-w-sm text-sm text-zinc-500">
+            Your workspace is ready. Import your career history any time from your profile.
+          </p>
+          <Button variant="primary" onClick={finish} className="mt-3 flex items-center gap-1.5">
+            Finish
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </Panel>
     )
   }
 
@@ -114,23 +161,29 @@ export function ReviewStep({ importId, onFinish }: ReviewStepProps) {
     !['experience', 'education', 'skill'].includes(e.entryType)
   ).length
 
+  // ── Saved: terminal success state ──────────────────────────────────────────
   if (sub === 'saved') {
     return (
-      <div className="flex flex-col items-center gap-3 py-12">
-        <CheckCircle2 className="h-10 w-10 text-emerald-400" />
-        <p className="text-sm font-medium text-zinc-200">Career history imported</p>
-        <p className="text-xs text-zinc-500">
-          {experienceEntries.length} role{experienceEntries.length !== 1 ? 's' : ''} extracted.
-          Enrichment continues in the background.
-        </p>
-        <Button variant="primary" onClick={finish} className="mt-3 flex items-center gap-1.5">
-          Finish
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      </div>
+      <Panel>
+        <div className="flex flex-col items-center gap-3 px-6 py-14 text-center">
+          <span className="flex size-12 items-center justify-center rounded-full bg-emerald-400/10 inset-ring inset-ring-emerald-400/30">
+            <CheckCircle2 className="size-6 text-emerald-300" />
+          </span>
+          <h3 className="text-base font-semibold text-zinc-100">Career history imported</h3>
+          <p className="max-w-sm text-sm text-zinc-500">
+            {experienceEntries.length} role{experienceEntries.length !== 1 ? 's' : ''} extracted.
+            Enrichment continues in the background.
+          </p>
+          <Button variant="primary" onClick={finish} className="mt-3 flex items-center gap-1.5">
+            Finish
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </Panel>
     )
   }
 
+  // ── Enhance sub-view ───────────────────────────────────────────────────────
   if (sub === 'enhance') {
     const enhanceExperience = enhancedEntries.filter(
       (e: CareerEntry) => e.entryType === 'experience',
@@ -142,26 +195,37 @@ export function ReviewStep({ importId, onFinish }: ReviewStepProps) {
       )
 
     return (
-      <div className="space-y-6">
-        <div>
-          <h3 className="text-base font-semibold text-zinc-100">Enhance your experience</h3>
-          <p className="mt-1 text-sm text-zinc-500">
-            We researched each role online. Review the suggestions, edit your highlights,
-            and save — or skip to keep them as extracted.
-          </p>
-          {!allTerminal && (
-            <p className="mt-1 flex items-center gap-1.5 text-xs text-indigo-400">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Researching remaining roles…
-            </p>
-          )}
-        </div>
-
-        <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-          {enhanceExperience.length === 0 ? (
-            <div className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-6 text-center text-sm text-zinc-500">
-              No experience entries found.
+      <div className="space-y-5">
+        <Panel>
+          <div className="flex flex-wrap items-start justify-between gap-4 px-6 py-5">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="flex size-7 items-center justify-center rounded-lg bg-indigo-400/10 text-indigo-300 inset-ring inset-ring-indigo-400/30">
+                  <Sparkles className="size-4" />
+                </span>
+                <h3 className="text-base font-semibold text-zinc-100">Enhance your experience</h3>
+              </div>
+              <p className="mt-2 text-sm text-zinc-400">
+                We researched each role online. Review the suggestions, edit your highlights,
+                and save — or skip to keep them as extracted.
+              </p>
             </div>
+            {!allTerminal && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-400/10 px-2.5 py-1 text-[11px] font-medium text-indigo-300 inset-ring inset-ring-indigo-400/30">
+                <Loader2 className="size-3 animate-spin" />
+                Researching…
+              </span>
+            )}
+          </div>
+        </Panel>
+
+        <div className="max-h-110 space-y-3 overflow-y-auto pr-1">
+          {enhanceExperience.length === 0 ? (
+            <Panel>
+              <p className="px-6 py-10 text-center text-sm text-zinc-500">
+                No experience entries found.
+              </p>
+            </Panel>
           ) : (
             enhanceExperience.map((entry: CareerEntry) => (
               <EnhanceRoleCard
@@ -173,7 +237,7 @@ export function ReviewStep({ importId, onFinish }: ReviewStepProps) {
           )}
         </div>
 
-        <div className="flex items-center justify-between pt-2 border-t border-white/10">
+        <div className="flex items-center justify-between border-t border-white/10 pt-3">
           <Button
             variant="ghost"
             onClick={() => setSub('review')}
@@ -203,127 +267,144 @@ export function ReviewStep({ importId, onFinish }: ReviewStepProps) {
     )
   }
 
+  // ── Review sub-view (default) ──────────────────────────────────────────────
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {profileSummary ? (
         <DiagnosticPanel summary={profileSummary} />
       ) : (
-        <p className="py-10 text-center text-sm text-zinc-500">Generating your readiness diagnostic…</p>
+        <Panel>
+          <p className="px-6 py-10 text-center text-sm text-zinc-500">
+            Generating your readiness diagnostic…
+          </p>
+        </Panel>
       )}
-      <div>
+
+      <div className="px-1">
         <h3 className="text-base font-semibold text-zinc-100">Review extracted career history</h3>
-        <p className="mt-1 text-sm text-zinc-500">
-          Tucaken extracted the following from your resume. You can edit individual entries later from your profile.
+        <p className="mt-1 text-sm text-zinc-400">
+          Tucaken extracted the following from your resume. Edit individual entries any time from
+          your profile.
         </p>
       </div>
 
       <GapAnalysisReport report={gapReport} />
 
-      <div className="space-y-4 max-h-[420px] overflow-y-auto pr-1">
-
+      <div className="max-h-115 space-y-4 overflow-y-auto pr-1">
         {experienceEntries.length > 0 && (
-          <section>
-            <h4 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              <Briefcase className="h-3.5 w-3.5" />
-              Experience ({experienceEntries.length})
-            </h4>
-            <div className="space-y-2">
+          <Panel>
+            <SectionHeader icon={Briefcase} title="Experience" count={experienceEntries.length} />
+            <ul role="list" className="divide-y divide-white/5">
               {experienceEntries.map((entry) => {
                 const d = entry.rawData as { title?: string; company?: string; period?: string; highlights?: string[] }
+                const enriched = entry.enrichmentStatus === 'complete' && entry.enrichedData
                 return (
-                  <div key={entry.id} className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-sm font-medium text-zinc-200 truncate">{d.title ?? '—'}</span>
-                      <span className="shrink-0 text-xs text-zinc-500">{d.period ?? ''}</span>
+                  <li key={entry.id} className="px-5 py-4">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-zinc-100">
+                          {d.title ?? '—'}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs text-zinc-500">
+                          {d.company ?? ''}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {enriched && (
+                          <span className="rounded-full bg-indigo-400/10 px-2 py-0.5 text-[10px] font-medium text-indigo-300 inset-ring inset-ring-indigo-400/30">
+                            AI enriched
+                          </span>
+                        )}
+                        <span className="whitespace-nowrap text-[11px] text-zinc-500">
+                          {d.period ?? ''}
+                        </span>
+                      </div>
                     </div>
-                    <div className="mt-0.5 text-xs text-zinc-500">{d.company ?? ''}</div>
                     {Array.isArray(d.highlights) && d.highlights.length > 0 && (
-                      <ul className="mt-2 space-y-0.5 text-xs text-zinc-400 list-disc list-inside">
+                      <ul className="mt-2.5 space-y-1 text-xs text-zinc-400">
                         {d.highlights.slice(0, 2).map((h, i) => (
-                          <li key={i} className="truncate">{h}</li>
+                          <li key={i} className="flex gap-2">
+                            <span className="mt-1.5 size-1 shrink-0 rounded-full bg-zinc-600" aria-hidden />
+                            <span className="truncate">{h}</span>
+                          </li>
                         ))}
                         {d.highlights.length > 2 && (
-                          <li className="text-zinc-600">+{d.highlights.length - 2} more</li>
+                          <li className="pl-3 text-[11px] text-zinc-600">
+                            +{d.highlights.length - 2} more
+                          </li>
                         )}
                       </ul>
                     )}
-                    {entry.enrichmentStatus === 'complete' && entry.enrichedData && (
-                      <span className="mt-2 inline-block rounded-full bg-indigo-500/10 px-2 py-0.5 text-[10px] text-indigo-400 ring-1 ring-inset ring-indigo-500/20">
-                        AI enriched
-                      </span>
-                    )}
-                  </div>
+                  </li>
                 )
               })}
-            </div>
-          </section>
+            </ul>
+          </Panel>
         )}
 
         {educationEntries.length > 0 && (
-          <section>
-            <h4 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              <GraduationCap className="h-3.5 w-3.5" />
-              Education ({educationEntries.length})
-            </h4>
-            <div className="space-y-2">
+          <Panel>
+            <SectionHeader icon={GraduationCap} title="Education" count={educationEntries.length} />
+            <ul role="list" className="divide-y divide-white/5">
               {educationEntries.map((entry) => {
                 const d = entry.rawData as { degree?: string; institution?: string; period?: string }
                 return (
-                  <div key={entry.id} className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-sm font-medium text-zinc-200 truncate">{d.degree ?? '—'}</span>
-                      <span className="shrink-0 text-xs text-zinc-500">{d.period ?? ''}</span>
+                  <li key={entry.id} className="px-5 py-4">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-zinc-100">{d.degree ?? '—'}</p>
+                        <p className="mt-0.5 truncate text-xs text-zinc-500">{d.institution ?? ''}</p>
+                      </div>
+                      <span className="shrink-0 whitespace-nowrap text-[11px] text-zinc-500">
+                        {d.period ?? ''}
+                      </span>
                     </div>
-                    <div className="mt-0.5 text-xs text-zinc-500">{d.institution ?? ''}</div>
-                  </div>
+                  </li>
                 )
               })}
-            </div>
-          </section>
+            </ul>
+          </Panel>
         )}
 
         {skillEntries.length > 0 && (
-          <section>
-            <h4 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              <Wrench className="h-3.5 w-3.5" />
-              Skills
-            </h4>
-            <div className="flex flex-wrap gap-1.5">
+          <Panel>
+            <SectionHeader icon={Wrench} title="Skills" />
+            <div className="flex flex-wrap gap-1.5 px-5 pt-1 pb-5">
               {skillEntries.flatMap((entry) => {
                 const d = entry.rawData as { skills?: string[] }
                 return d.skills ?? []
               }).slice(0, 20).map((skill, i) => (
                 <span
                   key={i}
-                  className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-0.5 text-xs text-zinc-300"
+                  className="rounded-full bg-white/5 px-2.5 py-0.5 text-xs text-zinc-300 inset-ring inset-ring-white/10"
                 >
                   {skill}
                 </span>
               ))}
             </div>
-          </section>
+          </Panel>
         )}
 
         {otherCount > 0 && (
-          <div className="flex items-center gap-1.5 text-xs text-zinc-600">
-            <Award className="h-3.5 w-3.5" />
-            {otherCount} additional entr{otherCount === 1 ? 'y' : 'ies'} extracted (certifications, projects, achievements)
+          <div className="flex items-center gap-2 px-1 text-xs text-zinc-500">
+            <Award className="size-3.5" />
+            {otherCount} additional entr{otherCount === 1 ? 'y' : 'ies'} extracted (certifications,
+            projects, achievements)
           </div>
         )}
 
         {entries.length === 0 && (
-          <div className="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-6 text-center text-sm text-zinc-500">
-            No entries extracted yet. Enrichment may still be running.
-          </div>
+          <Panel>
+            <div className="px-6 py-10 text-center">
+              <p className="text-sm text-zinc-400">No entries extracted yet.</p>
+              <p className="mt-1 text-xs text-zinc-500">Enrichment may still be running.</p>
+            </div>
+          </Panel>
         )}
       </div>
 
-      <div className="flex items-center justify-between pt-2 border-t border-white/10">
-        <Button
-          variant="ghost"
-          onClick={finish}
-          className="text-xs"
-        >
+      <div className="flex items-center justify-between border-t border-white/10 pt-3">
+        <Button variant="ghost" onClick={finish} className="text-xs">
           Skip for now
         </Button>
         <Button
