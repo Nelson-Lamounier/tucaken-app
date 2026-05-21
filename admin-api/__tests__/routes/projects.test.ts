@@ -34,13 +34,28 @@ jest.unstable_mockModule('../../src/lib/pg.js', () => ({
     ) => fn({ query: poolQueryMock }),
 }));
 
+const getJobImageMock       = jest.fn().mockReturnValue('eu-west-1.dkr.ecr/job-strategist:test');
+const isImageConfiguredMock = jest.fn().mockReturnValue(true);
 jest.unstable_mockModule('../../src/lib/config.js', () => ({
     loadConfig:               jest.fn(),
-    getJobImage:              jest.fn().mockReturnValue('image-uri-not-yet-set'),
-    isImageConfigured:        jest.fn().mockReturnValue(false),
+    getJobImage:              getJobImageMock,
+    isImageConfigured:        isImageConfiguredMock,
     isAssetsBucketConfigured: jest.fn().mockReturnValue(false),
     UNSET_IMAGE_SENTINEL:     'image-uri-not-yet-set',
     _resetJobImageCache:      jest.fn(),
+}));
+
+// K8s + GitHub App mocks — dispatch endpoints exercise these.
+const createNamespacedJobMock = jest.fn() as jest.Mock<() => Promise<void>>;
+createNamespacedJobMock.mockResolvedValue(undefined);
+jest.unstable_mockModule('../../src/lib/k8s.js', () => ({
+    getBatchApi: () => ({ createNamespacedJob: createNamespacedJobMock }),
+}));
+
+const generateInstallationTokenMock = jest.fn() as jest.Mock<() => Promise<string>>;
+generateInstallationTokenMock.mockResolvedValue('ghs_installation_token_TEST');
+jest.unstable_mockModule('../../src/lib/github-app.js', () => ({
+    generateInstallationToken: generateInstallationTokenMock,
 }));
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -68,6 +83,8 @@ const testConfig = {
     articlePipelineServiceAccount: 'article-pipeline-sa',
     strategistPipelineNamespace:   'job-strategist',
     strategistPipelineServiceAccount: 'job-strategist-sa',
+    githubAppId:                   '111111',
+    githubPrivateKey:              '-----BEGIN RSA PRIVATE KEY-----\nTEST\n-----END RSA PRIVATE KEY-----',
 } as const;
 
 const TEST_USER_UUID    = 'a1b2c3d4-0000-0000-0000-000000000001';
@@ -93,6 +110,10 @@ function buildApp() {
 beforeEach(() => {
     poolQueryMock.mockReset();
     poolQueryMock.mockResolvedValue({ rows: [], rowCount: 0 });
+    createNamespacedJobMock.mockClear();
+    createNamespacedJobMock.mockResolvedValue(undefined);
+    generateInstallationTokenMock.mockClear();
+    generateInstallationTokenMock.mockResolvedValue('ghs_installation_token_TEST');
 });
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -400,5 +421,95 @@ describe('POST /:id/split', () => {
             }),
         });
         expect(res.status).toBe(400);
+    });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// POST /clustering/run                  — dispatch
+// ────────────────────────────────────────────────────────────────────────────
+
+describe('POST /clustering/run', () => {
+    it('inserts a pipeline_run + creates a K8s Job', async () => {
+        poolQueryMock.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // insert pipeline_run
+        const res = await buildApp().request('/clustering/run', { method: 'POST' });
+        expect(res.status).toBe(202);
+        const body = await res.json() as { status: string; pipelineRunId: string; jobName: string };
+        expect(body.status).toBe('queued');
+        expect(body.pipelineRunId).toMatch(/^[0-9a-f-]{36}$/);
+        expect(createNamespacedJobMock).toHaveBeenCalledTimes(1);
+        const jobBody = (createNamespacedJobMock.mock.calls[0] as unknown as [{ body: { spec: { template: { spec: { containers: { command: string[]; env: { name: string; value: string }[] }[] } } } } }])[0].body;
+        const container = jobBody.spec.template.spec.containers[0]!;
+        expect(container.command).toEqual(['node', 'dist/run-clustering.js']);
+        expect(container.env.find((e) => e.name === 'CLUSTERING_PIPELINE_RUN_ID')?.value).toBe(body.pipelineRunId);
+        expect(container.env.find((e) => e.name === 'USER_ID')?.value).toBe(TEST_USER_UUID);
+    });
+
+    it('returns 502 when the image URI is unresolved', async () => {
+        isImageConfiguredMock.mockReturnValueOnce(false);
+        const res = await buildApp().request('/clustering/run', { method: 'POST' });
+        expect(res.status).toBe(502);
+        expect(createNamespacedJobMock).not.toHaveBeenCalled();
+    });
+
+    it('returns 502 when K8s API rejects the Job', async () => {
+        poolQueryMock.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+        createNamespacedJobMock.mockRejectedValueOnce(new Error('Conflict'));
+        const res = await buildApp().request('/clustering/run', { method: 'POST' });
+        expect(res.status).toBe(502);
+    });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// POST /:id/regenerate                  — case-study dispatch
+// ────────────────────────────────────────────────────────────────────────────
+
+describe('POST /:id/regenerate', () => {
+    it('dispatches the case-study Job for a confirmed project', async () => {
+        poolQueryMock
+            .mockResolvedValueOnce({ rows: [{ is_user_confirmed: true, status: 'active' }], rowCount: 1 }) // guard SELECT
+            .mockResolvedValueOnce({ rows: [], rowCount: 1 })                                              // UPDATE status='pending'
+            .mockResolvedValueOnce({ rows: [{ installation_id: '999' }], rowCount: 1 })                    // installation lookup
+            .mockResolvedValueOnce({ rows: [], rowCount: 1 });                                             // INSERT pipeline_run
+        const res = await buildApp().request(`/${TEST_PROJECT_UUID}/regenerate`, { method: 'POST' });
+        expect(res.status).toBe(202);
+        const body = await res.json() as { status: string; pipelineRunId: string; projectId: string; jobName: string };
+        expect(body.status).toBe('queued');
+        expect(body.projectId).toBe(TEST_PROJECT_UUID);
+        expect(generateInstallationTokenMock).toHaveBeenCalledWith('111111', expect.any(String), '999');
+        expect(createNamespacedJobMock).toHaveBeenCalledTimes(1);
+        const jobBody = (createNamespacedJobMock.mock.calls[0] as unknown as [{ body: { spec: { template: { spec: { containers: { command: string[]; env: { name: string; value: string }[] }[] } } } } }])[0].body;
+        const container = jobBody.spec.template.spec.containers[0]!;
+        expect(container.command).toEqual(['node', 'dist/run-case-study.js']);
+        expect(container.env.find((e) => e.name === 'GITHUB_TOKEN')?.value).toBe('ghs_installation_token_TEST');
+        expect(container.env.find((e) => e.name === 'PROJECT_ID')?.value).toBe(TEST_PROJECT_UUID);
+    });
+
+    it('404s when the project is missing', async () => {
+        poolQueryMock.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+        const res = await buildApp().request(`/${TEST_PROJECT_UUID}/regenerate`, { method: 'POST' });
+        expect(res.status).toBe(404);
+        expect(createNamespacedJobMock).not.toHaveBeenCalled();
+    });
+
+    it('409s when the project has not been confirmed', async () => {
+        poolQueryMock.mockResolvedValueOnce({ rows: [{ is_user_confirmed: false, status: 'active' }], rowCount: 1 });
+        const res = await buildApp().request(`/${TEST_PROJECT_UUID}/regenerate`, { method: 'POST' });
+        expect(res.status).toBe(409);
+    });
+
+    it('409s when the project is archived', async () => {
+        poolQueryMock.mockResolvedValueOnce({ rows: [{ is_user_confirmed: true, status: 'archived' }], rowCount: 1 });
+        const res = await buildApp().request(`/${TEST_PROJECT_UUID}/regenerate`, { method: 'POST' });
+        expect(res.status).toBe(409);
+    });
+
+    it('412s when the user has no GitHub connection', async () => {
+        poolQueryMock
+            .mockResolvedValueOnce({ rows: [{ is_user_confirmed: true, status: 'active' }], rowCount: 1 })
+            .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+            .mockResolvedValueOnce({ rows: [{ installation_id: null }], rowCount: 1 });
+        const res = await buildApp().request(`/${TEST_PROJECT_UUID}/regenerate`, { method: 'POST' });
+        expect(res.status).toBe(412);
+        expect(generateInstallationTokenMock).not.toHaveBeenCalled();
     });
 });
