@@ -2,8 +2,14 @@
  * @vitest-environment happy-dom
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ children, ...rest }: { children: React.ReactNode } & Record<string, unknown>) => (
+    <a {...(rest as Record<string, string>)}>{children}</a>
+  ),
+}))
 
 import { ProjectCard } from '@/features/projects/components/index/ProjectCard'
 import type { ProjectSummary } from '@/features/projects/lib/types'

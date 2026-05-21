@@ -9,7 +9,9 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { requireAuth } from './auth-guard'
 import { apiFetch } from './_api-client'
-import type { ProjectListResponse } from '../features/projects/lib/types'
+import type { ProjectDetail, ProjectListResponse } from '../features/projects/lib/types'
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const listProjectsSchema = z
   .object({
@@ -34,5 +36,16 @@ export const listProjectsFn = createServerFn({ method: 'GET' })
     const qs = params.toString()
     return apiFetch<ProjectListResponse>(`/projects${qs ? `?${qs}` : ''}`, {
       pathTemplate: '/projects',
+    })
+  })
+
+const projectIdSchema = z.string().regex(UUID_REGEX, 'project id must be a UUID')
+
+export const getProjectDetailFn = createServerFn({ method: 'GET' })
+  .inputValidator(projectIdSchema)
+  .handler(async ({ data: id }) => {
+    await requireAuth()
+    return apiFetch<ProjectDetail>(`/projects/${encodeURIComponent(id)}`, {
+      pathTemplate: '/projects/:id',
     })
   })
