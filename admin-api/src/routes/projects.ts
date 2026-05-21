@@ -60,7 +60,6 @@ import { getPool, withUser } from '../lib/pg.js';
 import { insertPipelineRun } from '../lib/repositories/pipeline-runs.js';
 import {
     archiveProject,
-    confirmProject,
     createProject,
     deleteDecision,
     getProjectDetail,
@@ -259,7 +258,20 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
     });
 
     // ────────────────────────────────────────────────────────────────────
-    // POST /:id/confirm                     — confirm AI proposal
+    // POST /:id/confirm                     — confirm AI proposal +
+    //                                          dispatch case-study Job
+    //
+    // Phase 4 — onboarding insertion. Confirmation is the user-driven
+    // pivot point: clicking Confirm flips `is_user_confirmed=true`,
+    // resets `case_study_status='pending'`, and (best-effort) dispatches
+    // the case-study K8s Job so the recruiter-facing surface fills in
+    // without a second click.
+    //
+    // Confirmation always succeeds independent of dispatch outcome —
+    // missing GitHub credentials or transient K8s errors set
+    // `dispatched: false` + a `reason`, and the frontend can re-trigger
+    // via /:id/regenerate. The hard failure path is reserved for
+    // pipeline_runs INSERT errors (data integrity).
     // ────────────────────────────────────────────────────────────────────
     router.post('/:id/confirm', async (ctx) => {
         const uid = requireUserId(ctx);
@@ -268,11 +280,46 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
         if (!isUuid(id)) return ctx.json({ error: 'invalid id' }, 400);
 
         const pool = getPool(config);
-        const result = await withUser(pool, uid, async (db) => confirmProject(db, id));
-        if (result.updated === 0) return ctx.json({ error: 'Not found' }, 404);
-        // Case-study Job dispatch lands in PR-3b; for now the response is
-        // intentionally narrow so callers don't depend on a job_id.
-        return ctx.json({ confirmed: true });
+
+        const guarded = await withUser(pool, uid, async (db) => {
+            const r = await db.query<{ status: string }>(
+                `SELECT status FROM projects WHERE id = $1`,
+                [id],
+            );
+            if (r.rows.length === 0) return { ok: false, code: 404 as const, msg: 'Not found' };
+            const row = r.rows[0]!;
+            if (row.status === 'archived') {
+                return { ok: false, code: 409 as const, msg: 'Cannot confirm an archived project' };
+            }
+            await db.query(
+                `UPDATE projects
+                    SET is_user_confirmed = TRUE,
+                        case_study_status = 'pending',
+                        updated_at = NOW()
+                  WHERE id = $1`,
+                [id],
+            );
+            return { ok: true as const };
+        });
+        if (!guarded.ok) return ctx.json({ error: guarded.msg }, guarded.code);
+
+        const dispatch = await dispatchCaseStudyJob(pool, config, uid, id, 'confirm');
+        if (dispatch.ok) {
+            return ctx.json({
+                confirmed:      true,
+                dispatched:     true,
+                pipelineRunId:  dispatch.pipelineRunId,
+                jobName:        dispatch.jobName,
+                projectId:      id,
+            }, 202);
+        }
+        if (dispatch.fatal) return ctx.json({ error: dispatch.reason }, 500);
+        return ctx.json({
+            confirmed:  true,
+            dispatched: false,
+            reason:     dispatch.reason,
+            projectId:  id,
+        });
     });
 
     // ────────────────────────────────────────────────────────────────────
@@ -527,21 +574,9 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
         const id = ctx.req.param('id');
         if (!isUuid(id)) return ctx.json({ error: 'invalid id' }, 400);
 
-        const { githubAppId, githubPrivateKey } = config;
-        if (!githubAppId || !githubPrivateKey) {
-            return ctx.json({ error: 'GitHub App not configured' }, 503);
-        }
-
-        const image = getJobImage('job-strategist');
-        if (!isImageConfigured(image)) {
-            console.error('[projects/regenerate] image URI unresolved');
-            return ctx.json({ error: 'Strategist pipeline image not yet configured' }, 502);
-        }
-
         const pool = getPool(config);
 
-        // Guard: project must exist, be confirmed, and the user must have
-        // an active GitHub installation so the Job can mine commits.
+        // Guard: project must exist, be confirmed, and not archived.
         const guarded = await withUser(pool, uid, async (db) => {
             const r = await db.query<{ is_user_confirmed: boolean; status: string }>(
                 `SELECT is_user_confirmed, status FROM projects WHERE id = $1`,
@@ -561,66 +596,22 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
         });
         if (!guarded.ok) return ctx.json({ error: guarded.msg }, guarded.code);
 
-        const installation = await getGitHubInstallation(pool, uid);
-        if (!installation) return ctx.json({ error: 'GitHub connection missing — connect your repos first' }, 412);
-
-        const githubToken = await generateInstallationToken(
-            githubAppId, githubPrivateKey, installation.installation_id,
-        );
-
-        const pipelineRunId = randomUUID();
-        try {
-            await withUser(pool, uid, async (db) => {
-                await insertPipelineRun(db, {
-                    id:           pipelineRunId,
-                    userId:       uid,
-                    pipelineType: 'case_study',
-                    referenceId:  id,
-                    metadata:     { projectId: id, triggeredBy: 'manual' },
-                });
-            });
-        } catch (err) {
-            console.error('[projects/regenerate] failed to insert pipeline_run', err);
-            return ctx.json({ error: 'Failed to record pipeline run' }, 500);
+        const dispatch = await dispatchCaseStudyJob(pool, config, uid, id, 'manual');
+        if (dispatch.ok) {
+            return ctx.json({
+                status:        'queued',
+                pipelineRunId: dispatch.pipelineRunId,
+                jobName:       dispatch.jobName,
+                projectId:     id,
+            }, 202);
         }
-
-        const job = buildPipelineJob({
-            namespace:          config.strategistPipelineNamespace,
-            image,
-            serviceAccountName: config.strategistPipelineServiceAccount,
-            nameStem:           `proj-cs-${sanitizeLabel(id).slice(0, 16)}`,
-            suffixInput:        `${pipelineRunId}:${id}:${Date.now()}`,
-            labels: {
-                app:       'project-case-study',
-                userId:    sanitizeLabel(uid),
-                projectId: sanitizeLabel(id),
-            },
-            command: ['node', 'dist/run-case-study.js'],
-            env: [
-                { name: 'CASE_STUDY_PIPELINE_RUN_ID', value: pipelineRunId },
-                { name: 'PROJECT_ID',                 value: id },
-                { name: 'USER_ID',                    value: uid },
-                { name: 'GITHUB_TOKEN',               value: githubToken },
-            ],
-            envFromSecretRefs: ['platform-rds-credentials'],
-        });
-
-        try {
-            await getBatchApi().createNamespacedJob({
-                namespace: config.strategistPipelineNamespace,
-                body:      job,
-            });
-        } catch (err) {
-            console.error('[projects/regenerate] failed to create K8s Job', err);
-            return ctx.json({ error: 'Failed to schedule case-study Job' }, 502);
-        }
-
-        return ctx.json({
-            status:        'queued',
-            pipelineRunId,
-            jobName:       job.metadata!.name!,
-            projectId:     id,
-        }, 202);
+        if (dispatch.fatal) return ctx.json({ error: dispatch.reason }, 500);
+        // Caller explicitly asked for dispatch — surface non-fatal failures
+        // as 502/412/503 so they can react. confirm tolerates the same
+        // reasons silently.
+        if (dispatch.reason === 'github_not_connected') return ctx.json({ error: dispatch.reason }, 412);
+        if (dispatch.reason === 'github_app_not_configured') return ctx.json({ error: dispatch.reason }, 503);
+        return ctx.json({ error: dispatch.reason }, 502);
     });
 
     return router;
@@ -643,4 +634,101 @@ async function getGitHubInstallation(
     const row = r.rows[0];
     if (!row || !row.installation_id) return null;
     return { installation_id: row.installation_id };
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Case-study Job dispatch helper.
+//
+// Used by both /:id/confirm (best-effort) and /:id/regenerate (strict —
+// the caller propagates the failure). Returns a discriminated union so
+// callers can distinguish "user can retry later" failures (no GitHub
+// connection, image not yet configured, K8s rejection) from "data
+// integrity broken" failures (pipeline_runs INSERT failed).
+//
+// `triggeredBy` lands on pipeline_runs.metadata so analytics can split
+// confirm-driven from manual regenerations.
+// ───────────────────────────────────────────────────────────────────────────
+type DispatchResult =
+    | { ok: true; pipelineRunId: string; jobName: string }
+    | { ok: false; fatal: boolean; reason: string };
+
+async function dispatchCaseStudyJob(
+    pool: Pool,
+    config: AdminApiConfig,
+    userId: string,
+    projectId: string,
+    triggeredBy: 'confirm' | 'manual',
+): Promise<DispatchResult> {
+    const { githubAppId, githubPrivateKey } = config;
+    if (!githubAppId || !githubPrivateKey) {
+        return { ok: false, fatal: false, reason: 'github_app_not_configured' };
+    }
+
+    const image = getJobImage('job-strategist');
+    if (!isImageConfigured(image)) {
+        return { ok: false, fatal: false, reason: 'image_not_configured' };
+    }
+
+    const installation = await getGitHubInstallation(pool, userId);
+    if (!installation) return { ok: false, fatal: false, reason: 'github_not_connected' };
+
+    let githubToken: string;
+    try {
+        githubToken = await generateInstallationToken(
+            githubAppId, githubPrivateKey, installation.installation_id,
+        );
+    } catch (err) {
+        console.error('[projects/dispatch] installation token failed', err);
+        return { ok: false, fatal: false, reason: 'installation_token_failed' };
+    }
+
+    const pipelineRunId = randomUUID();
+    try {
+        await withUser(pool, userId, async (db) => {
+            await insertPipelineRun(db, {
+                id:           pipelineRunId,
+                userId,
+                pipelineType: 'case_study',
+                referenceId:  projectId,
+                metadata:     { projectId, triggeredBy },
+            });
+        });
+    } catch (err) {
+        console.error('[projects/dispatch] failed to insert pipeline_run', err);
+        return { ok: false, fatal: true, reason: 'pipeline_run_insert_failed' };
+    }
+
+    const job = buildPipelineJob({
+        namespace:          config.strategistPipelineNamespace,
+        image,
+        serviceAccountName: config.strategistPipelineServiceAccount,
+        nameStem:           `proj-cs-${sanitizeLabel(projectId).slice(0, 16)}`,
+        suffixInput:        `${pipelineRunId}:${projectId}:${Date.now()}`,
+        labels: {
+            app:        'project-case-study',
+            userId:     sanitizeLabel(userId),
+            projectId:  sanitizeLabel(projectId),
+            trigger:    triggeredBy,
+        },
+        command: ['node', 'dist/run-case-study.js'],
+        env: [
+            { name: 'CASE_STUDY_PIPELINE_RUN_ID', value: pipelineRunId },
+            { name: 'PROJECT_ID',                 value: projectId },
+            { name: 'USER_ID',                    value: userId },
+            { name: 'GITHUB_TOKEN',               value: githubToken },
+        ],
+        envFromSecretRefs: ['platform-rds-credentials'],
+    });
+
+    try {
+        await getBatchApi().createNamespacedJob({
+            namespace: config.strategistPipelineNamespace,
+            body:      job,
+        });
+    } catch (err) {
+        console.error('[projects/dispatch] failed to create K8s Job', err);
+        return { ok: false, fatal: false, reason: 'k8s_create_failed' };
+    }
+
+    return { ok: true, pipelineRunId, jobName: job.metadata!.name! };
 }

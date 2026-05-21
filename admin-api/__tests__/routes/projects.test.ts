@@ -318,13 +318,96 @@ describe('DELETE /:id', () => {
 // ────────────────────────────────────────────────────────────────────────────
 
 describe('POST /:id/confirm', () => {
-    it('flips is_user_confirmed and does not dispatch a job', async () => {
-        poolQueryMock.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+    it('confirms + dispatches case-study Job when GitHub is connected', async () => {
+        poolQueryMock
+            .mockResolvedValueOnce({ rows: [{ status: 'active' }], rowCount: 1 })  // guard SELECT
+            .mockResolvedValueOnce({ rows: [], rowCount: 1 })                       // UPDATE confirm+pending
+            .mockResolvedValueOnce({ rows: [{ installation_id: '999' }], rowCount: 1 }) // installation
+            .mockResolvedValueOnce({ rows: [], rowCount: 1 });                      // INSERT pipeline_run
+
+        const res = await buildApp().request(`/${TEST_PROJECT_UUID}/confirm`, { method: 'POST' });
+        expect(res.status).toBe(202);
+        const body = await res.json() as { confirmed: boolean; dispatched: boolean; pipelineRunId: string; jobName: string; projectId: string };
+        expect(body.confirmed).toBe(true);
+        expect(body.dispatched).toBe(true);
+        expect(body.projectId).toBe(TEST_PROJECT_UUID);
+        expect(body.pipelineRunId).toMatch(/^[0-9a-f-]{36}$/);
+
+        // Guard SQL + the confirm UPDATE.
+        expect(String(poolQueryMock.mock.calls[0][0])).toMatch(/SELECT status FROM projects/);
+        expect(String(poolQueryMock.mock.calls[1][0])).toMatch(/SET is_user_confirmed = TRUE/);
+        expect(String(poolQueryMock.mock.calls[1][0])).toMatch(/case_study_status = 'pending'/);
+
+        // Dispatched with triggeredBy='confirm' in metadata + the case-study command.
+        expect(generateInstallationTokenMock).toHaveBeenCalledTimes(1);
+        expect(createNamespacedJobMock).toHaveBeenCalledTimes(1);
+        const insertCall = poolQueryMock.mock.calls[3] as unknown as [string, unknown[]];
+        const params = insertCall[1];
+        const metadata = JSON.parse(params[4] as string) as { projectId: string; triggeredBy: string };
+        expect(metadata.triggeredBy).toBe('confirm');
+        const jobBody = (createNamespacedJobMock.mock.calls[0] as unknown as [{ body: { spec: { template: { spec: { containers: { command: string[]; env: { name: string; value: string }[] }[] } } }; metadata?: { labels?: { trigger?: string } } } }])[0].body;
+        const container = jobBody.spec.template.spec.containers[0]!;
+        expect(container.command).toEqual(['node', 'dist/run-case-study.js']);
+        expect(jobBody.metadata?.labels?.trigger).toBe('confirm');
+    });
+
+    it('confirms without dispatching when the user has no GitHub connection', async () => {
+        poolQueryMock
+            .mockResolvedValueOnce({ rows: [{ status: 'active' }], rowCount: 1 })   // guard SELECT
+            .mockResolvedValueOnce({ rows: [], rowCount: 1 })                        // UPDATE
+            .mockResolvedValueOnce({ rows: [{ installation_id: null }], rowCount: 1 }); // installation lookup
+
         const res = await buildApp().request(`/${TEST_PROJECT_UUID}/confirm`, { method: 'POST' });
         expect(res.status).toBe(200);
-        expect(await res.json()).toMatchObject({ confirmed: true });
-        const sql = String(poolQueryMock.mock.calls[0][0]);
-        expect(sql).toMatch(/SET is_user_confirmed = TRUE/);
+        const body = await res.json() as { confirmed: boolean; dispatched: boolean; reason: string };
+        expect(body.confirmed).toBe(true);
+        expect(body.dispatched).toBe(false);
+        expect(body.reason).toBe('github_not_connected');
+        expect(generateInstallationTokenMock).not.toHaveBeenCalled();
+        expect(createNamespacedJobMock).not.toHaveBeenCalled();
+    });
+
+    it('confirms without dispatching when the image is unresolved', async () => {
+        isImageConfiguredMock.mockReturnValueOnce(false);
+        poolQueryMock
+            .mockResolvedValueOnce({ rows: [{ status: 'active' }], rowCount: 1 })
+            .mockResolvedValueOnce({ rows: [], rowCount: 1 });
+
+        const res = await buildApp().request(`/${TEST_PROJECT_UUID}/confirm`, { method: 'POST' });
+        expect(res.status).toBe(200);
+        const body = await res.json() as { confirmed: boolean; dispatched: boolean; reason: string };
+        expect(body.dispatched).toBe(false);
+        expect(body.reason).toBe('image_not_configured');
+        expect(createNamespacedJobMock).not.toHaveBeenCalled();
+    });
+
+    it('confirms with dispatched=false when K8s rejects the Job', async () => {
+        poolQueryMock
+            .mockResolvedValueOnce({ rows: [{ status: 'active' }], rowCount: 1 })
+            .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+            .mockResolvedValueOnce({ rows: [{ installation_id: '999' }], rowCount: 1 })
+            .mockResolvedValueOnce({ rows: [], rowCount: 1 });
+        createNamespacedJobMock.mockRejectedValueOnce(new Error('Conflict'));
+
+        const res = await buildApp().request(`/${TEST_PROJECT_UUID}/confirm`, { method: 'POST' });
+        expect(res.status).toBe(200);
+        const body = await res.json() as { confirmed: boolean; dispatched: boolean; reason: string };
+        expect(body.dispatched).toBe(false);
+        expect(body.reason).toBe('k8s_create_failed');
+    });
+
+    it('404s when the project is missing', async () => {
+        poolQueryMock.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+        const res = await buildApp().request(`/${TEST_PROJECT_UUID}/confirm`, { method: 'POST' });
+        expect(res.status).toBe(404);
+        expect(createNamespacedJobMock).not.toHaveBeenCalled();
+    });
+
+    it('409s when the project is archived', async () => {
+        poolQueryMock.mockResolvedValueOnce({ rows: [{ status: 'archived' }], rowCount: 1 });
+        const res = await buildApp().request(`/${TEST_PROJECT_UUID}/confirm`, { method: 'POST' });
+        expect(res.status).toBe(409);
+        expect(createNamespacedJobMock).not.toHaveBeenCalled();
     });
 });
 
