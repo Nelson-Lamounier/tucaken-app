@@ -47,6 +47,7 @@ import { createResumeImportsRouter } from './routes/resume-imports.js';
 import { createResumesRouter } from './routes/resumes.js';
 import { createDraftsRouter } from './routes/drafts.js';
 import { createProfileRouter } from './routes/profile.js';
+import { createProjectsRouter } from './routes/projects.js';
 
 // ── Startup Validation ───────────────────────────────────────────────────────
 // loadConfig() throws immediately if any required env var is absent.
@@ -186,6 +187,7 @@ app.route('/api/admin/resume-imports', createResumeImportsRouter(config));
 app.route('/api/admin/prompt-feedback', createPromptFeedbackRouter(config));
 app.route('/api/admin/drafts',         createDraftsRouter(config));
 app.route('/api/admin/profile',        createProfileRouter(config));
+app.route('/api/admin/projects',       createProjectsRouter(config));
 app.route('/api/admin/users',          createAdminUsersRouter(config));
 
 // ── 404 handler ──────────────────────────────────────────────────────────────
