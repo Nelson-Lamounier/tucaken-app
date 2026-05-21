@@ -36,6 +36,7 @@ import { Route as DashboardApplicationsIndexRouteImport } from './app/_dashboard
 import { Route as ArticlesPreviewSlugRouteImport } from './app/articles.preview.$slug'
 import { Route as DashboardSettingsGithubRouteImport } from './app/_dashboard.settings.github'
 import { Route as DashboardResumesNewRouteImport } from './app/_dashboard.resumes.new'
+import { Route as DashboardProjectsIdRouteImport } from './app/_dashboard/projects/$id'
 import { Route as DashboardApplicationsNewRouteImport } from './app/_dashboard.applications.new'
 import { Route as DashboardApplicationsListRouteImport } from './app/_dashboard.applications.list'
 import { Route as DashboardApplicationsInterviewPrepRouteImport } from './app/_dashboard.applications.interview-prep'
@@ -177,6 +178,11 @@ const DashboardResumesNewRoute = DashboardResumesNewRouteImport.update({
   path: '/new',
   getParentRoute: () => DashboardResumesRoute,
 } as any)
+const DashboardProjectsIdRoute = DashboardProjectsIdRouteImport.update({
+  id: '/projects/$id',
+  path: '/projects/$id',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardApplicationsNewRoute =
   DashboardApplicationsNewRouteImport.update({
     id: '/applications/new',
@@ -232,6 +238,7 @@ export interface FileRoutesByFullPath {
   '/applications/interview-prep': typeof DashboardApplicationsInterviewPrepRoute
   '/applications/list': typeof DashboardApplicationsListRoute
   '/applications/new': typeof DashboardApplicationsNewRoute
+  '/projects/$id': typeof DashboardProjectsIdRoute
   '/resumes/new': typeof DashboardResumesNewRoute
   '/settings/github': typeof DashboardSettingsGithubRoute
   '/articles/preview/$slug': typeof ArticlesPreviewSlugRoute
@@ -265,6 +272,7 @@ export interface FileRoutesByTo {
   '/applications/interview-prep': typeof DashboardApplicationsInterviewPrepRoute
   '/applications/list': typeof DashboardApplicationsListRoute
   '/applications/new': typeof DashboardApplicationsNewRoute
+  '/projects/$id': typeof DashboardProjectsIdRoute
   '/resumes/new': typeof DashboardResumesNewRoute
   '/settings/github': typeof DashboardSettingsGithubRoute
   '/articles/preview/$slug': typeof ArticlesPreviewSlugRoute
@@ -300,6 +308,7 @@ export interface FileRoutesById {
   '/_dashboard/applications/interview-prep': typeof DashboardApplicationsInterviewPrepRoute
   '/_dashboard/applications/list': typeof DashboardApplicationsListRoute
   '/_dashboard/applications/new': typeof DashboardApplicationsNewRoute
+  '/_dashboard/projects/$id': typeof DashboardProjectsIdRoute
   '/_dashboard/resumes/new': typeof DashboardResumesNewRoute
   '/_dashboard/settings/github': typeof DashboardSettingsGithubRoute
   '/articles/preview/$slug': typeof ArticlesPreviewSlugRoute
@@ -335,6 +344,7 @@ export interface FileRouteTypes {
     | '/applications/interview-prep'
     | '/applications/list'
     | '/applications/new'
+    | '/projects/$id'
     | '/resumes/new'
     | '/settings/github'
     | '/articles/preview/$slug'
@@ -368,6 +378,7 @@ export interface FileRouteTypes {
     | '/applications/interview-prep'
     | '/applications/list'
     | '/applications/new'
+    | '/projects/$id'
     | '/resumes/new'
     | '/settings/github'
     | '/articles/preview/$slug'
@@ -402,6 +413,7 @@ export interface FileRouteTypes {
     | '/_dashboard/applications/interview-prep'
     | '/_dashboard/applications/list'
     | '/_dashboard/applications/new'
+    | '/_dashboard/projects/$id'
     | '/_dashboard/resumes/new'
     | '/_dashboard/settings/github'
     | '/articles/preview/$slug'
@@ -615,6 +627,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardResumesNewRouteImport
       parentRoute: typeof DashboardResumesRoute
     }
+    '/_dashboard/projects/$id': {
+      id: '/_dashboard/projects/$id'
+      path: '/projects/$id'
+      fullPath: '/projects/$id'
+      preLoaderRoute: typeof DashboardProjectsIdRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/_dashboard/applications/new': {
       id: '/_dashboard/applications/new'
       path: '/applications/new'
@@ -682,6 +701,7 @@ interface DashboardRouteChildren {
   DashboardApplicationsInterviewPrepRoute: typeof DashboardApplicationsInterviewPrepRoute
   DashboardApplicationsListRoute: typeof DashboardApplicationsListRoute
   DashboardApplicationsNewRoute: typeof DashboardApplicationsNewRoute
+  DashboardProjectsIdRoute: typeof DashboardProjectsIdRoute
   DashboardSettingsGithubRoute: typeof DashboardSettingsGithubRoute
   DashboardApplicationsIndexRoute: typeof DashboardApplicationsIndexRoute
   DashboardProjectsIndexRoute: typeof DashboardProjectsIndexRoute
@@ -705,6 +725,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
     DashboardApplicationsInterviewPrepRoute,
   DashboardApplicationsListRoute: DashboardApplicationsListRoute,
   DashboardApplicationsNewRoute: DashboardApplicationsNewRoute,
+  DashboardProjectsIdRoute: DashboardProjectsIdRoute,
   DashboardSettingsGithubRoute: DashboardSettingsGithubRoute,
   DashboardApplicationsIndexRoute: DashboardApplicationsIndexRoute,
   DashboardProjectsIndexRoute: DashboardProjectsIndexRoute,

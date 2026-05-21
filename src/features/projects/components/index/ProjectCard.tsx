@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import { Boxes, ChevronRight, FolderGit, FolderGit2, GitBranch } from 'lucide-react'
 import {
   PROJECT_STATUS_LABELS,
@@ -31,8 +32,9 @@ export function ProjectCard({ project }: ProjectCardProps) {
 
   return (
     <li className="col-span-1">
-      {/* TODO(5b): wrap in Link to /_dashboard/projects/$id once detail route exists. */}
-      <div
+      <Link
+        to="/projects/$id"
+        params={{ id: project.id }}
         className="group flex h-full overflow-hidden rounded-2xl bg-white/2 inset-ring inset-ring-white/10 transition-colors hover:bg-white/5"
       >
         <div className="flex w-14 shrink-0 items-center justify-center bg-teal-500/10 text-teal-300">
@@ -66,7 +68,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
             </span>
           </div>
         </div>
-      </div>
+      </Link>
     </li>
   )
 }

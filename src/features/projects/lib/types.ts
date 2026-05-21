@@ -1,3 +1,12 @@
+/** JSON-compatible value used for jsonb columns surfaced via the API. */
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue }
+
 /**
  * Frontend mirror of admin-api `ProjectSummary` (admin-api/src/lib/repositories/projects.ts).
  * Keep in sync when the upstream shape changes.
@@ -70,4 +79,145 @@ export const PROJECT_STATUS_LABELS: Readonly<Record<ProjectStatus, string>> = {
   stable:   'Stable',
   dormant:  'Dormant',
   archived: 'Archived',
+}
+
+export const PROJECT_ROLE_LABELS: Readonly<Record<ProjectRole, string>> = {
+  sole_builder: 'Sole builder',
+  lead:         'Lead',
+  contributor:  'Contributor',
+  maintainer:   'Maintainer',
+}
+
+// ─── Detail shape (mirror of admin-api ProjectDetail) ───────────────────────
+
+export type ComponentKind =
+  | 'frontend' | 'backend' | 'infra' | 'mobile' | 'data' | 'ml' | 'docs' | 'shared'
+
+export interface ProjectComponent {
+  id:          string
+  name:        string
+  kind:        ComponentKind
+  order_index: number
+}
+
+export interface ProjectRepositoryLink {
+  component_id:    string
+  repository_id:   string
+  repository_name: string
+  subpath:         string
+}
+
+export type DecisionConfidence = 'high' | 'medium' | 'low'
+
+export interface ProjectDecision {
+  id:                string
+  title:             string
+  context:           string | null
+  decision:          string | null
+  consequences:      string | null
+  confidence:        DecisionConfidence
+  is_user_confirmed: boolean
+  source_signals:    JsonValue
+  order_index:       number
+}
+
+export interface ProjectHighlight {
+  id:             string
+  title:          string
+  description:    string | null
+  source_signals: JsonValue
+  order_index:    number
+}
+
+export interface ProjectChallenge {
+  id:             string
+  problem:        string
+  solution:       string | null
+  source_signals: JsonValue
+  order_index:    number
+}
+
+export type StackCategory =
+  | 'language' | 'framework' | 'database' | 'infrastructure'
+  | 'observability' | 'ci_cd' | 'external_service'
+
+export interface ProjectStackItem {
+  id:                   string
+  category:             StackCategory
+  name:                 string
+  justification:        string | null
+  used_in_component_id: string | null
+  source_signals:       JsonValue
+  order_index:          number
+}
+
+export type TestCoverageSignal    = 'none' | 'light' | 'moderate' | 'strong'
+export type CiMaturity            = 'none' | 'basic' | 'deploys_to_prod' | 'multi_env'
+export type DocumentationDensity  = 'none' | 'readme_only' | 'docs_dir' | 'comprehensive'
+
+export interface ProjectDepthMarkers {
+  has_tests:               boolean
+  test_coverage_signal:    TestCoverageSignal
+  has_ci:                  boolean
+  ci_maturity:             CiMaturity
+  documentation_density:   DocumentationDensity
+  has_deployment_evidence: boolean
+  deployment_url:          string | null
+  refactor_count:          number
+  computed_at:             string
+}
+
+export interface ProjectArchitecture {
+  diagram_format: 'mermaid' | 'svg'
+  diagram_source: string
+  nodes:          JsonValue
+  edges:          JsonValue
+  is_user_edited: boolean
+  generated_at:   string
+}
+
+export type ResumeAngle =
+  | 'backend' | 'frontend' | 'infrastructure' | 'fullstack' | 'data_ml' | 'product_leadership'
+
+export interface ProjectResumeBullets {
+  angle:        ResumeAngle
+  bullets:      string[]
+  generated_at: string
+}
+
+export interface ProjectDetail extends ProjectSummary {
+  pitch:                    string | null
+  proposal_reasoning:       string | null
+  proposal_confidence:      DecisionConfidence | null
+  proposal_pipeline_run_id: string | null
+  user_overrides:           Record<string, JsonValue>
+  components:               ProjectComponent[]
+  repositories:             ProjectRepositoryLink[]
+  decisions:                ProjectDecision[]
+  highlights:               ProjectHighlight[]
+  challenges:               ProjectChallenge[]
+  stack_items:              ProjectStackItem[]
+  depth_markers:            ProjectDepthMarkers | null
+  architecture:             ProjectArchitecture | null
+  resume_bullets:           ProjectResumeBullets[]
+  tags:                     string[]
+}
+
+export const STACK_CATEGORY_LABELS: Readonly<Record<StackCategory, string>> = {
+  language:         'Languages',
+  framework:        'Frameworks',
+  database:         'Data',
+  infrastructure:   'Infrastructure',
+  observability:    'Observability',
+  ci_cd:            'CI/CD',
+  external_service: 'External services',
+}
+
+export const RESUME_ANGLE_LABELS: Readonly<Record<ResumeAngle, string>> = {
+  backend:            'Backend',
+  frontend:           'Frontend',
+  infrastructure:     'Infrastructure',
+  fullstack:          'Full-stack',
+  data_ml:            'Data / ML',
+  product_leadership: 'Product / leadership',
 }
