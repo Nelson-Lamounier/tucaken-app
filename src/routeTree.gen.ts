@@ -23,7 +23,6 @@ import { Route as DashboardTestRouteImport } from './app/_dashboard.test'
 import { Route as DashboardResumesRouteImport } from './app/_dashboard.resumes'
 import { Route as DashboardResumeThemeRouteImport } from './app/_dashboard.resume-theme'
 import { Route as DashboardReportsRouteImport } from './app/_dashboard.reports'
-import { Route as DashboardProjectsRouteImport } from './app/_dashboard.projects'
 import { Route as DashboardOverviewRouteImport } from './app/_dashboard.overview'
 import { Route as DashboardCommentsRouteImport } from './app/_dashboard.comments'
 import { Route as DashboardCalendarRouteImport } from './app/_dashboard.calendar'
@@ -32,6 +31,7 @@ import { Route as DashboardArticlesRouteImport } from './app/_dashboard.articles
 import { Route as DashboardAiAgentRouteImport } from './app/_dashboard.ai-agent'
 import { Route as DashboardSplatRouteImport } from './app/_dashboard.$'
 import { Route as DashboardSettingsIndexRouteImport } from './app/_dashboard.settings.index'
+import { Route as DashboardProjectsIndexRouteImport } from './app/_dashboard/projects/index'
 import { Route as DashboardApplicationsIndexRouteImport } from './app/_dashboard.applications.index'
 import { Route as ArticlesPreviewSlugRouteImport } from './app/articles.preview.$slug'
 import { Route as DashboardSettingsGithubRouteImport } from './app/_dashboard.settings.github'
@@ -111,11 +111,6 @@ const DashboardReportsRoute = DashboardReportsRouteImport.update({
   path: '/reports',
   getParentRoute: () => DashboardRoute,
 } as any)
-const DashboardProjectsRoute = DashboardProjectsRouteImport.update({
-  id: '/projects',
-  path: '/projects',
-  getParentRoute: () => DashboardRoute,
-} as any)
 const DashboardOverviewRoute = DashboardOverviewRouteImport.update({
   id: '/overview',
   path: '/overview',
@@ -154,6 +149,11 @@ const DashboardSplatRoute = DashboardSplatRouteImport.update({
 const DashboardSettingsIndexRoute = DashboardSettingsIndexRouteImport.update({
   id: '/settings/',
   path: '/settings/',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardProjectsIndexRoute = DashboardProjectsIndexRouteImport.update({
+  id: '/projects/',
+  path: '/projects/',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardApplicationsIndexRoute =
@@ -220,7 +220,6 @@ export interface FileRoutesByFullPath {
   '/calendar': typeof DashboardCalendarRoute
   '/comments': typeof DashboardCommentsRoute
   '/overview': typeof DashboardOverviewRoute
-  '/projects': typeof DashboardProjectsRoute
   '/reports': typeof DashboardReportsRoute
   '/resume-theme': typeof DashboardResumeThemeRoute
   '/resumes': typeof DashboardResumesRouteWithChildren
@@ -237,6 +236,7 @@ export interface FileRoutesByFullPath {
   '/settings/github': typeof DashboardSettingsGithubRoute
   '/articles/preview/$slug': typeof ArticlesPreviewSlugRoute
   '/applications/': typeof DashboardApplicationsIndexRoute
+  '/projects/': typeof DashboardProjectsIndexRoute
   '/settings/': typeof DashboardSettingsIndexRoute
   '/resumes/edit/$id': typeof DashboardResumesEditIdRoute
 }
@@ -253,7 +253,6 @@ export interface FileRoutesByTo {
   '/calendar': typeof DashboardCalendarRoute
   '/comments': typeof DashboardCommentsRoute
   '/overview': typeof DashboardOverviewRoute
-  '/projects': typeof DashboardProjectsRoute
   '/reports': typeof DashboardReportsRoute
   '/resume-theme': typeof DashboardResumeThemeRoute
   '/resumes': typeof DashboardResumesRouteWithChildren
@@ -270,6 +269,7 @@ export interface FileRoutesByTo {
   '/settings/github': typeof DashboardSettingsGithubRoute
   '/articles/preview/$slug': typeof ArticlesPreviewSlugRoute
   '/applications': typeof DashboardApplicationsIndexRoute
+  '/projects': typeof DashboardProjectsIndexRoute
   '/settings': typeof DashboardSettingsIndexRoute
   '/resumes/edit/$id': typeof DashboardResumesEditIdRoute
 }
@@ -288,7 +288,6 @@ export interface FileRoutesById {
   '/_dashboard/calendar': typeof DashboardCalendarRoute
   '/_dashboard/comments': typeof DashboardCommentsRoute
   '/_dashboard/overview': typeof DashboardOverviewRoute
-  '/_dashboard/projects': typeof DashboardProjectsRoute
   '/_dashboard/reports': typeof DashboardReportsRoute
   '/_dashboard/resume-theme': typeof DashboardResumeThemeRoute
   '/_dashboard/resumes': typeof DashboardResumesRouteWithChildren
@@ -305,6 +304,7 @@ export interface FileRoutesById {
   '/_dashboard/settings/github': typeof DashboardSettingsGithubRoute
   '/articles/preview/$slug': typeof ArticlesPreviewSlugRoute
   '/_dashboard/applications/': typeof DashboardApplicationsIndexRoute
+  '/_dashboard/projects/': typeof DashboardProjectsIndexRoute
   '/_dashboard/settings/': typeof DashboardSettingsIndexRoute
   '/_dashboard/resumes/edit/$id': typeof DashboardResumesEditIdRoute
 }
@@ -323,7 +323,6 @@ export interface FileRouteTypes {
     | '/calendar'
     | '/comments'
     | '/overview'
-    | '/projects'
     | '/reports'
     | '/resume-theme'
     | '/resumes'
@@ -340,6 +339,7 @@ export interface FileRouteTypes {
     | '/settings/github'
     | '/articles/preview/$slug'
     | '/applications/'
+    | '/projects/'
     | '/settings/'
     | '/resumes/edit/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -356,7 +356,6 @@ export interface FileRouteTypes {
     | '/calendar'
     | '/comments'
     | '/overview'
-    | '/projects'
     | '/reports'
     | '/resume-theme'
     | '/resumes'
@@ -373,6 +372,7 @@ export interface FileRouteTypes {
     | '/settings/github'
     | '/articles/preview/$slug'
     | '/applications'
+    | '/projects'
     | '/settings'
     | '/resumes/edit/$id'
   id:
@@ -390,7 +390,6 @@ export interface FileRouteTypes {
     | '/_dashboard/calendar'
     | '/_dashboard/comments'
     | '/_dashboard/overview'
-    | '/_dashboard/projects'
     | '/_dashboard/reports'
     | '/_dashboard/resume-theme'
     | '/_dashboard/resumes'
@@ -407,6 +406,7 @@ export interface FileRouteTypes {
     | '/_dashboard/settings/github'
     | '/articles/preview/$slug'
     | '/_dashboard/applications/'
+    | '/_dashboard/projects/'
     | '/_dashboard/settings/'
     | '/_dashboard/resumes/edit/$id'
   fileRoutesById: FileRoutesById
@@ -524,13 +524,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardReportsRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/_dashboard/projects': {
-      id: '/_dashboard/projects'
-      path: '/projects'
-      fullPath: '/projects'
-      preLoaderRoute: typeof DashboardProjectsRouteImport
-      parentRoute: typeof DashboardRoute
-    }
     '/_dashboard/overview': {
       id: '/_dashboard/overview'
       path: '/overview'
@@ -585,6 +578,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings/'
       preLoaderRoute: typeof DashboardSettingsIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/_dashboard/projects/': {
+      id: '/_dashboard/projects/'
+      path: '/projects'
+      fullPath: '/projects/'
+      preLoaderRoute: typeof DashboardProjectsIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/_dashboard/applications/': {
@@ -674,7 +674,6 @@ interface DashboardRouteChildren {
   DashboardCalendarRoute: typeof DashboardCalendarRoute
   DashboardCommentsRoute: typeof DashboardCommentsRoute
   DashboardOverviewRoute: typeof DashboardOverviewRoute
-  DashboardProjectsRoute: typeof DashboardProjectsRoute
   DashboardReportsRoute: typeof DashboardReportsRoute
   DashboardResumeThemeRoute: typeof DashboardResumeThemeRoute
   DashboardResumesRoute: typeof DashboardResumesRouteWithChildren
@@ -685,6 +684,7 @@ interface DashboardRouteChildren {
   DashboardApplicationsNewRoute: typeof DashboardApplicationsNewRoute
   DashboardSettingsGithubRoute: typeof DashboardSettingsGithubRoute
   DashboardApplicationsIndexRoute: typeof DashboardApplicationsIndexRoute
+  DashboardProjectsIndexRoute: typeof DashboardProjectsIndexRoute
   DashboardSettingsIndexRoute: typeof DashboardSettingsIndexRoute
 }
 
@@ -696,7 +696,6 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardCalendarRoute: DashboardCalendarRoute,
   DashboardCommentsRoute: DashboardCommentsRoute,
   DashboardOverviewRoute: DashboardOverviewRoute,
-  DashboardProjectsRoute: DashboardProjectsRoute,
   DashboardReportsRoute: DashboardReportsRoute,
   DashboardResumeThemeRoute: DashboardResumeThemeRoute,
   DashboardResumesRoute: DashboardResumesRouteWithChildren,
@@ -708,6 +707,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardApplicationsNewRoute: DashboardApplicationsNewRoute,
   DashboardSettingsGithubRoute: DashboardSettingsGithubRoute,
   DashboardApplicationsIndexRoute: DashboardApplicationsIndexRoute,
+  DashboardProjectsIndexRoute: DashboardProjectsIndexRoute,
   DashboardSettingsIndexRoute: DashboardSettingsIndexRoute,
 }
 
