@@ -49,3 +49,94 @@ export const getProjectDetailFn = createServerFn({ method: 'GET' })
       pathTemplate: '/projects/:id',
     })
   })
+
+// ─── Mutations ──────────────────────────────────────────────────────────────
+
+const patchProjectSchema = z.object({
+  id: z.string().regex(UUID_REGEX),
+  patch: z.object({
+    name:           z.string().min(1).max(200).optional(),
+    tagline:        z.union([z.string(), z.null()]).optional(),
+    pitch:          z.union([z.string(), z.null()]).optional(),
+    type:           z.enum([
+      'side_project', 'open_source', 'production_saas',
+      'client_work', 'internal_tool', 'learning_project',
+    ]).optional(),
+    status:         z.enum(['active', 'stable', 'dormant', 'archived']).optional(),
+    visibility:     z.enum(['private', 'unlisted', 'public']).optional(),
+    role_exhibited: z.enum(['sole_builder', 'lead', 'contributor', 'maintainer']).optional(),
+  }),
+})
+
+export const patchProjectFn = createServerFn({ method: 'POST' })
+  .inputValidator(patchProjectSchema)
+  .handler(async ({ data }) => {
+    await requireAuth()
+    return apiFetch<{ updated: number }>(`/projects/${encodeURIComponent(data.id)}`, {
+      method:       'PATCH',
+      body:         JSON.stringify(data.patch),
+      pathTemplate: '/projects/:id',
+    })
+  })
+
+const patchDecisionSchema = z.object({
+  projectId:  z.string().regex(UUID_REGEX),
+  decisionId: z.string().regex(UUID_REGEX),
+  patch: z.object({
+    title:             z.string().min(1).optional(),
+    context:           z.union([z.string(), z.null()]).optional(),
+    decision:          z.union([z.string(), z.null()]).optional(),
+    consequences:      z.union([z.string(), z.null()]).optional(),
+    confidence:        z.enum(['high', 'medium', 'low']).optional(),
+    is_user_confirmed: z.boolean().optional(),
+  }),
+})
+
+export const patchDecisionFn = createServerFn({ method: 'POST' })
+  .inputValidator(patchDecisionSchema)
+  .handler(async ({ data }) => {
+    await requireAuth()
+    return apiFetch<{ updated: number }>(
+      `/projects/${encodeURIComponent(data.projectId)}/decisions/${encodeURIComponent(data.decisionId)}`,
+      {
+        method:       'PATCH',
+        body:         JSON.stringify(data.patch),
+        pathTemplate: '/projects/:id/decisions/:did',
+      },
+    )
+  })
+
+const deleteDecisionSchema = z.object({
+  projectId:  z.string().regex(UUID_REGEX),
+  decisionId: z.string().regex(UUID_REGEX),
+})
+
+export const deleteDecisionFn = createServerFn({ method: 'POST' })
+  .inputValidator(deleteDecisionSchema)
+  .handler(async ({ data }) => {
+    await requireAuth()
+    return apiFetch<{ deleted: number }>(
+      `/projects/${encodeURIComponent(data.projectId)}/decisions/${encodeURIComponent(data.decisionId)}`,
+      {
+        method:       'DELETE',
+        pathTemplate: '/projects/:id/decisions/:did',
+      },
+    )
+  })
+
+interface RegenerateResponse {
+  status:        string
+  pipelineRunId: string
+  jobName:       string
+  projectId:     string
+}
+
+export const regenerateProjectFn = createServerFn({ method: 'POST' })
+  .inputValidator(projectIdSchema)
+  .handler(async ({ data: id }) => {
+    await requireAuth()
+    return apiFetch<RegenerateResponse>(`/projects/${encodeURIComponent(id)}/regenerate`, {
+      method:       'POST',
+      pathTemplate: '/projects/:id/regenerate',
+    })
+  })

@@ -8,8 +8,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 const getProjectDetailMock = vi.fn()
 vi.mock('@/server/projects', () => ({
-  listProjectsFn:     vi.fn(),
-  getProjectDetailFn: (args: unknown) => getProjectDetailMock(args),
+  listProjectsFn:      vi.fn(),
+  getProjectDetailFn:  (args: unknown) => getProjectDetailMock(args),
+  patchProjectFn:      vi.fn(() => Promise.resolve({ updated: 1 })),
+  patchDecisionFn:     vi.fn(() => Promise.resolve({ updated: 1 })),
+  deleteDecisionFn:    vi.fn(() => Promise.resolve({ deleted: 1 })),
+  regenerateProjectFn: vi.fn(() => Promise.resolve({
+    status: 'queued', pipelineRunId: 'p', jobName: 'j', projectId: 'x',
+  })),
 }))
 
 import { ProjectDetail } from '@/features/projects/components/detail/ProjectDetail'
@@ -93,7 +99,7 @@ describe('ProjectDetail', () => {
   it('renders empty hints when sections have no data', async () => {
     getProjectDetailMock.mockResolvedValueOnce(makeDetail({ pitch: null }))
     renderWithClient()
-    await waitFor(() => screen.getByText(/pitch hasn't been generated yet/i))
+    await waitFor(() => screen.getByText(/click to write the project pitch/i))
     expect(screen.getByText(/no stack items recorded yet/i)).toBeTruthy()
     expect(screen.getByText(/no decisions extracted yet/i)).toBeTruthy()
     expect(screen.getByText(/depth analysis hasn't run yet/i)).toBeTruthy()
