@@ -7,20 +7,13 @@ import { MotionConfig } from 'motion/react'
 // exists on disk after the client build (see vite.config.ts).
 import '../styles.css'
 const appCss = `${import.meta.env.BASE_URL ?? '/'}assets/styles.css`
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import type { RouterContext } from '../router'
 import { getUserSessionFn } from '../server/session'
 import { Toaster } from '../components/ui/Toaster'
 import { initialiseFaroAdmin } from '../lib/observability/faro-admin'
 import { ThemeProvider } from '../contexts/ThemeContext'
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-    },
-  },
-})
+import { queryClient } from '../lib/query-client'
 
 /**
  * Inline script injected into <head> before first paint.
