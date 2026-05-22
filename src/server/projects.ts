@@ -141,6 +141,44 @@ export const regenerateProjectFn = createServerFn({ method: 'POST' })
     })
   })
 
+interface ConfirmResponse {
+  confirmed:      boolean
+  dispatched:     boolean
+  pipelineRunId?: string
+  jobName?:       string
+  reason?:        string
+  projectId:      string
+}
+
+export const confirmProjectFn = createServerFn({ method: 'POST' })
+  .inputValidator(projectIdSchema)
+  .handler(async ({ data: id }) => {
+    await requireAuth()
+    return apiFetch<ConfirmResponse>(`/projects/${encodeURIComponent(id)}/confirm`, {
+      method:       'POST',
+      pathTemplate: '/projects/:id/confirm',
+    })
+  })
+
+export const archiveProjectFn = createServerFn({ method: 'POST' })
+  .inputValidator(projectIdSchema)
+  .handler(async ({ data: id }) => {
+    await requireAuth()
+    return apiFetch<{ archived: boolean }>(`/projects/${encodeURIComponent(id)}`, {
+      method:       'DELETE',
+      pathTemplate: '/projects/:id',
+    })
+  })
+
+export const runClusteringFn = createServerFn({ method: 'POST' })
+  .handler(async () => {
+    await requireAuth()
+    return apiFetch<{ status: string; pipelineRunId: string; jobName: string }>(
+      `/projects/clustering/run`,
+      { method: 'POST', pathTemplate: '/projects/clustering/run' },
+    )
+  })
+
 const SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$/
 
 const mergeProjectsSchema = z.object({

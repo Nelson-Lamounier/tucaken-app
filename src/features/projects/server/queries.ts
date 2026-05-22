@@ -15,4 +15,10 @@ export const projectsQueries = {
       queryFn:  () => getProjectDetailFn({ data: id }),
       staleTime: 30 * 1000,
     }),
+  proposals: () =>
+    queryOptions({
+      queryKey: ['projects', 'proposals'],
+      queryFn:  () => listProjectsFn({ data: { limit: 100, offset: 0, proposalsOnly: true } }),
+      staleTime: 15 * 1000,
+    }),
 }
