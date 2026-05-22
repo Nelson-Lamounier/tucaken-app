@@ -6,6 +6,12 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
+vi.mock('@tanstack/react-router', () => ({
+  Link: ({ children, ...rest }: { children: React.ReactNode } & Record<string, unknown>) => (
+    <a {...(rest as Record<string, string>)}>{children}</a>
+  ),
+}))
+
 const getProjectDetailMock = vi.fn()
 vi.mock('@/server/projects', () => ({
   listProjectsFn:      vi.fn(),

@@ -140,3 +140,48 @@ export const regenerateProjectFn = createServerFn({ method: 'POST' })
       pathTemplate: '/projects/:id/regenerate',
     })
   })
+
+const SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$/
+
+const mergeProjectsSchema = z.object({
+  targetId:  z.string().regex(UUID_REGEX),
+  sourceIds: z.array(z.string().regex(UUID_REGEX)).min(1),
+}).refine((v) => !v.sourceIds.includes(v.targetId), {
+  message: 'targetId must not appear in sourceIds',
+})
+
+export const mergeProjectsFn = createServerFn({ method: 'POST' })
+  .inputValidator(mergeProjectsSchema)
+  .handler(async ({ data }) => {
+    await requireAuth()
+    return apiFetch<{ componentsReassigned: number; sourcesArchived: number }>(`/projects/merge`, {
+      method:       'POST',
+      body:         JSON.stringify({ target_id: data.targetId, source_ids: data.sourceIds }),
+      pathTemplate: '/projects/merge',
+    })
+  })
+
+const splitProjectSchema = z.object({
+  projectId:    z.string().regex(UUID_REGEX),
+  componentIds: z.array(z.string().regex(UUID_REGEX)).min(1),
+  name:         z.string().min(1).max(200),
+  slug:         z.string().regex(SLUG_REGEX, 'slug must be 1-80 chars, lowercase letters/digits/hyphens'),
+})
+
+export const splitProjectFn = createServerFn({ method: 'POST' })
+  .inputValidator(splitProjectSchema)
+  .handler(async ({ data }) => {
+    await requireAuth()
+    return apiFetch<{ newProjectId: string; componentsMoved: number }>(
+      `/projects/${encodeURIComponent(data.projectId)}/split`,
+      {
+        method:       'POST',
+        body:         JSON.stringify({
+          component_ids: data.componentIds,
+          name:          data.name,
+          slug:          data.slug,
+        }),
+        pathTemplate: '/projects/:id/split',
+      },
+    )
+  })
