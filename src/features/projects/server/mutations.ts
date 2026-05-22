@@ -1,9 +1,11 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   deleteDecisionFn,
+  mergeProjectsFn,
   patchDecisionFn,
   patchProjectFn,
   regenerateProjectFn,
+  splitProjectFn,
 } from '../../../server/projects'
 import type { ProjectDecision, ProjectDetail } from '../lib/types'
 import { projectsQueries } from './queries'
@@ -108,6 +110,41 @@ export function useRegenerateProject(projectId: string) {
       void queryClient.invalidateQueries({
         queryKey: projectsQueries.detail(projectId).queryKey,
       })
+    },
+  })
+}
+
+/**
+ * Merge source projects into `targetId`. Sources are archived and their
+ * components reassigned to the target. Invalidates the target detail and the
+ * list so the absorbed projects disappear and the target reflects new
+ * components.
+ */
+export function useMergeProjects(targetId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (sourceIds: string[]) => mergeProjectsFn({ data: { targetId, sourceIds } }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: projectsQueries.detail(targetId).queryKey })
+      void queryClient.invalidateQueries({ queryKey: ['projects', 'list'] })
+    },
+  })
+}
+
+/**
+ * Carve components out of `projectId` into a new project. Invalidates the
+ * source detail (components removed) and the list (new project appears).
+ */
+export function useSplitProject(projectId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (input: { componentIds: string[]; name: string; slug: string }) =>
+      splitProjectFn({ data: { projectId, ...input } }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: projectsQueries.detail(projectId).queryKey })
+      void queryClient.invalidateQueries({ queryKey: ['projects', 'list'] })
     },
   })
 }

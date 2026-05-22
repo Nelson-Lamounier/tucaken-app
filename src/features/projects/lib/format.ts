@@ -9,6 +9,22 @@ const RELATIVE_UNITS: ReadonlyArray<[Intl.RelativeTimeFormatUnit, number]> = [
 
 const RTF = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
 
+/**
+ * URL-safe slug from free text. Matches admin-api's SLUG_REGEX
+ * (^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$): lowercase, hyphen-separated,
+ * 1-80 chars, no leading/trailing hyphen.
+ */
+export function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80)
+    .replace(/-+$/g, '')
+}
+
 export function formatRelativeTime(iso: string | null, now: Date = new Date()): string {
   if (!iso) return 'never'
   const then    = new Date(iso)

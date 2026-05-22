@@ -1,4 +1,5 @@
-import { Boxes, FolderGit, FolderGit2, RefreshCw } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
+import { Boxes, FolderGit, FolderGit2, RefreshCw, SlidersHorizontal } from 'lucide-react'
 import {
   PROJECT_ROLE_LABELS,
   PROJECT_STATUS_LABELS,
@@ -75,7 +76,15 @@ export function Hero({ project }: HeroProps) {
             </dl>
           </div>
         </div>
-        <div className="flex shrink-0 items-start">
+        <div className="flex shrink-0 items-start gap-2">
+          <Link
+            to="/projects/$id/edit"
+            params={{ id: project.id }}
+            className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1 text-xs font-medium text-zinc-200 inset-ring inset-ring-white/10 transition-colors hover:bg-white/10"
+          >
+            <SlidersHorizontal className="size-3.5" />
+            Edit
+          </Link>
           <button
             type="button"
             onClick={() => regenerate.mutate()}
