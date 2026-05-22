@@ -122,7 +122,7 @@ describe('project mutation routes invalidate the read cache', () => {
       const res = await router.request(path, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: Object.keys(body).length > 0 ? JSON.stringify(body) : undefined,
+        body: JSON.stringify(body),
       });
       expect(res.status).toBeLessThan(maxStatus);
       expect(invalidateProject).toHaveBeenCalledTimes(expectedCalls);
