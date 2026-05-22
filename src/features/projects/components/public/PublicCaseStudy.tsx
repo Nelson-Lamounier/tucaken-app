@@ -6,6 +6,7 @@ import {
   type StackCategory,
 } from '../../lib/types'
 import type { PublicCaseStudy as PublicCaseStudyData } from '../../lib/public-types'
+import { ArchitectureDiagram } from '../ArchitectureDiagram'
 
 const CATEGORY_ORDER: StackCategory[] = [
   'language', 'framework', 'database', 'infrastructure',
@@ -62,6 +63,15 @@ export function PublicCaseStudy({ data }: { readonly data: PublicCaseStudyData }
               )
             })}
           </div>
+        </Block>
+      )}
+
+      {data.architecture && data.architecture.diagram_source && (
+        <Block title="Architecture">
+          <ArchitectureDiagram
+            format={data.architecture.diagram_format}
+            source={data.architecture.diagram_source}
+          />
         </Block>
       )}
 
