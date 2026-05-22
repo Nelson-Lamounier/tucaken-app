@@ -24,7 +24,7 @@ let _enabled: boolean | undefined;
 function client(): DelClient | undefined {
   if (_enabled === undefined) {
     const host = process.env['REDIS_CACHE_HOST'] ?? '';
-    _enabled = host !== '';
+    _enabled = host !== '';            // set first — a concurrent caller now skips the construct branch
     if (_enabled) {
       const opts: RedisOptions = {
         host,
@@ -38,7 +38,7 @@ function client(): DelClient | undefined {
       };
       const c = new Redis(opts);
       c.on('error', () => { /* fail-open */ });
-      _client = c;
+      _client = c as unknown as DelClient;
     }
   }
   return _enabled ? _client : undefined;

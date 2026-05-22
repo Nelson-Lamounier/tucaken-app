@@ -32,27 +32,12 @@ jest.unstable_mockModule('../lib/repositories/projects.js', () => ({
   splitProject:      async () => ({ newProjectId: SPLIT_NEW_ID, componentsMoved: 1 }),
 }));
 
-jest.unstable_mockModule('../lib/pg.js', () => ({
-  getPool:  () => ({}),
-  withUser: async (_pool: unknown, _uid: string, fn: (db: unknown) => unknown) => fn({}),
-}));
-
 // lib/types.js exports AdminApiBindings (type-only) and requireUserId (runtime).
 // Only export runtime values here — type-only exports have no runtime shape.
 jest.unstable_mockModule('../lib/types.js', () => ({
   requireUserId: () => 'user-1',
 }));
 
-// config / k8s / github-app — confirm and regenerate reach these only after
-// the DB guard; we short-circuit by making the guarded withUser return ok:false
-// so dispatch is never attempted. But for confirm we need ok:true to trigger
-// invalidation, so we mock the db.query inside withUser to return the right
-// guard rows via a smarter withUser mock if needed. Instead we rely on the
-// mock above always returning ok=true from the DB guard by making withUser
-// return { ok: true } when called with a fn that returns that shape.
-// Actually withUser runs `fn(db)` where db is `{}` — the confirm handler
-// calls `db.query(...)` on it. We need to make `db.query` return the right
-// guard rows. Patch the pg mock to provide a db with a .query stub.
 jest.unstable_mockModule('../lib/config.js', () => ({
   getJobImage:         () => 'UNSET',
   isImageConfigured:   () => false,  // makes confirm/regenerate dispatch bail early (non-fatal)
@@ -114,7 +99,7 @@ const MUTATING: Array<[string, string, number, Record<string, unknown>, number]>
   ['DELETE', `/${PROJECT_ID}`,                          1, {},                        500],
   ['POST',   `/${PROJECT_ID}/confirm`,                  1, {},                        500],
   // regenerate surfaces dispatch failures as 5xx; invalidateProject still fires before dispatch
-  ['POST',   `/${PROJECT_ID}/regenerate`,               1, {},                        600],
+  ['POST',   `/${PROJECT_ID}/regenerate`,               1, {},                        600 /* any status — dispatch fails on empty config, but invalidate fires before dispatch */],
   ['PATCH',  `/${PROJECT_ID}/decisions/${DECISION_ID}`, 1, { title: 'Updated' },      500],
   ['DELETE', `/${PROJECT_ID}/decisions/${DECISION_ID}`, 1, {},                        500],
   ['PATCH',  `/${PROJECT_ID}/architecture`,             1, { diagram_source: 'x' },   500],
