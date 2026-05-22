@@ -42,6 +42,7 @@ import { Route as DashboardApplicationsNewRouteImport } from './app/_dashboard.a
 import { Route as DashboardApplicationsListRouteImport } from './app/_dashboard.applications.list'
 import { Route as DashboardApplicationsInterviewPrepRouteImport } from './app/_dashboard.applications.interview-prep'
 import { Route as DashboardApplicationsSlugRouteImport } from './app/_dashboard.applications.$slug'
+import { Route as UUsernamePSlugRouteImport } from './app/u/$username/p/$slug'
 import { Route as DashboardResumesEditIdRouteImport } from './app/_dashboard.resumes.edit.$id'
 import { Route as DashboardProjectsIdEditRouteImport } from './app/_dashboard/projects/$id.edit'
 
@@ -214,6 +215,11 @@ const DashboardApplicationsSlugRoute =
     path: '/applications/$slug',
     getParentRoute: () => DashboardRoute,
   } as any)
+const UUsernamePSlugRoute = UUsernamePSlugRouteImport.update({
+  id: '/u/$username/p/$slug',
+  path: '/u/$username/p/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardResumesEditIdRoute = DashboardResumesEditIdRouteImport.update({
   id: '/edit/$id',
   path: '/edit/$id',
@@ -260,6 +266,7 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof DashboardSettingsIndexRoute
   '/projects/$id/edit': typeof DashboardProjectsIdEditRoute
   '/resumes/edit/$id': typeof DashboardResumesEditIdRoute
+  '/u/$username/p/$slug': typeof UUsernamePSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -296,6 +303,7 @@ export interface FileRoutesByTo {
   '/settings': typeof DashboardSettingsIndexRoute
   '/projects/$id/edit': typeof DashboardProjectsIdEditRoute
   '/resumes/edit/$id': typeof DashboardResumesEditIdRoute
+  '/u/$username/p/$slug': typeof UUsernamePSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -334,6 +342,7 @@ export interface FileRoutesById {
   '/_dashboard/settings/': typeof DashboardSettingsIndexRoute
   '/_dashboard/projects/$id/edit': typeof DashboardProjectsIdEditRoute
   '/_dashboard/resumes/edit/$id': typeof DashboardResumesEditIdRoute
+  '/u/$username/p/$slug': typeof UUsernamePSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -372,6 +381,7 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/projects/$id/edit'
     | '/resumes/edit/$id'
+    | '/u/$username/p/$slug'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -408,6 +418,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/projects/$id/edit'
     | '/resumes/edit/$id'
+    | '/u/$username/p/$slug'
   id:
     | '__root__'
     | '/'
@@ -445,6 +456,7 @@ export interface FileRouteTypes {
     | '/_dashboard/settings/'
     | '/_dashboard/projects/$id/edit'
     | '/_dashboard/resumes/edit/$id'
+    | '/u/$username/p/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -458,6 +470,7 @@ export interface RootRouteChildren {
   CheckoutReturnRoute: typeof CheckoutReturnRoute
   GithubCallbackRoute: typeof GithubCallbackRoute
   ArticlesPreviewSlugRoute: typeof ArticlesPreviewSlugRoute
+  UUsernamePSlugRoute: typeof UUsernamePSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -693,6 +706,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardApplicationsSlugRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/u/$username/p/$slug': {
+      id: '/u/$username/p/$slug'
+      path: '/u/$username/p/$slug'
+      fullPath: '/u/$username/p/$slug'
+      preLoaderRoute: typeof UUsernamePSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_dashboard/resumes/edit/$id': {
       id: '/_dashboard/resumes/edit/$id'
       path: '/edit/$id'
@@ -809,6 +829,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutReturnRoute: CheckoutReturnRoute,
   GithubCallbackRoute: GithubCallbackRoute,
   ArticlesPreviewSlugRoute: ArticlesPreviewSlugRoute,
+  UUsernamePSlugRoute: UUsernamePSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

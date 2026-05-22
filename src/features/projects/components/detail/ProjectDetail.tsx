@@ -8,6 +8,7 @@ import { Highlights } from './Highlights'
 import { Challenges } from './Challenges'
 import { DepthMarkers } from './DepthMarkers'
 import { ResumeBullets } from './ResumeBullets'
+import { ShareCaseStudy } from './ShareCaseStudy'
 
 export function ProjectDetail({ projectId }: { readonly projectId: string }) {
   const { data: project, isPending, isError, error } = useQuery(projectsQueries.detail(projectId))
@@ -43,6 +44,7 @@ export function ProjectDetail({ projectId }: { readonly projectId: string }) {
       <Challenges items={project.challenges} />
       <DecisionLog projectId={project.id} items={project.decisions} />
       <ResumeBullets angles={project.resume_bullets} />
+      <ShareCaseStudy projectId={project.id} slug={project.slug} visibility={project.visibility} />
     </div>
   )
 }
