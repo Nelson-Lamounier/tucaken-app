@@ -57,6 +57,7 @@ import { generateInstallationToken } from '../lib/github-app.js';
 import { buildPipelineJob, sanitizeLabel } from '../lib/k8s-job-builder.js';
 import { getBatchApi } from '../lib/k8s.js';
 import { getPool, withUser } from '../lib/pg.js';
+import { invalidateProject } from '../lib/redis-cache.js';
 import { insertPipelineRun } from '../lib/repositories/pipeline-runs.js';
 import {
     archiveProject,
@@ -239,6 +240,8 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
             }),
         );
         if (result.updated === 0) return ctx.json({ error: 'Not found' }, 404);
+        // fire-and-forget — Redis latency/faults must never pad or fail the write
+        void invalidateProject(id);
         return ctx.json({ updated: result.updated });
     });
 
@@ -254,6 +257,7 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
         const pool = getPool(config);
         const result = await withUser(pool, uid, async (db) => archiveProject(db, id));
         if (result.updated === 0) return ctx.json({ error: 'Not found' }, 404);
+        void invalidateProject(id);
         return ctx.json({ archived: true });
     });
 
@@ -302,6 +306,7 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
             return { ok: true as const };
         });
         if (!guarded.ok) return ctx.json({ error: guarded.msg }, guarded.code);
+        void invalidateProject(id);
 
         const dispatch = await dispatchCaseStudyJob(pool, config, uid, id, 'confirm');
         if (dispatch.ok) {
@@ -367,6 +372,7 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
             }),
         );
         if (result.updated === 0) return ctx.json({ error: 'Not found' }, 404);
+        void invalidateProject(id);
         return ctx.json({ updated: result.updated });
     });
 
@@ -384,6 +390,7 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
         const pool = getPool(config);
         const result = await withUser(pool, uid, async (db) => deleteDecision(db, id, did));
         if (result.deleted === 0) return ctx.json({ error: 'Not found' }, 404);
+        void invalidateProject(id);
         return ctx.json({ deleted: result.deleted });
     });
 
@@ -429,6 +436,7 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
             }),
         );
         if (result.updated === 0) return ctx.json({ error: 'Not found' }, 404);
+        void invalidateProject(id);
         return ctx.json({ updated: result.updated });
     });
 
@@ -456,6 +464,7 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
         const summary = await withUser(pool, uid, async (db) =>
             mergeProjects(db, targetId as string, sourceIds as string[]),
         );
+        void Promise.all([targetId as string, ...(sourceIds as string[])].map(invalidateProject));
         return ctx.json(summary);
     });
 
@@ -491,6 +500,7 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
                     name, slug,
                 }),
             );
+            void Promise.all([id, result.newProjectId].map(invalidateProject));
             return ctx.json(result, 201);
         } catch (err) {
             const code = (err as { code?: string }).code;
@@ -595,6 +605,7 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
             return { ok: true as const };
         });
         if (!guarded.ok) return ctx.json({ error: guarded.msg }, guarded.code);
+        void invalidateProject(id);
 
         const dispatch = await dispatchCaseStudyJob(pool, config, uid, id, 'manual');
         if (dispatch.ok) {

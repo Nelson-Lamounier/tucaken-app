@@ -5046,6 +5046,7 @@ __metadata:
     "@types/node": "npm:^22.0.0"
     "@types/pg": "npm:^8.20.0"
     hono: "npm:^4.6.14"
+    ioredis: "npm:^5.4.1"
     jest: "npm:^29.7.0"
     jose: "npm:^5.9.6"
     pg: "npm:^8.20.0"
@@ -12254,7 +12255,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ioredis@npm:^5.10.1":
+"ioredis@npm:^5.10.1, ioredis@npm:^5.4.1":
   version: 5.10.1
   resolution: "ioredis@npm:5.10.1"
   dependencies:
