@@ -34,14 +34,14 @@ export function ProjectDetail({ projectId }: { readonly projectId: string }) {
   return (
     <div className="space-y-5">
       <Hero project={project} />
-      <Pitch pitch={project.pitch} />
+      <Pitch projectId={project.id} pitch={project.pitch} />
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <StackMap items={project.stack_items} />
         <DepthMarkers markers={project.depth_markers} />
       </div>
       <Highlights items={project.highlights} />
       <Challenges items={project.challenges} />
-      <DecisionLog items={project.decisions} />
+      <DecisionLog projectId={project.id} items={project.decisions} />
       <ResumeBullets angles={project.resume_bullets} />
     </div>
   )

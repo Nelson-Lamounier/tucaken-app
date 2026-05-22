@@ -1,13 +1,28 @@
 import { FileText } from 'lucide-react'
-import { EmptyHint, Section } from './Section'
+import { Section } from './Section'
+import { InlineText } from './InlineText'
+import { usePatchProject } from '../../server/mutations'
 
-export function Pitch({ pitch }: { readonly pitch: string | null }) {
+export interface PitchProps {
+  readonly projectId: string
+  readonly pitch:     string | null
+}
+
+export function Pitch({ projectId, pitch }: PitchProps) {
+  const patch = usePatchProject(projectId)
   return (
     <Section icon={FileText} title="Pitch">
-      {pitch ? (
-        <p className="text-sm leading-relaxed text-zinc-300 whitespace-pre-wrap">{pitch}</p>
-      ) : (
-        <EmptyHint>Pitch hasn't been generated yet.</EmptyHint>
+      <InlineText
+        value={pitch}
+        multiline
+        placeholder="Click to write the project pitch…"
+        ariaLabel="project pitch"
+        onSave={(next) => patch.mutate({ pitch: next })}
+      />
+      {patch.isError && (
+        <p className="mt-2 text-xs text-rose-300">
+          {patch.error instanceof Error ? patch.error.message : 'Update failed — change reverted'}
+        </p>
       )}
     </Section>
   )
