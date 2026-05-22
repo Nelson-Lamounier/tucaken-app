@@ -55,3 +55,13 @@ export const authProvisionTotal = new Counter({
   labelNames: ['outcome'] as const,
   registers:  [registry],
 });
+
+// ── Read-cache invalidation (cross-app) ───────────────────────────────────────
+// admin-api is the writer for shared cache entities; it DELs the public-api
+// read-cache key on every project mutation. result: ok | error.
+export const redisCacheInvalidationsTotal = new Counter({
+  name:       'redis_cache_invalidations_total',
+  help:       'Cross-app read-cache invalidations issued by admin-api.',
+  labelNames: ['cache', 'result'] as const,
+  registers:  [registry],
+});
