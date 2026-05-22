@@ -1,13 +1,16 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
+  archiveProjectFn,
+  confirmProjectFn,
   deleteDecisionFn,
   mergeProjectsFn,
   patchDecisionFn,
   patchProjectFn,
   regenerateProjectFn,
+  runClusteringFn,
   splitProjectFn,
 } from '../../../server/projects'
-import type { ProjectDecision, ProjectDetail } from '../lib/types'
+import type { ProjectDecision, ProjectDetail, ProjectListResponse } from '../lib/types'
 import { projectsQueries } from './queries'
 
 type ProjectPatch = Parameters<typeof patchProjectFn>[0]['data']['patch']
@@ -127,6 +130,67 @@ export function useMergeProjects(targetId: string) {
     mutationFn: (sourceIds: string[]) => mergeProjectsFn({ data: { targetId, sourceIds } }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: projectsQueries.detail(targetId).queryKey })
+      void queryClient.invalidateQueries({ queryKey: ['projects', 'list'] })
+    },
+  })
+}
+
+/**
+ * Confirm an AI-suggested grouping. Flips is_user_confirmed and (server-side)
+ * dispatches the case-study Job. Invalidates the proposals list (the project
+ * leaves the unconfirmed set) and the main list.
+ */
+export function useConfirmProject() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (projectId: string) => confirmProjectFn({ data: projectId }),
+    onSuccess: (_res, projectId) => {
+      void queryClient.invalidateQueries({ queryKey: projectsQueries.proposals().queryKey })
+      void queryClient.invalidateQueries({ queryKey: ['projects', 'list'] })
+      void queryClient.invalidateQueries({ queryKey: projectsQueries.detail(projectId).queryKey })
+    },
+  })
+}
+
+/**
+ * Kick off the clustering Job. Proposals appear asynchronously once the Job
+ * completes — the caller should poll / refetch proposals after a delay.
+ */
+export function useRunClustering() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: () => runClusteringFn(),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: projectsQueries.proposals().queryKey })
+    },
+  })
+}
+
+/**
+ * Reject a proposal (soft delete → archived). Optimistically removes it from
+ * the cached proposals list, rolls back on failure.
+ */
+export function useArchiveProject() {
+  const queryClient = useQueryClient()
+  const proposalsKey = projectsQueries.proposals().queryKey
+
+  return useMutation({
+    mutationFn: (projectId: string) => archiveProjectFn({ data: projectId }),
+    onMutate: async (projectId) => {
+      await queryClient.cancelQueries({ queryKey: proposalsKey })
+      const previous = queryClient.getQueryData<ProjectListResponse>(proposalsKey)
+      queryClient.setQueryData<ProjectListResponse>(proposalsKey, (old) =>
+        old ? { ...old, items: old.items.filter((p) => p.id !== projectId) } : old,
+      )
+      return { previous }
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous) queryClient.setQueryData(proposalsKey, context.previous)
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: proposalsKey })
       void queryClient.invalidateQueries({ queryKey: ['projects', 'list'] })
     },
   })
