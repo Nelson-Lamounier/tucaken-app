@@ -28,6 +28,7 @@
  *   - frontend     apps/site/src/lib/observability/faro.ts (default .../faro/collect)
  */
 
+import { randomUUID } from 'node:crypto';
 import { describe, it, expect } from 'vitest';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
@@ -50,7 +51,7 @@ function buildFaroPayload() {
     meta: {
       app: { name: 'faro-smoke-test', version: 'integration', environment: 'test' },
       sdk: { name: '@grafana/faro-web-sdk', version: 'smoke' },
-      session: { id: `smoke-${Date.now()}-${Math.random().toString(36).slice(2)}` },
+      session: { id: `smoke-${randomUUID()}` },
       page: { url: `${APP_ORIGIN}/onboarding` },
     },
     logs: [],
