@@ -12,7 +12,7 @@ describe('invalidateProject', () => {
     const deleted: string[] = [];
     const client = { del: async (k: string) => { deleted.push(k); return 1; } };
     const counts: Array<{ cache: string; result: string }> = [];
-    await __test.invalidateProjectWith(client as never, 'abc-123', (l) => counts.push(l));
+    await __test.invalidateProjectWith(client, 'abc-123', (l) => counts.push(l));
     expect(deleted).toEqual(['shared:project:case_study:abc-123:v1']);
     expect(counts).toEqual([{ cache: 'project_case_study', result: 'ok' }]);
   });
@@ -21,7 +21,7 @@ describe('invalidateProject', () => {
     const client = { del: async () => { throw new Error('down'); } };
     const counts: Array<{ cache: string; result: string }> = [];
     await expect(
-      __test.invalidateProjectWith(client as never, 'abc-123', (l) => counts.push(l)),
+      __test.invalidateProjectWith(client, 'abc-123', (l) => counts.push(l)),
     ).resolves.toBeUndefined();
     expect(counts).toEqual([{ cache: 'project_case_study', result: 'error' }]);
   });

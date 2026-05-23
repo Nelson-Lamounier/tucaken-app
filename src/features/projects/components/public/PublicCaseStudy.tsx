@@ -66,7 +66,7 @@ export function PublicCaseStudy({ data }: { readonly data: PublicCaseStudyData }
         </Block>
       )}
 
-      {data.architecture && data.architecture.diagram_source && (
+      {data.architecture?.diagram_source && (
         <Block title="Architecture">
           <ArchitectureDiagram
             format={data.architecture.diagram_format}
@@ -78,8 +78,8 @@ export function PublicCaseStudy({ data }: { readonly data: PublicCaseStudyData }
       {data.highlights.length > 0 && (
         <Block title="Highlights">
           <ul className="space-y-4">
-            {data.highlights.map((h, i) => (
-              <li key={i}>
+            {data.highlights.map((h) => (
+              <li key={h.title}>
                 <p className="font-medium text-zinc-900 dark:text-zinc-100">{h.title}</p>
                 {h.description && (
                   <p className="mt-1 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">{h.description}</p>
@@ -93,8 +93,8 @@ export function PublicCaseStudy({ data }: { readonly data: PublicCaseStudyData }
       {data.challenges.length > 0 && (
         <Block title="Challenges">
           <ol className="space-y-4">
-            {data.challenges.map((c, i) => (
-              <li key={i}>
+            {data.challenges.map((c) => (
+              <li key={c.problem}>
                 <p className="font-medium text-zinc-900 dark:text-zinc-100">{c.problem}</p>
                 {c.solution && (
                   <p className="mt-1 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
@@ -111,8 +111,8 @@ export function PublicCaseStudy({ data }: { readonly data: PublicCaseStudyData }
       {data.decisions.length > 0 && (
         <Block title="Key decisions">
           <ol className="space-y-5">
-            {data.decisions.map((d, i) => (
-              <li key={i} className="border-l-2 border-zinc-200 pl-4 dark:border-white/10">
+            {data.decisions.map((d) => (
+              <li key={d.title} className="border-l-2 border-zinc-200 pl-4 dark:border-white/10">
                 <p className="font-medium text-zinc-900 dark:text-zinc-100">{d.title}</p>
                 {d.context && <DecisionLine label="Context" value={d.context} />}
                 {d.decision && <DecisionLine label="Decision" value={d.decision} />}
@@ -132,8 +132,8 @@ export function PublicCaseStudy({ data }: { readonly data: PublicCaseStudyData }
                   {RESUME_ANGLE_LABELS[rb.angle] ?? rb.angle}
                 </h3>
                 <ul className="space-y-1.5 text-sm text-zinc-700 dark:text-zinc-300">
-                  {rb.bullets.map((b, i) => (
-                    <li key={i} className="flex gap-2">
+                  {rb.bullets.map((b) => (
+                    <li key={b} className="flex gap-2">
                       <span className="mt-2 size-1 shrink-0 rounded-full bg-teal-500" aria-hidden />
                       <span>{b}</span>
                     </li>
