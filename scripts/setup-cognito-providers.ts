@@ -279,8 +279,8 @@ async function configureGoogle(
       }),
     )
     ok('Google provider created')
-  } catch (e: any) {
-    if (e.name !== 'DuplicateProviderException') throw e
+  } catch (e) {
+    if (!(e instanceof Error) || e.name !== 'DuplicateProviderException') throw e
     await cognito.send(
       new UpdateIdentityProviderCommand({
         UserPoolId: poolId,
@@ -538,8 +538,8 @@ async function ensureLambdaRole(iam: IAMClient): Promise<string> {
     const res = await iam.send(new GetRoleCommand({ RoleName: LAMBDA_ROLE_NAME }))
     ok(`IAM role already exists: ${LAMBDA_ROLE_NAME}`)
     return res.Role!.Arn!
-  } catch (e: any) {
-    if (e.name !== 'NoSuchEntityException') throw e
+  } catch (e) {
+    if (!(e instanceof Error) || e.name !== 'NoSuchEntityException') throw e
   }
 
   const res = await iam.send(
@@ -577,8 +577,8 @@ async function ensureLambdaFunction(
   try {
     const res = await lambda.send(new GetFunctionCommand({ FunctionName: LAMBDA_FN_NAME }))
     existing = res.Configuration
-  } catch (e: any) {
-    if (e.name !== 'ResourceNotFoundException') throw e
+  } catch (e) {
+    if (!(e instanceof Error) || e.name !== 'ResourceNotFoundException') throw e
   }
 
   if (existing) {
@@ -657,8 +657,8 @@ async function ensureHttpApi(
         SourceArn: `arn:aws:execute-api:${region}:${accountId}:${apiId}/*`,
       }),
     )
-  } catch (e: any) {
-    if (e.name !== 'ResourceConflictException') throw e
+  } catch (e) {
+    if (!(e instanceof Error) || e.name !== 'ResourceConflictException') throw e
   }
 
   ok(`HTTP API created: ${apiId}`)
@@ -768,8 +768,8 @@ async function configureGitHub(
       }),
     )
     ok('GitHub OIDC provider created')
-  } catch (e: any) {
-    if (e.name !== 'DuplicateProviderException') throw e
+  } catch (e) {
+    if (!(e instanceof Error) || e.name !== 'DuplicateProviderException') throw e
     await clients.cognito.send(
       new UpdateIdentityProviderCommand({
         UserPoolId: poolId,
