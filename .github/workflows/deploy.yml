@@ -73,6 +73,35 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Configure AWS Credentials
+        uses: ./.github/actions/configure-aws
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Resolve client (VITE_) build args from SSM
+        id: vite-args
+        env:
+          ENVIRONMENT: ${{ env.ENVIRONMENT }}
+        run: |
+          # VITE_* values are INLINED into the browser bundle by Vite at build
+          # time (not read at runtime), so they must be present as build-args.
+          # They are public by definition (shipped to the browser) — safe to pass
+          # as build-args. Stored under a path prefix; each parameter's leaf name
+          # is the exact env var, e.g. /tucaken-app/development/vite/VITE_GITHUB_APP_SLUG.
+          # VITE_APP_VERSION is derived from IMAGE_TAG below — do not store it in SSM.
+          PREFIX="/tucaken-app/${ENVIRONMENT}/vite"
+          {
+            echo "args<<__ARGS_EOF__"
+            aws ssm get-parameters-by-path \
+              --path "$PREFIX" --recursive --with-decryption \
+              --query "Parameters[].[Name,Value]" --output text \
+            | while IFS=$'\t' read -r name value; do
+                [ -n "$name" ] && echo "$(basename "$name")=$value"
+              done
+            echo "__ARGS_EOF__"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build Docker Image
         uses: docker/build-push-action@v6
         with:
@@ -88,6 +117,8 @@ jobs:
           outputs: type=docker,dest=/tmp/app-image.tar
           build-args: |
             NODE_ENV=production
+            VITE_APP_VERSION=${{ env.IMAGE_TAG }}
+            ${{ steps.vite-args.outputs.args }}
 
       - name: Cache Image
         uses: actions/cache/save@v4
