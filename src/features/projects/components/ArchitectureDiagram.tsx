@@ -85,22 +85,25 @@ export function ArchitectureDiagram({ format, source }: ArchitectureDiagramProps
         )}
       </div>
 
-      {showSource ? (
+      {showSource && (
         <pre className="overflow-x-auto rounded-xl bg-zinc-950/60 p-4 text-xs leading-relaxed text-zinc-300 inset-ring inset-ring-white/10">
           <code>{source}</code>
         </pre>
-      ) : error ? (
+      )}
+      {!showSource && error && (
         <p className="rounded-xl bg-rose-400/5 px-4 py-6 text-center text-xs text-rose-300 inset-ring inset-ring-rose-400/30">
           {error}
         </p>
-      ) : svg ? (
+      )}
+      {!showSource && !error && svg && (
         <div
           ref={containerRef}
           className="flex justify-center overflow-x-auto rounded-xl bg-white/2 p-4 inset-ring inset-ring-white/10 [&_svg]:max-w-full"
           // SVG is sanitised with DOMPurify (SVG profile, scripts stripped) above.
           dangerouslySetInnerHTML={{ __html: svg }}
         />
-      ) : (
+      )}
+      {!showSource && !error && !svg && (
         <div className="h-40 animate-pulse rounded-xl bg-white/2 inset-ring inset-ring-white/10" aria-label="Rendering diagram" />
       )}
     </div>

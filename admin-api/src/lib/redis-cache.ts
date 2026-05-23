@@ -38,7 +38,7 @@ function client(): DelClient | undefined {
       };
       const c = new Redis(opts);
       c.on('error', () => { /* fail-open */ });
-      _client = c as unknown as DelClient;
+      _client = c;
     }
   }
   return _enabled ? _client : undefined;

@@ -165,7 +165,7 @@ export async function listProjects(db: Queryable, options: ListProjectsOptions):
     const totalResult = await db.query<{ count: string }>(
         `SELECT COUNT(*)::text AS count FROM projects ${where}`,
     );
-    const total = parseInt(totalResult.rows[0]?.count ?? '0', 10);
+    const total = Number.parseInt(totalResult.rows[0]?.count ?? '0', 10);
 
     const result = await db.query<ProjectSummary>(
         `SELECT

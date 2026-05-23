@@ -73,11 +73,11 @@ import {
 } from '../lib/repositories/projects.js';
 import { AdminApiBindings, requireUserId } from '../lib/types.js';
 
-const VALID_TYPES        = ['side_project', 'open_source', 'production_saas', 'client_work', 'internal_tool', 'learning_project'];
-const VALID_STATUSES     = ['active', 'stable', 'dormant', 'archived'];
-const VALID_VISIBILITIES = ['private', 'unlisted', 'public'];
-const VALID_ROLES        = ['sole_builder', 'lead', 'contributor', 'maintainer'];
-const VALID_CONFIDENCE   = ['high', 'medium', 'low'];
+const VALID_TYPES        = new Set(['side_project', 'open_source', 'production_saas', 'client_work', 'internal_tool', 'learning_project']);
+const VALID_STATUSES     = new Set(['active', 'stable', 'dormant', 'archived']);
+const VALID_VISIBILITIES = new Set(['private', 'unlisted', 'public']);
+const VALID_ROLES        = new Set(['sole_builder', 'lead', 'contributor', 'maintainer']);
+const VALID_CONFIDENCE   = new Set(['high', 'medium', 'low']);
 
 const SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$/;
 
@@ -88,13 +88,24 @@ function isUuid(value: unknown): value is string {
 
 function parsePositiveInt(input: string | undefined, fallback: number, max: number): number {
     if (!input) return fallback;
-    const n = parseInt(input, 10);
+    const n = Number.parseInt(input, 10);
     if (Number.isNaN(n) || n < 0) return fallback;
     return Math.min(n, max);
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** Normalise a nullable text patch field: null → null, string → string, else undefined. */
+function nullableString(value: unknown): string | null | undefined {
+    if (value === null) return null;
+    return typeof value === 'string' ? value : undefined;
+}
+
+/** True when `value` is a string that belongs to the allowed set. */
+function isValidOption(allowed: Set<string>, value: unknown): boolean {
+    return typeof value === 'string' && allowed.has(value);
 }
 
 export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
@@ -164,10 +175,10 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
         if (typeof name !== 'string' || name.length === 0 || name.length > 200) {
             return ctx.json({ error: 'name must be 1-200 chars' }, 400);
         }
-        if (input.type           !== undefined && !VALID_TYPES.includes(String(input.type)))                return ctx.json({ error: 'invalid type' }, 400);
-        if (input.status         !== undefined && !VALID_STATUSES.includes(String(input.status)))           return ctx.json({ error: 'invalid status' }, 400);
-        if (input.visibility     !== undefined && !VALID_VISIBILITIES.includes(String(input.visibility)))   return ctx.json({ error: 'invalid visibility' }, 400);
-        if (input.role_exhibited !== undefined && !VALID_ROLES.includes(String(input.role_exhibited)))      return ctx.json({ error: 'invalid role_exhibited' }, 400);
+        if (input.type           !== undefined && !isValidOption(VALID_TYPES, input.type))                return ctx.json({ error: 'invalid type' }, 400);
+        if (input.status         !== undefined && !isValidOption(VALID_STATUSES, input.status))           return ctx.json({ error: 'invalid status' }, 400);
+        if (input.visibility     !== undefined && !isValidOption(VALID_VISIBILITIES, input.visibility))   return ctx.json({ error: 'invalid visibility' }, 400);
+        if (input.role_exhibited !== undefined && !isValidOption(VALID_ROLES, input.role_exhibited))      return ctx.json({ error: 'invalid role_exhibited' }, 400);
 
         const pool = getPool(config);
         try {
@@ -220,18 +231,18 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
         if (!body || typeof body !== 'object') return ctx.json({ error: 'Invalid JSON' }, 400);
         const input = body as Record<string, unknown>;
 
-        if (input.type           !== undefined && !VALID_TYPES.includes(String(input.type)))              return ctx.json({ error: 'invalid type' }, 400);
-        if (input.status         !== undefined && !VALID_STATUSES.includes(String(input.status)))         return ctx.json({ error: 'invalid status' }, 400);
-        if (input.visibility     !== undefined && !VALID_VISIBILITIES.includes(String(input.visibility))) return ctx.json({ error: 'invalid visibility' }, 400);
-        if (input.role_exhibited !== undefined && !VALID_ROLES.includes(String(input.role_exhibited)))    return ctx.json({ error: 'invalid role_exhibited' }, 400);
+        if (input.type           !== undefined && !isValidOption(VALID_TYPES, input.type))              return ctx.json({ error: 'invalid type' }, 400);
+        if (input.status         !== undefined && !isValidOption(VALID_STATUSES, input.status))         return ctx.json({ error: 'invalid status' }, 400);
+        if (input.visibility     !== undefined && !isValidOption(VALID_VISIBILITIES, input.visibility)) return ctx.json({ error: 'invalid visibility' }, 400);
+        if (input.role_exhibited !== undefined && !isValidOption(VALID_ROLES, input.role_exhibited))    return ctx.json({ error: 'invalid role_exhibited' }, 400);
         if (input.user_overrides !== undefined && !isPlainObject(input.user_overrides))                   return ctx.json({ error: 'user_overrides must be an object' }, 400);
 
         const pool = getPool(config);
         const result = await withUser(pool, uid, async (db) =>
             patchProject(db, id, {
                 name:           typeof input.name           === 'string' ? input.name           : undefined,
-                tagline:        input.tagline === null ? null : (typeof input.tagline === 'string' ? input.tagline : undefined),
-                pitch:          input.pitch   === null ? null : (typeof input.pitch   === 'string' ? input.pitch   : undefined),
+                tagline:        nullableString(input.tagline),
+                pitch:          nullableString(input.pitch),
                 type:           typeof input.type           === 'string' ? input.type           : undefined,
                 status:         typeof input.status         === 'string' ? input.status         : undefined,
                 role_exhibited: typeof input.role_exhibited === 'string' ? input.role_exhibited : undefined,
@@ -356,7 +367,7 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
         const body = await ctx.req.json().catch(() => null);
         if (!body || typeof body !== 'object') return ctx.json({ error: 'Invalid JSON' }, 400);
         const input = body as Record<string, unknown>;
-        if (input.confidence !== undefined && !VALID_CONFIDENCE.includes(String(input.confidence))) {
+        if (input.confidence !== undefined && !isValidOption(VALID_CONFIDENCE, input.confidence)) {
             return ctx.json({ error: 'invalid confidence' }, 400);
         }
 
@@ -364,9 +375,9 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
         const result = await withUser(pool, uid, async (db) =>
             patchDecision(db, id, did, {
                 title:             typeof input.title             === 'string'  ? input.title             : undefined,
-                context:           input.context === null ? null : (typeof input.context === 'string' ? input.context : undefined),
-                decision:          input.decision === null ? null : (typeof input.decision === 'string' ? input.decision : undefined),
-                consequences:      input.consequences === null ? null : (typeof input.consequences === 'string' ? input.consequences : undefined),
+                context:           nullableString(input.context),
+                decision:          nullableString(input.decision),
+                consequences:      nullableString(input.consequences),
                 confidence:        typeof input.confidence        === 'string'  ? input.confidence        : undefined,
                 is_user_confirmed: typeof input.is_user_confirmed === 'boolean' ? input.is_user_confirmed : undefined,
             }),
@@ -429,7 +440,7 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
         const pool = getPool(config);
         const result = await withUser(pool, uid, async (db) =>
             patchArchitecture(db, id, {
-                diagram_format: format as ('mermaid' | 'svg' | undefined),
+                diagram_format: format,
                 diagram_source: typeof input.diagram_source === 'string' ? input.diagram_source : undefined,
                 nodes:          Array.isArray(input.nodes) ? input.nodes : undefined,
                 edges:          Array.isArray(input.edges) ? input.edges : undefined,
@@ -462,9 +473,9 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
 
         const pool = getPool(config);
         const summary = await withUser(pool, uid, async (db) =>
-            mergeProjects(db, targetId as string, sourceIds as string[]),
+            mergeProjects(db, targetId, sourceIds),
         );
-        void Promise.all([targetId as string, ...(sourceIds as string[])].map(invalidateProject));
+        void Promise.all([targetId, ...sourceIds].map(invalidateProject));
         return ctx.json(summary);
     });
 
@@ -496,7 +507,7 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
         try {
             const result = await withUser(pool, uid, async (db) =>
                 splitProject(db, uid, id, {
-                    componentIds: componentIds as string[],
+                    componentIds,
                     name, slug,
                 }),
             );
@@ -643,7 +654,7 @@ async function getGitHubInstallation(
         [userId],
     );
     const row = r.rows[0];
-    if (!row || !row.installation_id) return null;
+    if (!row?.installation_id) return null;
     return { installation_id: row.installation_id };
 }
 

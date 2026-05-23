@@ -93,7 +93,7 @@ admin-api/             # workspace (separate package)
 - **Devtools**: `@tanstack/react-router-devtools`, `@tanstack/react-query-devtools` only mounted in dev.
 - **Type safety**: rely on generated route types; never cast `as any` to silence the router.
 
-When unsure of an API: use the **context7 MCP** (`resolve-library-id` → `query-docs`) for `@tanstack/*` packages instead of guessing.
+When unsure of **any** library or API in TypeScript code, use the **context7 MCP** (`resolve-library-id` → `query-docs`) **before writing it** — always, not just for `@tanstack/*`. This is mandatory for all TypeScript work and applies to every external package (TanStack, Zod, Hono, Stripe, `ioredis`, `jose`, Motion, AWS SDK, etc.). Prefer context7 over guessing or relying on memory; it prevents wrong-API code and the rework it causes.
 
 ## Components — TailwindPlus first, no duplicates
 
@@ -139,6 +139,44 @@ Project rule file: `.claude/rules/motion-react.md` (authoritative; this section 
   - Use independent transforms (`x`, `scaleX`) when composing.
   - Never read `MotionValue.get()` during render — only in effects/`useTransform` callbacks.
 - Radix integration: use `asChild` + `motion.<el>`; hoist `open`/`onOpenChange` state for exit anims; `forceMount` on Radix child of `<AnimatePresence>`.
+
+## TypeScript code quality — SonarQube / SonarLint rules
+
+This repo is analysed by **SonarCloud Automatic Analysis** (runs per-PR; the
+quality gate blocks the PR on new issues and unreviewed Security Hotspots).
+Write new TypeScript to these rules so the gate stays green — they are
+requirements, not style preferences. SonarLint surfaces the same rules live in
+the IDE.
+
+- **No nested ternaries (`S3358`).** Use `if`/`else`, an early return, or a small
+  helper. In JSX, split branches into separate `{cond && <X/>}` expressions or
+  extract a render helper — never `a ? … : b ? … : c` in one container.
+- **No redundant casts / non-null assertions (`S4325`).** Let the compiler narrow
+  via type guards, `typeof`, `instanceof`, and discriminated unions; don't write
+  `x as T` or `x!` when the type is already known. Catch errors as `unknown`:
+  `catch (e) { if (!(e instanceof Error) || e.name !== 'X') throw e }` — never
+  `catch (e: any)`. **Never** `as any` to silence types.
+- **No `String(x)` / template coercion of `unknown` or objects (`S6551`).** Guard
+  first: `if (typeof x === 'string' && allowed.has(x))`. Any object used in a
+  string context must define `toString()`.
+- **Optional chaining over `&&` (`S6582`).** `obj?.prop`, `arr?.[0]`, `fn?.(x)` —
+  not `obj && obj.prop`.
+- **`Number.*` over globals (`S7773`).** `Number.parseInt` / `Number.parseFloat` /
+  `Number.isNaN` / `Number.isFinite` — never the bare globals.
+- **`Set` for membership checks (`S7776`).** Declare constant allow-lists as
+  `new Set([...])` and use `.has()`, not an array + `.includes()`.
+- **Stable React keys (`S6479`).** Use a DB id or a stable content string — never
+  the array index.
+- **No `Math.random()` for ids/tokens (`S2245` — Security Hotspot, fails the
+  gate).** Use `crypto.randomUUID()` / `node:crypto`.
+- **No `console.*` in app code.** Use the Pino logger (`src/lib/observability`);
+  `console` is acceptable only in CLI/ops scripts under `scripts/`.
+
+**Verification discipline (learned the hard way):** fix findings one at a time
+and run `yarn typecheck` (plus the touched tests) after each. If removing an
+assertion breaks the build, the compiler genuinely needs it — that's a SonarLint
+false positive, so keep it. **Never bulk `eslint --fix` type-assertions across
+the repo** — it strips load-bearing casts and cascades into hundreds of errors.
 
 ## Security — non-negotiable
 
