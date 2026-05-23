@@ -32,6 +32,27 @@ COPY . .
 ARG NODE_ENV=production
 ENV NODE_ENV=$NODE_ENV
 
+# Client-side config (VITE_ prefix) is INLINED into the browser bundle by Vite
+# at build time — it is NOT read from the container env at runtime. .env.local is
+# .dockerignore'd, so each var must arrive as a build-arg and be promoted to an
+# ENV so Vite picks it up from process.env during `yarn build`.
+# Values are sourced from SSM in .github/workflows/deploy.yml. VITE_MOCK_AUTH is
+# intentionally omitted so production never takes the dev-mock auth path.
+ARG VITE_GITHUB_APP_SLUG
+ARG VITE_STRIPE_PUBLISHABLE_KEY
+ARG VITE_IMAGES_CDN_URL
+ARG VITE_PROJECTS_V2
+ARG VITE_FARO_ENABLED
+ARG VITE_FARO_URL
+ARG VITE_APP_VERSION
+ENV VITE_GITHUB_APP_SLUG=$VITE_GITHUB_APP_SLUG \
+    VITE_STRIPE_PUBLISHABLE_KEY=$VITE_STRIPE_PUBLISHABLE_KEY \
+    VITE_IMAGES_CDN_URL=$VITE_IMAGES_CDN_URL \
+    VITE_PROJECTS_V2=$VITE_PROJECTS_V2 \
+    VITE_FARO_ENABLED=$VITE_FARO_ENABLED \
+    VITE_FARO_URL=$VITE_FARO_URL \
+    VITE_APP_VERSION=$VITE_APP_VERSION
+
 RUN yarn build
 
 # ── Stage 4: Production runner (Amazon Linux 2023) ────────────────
