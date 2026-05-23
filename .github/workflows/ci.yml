@@ -86,6 +86,21 @@ jobs:
           node-version: ${{ needs.setup.outputs.node-version }}
       - run: yarn test
 
+  admin-api-test:
+    name: Admin API Unit Tests
+    needs: [setup]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node-yarn
+        with:
+          node-version: ${{ needs.setup.outputs.node-version }}
+      # admin-api uses Jest (root `yarn test` is vitest and does not cover it).
+      # Includes the auth_provision_total metric-contract test guarding the
+      # "Auth — Sign-In / Sign-Up Workflow" dashboard.
+      - run: yarn workspace @repo/admin-api test
+
   build:
     name: Build
     needs: [setup]
