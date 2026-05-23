@@ -56,6 +56,14 @@ export const authProvisionTotal = new Counter({
   registers:  [registry],
 });
 
+// Seed every outcome series at 0 on boot so the first real increment shows as a
+// clean 0->1 jump. Without this, a label's series is born at 1 on its first
+// .inc(), leaving no baseline sample for increase()/rate() to subtract from —
+// so the very first new_user (or error) is invisible over its window.
+for (const outcome of ['new_user', 'returning', 'error'] as const) {
+  authProvisionTotal.inc({ outcome }, 0);
+}
+
 // ── Read-cache invalidation (cross-app) ───────────────────────────────────────
 // admin-api is the writer for shared cache entities; it DELs the public-api
 // read-cache key on every project mutation. result: ok | error.
