@@ -45,6 +45,7 @@ import {
     getInstallationInfo,
     listInstallationRepos,
 } from '../lib/github-app.js';
+import type { V1Job } from '@kubernetes/client-node';
 import { getBatchApi } from '../lib/k8s.js';
 import { traceParentEnv, observabilityEnv } from '../lib/k8s-job-builder.js';
 import { getPool } from '../lib/pg.js';
@@ -137,6 +138,7 @@ interface ConnectedRepoRow {
     added_at:           Date;
     sync_status:        string | null;
     last_synced_at:     Date | null;
+    last_sync_triggered_at: Date | null;
     file_count:         number | null;
     chunk_count:        number | null;
     error_message:      string | null;
@@ -159,7 +161,8 @@ interface ConnectedRepoRow {
 async function listConnectedRepos(pool: Pool, userId: string): Promise<ConnectedRepoRow[]> {
     const { rows } = await pool.query<ConnectedRepoRow>(
         `SELECT r.full_name, r.default_branch, r.index_status, r.added_at,
-                s.sync_status, s.last_synced_at, s.file_count, s.chunk_count, s.error_message,
+                s.sync_status, s.last_synced_at, s.last_sync_triggered_at,
+                s.file_count, s.chunk_count, s.error_message,
                 p.quality_score, p.quality_breakdown, p.classification, p.extraction_status,
                 p.extracted->>'one_liner'             AS one_liner,
                 p.extracted->>'domain'                AS domain,
@@ -392,7 +395,16 @@ async function dispatchIngestionJob(
             name:      jobName,
             namespace: config.ingestionNamespace,
             labels:      { app: 'ingestion-worker', userId: safeUser, repoSlug },
-            annotations: { 'argocd.argoproj.io/compare-options': 'IgnoreExtraneous' },
+            // Labels are charset-restricted + lossily sanitized, so they can't
+            // round-trip back to the exact identifiers. Annotations carry the
+            // unsanitized user_id + repo_full_name so reconciliation (read-time
+            // in this service, and the platform-job-watcher sweep) can map a
+            // terminally-failed Job back to its repo_sync_state row.
+            annotations: {
+                'argocd.argoproj.io/compare-options': 'IgnoreExtraneous',
+                'ingestion.tucaken.io/user-id':        userId,
+                'ingestion.tucaken.io/repo-full-name': repoFullName,
+            },
         },
         spec: {
             ttlSecondsAfterFinished: 3600,
@@ -437,6 +449,115 @@ async function dispatchIngestionJob(
 
     await getBatchApi().createNamespacedJob({ namespace: config.ingestionNamespace, body: job });
     return { jobName };
+}
+
+// =============================================================================
+// READ-TIME RECONCILIATION
+// =============================================================================
+//
+// The ingestion pod writes its own terminal status (complete/error) — but only
+// if it lives long enough to run its catch/finally. A hard kill (OOMKilled,
+// activeDeadlineSeconds exceeded, node eviction, image-pull failure) leaves
+// repo_sync_state stuck at 'pending'/'syncing' forever. This makes the DB
+// authoritative by consulting the live K8s Job state whenever the UI reads
+// status, independent of any browser staying open. The platform-job-watcher
+// sweep is the second, fully server-side line of defence.
+
+const ACTIVE_SYNC_STATUSES = new Set(['pending', 'syncing']);
+
+// An ingestion Job's deadline is 900s and its finished-Job TTL is 3600s. If a
+// repo has been triggered longer ago than this and has no live Job, the Job
+// terminally failed and was already garbage-collected → treat as errored.
+const ORPHAN_GRACE_MS = 20 * 60 * 1_000;
+const REPO_FULL_NAME_ANNOTATION = 'ingestion.tucaken.io/repo-full-name';
+
+interface StuckRepo {
+    readonly fullName:           string;
+    readonly lastSyncTriggeredAt: Date | null;
+}
+
+function jobCreatedAtMs(job: V1Job): number {
+    const ts = job.metadata?.creationTimestamp;
+    return ts ? new Date(ts).getTime() : 0;
+}
+
+// User-facing copy — no internal reason codes (BackoffLimitExceeded, etc.) or
+// K8s/job vocabulary leaks to the customer. The reason is kept in logs only.
+const MSG_TIMED_OUT = "Indexing took too long and didn't finish. Please try again.";
+const MSG_FAILED    = "Indexing didn't finish for this repository. Please try again.";
+
+/** User-facing failure message for a Job whose `Failed` condition is True. */
+function failureMessageFor(job: V1Job): string {
+    const cond = job.status?.conditions?.find((c) => c.type === 'Failed' && c.status === 'True');
+    if (!cond) return '';
+    return cond.reason === 'DeadlineExceeded' ? MSG_TIMED_OUT : MSG_FAILED;
+}
+
+/**
+ * For repos still in an active state, consult the live K8s Job and flip any
+ * terminally-failed (or orphaned-past-grace) repo to 'error' in the DB.
+ * Best-effort: a K8s API failure leaves status untouched (the sweep covers it)
+ * and never propagates into the request path. Returns the repos transitioned.
+ */
+async function reconcileStuckRepos(
+    config: AdminApiConfig,
+    pool:   Pool,
+    userId: string,
+    stuck:  readonly StuckRepo[],
+): Promise<Set<string>> {
+    const transitioned = new Set<string>();
+    if (stuck.length === 0) return transitioned;
+
+    let jobs: V1Job[];
+    try {
+        const safeUser = sanitizeLabel(userId);
+        const res = await getBatchApi().listNamespacedJob({
+            namespace:     config.ingestionNamespace,
+            labelSelector: `app=ingestion-worker,userId=${safeUser}`,
+        });
+        jobs = res.items ?? [];
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('[github/reconcile] listNamespacedJob failed — deferring to sweep', msg);
+        return transitioned;
+    }
+
+    // repo_full_name → most recent Job (a repo can be re-dispatched many times).
+    const latestByRepo = new Map<string, V1Job>();
+    for (const job of jobs) {
+        const repo = job.metadata?.annotations?.[REPO_FULL_NAME_ANNOTATION];
+        if (!repo) continue;
+        const prev = latestByRepo.get(repo);
+        if (!prev || jobCreatedAtMs(job) >= jobCreatedAtMs(prev)) latestByRepo.set(repo, job);
+    }
+
+    const now = Date.now();
+    for (const repo of stuck) {
+        const job = latestByRepo.get(repo.fullName);
+        let errorMessage = '';
+
+        if (job) {
+            errorMessage = failureMessageFor(job);
+        } else if (repo.lastSyncTriggeredAt) {
+            // No live Job. Past the grace window means it died and was GC'd.
+            const age = now - repo.lastSyncTriggeredAt.getTime();
+            if (age > ORPHAN_GRACE_MS) {
+                errorMessage = MSG_FAILED;
+            }
+        }
+
+        if (!errorMessage) continue;
+
+        const result = await pool.query(
+            `UPDATE repo_sync_state
+                SET sync_status = 'error', error_message = $3, updated_at = NOW()
+              WHERE user_id = $1::uuid AND repo_full_name = $2
+                AND sync_status IN ('pending', 'syncing')`,
+            [userId, repo.fullName, errorMessage],
+        );
+        if ((result.rowCount ?? 0) > 0) transitioned.add(repo.fullName);
+    }
+    return transitioned;
 }
 
 // =============================================================================
@@ -625,7 +746,18 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         const pool = getPool(config);
         const uid  = requireUserId(ctx);
         if (!uid) return ctx.json({ error: 'Authenticated subject missing' }, 401);
-        const rows = await listConnectedRepos(pool, uid);
+        let rows = await listConnectedRepos(pool, uid);
+
+        // Reconcile any repo still showing as active against the live K8s Job
+        // state, so a crashed pod surfaces as 'error' rather than spinning
+        // forever. Re-read only when something actually changed.
+        const stuck = rows
+            .filter(r => ACTIVE_SYNC_STATUSES.has(r.sync_status ?? r.index_status))
+            .map(r => ({ fullName: r.full_name, lastSyncTriggeredAt: r.last_sync_triggered_at }));
+        if (stuck.length > 0) {
+            const transitioned = await reconcileStuckRepos(config, pool, uid, stuck);
+            if (transitioned.size > 0) rows = await listConnectedRepos(pool, uid);
+        }
 
         const repos = rows.map(r => {
             const [owner, name] = r.full_name.split('/');
@@ -792,15 +924,52 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         const result = await pool.query(
             `UPDATE repo_sync_state
              SET sync_status   = 'error',
-                 error_message = 'Ingestion job timed out — the background job may have crashed. Please re-sync.',
+                 error_message = $3,
                  updated_at    = NOW()
              WHERE user_id = $1::uuid
                AND repo_full_name = ANY($2::text[])
                AND sync_status IN ('pending', 'syncing')`,
-            [uid, names],
+            [uid, names, MSG_TIMED_OUT],
         );
 
         return ctx.json({ updated: result.rowCount ?? 0 });
+    });
+
+    // -------------------------------------------------------------------------
+    // POST /connected-repos/:fullName/retry — re-dispatch a failed repo.
+    // Re-running after a crashed/timed-out ingestion does NOT consume a new
+    // monthly quota credit: the original dispatch already charged one, and the
+    // pod failing is an infra event, not a user action. Resets the repo to
+    // 'pending' and dispatches a fresh (force-reindex) Job.
+    // -------------------------------------------------------------------------
+    router.post('/connected-repos/:fullName/retry', async (ctx) => {
+        const pool = getPool(config);
+        const uid  = requireUserId(ctx);
+        if (!uid) return ctx.json({ error: 'Authenticated subject missing' }, 401);
+
+        const conn = await getConnection(pool, uid);
+        if (!conn?.installation_id) return ctx.json({ error: 'GitHub not connected' }, 400);
+
+        const repoFullName = decodeURIComponent(ctx.req.param('fullName'));
+        if (!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(repoFullName)) {
+            return ctx.json({ error: 'Invalid repo name' }, 400);
+        }
+
+        // The repo must already belong to the caller (it was charged once).
+        const { rows } = await pool.query<{ full_name: string }>(
+            `SELECT full_name FROM repositories
+              WHERE user_id = $1::uuid AND provider = 'github' AND full_name = $2`,
+            [uid, repoFullName],
+        );
+        if (!rows[0]) return ctx.json({ error: 'Repository not connected' }, 404);
+
+        const [appId, key] = requireGitHubConfig(config);
+        await markRepoPending(pool, uid, repoFullName);
+        await markSyncTriggered(pool, uid, repoFullName);
+        const token = await generateInstallationToken(appId, key, conn.installation_id);
+        const { jobName } = await dispatchIngestionJob(config, uid, repoFullName, token, true);
+
+        return ctx.json({ status: 'queued', repoFullName, jobName }, 202);
     });
 
     // -------------------------------------------------------------------------

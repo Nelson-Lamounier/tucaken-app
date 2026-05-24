@@ -54,9 +54,10 @@ jest.unstable_mockModule('../../src/lib/pg.js', () => ({
 // ---------------------------------------------------------------------------
 
 const createNamespacedJobMock = jest.fn<() => Promise<object>>().mockResolvedValue({});
+const listNamespacedJobMock   = jest.fn<() => Promise<{ items: object[] }>>().mockResolvedValue({ items: [] });
 
 jest.unstable_mockModule('../../src/lib/k8s.js', () => ({
-    getBatchApi:    () => ({ createNamespacedJob: createNamespacedJobMock }),
+    getBatchApi:    () => ({ createNamespacedJob: createNamespacedJobMock, listNamespacedJob: listNamespacedJobMock }),
     _resetBatchApi: () => {},
 }));
 
@@ -176,6 +177,7 @@ beforeEach(() => {
         { id: 2, full_name: 'Nelson-Lamounier/kubernetes-bootstrap',  owner: { login: 'Nelson-Lamounier' }, name: 'kubernetes-bootstrap', default_branch: 'develop', private: false, updated_at: '2026-04-29T00:00:00Z' },
     ]);
     createNamespacedJobMock.mockResolvedValue({});
+    listNamespacedJobMock.mockResolvedValue({ items: [] });
 });
 
 // ===========================================================================
@@ -429,6 +431,123 @@ describe('GET /connected-repos', () => {
 });
 
 // ===========================================================================
+// GET /connected-repos — read-time reconciliation of stuck repos
+// ===========================================================================
+
+describe('GET /connected-repos — reconciliation', () => {
+    const REPO = 'Nelson-Lamounier/cdk-monitoring';
+    const ANNOTATION = 'ingestion.tucaken.io/repo-full-name';
+
+    function activeRow(status: 'pending' | 'syncing', triggeredAt: Date | null): Row {
+        return { ...connectedRepoRow, sync_status: status, last_synced_at: null, last_sync_triggered_at: triggeredAt };
+    }
+    function failedJob(reason: string): object {
+        return {
+            metadata: { annotations: { [ANNOTATION]: REPO }, creationTimestamp: new Date().toISOString() },
+            status:   { conditions: [{ type: 'Failed', status: 'True', reason }] },
+        };
+    }
+
+    it('flips a syncing repo to error when its Job terminally failed', async () => {
+        poolQueryMock.mockResolvedValueOnce({ rows: [activeRow('syncing', new Date())] }); // listConnectedRepos #1
+        listNamespacedJobMock.mockResolvedValueOnce({ items: [failedJob('BackoffLimitExceeded')] });
+        poolQueryMock.mockResolvedValueOnce({ rows: [], rowCount: 1 });                     // UPDATE → error
+        poolQueryMock.mockResolvedValueOnce({ rows: [{ ...connectedRepoRow, sync_status: 'error', error_message: "Indexing didn't finish for this repository. Please try again." }] }); // re-read
+
+        const res  = await buildApp().request('/connected-repos');
+        const body = await res.json() as { repos: Array<Record<string, unknown>> };
+
+        expect(res.status).toBe(200);
+        expect(body.repos[0]!['syncStatus']).toBe('error');
+        // User-facing copy only — no internal reason codes leaked.
+        expect(String(body.repos[0]!['errorMessage'])).toMatch(/didn't finish/i);
+        expect(String(body.repos[0]!['errorMessage'])).not.toMatch(/BackoffLimit|DeadlineExceeded|k8s|job/i);
+        // The error message written to the DB is the friendly constant.
+        expect(String(poolQueryMock.mock.calls[1]![1]?.[2])).toMatch(/didn't finish/i);
+        // Selector scopes to this app + the sanitized userId.
+        expect(listNamespacedJobMock).toHaveBeenCalledWith(
+            expect.objectContaining({ namespace: 'ingestion', labelSelector: expect.stringContaining('app=ingestion-worker') }),
+        );
+        // list #1, UPDATE, list #2
+        expect(poolQueryMock).toHaveBeenCalledTimes(3);
+        const update = String(poolQueryMock.mock.calls[1]![0]);
+        expect(update).toMatch(/UPDATE repo_sync_state/);
+        expect(update).toMatch(/sync_status\s*=\s*'error'/);
+    });
+
+    it('surfaces a friendlier message for a deadline-exceeded Job', async () => {
+        poolQueryMock.mockResolvedValueOnce({ rows: [activeRow('syncing', new Date())] });
+        listNamespacedJobMock.mockResolvedValueOnce({ items: [failedJob('DeadlineExceeded')] });
+        poolQueryMock.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+        poolQueryMock.mockResolvedValueOnce({ rows: [{ ...connectedRepoRow, sync_status: 'error' }] });
+
+        await buildApp().request('/connected-repos');
+        const errMsg = String(poolQueryMock.mock.calls[1]![1]?.[2]);
+        expect(errMsg).toMatch(/too long/i);
+        expect(errMsg).not.toMatch(/DeadlineExceeded|k8s|job/i);
+    });
+
+    it('leaves a syncing repo untouched while its Job is still active', async () => {
+        poolQueryMock.mockResolvedValueOnce({ rows: [activeRow('syncing', new Date())] });
+        listNamespacedJobMock.mockResolvedValueOnce({ items: [{
+            metadata: { annotations: { [ANNOTATION]: REPO }, creationTimestamp: new Date().toISOString() },
+            status:   { active: 1 },
+        }] });
+
+        const res  = await buildApp().request('/connected-repos');
+        const body = await res.json() as { repos: Array<Record<string, unknown>> };
+
+        expect(body.repos[0]!['syncStatus']).toBe('syncing');
+        // Only the initial list — no UPDATE, no re-read.
+        expect(poolQueryMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('flips an orphaned repo (no live Job, past grace) to error', async () => {
+        const longAgo = new Date(Date.now() - 30 * 60 * 1_000);
+        poolQueryMock.mockResolvedValueOnce({ rows: [activeRow('pending', longAgo)] });
+        listNamespacedJobMock.mockResolvedValueOnce({ items: [] });
+        poolQueryMock.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+        poolQueryMock.mockResolvedValueOnce({ rows: [{ ...connectedRepoRow, sync_status: 'error' }] });
+
+        const res  = await buildApp().request('/connected-repos');
+        const body = await res.json() as { repos: Array<Record<string, unknown>> };
+
+        expect(body.repos[0]!['syncStatus']).toBe('error');
+        expect(poolQueryMock).toHaveBeenCalledTimes(3);
+    });
+
+    it('leaves a recently-triggered repo with no Job alone (within grace)', async () => {
+        poolQueryMock.mockResolvedValueOnce({ rows: [activeRow('pending', new Date())] });
+        listNamespacedJobMock.mockResolvedValueOnce({ items: [] });
+
+        const res  = await buildApp().request('/connected-repos');
+        const body = await res.json() as { repos: Array<Record<string, unknown>> };
+
+        expect(body.repos[0]!['syncStatus']).toBe('pending');
+        expect(poolQueryMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('is best-effort: leaves status untouched when the K8s API call fails', async () => {
+        poolQueryMock.mockResolvedValueOnce({ rows: [activeRow('syncing', new Date())] });
+        listNamespacedJobMock.mockRejectedValueOnce(new Error('connect ECONNREFUSED'));
+
+        const res  = await buildApp().request('/connected-repos');
+        const body = await res.json() as { repos: Array<Record<string, unknown>> };
+
+        expect(res.status).toBe(200);
+        expect(body.repos[0]!['syncStatus']).toBe('syncing');
+        expect(poolQueryMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not call the K8s API when no repo is active', async () => {
+        poolQueryMock.mockResolvedValueOnce({ rows: [connectedRepoRow] }); // sync_status 'complete'
+        await buildApp().request('/connected-repos');
+        expect(listNamespacedJobMock).not.toHaveBeenCalled();
+        expect(poolQueryMock).toHaveBeenCalledTimes(1);
+    });
+});
+
+// ===========================================================================
 // POST /connected-repos
 // ===========================================================================
 
@@ -498,6 +617,22 @@ describe('POST /connected-repos', () => {
         // not the Cognito sub. All DB FK constraints use users.id.
         expect(envMap['USER_ID']).toBe(TEST_USER_UUID);
         expect(envMap['REPO_FULL_NAME']).toBe('Nelson-Lamounier/cdk-monitoring');
+    });
+
+    it('stamps unsanitized user-id + repo-full-name annotations for reconciliation', async () => {
+        seedQuery([connectedRow]);
+        seedQuery([]);
+        seedQuery([{ count: 1 }]);
+
+        await buildApp().request('/connected-repos', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ repoFullName: 'Nelson-Lamounier/cdk-monitoring', defaultBranch: 'develop' }),
+        });
+
+        const jobArg = (createNamespacedJobMock.mock.calls[0] as unknown as [{ body: { metadata: { annotations: Record<string, string> } } }])[0];
+        expect(jobArg.body.metadata.annotations['ingestion.tucaken.io/user-id']).toBe(TEST_USER_UUID);
+        expect(jobArg.body.metadata.annotations['ingestion.tucaken.io/repo-full-name']).toBe('Nelson-Lamounier/cdk-monitoring');
     });
 
     it('deferSync:true connects as pending without quota or Job dispatch', async () => {
@@ -578,6 +713,57 @@ describe('POST /connected-repos/sync', () => {
         const pendingSelect = (poolQueryMock.mock.calls[1]![0] as string);
         expect(pendingSelect).toMatch(/sync_status\s*=\s*'pending'/);
         expect(pendingSelect).toMatch(/last_sync_triggered_at\s+IS\s+NULL/);
+    });
+});
+
+// ===========================================================================
+// POST /connected-repos/:fullName/retry
+// ===========================================================================
+
+describe('POST /connected-repos/:fullName/retry', () => {
+    it('400 when GitHub is not connected', async () => {
+        seedQuery([]); // getConnection → empty
+        const res = await buildApp().request('/connected-repos/octo%2Fapp/retry', { method: 'POST' });
+        expect(res.status).toBe(400);
+    });
+
+    it('400 on invalid repo name', async () => {
+        seedQuery([connectedRow]); // getConnection
+        const res = await buildApp().request('/connected-repos/not-a-repo/retry', { method: 'POST' });
+        expect(res.status).toBe(400);
+    });
+
+    it('404 when the repo is not connected to this user', async () => {
+        seedQuery([connectedRow]); // getConnection
+        seedQuery([]);             // ownership SELECT → none
+        const res = await buildApp().request('/connected-repos/octo%2Fapp/retry', { method: 'POST' });
+        expect(res.status).toBe(404);
+    });
+
+    it('re-dispatches without touching usage_quotas (no double charge)', async () => {
+        seedQuery([connectedRow]);                       // 1. getConnection
+        seedQuery([{ full_name: 'octo/app' }]);          // 2. ownership SELECT
+        // 3. markRepoPending, 4. markSyncTriggered → default { rows: [] }
+
+        const res  = await buildApp().request('/connected-repos/octo%2Fapp/retry', { method: 'POST' });
+        const body = await res.json() as { status: string; repoFullName: string; jobName: string };
+
+        expect(res.status).toBe(202);
+        expect(body.status).toBe('queued');
+        expect(body.repoFullName).toBe('octo/app');
+        expect(body.jobName).toMatch(/^ingestion-/);
+
+        // A fresh Job is dispatched with the per-user token.
+        expect(mockGenerateInstallationToken).toHaveBeenCalledWith('999999', testConfig.githubPrivateKey, '12345');
+        expect(createNamespacedJobMock).toHaveBeenCalledTimes(1);
+
+        // Crucially: quota is never read or incremented on retry.
+        const sql = poolQueryMock.mock.calls.map(c => String(c[0]));
+        expect(sql.some(s => /usage_quotas/.test(s))).toBe(false);
+        // Force-reindex so the index rebuilds from scratch.
+        const jobArg = (createNamespacedJobMock.mock.calls[0] as unknown as [{ body: { spec: { template: { spec: { containers: Array<{ env: Array<{ name: string; value: string }> }> } } } } }])[0];
+        const envMap = Object.fromEntries(jobArg.body.spec.template.spec.containers[0]!.env.map(e => [e.name, e.value]));
+        expect(envMap['FORCE_REINDEX']).toBe('true');
     });
 });
 
