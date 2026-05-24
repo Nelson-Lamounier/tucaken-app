@@ -136,6 +136,25 @@ export const setRepoFeaturedFn = createServerFn({ method: 'POST' })
     )
   })
 
+const retryRepoSchema = z.object({ repoFullName: z.string().min(1) })
+
+// Re-dispatch a failed repo's ingestion. Unlike triggerGitHubIngestionFn this
+// hits the dedicated retry endpoint, which does NOT consume a new monthly quota
+// credit (the original dispatch already charged one).
+export const retryConnectedRepoFn = createServerFn({ method: 'POST' })
+  .inputValidator(retryRepoSchema)
+  .handler(async ({ data }) => {
+    await requireAuth()
+    return apiFetch<{ status: string; repoFullName: string; jobName: string }>(
+      `/github/connected-repos/${encodeURIComponent(data.repoFullName)}/retry`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ repoFullName: data.repoFullName }),
+        pathTemplate: '/github/connected-repos/:repoFullName/retry',
+      },
+    )
+  })
+
 const markTimedOutSchema = z.object({
   repoFullNames: z.array(z.string().min(1)).min(1),
 })

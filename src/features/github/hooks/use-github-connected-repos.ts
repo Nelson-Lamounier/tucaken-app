@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { adminKeys } from '@/lib/api/query-keys'
 import { getGitHubConnectedReposFn, markReposTimedOutFn } from '@/server/github'
@@ -58,7 +58,9 @@ export function useGitHubConnectedRepos() {
       .then(() =>
         queryClient.invalidateQueries({ queryKey: adminKeys.github.connectedRepos() }),
       )
-      .catch(console.error)
+      // Best-effort client nudge: the admin-api read-time reconcile and the
+      // platform-job-watcher sweep mark stuck repos errored server-side anyway.
+      .catch(() => { /* swallow — server-side reconciliation is authoritative */ })
   }, [timedOut, queryClient])
 
   useEffect(() => {
@@ -71,5 +73,12 @@ export function useGitHubConnectedRepos() {
     }
   }, [query.data])
 
-  return { ...query, timedOut }
+  // Restart the polling window after a manual retry: a repo just flipped back
+  // to 'pending', so clear the timed-out latch and let refetchInterval resume.
+  const resetPolling = useCallback(() => {
+    pollStartRef.current = null
+    setTimedOut(false)
+  }, [])
+
+  return { ...query, timedOut, resetPolling }
 }
