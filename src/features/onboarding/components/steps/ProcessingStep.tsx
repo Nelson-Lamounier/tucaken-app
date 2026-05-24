@@ -8,16 +8,52 @@
 // step by OnboardingShell.
 
 import { useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { motion } from 'motion/react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, RotateCw } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Typewriter } from '@/components/ui/Typewriter'
 import { SyncProgressBar } from '@/features/github/components/SyncProgressBar'
 import { GitHubSyncStatusBadge } from '@/features/github/components/GitHubSyncStatusBadge'
 import { useGitHubConnectedRepos } from '@/features/github/hooks/use-github-connected-repos'
-import { startConnectedReposSyncFn } from '@/server/github'
+import { startConnectedReposSyncFn, retryConnectedRepoFn } from '@/server/github'
+import { adminKeys } from '@/lib/api/query-keys'
+import type { ConnectedRepo } from '@/lib/types/github.types'
 
 const TERMINAL_STATUSES = new Set(['complete', 'error'])
+const ACTIVE_STATUSES = new Set(['pending', 'syncing'])
+
+// Per-repo status control. Early returns (not a nested ternary) keep this
+// SonarQube-clean while rendering one of: progress bar (active), error badge +
+// Retry (failed), or a plain status badge (complete).
+function RepoRowStatus({
+  repo,
+  isRetrying,
+  onRetry,
+}: {
+  readonly repo: ConnectedRepo
+  readonly isRetrying: boolean
+  readonly onRetry: (repoFullName: string) => void
+}) {
+  if (ACTIVE_STATUSES.has(repo.syncStatus)) return <SyncProgressBar />
+  if (repo.syncStatus === 'error') {
+    return (
+      <div className="flex items-center gap-2">
+        <GitHubSyncStatusBadge status="error" />
+        <Button
+          variant="secondary"
+          onClick={() => onRetry(repo.repoFullName)}
+          disabled={isRetrying}
+          className="flex items-center gap-1 px-2 py-0.5 text-xs"
+        >
+          {isRetrying ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCw className="h-3 w-3" />}
+          {isRetrying ? 'Retrying…' : 'Retry'}
+        </Button>
+      </div>
+    )
+  }
+  return <GitHubSyncStatusBadge status={repo.syncStatus} />
+}
 
 // Progress-ring geometry: r=44 in a 96×96 viewBox.
 const RING_RADIUS = 44
@@ -28,9 +64,12 @@ interface ProcessingStepProps {
 }
 
 export function ProcessingStep({ onNext }: ProcessingStepProps) {
-  const { data: connectedRepos } = useGitHubConnectedRepos()
+  const { data: connectedRepos, resetPolling } = useGitHubConnectedRepos()
+  const queryClient = useQueryClient()
   const startedRef = useRef(false)
   const [startError, setStartError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState<ReadonlySet<string>>(new Set())
+  const [retryError, setRetryError] = useState<string | null>(null)
 
   // Trigger the bulk sync once on mount (queued → syncing).
   const triggerSync = () => {
@@ -50,11 +89,38 @@ export function ProcessingStep({ onNext }: ProcessingStepProps) {
   const repos = connectedRepos ?? []
   const total = repos.length
   const terminalCount = repos.filter((r) => TERMINAL_STATUSES.has(r.syncStatus)).length
-  const pct = total === 0 ? 0 : Math.round((terminalCount / total) * 100)
+  const failedRepos = repos.filter((r) => r.syncStatus === 'error')
+  const allTerminal = total > 0 && terminalCount === total
+  const allSucceeded = allTerminal && failedRepos.length === 0
 
+  // Only auto-advance when EVERY repo indexed cleanly. Any failure blocks the
+  // step so the user can retry (or skip) instead of silently moving on.
   useEffect(() => {
-    if (total > 0 && terminalCount === total) onNext()
-  }, [total, terminalCount, onNext])
+    if (allSucceeded) onNext()
+  }, [allSucceeded, onNext])
+
+  const handleRetry = (repoFullName: string) => {
+    setRetryError(null)
+    setRetrying((prev) => new Set(prev).add(repoFullName))
+    retryConnectedRepoFn({ data: { repoFullName } })
+      .then(() => {
+        // Repo is 'pending' again — resume the polling window and refetch.
+        resetPolling()
+        return queryClient.invalidateQueries({ queryKey: adminKeys.github.connectedRepos() })
+      })
+      .catch((err: unknown) => {
+        setRetryError(err instanceof Error ? err.message : 'Failed to retry indexing')
+      })
+      .finally(() => {
+        setRetrying((prev) => {
+          const next = new Set(prev)
+          next.delete(repoFullName)
+          return next
+        })
+      })
+  }
+
+  const pct = total === 0 ? 0 : Math.round((terminalCount / total) * 100)
 
   return (
     <div className="space-y-8">
@@ -125,14 +191,19 @@ export function ProcessingStep({ onNext }: ProcessingStepProps) {
         {repos.map((repo) => (
           <div
             key={repo.repoFullName}
-            className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2"
+            className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2"
           >
-            <span className="truncate text-xs font-medium text-zinc-200">{repo.repoFullName}</span>
-            {repo.syncStatus === 'pending' || repo.syncStatus === 'syncing' ? (
-              <SyncProgressBar />
-            ) : (
-              <GitHubSyncStatusBadge status={repo.syncStatus} />
-            )}
+            <div className="flex min-w-0 flex-col">
+              <span className="truncate text-xs font-medium text-zinc-200">{repo.repoFullName}</span>
+              {repo.syncStatus === 'error' && repo.errorMessage && (
+                <span className="truncate text-[0.7rem] text-red-300/80">{repo.errorMessage}</span>
+              )}
+            </div>
+            <RepoRowStatus
+              repo={repo}
+              isRetrying={retrying.has(repo.repoFullName)}
+              onRetry={handleRetry}
+            />
           </div>
         ))}
         {total === 0 && (
@@ -143,9 +214,29 @@ export function ProcessingStep({ onNext }: ProcessingStepProps) {
         )}
       </div>
 
-      <p className="text-center text-xs text-zinc-600">
-        This can take several minutes (up to ~15 in some cases). You can leave this page — we'll keep indexing.
-      </p>
+      {retryError && (
+        <p className="text-center text-sm text-red-300">{retryError}</p>
+      )}
+
+      {allTerminal && failedRepos.length > 0 && (
+        <div className="mx-auto flex max-w-md flex-col items-center gap-3 rounded-lg border border-red-500/20 bg-red-500/[0.06] px-4 py-4 text-center">
+          <p className="text-sm font-medium text-red-200">
+            {failedRepos.length} of {total} {failedRepos.length === 1 ? 'repository' : 'repositories'} failed to index.
+          </p>
+          <p className="text-xs text-zinc-400">
+            Retry the failed {failedRepos.length === 1 ? 'repository' : 'repositories'} above, or continue and finish them later from Settings.
+          </p>
+          <Button variant="secondary" onClick={onNext}>
+            Continue anyway
+          </Button>
+        </div>
+      )}
+
+      {!allTerminal && (
+        <p className="text-center text-xs text-zinc-600">
+          This can take several minutes (up to ~15 in some cases). You can leave this page — we'll keep indexing.
+        </p>
+      )}
     </div>
   )
 }
