@@ -44,6 +44,7 @@ import {
     generateInstallationToken,
     getInstallationInfo,
     listInstallationRepos,
+    resolveHeadSha,
 } from '../lib/github-app.js';
 import type { V1Job } from '@kubernetes/client-node';
 import { getBatchApi } from '../lib/k8s.js';
@@ -354,6 +355,11 @@ async function autoDispatchRepos(
             // Roll back the quota slot — this repo never got an active job.
             await decrementQuota(pool, userId).catch(() => {});
         }
+        try {
+            await dispatchTechExtractJob(config, userId, repo.full_name, token, repo.default_branch ?? undefined);
+        } catch (err) {
+            console.error('[tech-extractor] dispatch failed (non-fatal)', (err as Error).message);
+        }
     }
 
     return queued;
@@ -449,6 +455,122 @@ async function dispatchIngestionJob(
 
     await getBatchApi().createNamespacedJob({ namespace: config.ingestionNamespace, body: job });
     return { jobName };
+}
+
+/**
+ * Dispatch a tech-extractor K8s Job alongside the ingestion Job (shadow-mode).
+ * This is additive — it MUST NEVER throw in a way that blocks ingestion.
+ * Returns null (no throw) if the image is unconfigured.
+ */
+export async function buildTechExtractJobSpec(
+    config:        AdminApiConfig,
+    image:         string,
+    userId:        string,
+    repoFullName:  string,
+    timestamp:     number,
+    commitSha?:    string,
+): Promise<V1Job> {
+    const { createHash } = await import('node:crypto');
+    const safeUser  = sanitizeLabel(userId);
+    const repoSlug  = sanitizeLabel(repoFullName.replace('/', '-'));
+    const suffix    = createHash('sha1').update(`${userId}:${repoFullName}:${timestamp}`).digest('hex').slice(0, 8);
+    // 'tech-extract-' (13) + suffix (8) + 1 hyphen = 22 fixed chars; 41 left for slug
+    const slugPart  = sanitizeLabel(`${safeUser}-${repoSlug}`).slice(0, 41);
+    const jobName   = `tech-extract-${slugPart}-${suffix}`.slice(0, MAX_NAME_LEN);
+
+    const env: Array<{ name: string; value: string }> = [
+        ...observabilityEnv('tech-extractor', `${userId}:${repoFullName}:${timestamp}`),
+        { name: 'USER_ID',        value: userId },
+        { name: 'REPO_FULL_NAME', value: repoFullName },
+        { name: 'WORK_DIR',       value: '/work' },
+        { name: 'GITHUB_TOKEN',   value: '' }, // overwritten by caller; placeholder keeps shape
+        ...(() => { const tp = traceParentEnv(); return tp ? [tp] : []; })(),
+    ];
+    if (commitSha) {
+        env.push({ name: 'COMMIT_SHA', value: commitSha });
+    }
+
+    return {
+        apiVersion: 'batch/v1',
+        kind:       'Job',
+        metadata: {
+            name:      jobName,
+            namespace: config.techExtractorNamespace,
+            labels: {
+                app:      'tech-extractor',
+                userId:   safeUser,
+                repoSlug,
+            },
+            annotations: {
+                'argocd.argoproj.io/compare-options':      'IgnoreExtraneous',
+                'tech-extractor.tucaken.io/user-id':       userId,
+                'tech-extractor.tucaken.io/repo-full-name': repoFullName,
+            },
+        },
+        spec: {
+            ttlSecondsAfterFinished: 3600,
+            backoffLimit:            2,
+            activeDeadlineSeconds:   1800,
+            template: {
+                metadata: { labels: { app: 'tech-extractor', userId: safeUser, repoSlug } },
+                spec: {
+                    restartPolicy:      'Never',
+                    serviceAccountName: config.techExtractorServiceAccount,
+                    volumes: [{ name: 'work', emptyDir: { sizeLimit: '2Gi' } }],
+                    containers: [{
+                        name:    'worker',
+                        image,
+                        command: ['node', 'dist/run-tech-extract.js'],
+                        env,
+                        envFrom: [
+                            { secretRef: { name: 'platform-rds-credentials' } },
+                            { secretRef: { name: 'tech-extractor-secrets' } },
+                        ],
+                        volumeMounts: [{ name: 'work', mountPath: '/work' }],
+                    }],
+                },
+            },
+        },
+    };
+}
+
+async function dispatchTechExtractJob(
+    config:        AdminApiConfig,
+    userId:        string,
+    repoFullName:  string,
+    githubToken:   string,
+    defaultBranch?: string,
+): Promise<{ jobName: string } | null> {
+    const image = getJobImage('tech-extractor');
+    if (!isImageConfigured(image)) {
+        console.warn('[tech-extractor] image not yet configured — skipping dispatch (non-fatal)');
+        return null;
+    }
+
+    const timestamp = Date.now();
+
+    // Resolve the HEAD commit sha so the Job can short-circuit on repeat runs.
+    // On failure: log and omit COMMIT_SHA (do not throw).
+    let commitSha: string | undefined;
+    try {
+        commitSha = await resolveHeadSha(githubToken, repoFullName, defaultBranch ?? 'HEAD');
+    } catch (err) {
+        console.warn('[tech-extractor] resolveHeadSha failed — omitting COMMIT_SHA', (err as Error).message);
+    }
+
+    const job = await buildTechExtractJobSpec(config, image, userId, repoFullName, timestamp, commitSha);
+
+    // Stamp the real GITHUB_TOKEN into the env (buildTechExtractJobSpec uses a placeholder).
+    const container = job.spec!.template.spec!.containers[0]!;
+    const tokenIdx = container.env!.findIndex(e => e.name === 'GITHUB_TOKEN');
+    if (tokenIdx >= 0) {
+        container.env![tokenIdx]!.value = githubToken;
+    } else {
+        container.env!.push({ name: 'GITHUB_TOKEN', value: githubToken });
+    }
+
+    await getBatchApi().createNamespacedJob({ namespace: config.techExtractorNamespace, body: job });
+    return { jobName: job.metadata!.name! };
 }
 
 // =============================================================================
@@ -853,6 +975,12 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
             const githubToken = await generateInstallationToken(appId, key, conn.installation_id);
             const { jobName } = await dispatchIngestionJob(config, uid, repoFullName, githubToken, forceReindex);
 
+            try {
+                await dispatchTechExtractJob(config, uid, repoFullName, githubToken, defaultBranch);
+            } catch (err) {
+                console.error('[tech-extractor] dispatch failed (non-fatal)', (err as Error).message);
+            }
+
             return ctx.json({ status: 'queued', repoFullName, jobName }, 202);
         } catch (err) {
             await decrementQuota(pool, uid).catch(() => {});
@@ -968,6 +1096,12 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         await markSyncTriggered(pool, uid, repoFullName);
         const token = await generateInstallationToken(appId, key, conn.installation_id);
         const { jobName } = await dispatchIngestionJob(config, uid, repoFullName, token, true);
+
+        try {
+            await dispatchTechExtractJob(config, uid, repoFullName, token);
+        } catch (err) {
+            console.error('[tech-extractor] dispatch failed (non-fatal)', (err as Error).message);
+        }
 
         return ctx.json({ status: 'queued', repoFullName, jobName }, 202);
     });
@@ -1241,6 +1375,12 @@ export function createGitHubWebhookRouter(config: AdminApiConfig): Hono {
                 console.log(`[github/webhook] push re-index queued for ${repoFullName}: job=${jobName}`);
             } catch (err) {
                 console.error(`[github/webhook] push dispatch failed for ${repoFullName}`, (err as Error).message);
+            }
+
+            try {
+                await dispatchTechExtractJob(config, user.userId, repoFullName, token);
+            } catch (err) {
+                console.error('[tech-extractor] dispatch failed (non-fatal)', (err as Error).message);
             }
 
             return ctx.json({ ok: true });

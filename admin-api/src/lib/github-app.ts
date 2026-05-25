@@ -155,6 +155,24 @@ export async function listInstallationRepos(installationToken: string): Promise<
 }
 
 // =============================================================================
+// COMMIT SHA RESOLUTION
+// =============================================================================
+
+/**
+ * Resolve the HEAD commit sha of a ref (e.g. the default branch) via the
+ * installation token. Used to stamp tech-extract Jobs with a real commit sha
+ * (a branch name can't be used — it would defeat the commit-sha short-circuit).
+ */
+export async function resolveHeadSha(token: string, repoFullName: string, ref: string): Promise<string> {
+    const data = await githubRequest<{ sha: string }>(
+        'GET',
+        `/repos/${repoFullName}/commits/${encodeURIComponent(ref)}`,
+        token,
+    );
+    return data.sha;
+}
+
+// =============================================================================
 // INSTALLATION DELETION
 // =============================================================================
 
