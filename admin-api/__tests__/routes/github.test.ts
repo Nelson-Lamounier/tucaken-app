@@ -35,6 +35,7 @@ jest.unstable_mockModule('../../src/lib/github-app.js', () => ({
     getInstallationInfo:       mockGetInstallationInfo,
     listInstallationRepos:     mockListInstallationRepos,
     deleteInstallation:        mockDeleteInstallation,
+    resolveHeadSha:            jest.fn<() => Promise<string>>().mockResolvedValue('deadbeef00000000'),
 }));
 
 // ---------------------------------------------------------------------------
@@ -604,8 +605,8 @@ describe('POST /connected-repos', () => {
         // Installation token generated for this user's installation
         expect(mockGenerateInstallationToken).toHaveBeenCalledWith('999999', testConfig.githubPrivateKey, '12345');
 
-        // K8s Job created
-        expect(createNamespacedJobMock).toHaveBeenCalledTimes(1);
+        // K8s Jobs created: 1 ingestion + 1 tech-extract (shadow-mode, additive)
+        expect(createNamespacedJobMock).toHaveBeenCalledTimes(2);
 
         // Job spec must inject per-user GITHUB_TOKEN (not rely on ingestion-secrets static token)
         const jobArg = (createNamespacedJobMock.mock.calls[0] as unknown as [{ body: { spec: { template: { spec: { containers: Array<{ env: Array<{ name: string; value: string }> }> } } } } }])[0];
@@ -708,7 +709,8 @@ describe('POST /connected-repos/sync', () => {
         expect(body).toEqual({ started: 2 });
 
         expect(mockGenerateInstallationToken).toHaveBeenCalledWith('999999', testConfig.githubPrivateKey, '12345');
-        expect(createNamespacedJobMock).toHaveBeenCalledTimes(2);
+        // 2 ingestion Jobs + 2 tech-extract Jobs (shadow-mode, one per repo)
+        expect(createNamespacedJobMock).toHaveBeenCalledTimes(4);
 
         const pendingSelect = (poolQueryMock.mock.calls[1]![0] as string);
         expect(pendingSelect).toMatch(/sync_status\s*=\s*'pending'/);
@@ -755,7 +757,8 @@ describe('POST /connected-repos/:fullName/retry', () => {
 
         // A fresh Job is dispatched with the per-user token.
         expect(mockGenerateInstallationToken).toHaveBeenCalledWith('999999', testConfig.githubPrivateKey, '12345');
-        expect(createNamespacedJobMock).toHaveBeenCalledTimes(1);
+        // 1 ingestion Job + 1 tech-extract Job (shadow-mode, additive)
+        expect(createNamespacedJobMock).toHaveBeenCalledTimes(2);
 
         // Crucially: quota is never read or incremented on retry.
         const sql = poolQueryMock.mock.calls.map(c => String(c[0]));
