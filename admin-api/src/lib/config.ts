@@ -197,6 +197,25 @@ export interface AdminApiConfig {
    */
   readonly githubWebhookSecret: string | undefined;
 
+  // ── Bedrock model IDs injected into the ingestion Job ─────────────────────
+  // The ingestion pod's profile synthesizers (Mirror/Reveal, Direction,
+  // Reconciliation) read these from the env; if absent they silently DISABLE
+  // (return undefined), leaving user_profile_rollup synthesis columns NULL.
+  // We always inject them so synthesis is never silently skipped. Each falls
+  // back to profileExtractorModelId, which falls back to a single explicit
+  // default — no split-brain where one consumer defaults and another disables.
+
+  /** Model for repo profile extraction + the synthesis fallback. Always set. */
+  readonly profileExtractorModelId: string;
+  /** Model for the Mirror/Reveal "distilled" synthesis. */
+  readonly mirrorRevealModelId: string;
+  /** Model for the "Where you fit" direction synthesis. */
+  readonly directionModelId: string;
+  /** Model for the "Résumé vs reality" reconciliation synthesis. */
+  readonly reconciliationModelId: string;
+  /** Model for the readiness-diagnostic LLM narration. */
+  readonly diagnosticModelId: string;
+
   /** Kubernetes namespace where resume-import-processor Jobs are created. */
   readonly resumeImportNamespace: string;
 
@@ -277,11 +296,25 @@ export function loadConfig(): AdminApiConfig {
   const githubPrivateKey    = process.env['GITHUB_PRIVATE_KEY'];
   const githubWebhookSecret = process.env['GITHUB_WEBHOOK_SECRET'];
 
+  // Bedrock model IDs. Single explicit default (matches the ingestion service's
+  // env.ts fallback) → profileExtractor → per-stage overrides. We deliberately
+  // do NOT fail-fast: an unset model id must never crashloop the API. Always
+  // resolving to a concrete id guarantees the ingestion Job's synthesizers are
+  // enabled rather than silently skipped.
+  const DEFAULT_BEDROCK_MODEL_ID = 'eu.anthropic.claude-haiku-4-5-20251001-v1:0';
+  const profileExtractorModelId =
+    process.env['PROFILE_EXTRACTOR_MODEL_ID'] || DEFAULT_BEDROCK_MODEL_ID;
+
   return {
     assetsBucketName:     assetsBucketName && assetsBucketName.length > 0 ? assetsBucketName : undefined,
     githubAppId:          githubAppId && githubAppId.length > 0 ? githubAppId : undefined,
     githubPrivateKey:     githubPrivateKey && githubPrivateKey.length > 0 ? githubPrivateKey : undefined,
     githubWebhookSecret:  githubWebhookSecret && githubWebhookSecret.length > 0 ? githubWebhookSecret : undefined,
+    profileExtractorModelId,
+    mirrorRevealModelId:   process.env['MIRROR_REVEAL_MODEL_ID']  || profileExtractorModelId,
+    directionModelId:      process.env['DIRECTION_MODEL_ID']      || profileExtractorModelId,
+    reconciliationModelId: process.env['RECONCILIATION_MODEL_ID'] || profileExtractorModelId,
+    diagnosticModelId:     process.env['DIAGNOSTIC_MODEL_ID']     || profileExtractorModelId,
     cognitoUserPoolId: required['COGNITO_USER_POOL_ID']!,
     cognitoClientId: required['COGNITO_CLIENT_ID']!,
     cognitoIssuerUrl: required['COGNITO_ISSUER_URL']!,

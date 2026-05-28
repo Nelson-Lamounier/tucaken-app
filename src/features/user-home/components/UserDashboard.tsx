@@ -101,7 +101,7 @@ export function UserDashboard() {
         {profileSummary && <DiagnosticPanel summary={profileSummary} />}
         {profileSummary && <MirrorPanel summary={profileSummary} />}
         {profileSummary && <DirectionPanel summary={profileSummary} />}
-        {profileSummary && <ReconciliationPanel summary={profileSummary} />}
+        {profileSummary && <ReconciliationPanel summary={profileSummary} hasResume={entries.length > 0} />}
         <RepoProfileCards repos={repos} isLoading={loadingRepos} />
         <CareerDataBreakdown
           entries={entries}

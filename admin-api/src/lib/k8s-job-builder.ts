@@ -14,6 +14,8 @@ import { createHash } from 'node:crypto';
 import type { V1Job } from '@kubernetes/client-node';
 import { context as otelContext, propagation } from '@opentelemetry/api';
 
+import type { AdminApiConfig } from './config.js';
+
 export const MAX_NAME_LEN = 63;
 
 export function sanitizeLabel(value: string): string {
@@ -78,6 +80,24 @@ export function observabilityEnv(serviceName: string, suffixInput: string): { na
         { name: 'PUSHGATEWAY_URL',             value: 'http://pushgateway.monitoring.svc.cluster.local:9091' },
         { name: 'DEPLOY_ENV',                  value: env },
         { name: 'LOG_LEVEL',                   value: 'info' },
+    ];
+}
+
+/**
+ * Bedrock model-id env vars for the ingestion Job. The ingestion pod's profile
+ * synthesizers read these directly from process.env and silently DISABLE if
+ * absent (leaving user_profile_rollup synthesis columns NULL). Injecting all
+ * five from config (each resolved with a fallback chain) guarantees synthesis
+ * is enabled. Shared by both dispatch paths (github.ts, ingestion.ts) so they
+ * cannot drift.
+ */
+export function ingestionModelEnv(config: AdminApiConfig): { name: string; value: string }[] {
+    return [
+        { name: 'PROFILE_EXTRACTOR_MODEL_ID', value: config.profileExtractorModelId },
+        { name: 'MIRROR_REVEAL_MODEL_ID',     value: config.mirrorRevealModelId },
+        { name: 'DIRECTION_MODEL_ID',         value: config.directionModelId },
+        { name: 'RECONCILIATION_MODEL_ID',    value: config.reconciliationModelId },
+        { name: 'DIAGNOSTIC_MODEL_ID',        value: config.diagnosticModelId },
     ];
 }
 

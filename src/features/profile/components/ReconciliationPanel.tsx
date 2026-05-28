@@ -1,9 +1,28 @@
 import { useState } from 'react'
 import type { ProfileSummary } from '@/lib/types/profile.types'
 
-export function ReconciliationPanel({ summary }: { readonly summary: ProfileSummary }) {
+export function ReconciliationPanel({
+  summary,
+  hasResume,
+}: {
+  readonly summary: ProfileSummary
+  /** Whether the user has imported any résumé/career history. When explicitly
+   *  false, reconciliation is not "pending" — it's blocked until import. */
+  readonly hasResume?: boolean
+}) {
   const [open, setOpen] = useState(false)
   const rc = summary.reconciliation
+  // No résumé to reconcile against → distinct "not yet possible" state, not
+  // "still being generated". Only shown when we know there's no career history.
+  if (!rc && hasResume === false) {
+    return (
+      <section className="rounded-xl border border-white/10 bg-white/2 p-5">
+        <p className="text-sm text-zinc-400">
+          Import your résumé to unlock this — we&apos;ll compare it against the evidence in your code.
+        </p>
+      </section>
+    )
+  }
   if (!rc) {
     return (
       <section className="rounded-xl border border-white/10 bg-white/2 p-5">

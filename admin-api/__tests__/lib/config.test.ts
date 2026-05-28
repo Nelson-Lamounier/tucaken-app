@@ -146,6 +146,47 @@ describe('loadConfig()', () => {
     });
   });
 
+  describe('bedrock model ids', () => {
+    const MODEL_ENV = [
+      'PROFILE_EXTRACTOR_MODEL_ID', 'MIRROR_REVEAL_MODEL_ID', 'DIRECTION_MODEL_ID',
+      'RECONCILIATION_MODEL_ID', 'DIAGNOSTIC_MODEL_ID',
+    ];
+    afterEach(() => unsetEnv(MODEL_ENV));
+
+    it('resolves all model ids to the default when none are set', () => {
+      unsetEnv(MODEL_ENV);
+      const cfg = loadConfig();
+      const def = 'eu.anthropic.claude-haiku-4-5-20251001-v1:0';
+      expect(cfg.profileExtractorModelId).toBe(def);
+      expect(cfg.mirrorRevealModelId).toBe(def);
+      expect(cfg.directionModelId).toBe(def);
+      expect(cfg.reconciliationModelId).toBe(def);
+      expect(cfg.diagnosticModelId).toBe(def);
+    });
+
+    it('per-stage ids fall back to PROFILE_EXTRACTOR_MODEL_ID when unset', () => {
+      unsetEnv(MODEL_ENV);
+      process.env['PROFILE_EXTRACTOR_MODEL_ID'] = 'eu.custom-extractor';
+      const cfg = loadConfig();
+      expect(cfg.profileExtractorModelId).toBe('eu.custom-extractor');
+      expect(cfg.mirrorRevealModelId).toBe('eu.custom-extractor');
+      expect(cfg.directionModelId).toBe('eu.custom-extractor');
+      expect(cfg.reconciliationModelId).toBe('eu.custom-extractor');
+      expect(cfg.diagnosticModelId).toBe('eu.custom-extractor');
+    });
+
+    it('per-stage overrides win over the extractor fallback', () => {
+      process.env['PROFILE_EXTRACTOR_MODEL_ID'] = 'eu.extractor';
+      process.env['MIRROR_REVEAL_MODEL_ID']     = 'eu.mirror';
+      process.env['DIRECTION_MODEL_ID']         = 'eu.direction';
+      const cfg = loadConfig();
+      expect(cfg.mirrorRevealModelId).toBe('eu.mirror');
+      expect(cfg.directionModelId).toBe('eu.direction');
+      // unset stage still falls back to the extractor id
+      expect(cfg.reconciliationModelId).toBe('eu.extractor');
+    });
+  });
+
   describe('ingestion config', () => {
     // INGESTION_IMAGE is no longer in AdminApiConfig — see getJobImage().
 
