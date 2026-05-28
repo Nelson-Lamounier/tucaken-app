@@ -173,6 +173,41 @@ export async function resolveHeadSha(token: string, repoFullName: string, ref: s
 }
 
 // =============================================================================
+// INSTALLATION LISTING (App-wide)
+// =============================================================================
+
+export interface AppInstallationSummary {
+    /** GitHub installation id (numeric). Compare as string against RDS. */
+    id:        number;
+    /** ISO timestamp the installation was created — used for a grace window. */
+    createdAt: string;
+}
+
+/**
+ * List every installation of this GitHub App, App-wide, via the App JWT.
+ * Page-based pagination (per_page=100), consistent with listInstallationRepos.
+ * Used by the orphan-reconciliation sweep to compare GitHub's installations
+ * against the installation_ids stored in RDS.
+ */
+export async function listAppInstallations(
+    appId: string,
+    privateKeyPem: string,
+): Promise<AppInstallationSummary[]> {
+    const jwt = await generateAppJwt(appId, privateKeyPem);
+    const out: AppInstallationSummary[] = [];
+    for (let page = 1; ; page++) {
+        const batch = await githubRequest<Array<{ id: number; created_at: string }>>(
+            'GET',
+            `/app/installations?per_page=100&page=${page}`,
+            jwt,
+        );
+        for (const it of batch) out.push({ id: it.id, createdAt: it.created_at });
+        if (batch.length < 100) break;
+    }
+    return out;
+}
+
+// =============================================================================
 // INSTALLATION DELETION
 // =============================================================================
 

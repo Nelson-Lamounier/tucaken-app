@@ -30,6 +30,7 @@ import {
 } from '@aws-sdk/client-cognito-identity-provider';
 import { Pool } from 'pg';
 
+import { revokeGitHubInstallationForUser } from '../lib/github-uninstall.js';
 import {
   findUsersForHardDelete,
   hardDeleteUser,
@@ -37,6 +38,8 @@ import {
 
 const GRACE_DAYS = Number(process.env['GRACE_DAYS'] ?? '30');
 const DRY_RUN    = process.argv.includes('--dry-run');
+const GITHUB_APP_ID      = process.env['GITHUB_APP_ID'];
+const GITHUB_PRIVATE_KEY = process.env['GITHUB_PRIVATE_KEY'];
 
 interface SweepResult {
   total: number;
@@ -94,11 +97,18 @@ async function main(): Promise<SweepResult> {
       continue;
     }
     try {
+      // Uninstall the GitHub App BEFORE the row + oauth_connections cascade
+      // away — once the row is gone the installation_id is lost and the App
+      // would be orphaned on GitHub. Best-effort; the reconcile sweep is the
+      // backstop if this fails.
+      const gh = await revokeGitHubInstallationForUser(
+        pool, GITHUB_APP_ID, GITHUB_PRIVATE_KEY, user.id,
+      );
       await deleteFromCognito(cognito, userPoolId, user.id);
       await hardDeleteUser(pool, user.id);
       result.purged.push(user.id);
       // eslint-disable-next-line no-console
-      console.log('purged', ctx);
+      console.log('purged', { ...ctx, githubUninstall: gh });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       result.skipped.push({ id: user.id, reason: msg });

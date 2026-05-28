@@ -10,6 +10,7 @@ import { Hono } from 'hono';
 
 import { adminDisableUser } from '../lib/cognito-admin.js';
 import type { AdminApiConfig } from '../lib/config.js';
+import { revokeGitHubInstallationForUser } from '../lib/github-uninstall.js';
 import { logger } from '../lib/observability/logger.js';
 import { getPool } from '../lib/pg.js';
 import { getUserPlanStatus, softDeleteUser } from '../lib/repositories/users.js';
@@ -117,11 +118,22 @@ export function createMeRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
     }
 
     const wasNewlyDeleted = await softDeleteUser(getPool(config), userId, reason);
+
+    // Revoke the GitHub App installation now that deletion is committed. The
+    // soft-delete keeps the oauth_connections row (so installation_id is still
+    // available), but the App lives on GitHub — RDS deletion alone would leave
+    // it installed and able to mint tokens. Best-effort + idempotent (404-safe
+    // on retry); a failure here is caught by the reconciliation sweep.
+    const githubUninstall = await revokeGitHubInstallationForUser(
+      getPool(config), config.githubAppId, config.githubPrivateKey, userId,
+    );
+
     logger.warn(
       {
         event:    wasNewlyDeleted ? 'account_soft_deleted' : 'account_already_deleted',
         userId,
         hasReason: Boolean(reason),
+        githubUninstall,
       },
       'account termination completed',
     );
