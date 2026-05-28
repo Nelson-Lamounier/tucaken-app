@@ -10,7 +10,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { motion } from 'motion/react'
-import { Loader2, RotateCw } from 'lucide-react'
+import { CheckCircle2, Loader2, RotateCw } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Typewriter } from '@/components/ui/Typewriter'
 import { SyncProgressBar } from '@/features/github/components/SyncProgressBar'
@@ -21,6 +21,23 @@ import { adminKeys } from '@/lib/api/query-keys'
 import type { ConnectedRepo } from '@/lib/types/github.types'
 
 const TERMINAL_STATUSES = new Set(['complete', 'error'])
+
+// Per-repo progress fraction in [0,1]. Terminal repos count as fully done; a
+// syncing repo contributes its intra-repo embed progress (embedded/total) when
+// the pipeline has reported it, else 0. Early returns (not nested ternaries)
+// keep this SonarQube-clean (S3358).
+function repoProgressFraction(repo: ConnectedRepo): number {
+  if (TERMINAL_STATUSES.has(repo.syncStatus)) return 1
+  if (
+    repo.syncStatus === 'syncing' &&
+    typeof repo.embedTotal === 'number' &&
+    repo.embedTotal > 0 &&
+    typeof repo.embeddedCount === 'number'
+  ) {
+    return Math.min(repo.embeddedCount / repo.embedTotal, 1)
+  }
+  return 0
+}
 const ACTIVE_STATUSES = new Set(['pending', 'syncing'])
 
 // Per-repo status control. Early returns (not a nested ternary) keep this
@@ -59,6 +76,66 @@ function RepoRowStatus({
 const RING_RADIUS = 44
 const RING_CIRC = 2 * Math.PI * RING_RADIUS
 
+// How long the "All done" screen stays up before redirecting to /overview.
+const ALL_DONE_DISPLAY_MS = 2200
+
+// Terminal success screen shown once every repo has indexed, just before the
+// hand-off to the dashboard. Animates a spring-scaled check + fade-up copy;
+// only transform/opacity are animated (composited) and flagged on willChange.
+function AllDoneScreen() {
+  return (
+    <motion.div
+      key="all-done"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      className="flex min-h-100 flex-col items-center justify-center gap-6 text-center"
+    >
+      <motion.div
+        className="relative grid size-24 place-items-center rounded-full"
+        initial={{ scale: 0.6, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: 'spring', bounce: 0.45, visualDuration: 0.6 }}
+        style={{ willChange: 'transform, opacity' }}
+      >
+        <div aria-hidden className="absolute inset-0 rounded-full bg-emerald-400/15 blur-[2px]" />
+        <CheckCircle2 className="relative size-14 text-emerald-300" strokeWidth={1.75} />
+      </motion.div>
+
+      <div className="space-y-2">
+        <motion.h3
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          style={{ willChange: 'transform, opacity' }}
+          className="text-3xl font-bold leading-[1.1] text-zinc-50 md:text-4xl"
+        >
+          All done
+        </motion.h3>
+        <motion.p
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          style={{ willChange: 'transform, opacity' }}
+          className="text-lg font-semibold text-teal-100/90"
+        >
+          Your knowledge base is ready.
+        </motion.p>
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.5, duration: 0.4 }}
+        className="flex items-center gap-2 text-xs text-teal-200/70"
+      >
+        <Loader2 className="size-3.5 animate-spin" />
+        Taking you to your dashboard…
+      </motion.div>
+    </motion.div>
+  )
+}
+
 interface ProcessingStepProps {
   readonly onNext: () => void
 }
@@ -70,6 +147,7 @@ export function ProcessingStep({ onNext }: ProcessingStepProps) {
   const [startError, setStartError] = useState<string | null>(null)
   const [retrying, setRetrying] = useState<ReadonlySet<string>>(new Set())
   const [retryError, setRetryError] = useState<string | null>(null)
+  const [showDone, setShowDone] = useState(false)
 
   // Trigger the bulk sync once on mount (queued → syncing).
   const triggerSync = () => {
@@ -93,11 +171,18 @@ export function ProcessingStep({ onNext }: ProcessingStepProps) {
   const allTerminal = total > 0 && terminalCount === total
   const allSucceeded = allTerminal && failedRepos.length === 0
 
-  // Only auto-advance when EVERY repo indexed cleanly. Any failure blocks the
-  // step so the user can retry (or skip) instead of silently moving on.
+  // When EVERY repo indexed cleanly, show the "All done" screen. Any failure
+  // blocks the step so the user can retry (or skip) instead of moving on.
   useEffect(() => {
-    if (allSucceeded) onNext()
-  }, [allSucceeded, onNext])
+    if (allSucceeded) setShowDone(true)
+  }, [allSucceeded])
+
+  // After the All-done screen has displayed briefly, hand off to /overview.
+  useEffect(() => {
+    if (!showDone) return
+    const timer = setTimeout(onNext, ALL_DONE_DISPLAY_MS)
+    return () => clearTimeout(timer)
+  }, [showDone, onNext])
 
   const handleRetry = (repoFullName: string) => {
     setRetryError(null)
@@ -120,7 +205,14 @@ export function ProcessingStep({ onNext }: ProcessingStepProps) {
       })
   }
 
-  const pct = total === 0 ? 0 : Math.round((terminalCount / total) * 100)
+  // Aggregate ring reflects fractional progress across all repos, so a single
+  // in-flight repo advances the ring as its chunks embed instead of jumping
+  // 0→100 only when the whole repo finishes.
+  const progressSum = repos.reduce((sum, r) => sum + repoProgressFraction(r), 0)
+  const pct = total === 0 ? 0 : Math.round((progressSum / total) * 100)
+
+  // Terminal success: swap the progress UI for the "All done" hand-off screen.
+  if (showDone) return <AllDoneScreen />
 
   return (
     <div className="space-y-8">

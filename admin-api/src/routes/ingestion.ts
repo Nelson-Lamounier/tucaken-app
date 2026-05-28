@@ -20,7 +20,7 @@ import type { AdminApiBindings } from '../lib/types.js';
 import type { AdminApiConfig } from '../lib/config.js';
 import { getJobImage, isImageConfigured } from '../lib/config.js';
 import { getBatchApi } from '../lib/k8s.js';
-import { traceParentEnv, observabilityEnv } from '../lib/k8s-job-builder.js';
+import { traceParentEnv, observabilityEnv, ingestionModelEnv } from '../lib/k8s-job-builder.js';
 
 const REPO_FULL_NAME_RE = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/;
 const MAX_NAME_LEN = 63;
@@ -98,6 +98,10 @@ function buildJobSpec(
                                 name:  'RETRIEVAL_PROBE_MODEL_ID',
                                 value: process.env['RETRIEVAL_PROBE_MODEL_ID'] ?? 'eu.anthropic.claude-haiku-4-5-20251001-v1:0',
                             },
+                            // Profile synthesis model ids — without these the
+                            // Mirror/Direction/Reconciliation synthesizers silently
+                            // disable and rollup synthesis columns stay NULL.
+                            ...ingestionModelEnv(cfg),
                             ...(() => { const tp = traceParentEnv(); return tp ? [tp] : []; })(),
                         ],
                         envFrom: [
@@ -115,8 +119,90 @@ function buildJobSpec(
     };
 }
 
+/**
+ * Lightweight rollup-refresh Job — recomputes a user's profile rollup +
+ * synthesis WITHOUT re-embedding. Backfills users whose synthesis columns are
+ * NULL and powers a "Regenerate profile" action. Reuses the ingestion image
+ * (command → dist/run-rollup.js). Shorter deadline: no GitHub fetch / embedding.
+ */
+function buildRollupJobSpec(
+    cfg: AdminApiConfig,
+    image: string,
+    userId: string,
+    timestamp: number,
+): V1Job {
+    const safeUserId = sanitizeLabel(userId);
+    const suffix     = createHash('sha1').update(`rollup:${userId}:${timestamp}`).digest('hex').slice(0, 8);
+    const jobName    = `rollup-${safeUserId}-${suffix}`.slice(0, MAX_NAME_LEN);
+
+    return {
+        apiVersion: 'batch/v1',
+        kind:       'Job',
+        metadata: {
+            name:      jobName,
+            namespace: cfg.ingestionNamespace,
+            labels:    { app: 'rollup-refresh', userId: safeUserId },
+        },
+        spec: {
+            ttlSecondsAfterFinished: 3600,
+            backoffLimit:            2,
+            activeDeadlineSeconds:   300,
+            template: {
+                metadata: { labels: { app: 'rollup-refresh', userId: safeUserId } },
+                spec: {
+                    restartPolicy:      'Never',
+                    serviceAccountName: cfg.ingestionServiceAccount,
+                    containers: [{
+                        name:    'rollup',
+                        image,
+                        command: ['node', 'dist/run-rollup.js'],
+                        env: [
+                            ...observabilityEnv('rollup-refresh', `${userId}:${timestamp}`),
+                            { name: 'USER_ID', value: userId },
+                            ...ingestionModelEnv(cfg),
+                            ...(() => { const tp = traceParentEnv(); return tp ? [tp] : []; })(),
+                        ],
+                        envFrom: [
+                            { secretRef: { name: 'platform-rds-credentials' } },
+                            { secretRef: { name: 'ingestion-secrets' } },
+                        ],
+                        resources: {
+                            requests: { memory: '256Mi', cpu: '150m' },
+                            limits:   { memory: '512Mi', cpu: '500m' },
+                        },
+                    }],
+                },
+            },
+        },
+    };
+}
+
 export function createIngestionRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
     const router = new Hono<AdminApiBindings>();
+
+    // Dispatch a rollup-refresh Job for the authenticated user (no re-embed).
+    // Self-service "regenerate profile" + the backfill path for users whose
+    // synthesis columns are NULL.
+    router.post('/rollup-refresh', async (ctx) => {
+        const userId = ctx.get('userId');
+        if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
+
+        const ingestionImage = getJobImage('ingestion');
+        if (!isImageConfigured(ingestionImage)) {
+            console.error('[rollup-refresh] image URI unresolved — admin-api-job-images Secret not yet synced', { value: ingestionImage });
+            return ctx.json({ error: 'Ingestion image not yet configured — wait ~60s for ESO/kubelet sync' }, 502);
+        }
+
+        const job = buildRollupJobSpec(config, ingestionImage, userId, Date.now());
+        try {
+            await getBatchApi().createNamespacedJob({ namespace: config.ingestionNamespace, body: job });
+        } catch (err: unknown) {
+            console.error('[rollup-refresh] failed to create K8s Job', err);
+            return ctx.json({ error: 'Failed to schedule rollup-refresh Job' }, 502);
+        }
+
+        return ctx.json({ status: 'queued', jobName: job.metadata!.name!, userId }, 202);
+    });
 
     router.post('/trigger', async (ctx) => {
         // The provisioned platform users.id (set by userProvisionMiddleware),

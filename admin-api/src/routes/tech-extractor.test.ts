@@ -56,6 +56,7 @@ jest.unstable_mockModule('../lib/k8s-job-builder.js', () => ({
         { name: 'OTEL_SERVICE_NAME', value: _svc },
     ],
     traceParentEnv: () => null,
+    ingestionModelEnv: () => [],
     sanitizeLabel: (v: string) =>
         v.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '').slice(0, 63),
 }));

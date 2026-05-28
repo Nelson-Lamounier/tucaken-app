@@ -7,7 +7,7 @@ export const COPY = {
   welcome: {
     eyebrow: 'Welcome to Tucaken',
     title: "Let's set up something you'll actually be proud to send.",
-    sub: "We'll connect your code, your career, and your portfolio so every line of your resume has receipts. Three quick steps — about three minutes.",
+    sub: "We'll connect your code and your career so every line of your resume has receipts. Three quick steps — about three minutes.",
     cta: 'Get started',
   },
   portfolio: {
@@ -18,18 +18,21 @@ export const COPY = {
     skipNote: "It's totally fine to add this later in Settings.",
   },
   resume: {
-    eyebrow: 'Step 3 of 5 · optional',
+    eyebrow: 'Step 1 of 3 · optional',
     title: 'Have an existing resume? Bring it.',
     sub: "We'll pull out your roles, dates, and skills so you don't have to re-type them. PDFs and Word docs both work.",
     skipNote: "No resume yet? No problem — we'll generate one from your code.",
   },
   connect: {
-    eyebrow: 'Step 4 of 5',
+    eyebrow: 'Step 2 of 3',
     title: 'Connect your GitHub.',
     sub: "We index your repos so resumes cite real commits and pull requests. Read-only — you can revoke access anytime.",
   },
   repos: {
-    eyebrow: 'Step 5 of 5',
+    // Connect + Repositories share one onboarding step, but read as two phases
+    // to the user: GitHub auth ("Step 2 of 3") then repo selection here, which
+    // advances the counter to "Step 3 of 3".
+    eyebrow: 'Step 3 of 3',
     title: 'Connect your repositories.',
     sub: 'Select which GitHub repos to index. Tucaken kicks off ingestion and enriches each previous role against your actual commit history.',
   },

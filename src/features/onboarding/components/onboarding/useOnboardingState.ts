@@ -8,18 +8,14 @@ import { useCallback, useState } from 'react'
 import type { OnboardingData, ResumeSummary, StepId } from './types'
 import { STEPS } from './types'
 
+// NOTE: `portfolio` is temporarily unwired (see types.ts). setPortfolioUrl
+// below is retained for when the step is re-added. `connect` now also covers
+// repo selection (the old `repos` step was merged into it).
 const STEP_INDEX: Record<StepId, number> = {
-  welcome:        0,
-  portfolio:      1,
-  resume:         2,
-  connect:        3,
-  repos:          4,
-  processing:     5,
-  mirror:         6,
-  direction:      7,
-  reconciliation: 8,
-  distill:        9,
-  review:         10,
+  welcome:    0,
+  resume:     1,
+  connect:    2,
+  processing: 3,
 }
 
 const ID_BY_INDEX: StepId[] = STEPS.map((s) => s.id)
