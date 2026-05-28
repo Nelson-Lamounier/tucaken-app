@@ -17,8 +17,10 @@ import { adminKeys } from '@/lib/api/query-keys'
 import { useToastStore } from '@/lib/stores/toast-store'
 
 // connect step index in the onboarding STEPS array
-// (welcome/portfolio/resume/connect/…) — see onboarding.tsx.
-const CONNECT_STEP_INDEX = 3
+// (welcome/resume/connect/processing) — see onboarding.tsx. With an
+// installation present, the connect step renders the repo picker (connect +
+// repos are merged). MUST match onboarding.tsx's CONNECT_STEP_INDEX.
+const CONNECT_STEP_INDEX = 2
 
 const searchSchema = z.object({
   installation_id: z.coerce.string().optional(),
