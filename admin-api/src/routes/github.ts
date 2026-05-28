@@ -144,6 +144,9 @@ interface ConnectedRepoRow {
     chunk_count:        number | null;
     embedded_count:     number | null;
     embed_total:        number | null;
+    phase:              string | null;
+    phase_done:         number | null;
+    phase_total:        number | null;
     error_message:      string | null;
     // profile fields — all nullable (LEFT JOIN; no profile yet = nulls)
     quality_score:      number | null;
@@ -165,7 +168,8 @@ async function listConnectedRepos(pool: Pool, userId: string): Promise<Connected
     const { rows } = await pool.query<ConnectedRepoRow>(
         `SELECT r.full_name, r.default_branch, r.index_status, r.added_at,
                 s.sync_status, s.last_synced_at, s.last_sync_triggered_at,
-                s.file_count, s.chunk_count, s.embedded_count, s.embed_total, s.error_message,
+                s.file_count, s.chunk_count, s.embedded_count, s.embed_total,
+                s.phase, s.phase_done, s.phase_total, s.error_message,
                 p.quality_score, p.quality_breakdown, p.classification, p.extraction_status,
                 p.extracted->>'one_liner'             AS one_liner,
                 p.extracted->>'domain'                AS domain,
@@ -900,6 +904,9 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
                 chunkCount:        r.chunk_count ?? 0,
                 embeddedCount:     r.embedded_count ?? null,
                 embedTotal:        r.embed_total ?? null,
+                phase:             r.phase ?? null,
+                phaseDone:         r.phase_done ?? null,
+                phaseTotal:        r.phase_total ?? null,
                 errorMessage:      r.error_message,
                 addedAt:           r.added_at.toISOString(),
                 qualityScore:      r.quality_score      ?? null,
