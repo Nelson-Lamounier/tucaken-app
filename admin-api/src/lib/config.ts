@@ -302,6 +302,13 @@ export function loadConfig(): AdminApiConfig {
   // resolving to a concrete id guarantees the ingestion Job's synthesizers are
   // enabled rather than silently skipped.
   const DEFAULT_BEDROCK_MODEL_ID = 'eu.anthropic.claude-haiku-4-5-20251001-v1:0';
+  // Profile SYNTHESIS (Mirror/Direction/Reconciliation) emits strict
+  // tool-schema JSON; haiku frequently produces structurally-invalid output
+  // (wrong types, over-long arrays, missing fields) → silent NULL synthesis.
+  // Default synthesis to sonnet, which follows the schema reliably. Synthesis
+  // is only a few calls per ingest, so the cost delta is negligible vs the
+  // per-chunk haiku enrichment. Overridable per stage via *_MODEL_ID.
+  const DEFAULT_SYNTHESIS_MODEL_ID = 'eu.anthropic.claude-sonnet-4-6';
   const profileExtractorModelId =
     process.env['PROFILE_EXTRACTOR_MODEL_ID'] || DEFAULT_BEDROCK_MODEL_ID;
 
@@ -311,9 +318,9 @@ export function loadConfig(): AdminApiConfig {
     githubPrivateKey:     githubPrivateKey && githubPrivateKey.length > 0 ? githubPrivateKey : undefined,
     githubWebhookSecret:  githubWebhookSecret && githubWebhookSecret.length > 0 ? githubWebhookSecret : undefined,
     profileExtractorModelId,
-    mirrorRevealModelId:   process.env['MIRROR_REVEAL_MODEL_ID']  || profileExtractorModelId,
-    directionModelId:      process.env['DIRECTION_MODEL_ID']      || profileExtractorModelId,
-    reconciliationModelId: process.env['RECONCILIATION_MODEL_ID'] || profileExtractorModelId,
+    mirrorRevealModelId:   process.env['MIRROR_REVEAL_MODEL_ID']  || DEFAULT_SYNTHESIS_MODEL_ID,
+    directionModelId:      process.env['DIRECTION_MODEL_ID']      || DEFAULT_SYNTHESIS_MODEL_ID,
+    reconciliationModelId: process.env['RECONCILIATION_MODEL_ID'] || DEFAULT_SYNTHESIS_MODEL_ID,
     diagnosticModelId:     process.env['DIAGNOSTIC_MODEL_ID']     || profileExtractorModelId,
     cognitoUserPoolId: required['COGNITO_USER_POOL_ID']!,
     cognitoClientId: required['COGNITO_CLIENT_ID']!,
