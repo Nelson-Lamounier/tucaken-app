@@ -4,6 +4,7 @@ import { motion } from 'motion/react'
 import { AlertTriangle } from 'lucide-react'
 import { z } from 'zod'
 import { OnboardingShell } from '@/features/onboarding/components/onboarding/OnboardingShell'
+import { CONNECT_STEP_INDEX } from '@/features/onboarding/components/onboarding/types'
 import { useGitHubInstallation } from '@/features/github/hooks/use-github-installation'
 import { handleGitHubInstallFn } from '@/server/github'
 import { adminKeys } from '@/lib/api/query-keys'
@@ -30,13 +31,6 @@ export const Route = createFileRoute('/onboarding')({
   },
   component: OnboardingPage,
 })
-
-// connect step is index 2 in the STEPS array (welcome/resume/connect/processing).
-// After the GitHub App install the user returns here; with an installation
-// present, the connect step shows the repo picker (connect + repos are merged).
-// NOTE: portfolio is temporarily unwired (see onboarding/types.ts); if it's
-// re-added before connect, bump this index accordingly.
-const CONNECT_STEP_INDEX = 2
 
 function OnboardingPage() {
   const navigate                         = useNavigate()
