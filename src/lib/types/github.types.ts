@@ -18,6 +18,15 @@ export interface GitHubAccessibleRepo {
 
 export type RepoSyncStatus = 'pending' | 'syncing' | 'complete' | 'error'
 
+/** Coarse ingestion phase surfaced for the onboarding progress display.
+ *  Mirrors the producer type in ai-applications (shared/rds/types.ts). */
+export type IngestionPhase =
+  | 'analyzing'
+  | 'fetching'
+  | 'enriching'
+  | 'embedding'
+  | 'finalizing'
+
 export interface ScoreBreakdown {
   readonly has_readme:    number
   readonly has_manifest:  number
@@ -47,6 +56,12 @@ export interface ConnectedRepo {
   readonly embeddedCount?:   number | null
   /** Total chunks to embed in the current run. */
   readonly embedTotal?:      number | null
+  /** Current ingestion phase (drives the labelled progress display). */
+  readonly phase?:           IngestionPhase | null
+  /** Items completed in the current phase (null when indeterminate). */
+  readonly phaseDone?:       number | null
+  /** Total items in the current phase (null when indeterminate). */
+  readonly phaseTotal?:      number | null
   readonly errorMessage?:    string | null
   readonly pipelineRunId?:   string
   readonly jobName?:         string

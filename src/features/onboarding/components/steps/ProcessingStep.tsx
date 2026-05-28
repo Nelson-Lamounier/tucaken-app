@@ -18,25 +18,56 @@ import { GitHubSyncStatusBadge } from '@/features/github/components/GitHubSyncSt
 import { useGitHubConnectedRepos } from '@/features/github/hooks/use-github-connected-repos'
 import { startConnectedReposSyncFn, retryConnectedRepoFn } from '@/server/github'
 import { adminKeys } from '@/lib/api/query-keys'
-import type { ConnectedRepo } from '@/lib/types/github.types'
+import type { ConnectedRepo, IngestionPhase } from '@/lib/types/github.types'
 
 const TERMINAL_STATUSES = new Set(['complete', 'error'])
 
+// Per-phase progress model: each phase occupies a [base, base+span) slice of
+// the 0..1 bar, so the ring advances continuously across analyze → fetch →
+// enrich → embed → finalize instead of sitting at 0% until embedding. Phases
+// with a done/total fill their slice proportionally; indeterminate phases
+// (no counts) sit at the slice midpoint so the user still sees movement.
+const PHASE_RANGE: Record<IngestionPhase, { base: number; span: number }> = {
+  analyzing:  { base: 0.00, span: 0.10 },
+  fetching:   { base: 0.10, span: 0.15 },
+  enriching:  { base: 0.25, span: 0.40 },
+  embedding:  { base: 0.65, span: 0.30 },
+  finalizing: { base: 0.95, span: 0.05 },
+}
+
+const PHASE_LABEL: Record<IngestionPhase, string> = {
+  analyzing:  'Analyzing your repository',
+  fetching:   'Fetching files',
+  enriching:  'Enriching code with skills',
+  embedding:  'Building the knowledge base',
+  finalizing: 'Finishing up',
+}
+
 // Per-repo progress fraction in [0,1]. Terminal repos count as fully done; a
-// syncing repo contributes its intra-repo embed progress (embedded/total) when
-// the pipeline has reported it, else 0. Early returns (not nested ternaries)
-// keep this SonarQube-clean (S3358).
+// syncing repo maps its current phase (+ in-phase done/total) onto the bar.
+// Early returns (not nested ternaries) keep this SonarQube-clean (S3358).
 function repoProgressFraction(repo: ConnectedRepo): number {
   if (TERMINAL_STATUSES.has(repo.syncStatus)) return 1
-  if (
-    repo.syncStatus === 'syncing' &&
-    typeof repo.embedTotal === 'number' &&
-    repo.embedTotal > 0 &&
-    typeof repo.embeddedCount === 'number'
-  ) {
-    return Math.min(repo.embeddedCount / repo.embedTotal, 1)
+  if (repo.syncStatus !== 'syncing' || !repo.phase) return 0
+  const range = PHASE_RANGE[repo.phase]
+  if (!range) return 0
+  if (typeof repo.phaseTotal === 'number' && repo.phaseTotal > 0 && typeof repo.phaseDone === 'number') {
+    return range.base + Math.min(repo.phaseDone / repo.phaseTotal, 1) * range.span
   }
-  return 0
+  // Indeterminate phase — show that it has started (slice midpoint).
+  return range.base + range.span / 2
+}
+
+// Human label for the active repo's current phase, with an in-phase count when
+// available — drives the reassuring "what's happening" subtext.
+function activePhaseLabel(repos: readonly ConnectedRepo[]): string | null {
+  const active = repos.find((r) => r.syncStatus === 'syncing' && r.phase)
+  if (!active?.phase) return null
+  const label = PHASE_LABEL[active.phase]
+  if (typeof active.phaseTotal === 'number' && active.phaseTotal > 0 && typeof active.phaseDone === 'number') {
+    return `${label} — ${Math.min(active.phaseDone, active.phaseTotal)}/${active.phaseTotal}`
+  }
+  return `${label}…`
 }
 const ACTIVE_STATUSES = new Set(['pending', 'syncing'])
 
@@ -211,6 +242,16 @@ export function ProcessingStep({ onNext }: ProcessingStepProps) {
   const progressSum = repos.reduce((sum, r) => sum + repoProgressFraction(r), 0)
   const pct = total === 0 ? 0 : Math.round((progressSum / total) * 100)
 
+  // Subtext: prefer the active phase label ("Enriching code — 1400/2000") so
+  // the long pre-embed phases read as work-in-progress, not a stuck 0%. Fall
+  // back to the indexed count once nothing is actively phased. Computed with
+  // if/else (not nested ternaries) per SonarQube S3358.
+  const phaseLabel = activePhaseLabel(repos)
+  let progressSubtext: string
+  if (total === 0) progressSubtext = 'Starting…'
+  else if (phaseLabel) progressSubtext = phaseLabel
+  else progressSubtext = `${terminalCount} of ${total} ${total === 1 ? 'repository' : 'repositories'} indexed`
+
   // Terminal success: swap the progress UI for the "All done" hand-off screen.
   if (showDone) return <AllDoneScreen />
 
@@ -225,9 +266,7 @@ export function ProcessingStep({ onNext }: ProcessingStepProps) {
       />
 
       <p className="text-lg font-semibold leading-snug text-teal-100/90 md:text-xl">
-        {total === 0
-          ? 'Starting…'
-          : `${terminalCount} of ${total} ${total === 1 ? 'repository' : 'repositories'} indexed`}
+        {progressSubtext}
       </p>
 
       <div className="mx-auto flex w-full max-w-[16rem] flex-col items-center gap-6 px-6 py-10">
