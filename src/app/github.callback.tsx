@@ -13,14 +13,9 @@ import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { z } from 'zod'
 import { handleGitHubInstallFn, getGitHubInstallationFn } from '@/server/github'
+import { CONNECT_STEP_INDEX } from '@/features/onboarding/components/onboarding/types'
 import { adminKeys } from '@/lib/api/query-keys'
 import { useToastStore } from '@/lib/stores/toast-store'
-
-// connect step index in the onboarding STEPS array
-// (welcome/resume/connect/processing) — see onboarding.tsx. With an
-// installation present, the connect step renders the repo picker (connect +
-// repos are merged). MUST match onboarding.tsx's CONNECT_STEP_INDEX.
-const CONNECT_STEP_INDEX = 2
 
 const searchSchema = z.object({
   installation_id: z.coerce.string().optional(),

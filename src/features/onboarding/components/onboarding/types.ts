@@ -28,6 +28,11 @@ export const STEPS: Array<{ id: StepId; name: string; required: boolean }> = [
   { id: 'processing',     name: 'Processing',    required: true  },
 ]
 
+// Index of the merged GitHub connect+repos step. Derived from STEPS so the
+// post-install redirect target (used by both onboarding.tsx and the
+// github.callback.tsx return path) can never drift from the step order.
+export const CONNECT_STEP_INDEX = STEPS.findIndex((s) => s.id === 'connect')
+
 export interface ResumeSummary {
   roles: number
   education: number
