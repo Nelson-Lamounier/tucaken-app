@@ -12,7 +12,7 @@ import { getMeFn } from '@/server/me'
 const searchSchema = z.object({
   // Step index (0-based) to restore. The /github/callback route sends the
   // user back here at the connect step after a successful App install.
-  step:            z.coerce.number().min(0).max(10).optional(),
+  step:            z.coerce.number().min(0).max(3).optional(),
 })
 
 export const Route = createFileRoute('/onboarding')({
@@ -31,8 +31,12 @@ export const Route = createFileRoute('/onboarding')({
   component: OnboardingPage,
 })
 
-// connect step is index 3 in the STEPS array (welcome/portfolio/resume/connect/repos/processing/mirror/direction/reconciliation/distill/review)
-const CONNECT_STEP_INDEX = 3
+// connect step is index 2 in the STEPS array (welcome/resume/connect/processing).
+// After the GitHub App install the user returns here; with an installation
+// present, the connect step shows the repo picker (connect + repos are merged).
+// NOTE: portfolio is temporarily unwired (see onboarding/types.ts); if it's
+// re-added before connect, bump this index accordingly.
+const CONNECT_STEP_INDEX = 2
 
 function OnboardingPage() {
   const navigate                         = useNavigate()

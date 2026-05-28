@@ -6,6 +6,10 @@ import { describe, it, expect } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useOnboardingState } from '@/features/onboarding/components/onboarding/useOnboardingState'
 
+// Onboarding machine: welcome(0) → resume(1) → connect(2) → processing(3).
+// `portfolio` is temporarily unwired (see types.ts). `connect` now also covers
+// repo selection (the old `repos` step was merged into it). Completion hands
+// off to /overview from OnboardingShell, so there are no post-processing steps.
 describe('useOnboardingState', () => {
   it('starts at welcome by default', () => {
     const { result } = renderHook(() => useOnboardingState())
@@ -14,31 +18,33 @@ describe('useOnboardingState', () => {
   })
 
   it('respects initialStepIndex', () => {
-    const { result } = renderHook(() => useOnboardingState(3))
+    const { result } = renderHook(() => useOnboardingState(2))
     expect(result.current.stepId).toBe('connect')
   })
 
   it('clamps initialStepIndex to valid range', () => {
     const { result } = renderHook(() => useOnboardingState(99))
-    expect(result.current.stepIndex).toBe(10) // review is last
+    expect(result.current.stepIndex).toBe(3) // processing is last
+    expect(result.current.stepId).toBe('processing')
   })
 
   it('advances through steps with next()', () => {
     const { result } = renderHook(() => useOnboardingState())
     act(() => result.current.next())
-    expect(result.current.stepId).toBe('portfolio')
+    expect(result.current.stepId).toBe('resume')
   })
 
   it('does not advance past the last step', () => {
-    const { result } = renderHook(() => useOnboardingState(10))
+    const { result } = renderHook(() => useOnboardingState(3))
     act(() => result.current.next())
-    expect(result.current.stepIndex).toBe(10)
+    expect(result.current.stepIndex).toBe(3)
+    expect(result.current.stepId).toBe('processing')
   })
 
   it('goes back with back()', () => {
     const { result } = renderHook(() => useOnboardingState(2))
     act(() => result.current.back())
-    expect(result.current.stepId).toBe('portfolio')
+    expect(result.current.stepId).toBe('resume')
   })
 
   it('does not go back past step 0', () => {
@@ -49,9 +55,9 @@ describe('useOnboardingState', () => {
 
   it('jumpTo navigates to named step', () => {
     const { result } = renderHook(() => useOnboardingState())
-    act(() => result.current.jumpTo('repos'))
-    expect(result.current.stepId).toBe('repos')
-    expect(result.current.stepIndex).toBe(4)
+    act(() => result.current.jumpTo('connect'))
+    expect(result.current.stepId).toBe('connect')
+    expect(result.current.stepIndex).toBe(2)
   })
 
   it('setReposConnected updates data', () => {
@@ -61,98 +67,26 @@ describe('useOnboardingState', () => {
     expect(result.current.data.reposConnected).toBe(true)
   })
 
-  it('jumpTo navigates to the review step', () => {
-    const { result } = renderHook(() => useOnboardingState())
-    act(() => result.current.jumpTo('review'))
-    expect(result.current.stepId).toBe('review')
-    expect(result.current.stepIndex).toBe(10)
-  })
-
-  it('reaches mirror from processing via next()', () => {
-    const { result } = renderHook(() => useOnboardingState(5))
+  it('reaches processing as the terminal step via next()', () => {
+    const { result } = renderHook(() => useOnboardingState(2))
     act(() => result.current.next())
-    expect(result.current.stepId).toBe('mirror')
-    expect(result.current.stepIndex).toBe(6)
-  })
-
-  it('reaches direction from mirror via next()', () => {
-    const { result } = renderHook(() => useOnboardingState(6))
-    act(() => result.current.next())
-    expect(result.current.stepId).toBe('direction')
-    expect(result.current.stepIndex).toBe(7)
-  })
-
-  it('reaches reconciliation from direction via next()', () => {
-    const { result } = renderHook(() => useOnboardingState(7))
-    act(() => result.current.next())
-    expect(result.current.stepId).toBe('reconciliation')
-    expect(result.current.stepIndex).toBe(8)
-  })
-
-  it('reaches distill from reconciliation via next()', () => {
-    const { result } = renderHook(() => useOnboardingState(8))
-    act(() => result.current.next())
-    expect(result.current.stepId).toBe('distill')
-    expect(result.current.stepIndex).toBe(9)
-  })
-
-  it('reaches review as the terminal step via next()', () => {
-    const { result } = renderHook(() => useOnboardingState(9))
-    act(() => result.current.next())
-    expect(result.current.stepId).toBe('review')
-    expect(result.current.stepIndex).toBe(10)
-  })
-
-  it('orders processing → mirror → direction → reconciliation → distill → review', () => {
-    const { result } = renderHook(() => useOnboardingState(5))
     expect(result.current.stepId).toBe('processing')
-    act(() => result.current.next())
-    expect(result.current.stepId).toBe('mirror')
-    act(() => result.current.next())
-    expect(result.current.stepId).toBe('direction')
-    expect(result.current.stepIndex).toBe(7)
-    act(() => result.current.next())
-    expect(result.current.stepId).toBe('reconciliation')
-    expect(result.current.stepIndex).toBe(8)
-    act(() => result.current.next())
-    expect(result.current.stepId).toBe('distill')
-    act(() => result.current.next())
-    expect(result.current.stepId).toBe('review')
+    expect(result.current.stepIndex).toBe(3)
   })
 
-  it('back() from distill returns to reconciliation', () => {
-    const { result } = renderHook(() => useOnboardingState(9))
+  it('orders connect → processing', () => {
+    const { result } = renderHook(() => useOnboardingState(2))
+    expect(result.current.stepId).toBe('connect')
+    act(() => result.current.next())
+    expect(result.current.stepId).toBe('processing')
+    expect(result.current.stepIndex).toBe(3)
+  })
+
+  it('back() from processing returns to connect', () => {
+    const { result } = renderHook(() => useOnboardingState(3))
     act(() => result.current.back())
-    expect(result.current.stepId).toBe('reconciliation')
-    expect(result.current.stepIndex).toBe(8)
-  })
-
-  it('back() from reconciliation returns to direction', () => {
-    const { result } = renderHook(() => useOnboardingState(8))
-    act(() => result.current.back())
-    expect(result.current.stepId).toBe('direction')
-    expect(result.current.stepIndex).toBe(7)
-  })
-
-  it('jumpTo navigates to mirror step', () => {
-    const { result } = renderHook(() => useOnboardingState())
-    act(() => result.current.jumpTo('mirror'))
-    expect(result.current.stepId).toBe('mirror')
-    expect(result.current.stepIndex).toBe(6)
-  })
-
-  it('jumpTo navigates to direction step', () => {
-    const { result } = renderHook(() => useOnboardingState())
-    act(() => result.current.jumpTo('direction'))
-    expect(result.current.stepId).toBe('direction')
-    expect(result.current.stepIndex).toBe(7)
-  })
-
-  it('jumpTo navigates to reconciliation step', () => {
-    const { result } = renderHook(() => useOnboardingState())
-    act(() => result.current.jumpTo('reconciliation'))
-    expect(result.current.stepId).toBe('reconciliation')
-    expect(result.current.stepIndex).toBe(8)
+    expect(result.current.stepId).toBe('connect')
+    expect(result.current.stepIndex).toBe(2)
   })
 
   it('setResumeImportId updates data', () => {

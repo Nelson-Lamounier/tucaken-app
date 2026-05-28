@@ -5,15 +5,16 @@
 // including) the active one. scaleX (origin-left) → GPU-composited.
 
 import { motion } from 'motion/react'
-import type { StepId } from './types'
 
 interface Props {
-  /** Ordered step ids (welcome → repos, the public-facing 5 steps). */
-  steps: Array<{ id: StepId; name: string }>
+  /**
+   * Ordered visible steps. Ids are display-only (the continuum renders no
+   * labels), so they need not be machine StepIds — the GitHub/Repositories
+   * phases of the merged `connect` step appear here as separate segments.
+   */
+  steps: Array<{ id: string; name: string }>
   /** Index of the currently-active step within `steps`. */
   current: number
-  /** Optional: kept for API compatibility (no clickable labels now). */
-  onJump?: (id: StepId) => void
 }
 
 // Duration-based spring (per Motion transitions docs): easy to coordinate,

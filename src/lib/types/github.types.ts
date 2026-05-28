@@ -43,6 +43,10 @@ export interface ConnectedRepo {
   readonly defaultBranch:    string
   readonly syncStatus:       RepoSyncStatus
   readonly lastSyncedAt?:    string
+  /** Chunks embedded so far in the current run (intra-repo progress). */
+  readonly embeddedCount?:   number | null
+  /** Total chunks to embed in the current run. */
+  readonly embedTotal?:      number | null
   readonly errorMessage?:    string | null
   readonly pipelineRunId?:   string
   readonly jobName?:         string

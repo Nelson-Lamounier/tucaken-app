@@ -4,20 +4,28 @@
 
 import type { GitHubInstallation } from '@/lib/types/github.types'
 
-export type StepId = 'welcome' | 'portfolio' | 'resume' | 'connect' | 'repos' | 'processing' | 'mirror' | 'direction' | 'reconciliation' | 'distill' | 'review'
+// Onboarding ends at `processing`. Once indexing finishes, the user is
+// redirected to /overview (the Knowledge Base dashboard), which surfaces the
+// profile summary, direction, reconciliation, and resume-ready project cards
+// that used to be their own onboarding steps.
+//
+// NOTE: the `portfolio` step ("Where do you live online?") is temporarily
+// unwired from the flow — PortfolioStep.tsx and `OnboardingData.portfolioUrl`
+// are kept so it can be re-added later. To restore it, re-add 'portfolio'
+// here, in STEP_INDEX (useOnboardingState), in VISIBLE_STEPS, and the render
+// branch in OnboardingShell.
+//
+// The `connect` step now also covers repository selection: OnboardingShell
+// renders ConnectStep (GitHub auth) until an installation exists, then swaps
+// to ConnectReposStep (repo picker) in the same step. The old standalone
+// `repos` step was merged in here.
+export type StepId = 'welcome' | 'resume' | 'connect' | 'processing'
 
 export const STEPS: Array<{ id: StepId; name: string; required: boolean }> = [
   { id: 'welcome',        name: 'Welcome',       required: false },
-  { id: 'portfolio',      name: 'Portfolio',     required: false },
   { id: 'resume',         name: 'Resume',        required: false },
   { id: 'connect',        name: 'Connect',       required: true  },
-  { id: 'repos',          name: 'Repositories',  required: true  },
   { id: 'processing',     name: 'Processing',    required: true  },
-  { id: 'mirror',         name: 'Profile',       required: false },
-  { id: 'direction',      name: 'Direction',     required: false },
-  { id: 'reconciliation', name: 'Reconciliation',required: false },
-  { id: 'distill',        name: 'Distill',       required: false },
-  { id: 'review',         name: 'Review',        required: true  },
 ]
 
 export interface ResumeSummary {
