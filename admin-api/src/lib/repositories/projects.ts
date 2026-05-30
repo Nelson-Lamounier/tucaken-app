@@ -460,6 +460,45 @@ export async function archiveProject(db: Queryable, id: string): Promise<{ updat
     return { updated: r.rowCount ?? 0 };
 }
 
+/**
+ * When a multi_repo proposal is confirmed, archive the now-redundant default
+ * single_repo projects for the same repos — but ONLY pristine ones (untouched
+ * by the user). Edited/published defaults survive for manual resolution.
+ * Returns the archived project ids. Caller runs this inside withUser (RLS).
+ */
+export async function archiveSupersededDefaults(
+  db: Queryable,
+  userId: string,
+  confirmedProjectId: string,
+): Promise<string[]> {
+  const r = await db.query<{ id: string }>(
+    `UPDATE projects p
+        SET status = 'archived', updated_at = NOW()
+      WHERE p.user_id = $1::uuid
+        AND p.id <> $2::uuid
+        AND p.shape = 'single_repo'
+        AND p.is_user_confirmed = FALSE
+        AND p.case_study_status IS NULL
+        AND COALESCE(p.user_overrides, '{}'::jsonb) = '{}'::jsonb
+        AND p.status <> 'archived'
+        AND EXISTS (
+          SELECT 1
+            FROM project_repositories def_pr
+            JOIN project_components  def_pc ON def_pc.id = def_pr.project_component_id
+           WHERE def_pc.project_id = p.id
+             AND def_pr.repository_id IN (
+               SELECT con_pr.repository_id
+                 FROM project_repositories con_pr
+                 JOIN project_components  con_pc ON con_pc.id = con_pr.project_component_id
+                WHERE con_pc.project_id = $2::uuid
+             )
+        )
+      RETURNING p.id`,
+    [userId, confirmedProjectId],
+  );
+  return r.rows.map((row) => row.id);
+}
+
 export async function confirmProject(db: Queryable, id: string): Promise<{ updated: number }> {
     const r = await db.query(
         `UPDATE projects

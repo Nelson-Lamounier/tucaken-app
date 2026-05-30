@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { deriveRepoSlug, ensureDefaultProject } from './projects.js';
+import { deriveRepoSlug, ensureDefaultProject, archiveSupersededDefaults } from './projects.js';
 import type { Queryable } from '../pg.js';
 
 describe('deriveRepoSlug', () => {
@@ -49,5 +49,35 @@ describe('ensureDefaultProject', () => {
     const projInsert = calls.find(c => /INSERT INTO projects/i.test(c.sql))!;
     expect(projInsert.params).toContain('owner-my-repo');
     expect(projInsert.sql).toMatch(/'single_repo'/);
+  });
+});
+
+describe('archiveSupersededDefaults', () => {
+  it('archives only pristine single_repo defaults for the confirmed project\'s repos', async () => {
+    const calls: { sql: string; params: readonly unknown[] }[] = [];
+    const db = {
+      query: async (sql: string, params: readonly unknown[] = []) => {
+        calls.push({ sql, params });
+        if (/UPDATE projects/i.test(sql)) {
+          return { rows: [{ id: 'old-default-1' }], rowCount: 1 };
+        }
+        return { rows: [], rowCount: 0 };
+      },
+    } as unknown as Queryable;
+
+    const archived = await archiveSupersededDefaults(db, 'user-1', 'confirmed-1');
+    expect(archived).toEqual(['old-default-1']);
+    const upd = calls.find(c => /UPDATE projects/i.test(c.sql))!;
+    expect(upd.sql).toMatch(/status\s*=\s*'archived'/i);
+    expect(upd.sql).toMatch(/shape\s*=\s*'single_repo'/i);
+    expect(upd.sql).toMatch(/is_user_confirmed\s*=\s*FALSE/i);
+    expect(upd.sql).toMatch(/case_study_status\s+IS\s+NULL/i);
+    expect(upd.sql).toMatch(/user_overrides/i);
+    expect(upd.params).toEqual(['user-1', 'confirmed-1']);
+  });
+
+  it('returns empty array when nothing matches', async () => {
+    const db = { query: async () => ({ rows: [], rowCount: 0 }) } as unknown as Queryable;
+    expect(await archiveSupersededDefaults(db, 'user-1', 'confirmed-1')).toEqual([]);
   });
 });
