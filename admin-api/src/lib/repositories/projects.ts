@@ -27,6 +27,53 @@ export function deriveRepoSlug(fullName: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+/**
+ * Ensure a repo has a default single_repo project. Mirrors migration 031 for
+ * one repo. Idempotent: no-ops if the repo already has any project_repositories
+ * link. Runs against the caller's Queryable (Pool or PoolClient) — the caller
+ * owns the transaction so repo-insert + project-create commit/rollback together.
+ */
+export async function ensureDefaultProject(
+  db: Queryable,
+  userId: string,
+  repositoryId: string,
+  repoFullName: string,
+): Promise<void> {
+  const guard = await db.query(
+    `SELECT 1 FROM project_repositories WHERE repository_id = $1::uuid LIMIT 1`,
+    [repositoryId],
+  );
+  if ((guard.rowCount ?? 0) > 0) return;
+
+  const projectId   = randomUUID();
+  const componentId = randomUUID();
+  const slug        = deriveRepoSlug(repoFullName);
+  const name        = repoFullName.split('/')[1] || repoFullName;
+
+  await db.query(
+    `INSERT INTO projects (
+        id, user_id, slug, name, shape, is_ai_suggested, is_user_confirmed,
+        status, role_exhibited, visibility
+     ) VALUES (
+        $1::uuid, $2::uuid, $3, $4, 'single_repo', FALSE, FALSE,
+        'active', 'sole_builder', 'private'
+     )
+     ON CONFLICT (user_id, slug) DO NOTHING`,
+    [projectId, userId, slug, name],
+  );
+  await db.query(
+    `INSERT INTO project_components (id, user_id, project_id, name, kind, order_index)
+     VALUES ($1::uuid, $2::uuid, $3::uuid, 'Main', 'shared', 0)`,
+    [componentId, userId, projectId],
+  );
+  await db.query(
+    `INSERT INTO project_repositories (user_id, project_component_id, repository_id, subpath)
+     VALUES ($1::uuid, $2::uuid, $3::uuid, '')
+     ON CONFLICT (project_component_id, repository_id, subpath) DO NOTHING`,
+    [userId, componentId, repositoryId],
+  );
+}
+
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 export interface ProjectSummary {
