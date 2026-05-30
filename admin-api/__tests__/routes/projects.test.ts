@@ -513,7 +513,9 @@ describe('POST /:id/split', () => {
 
 describe('POST /clustering/run', () => {
     it('inserts a pipeline_run + creates a K8s Job', async () => {
-        poolQueryMock.mockResolvedValueOnce({ rows: [], rowCount: 1 }); // insert pipeline_run
+        poolQueryMock
+            .mockResolvedValueOnce({ rows: [{ plan: 'pro' }], rowCount: 1 }) // SELECT plan (Pro gate)
+            .mockResolvedValueOnce({ rows: [], rowCount: 1 });                // insert pipeline_run
         const res = await buildApp().request('/clustering/run', { method: 'POST' });
         expect(res.status).toBe(202);
         const body = await res.json() as { status: string; pipelineRunId: string; jobName: string };
@@ -528,6 +530,7 @@ describe('POST /clustering/run', () => {
     });
 
     it('returns 502 when the image URI is unresolved', async () => {
+        poolQueryMock.mockResolvedValueOnce({ rows: [{ plan: 'pro' }], rowCount: 1 }); // SELECT plan (Pro gate)
         isImageConfiguredMock.mockReturnValueOnce(false);
         const res = await buildApp().request('/clustering/run', { method: 'POST' });
         expect(res.status).toBe(502);
@@ -535,10 +538,28 @@ describe('POST /clustering/run', () => {
     });
 
     it('returns 502 when K8s API rejects the Job', async () => {
-        poolQueryMock.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+        poolQueryMock
+            .mockResolvedValueOnce({ rows: [{ plan: 'pro' }], rowCount: 1 }) // SELECT plan (Pro gate)
+            .mockResolvedValueOnce({ rows: [], rowCount: 1 });                // insert pipeline_run
         createNamespacedJobMock.mockRejectedValueOnce(new Error('Conflict'));
         const res = await buildApp().request('/clustering/run', { method: 'POST' });
         expect(res.status).toBe(502);
+    });
+
+    it('returns 403 for a free-plan user', async () => {
+        poolQueryMock.mockResolvedValueOnce({ rows: [{ plan: 'free' }], rowCount: 1 }); // SELECT plan (Pro gate)
+        const res = await buildApp().request('/clustering/run', { method: 'POST' });
+        expect(res.status).toBe(403);
+        expect((await res.json() as { error: string }).error).toMatch(/Pro/i);
+        expect(createNamespacedJobMock).not.toHaveBeenCalled();
+    });
+
+    it('proceeds (202) for a pro-plan user', async () => {
+        poolQueryMock
+            .mockResolvedValueOnce({ rows: [{ plan: 'pro' }], rowCount: 1 }) // SELECT plan (Pro gate)
+            .mockResolvedValueOnce({ rows: [], rowCount: 1 });                // insert pipeline_run
+        const res = await buildApp().request('/clustering/run', { method: 'POST' });
+        expect(res.status).toBe(202);
     });
 });
 

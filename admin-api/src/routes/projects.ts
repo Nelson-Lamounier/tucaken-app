@@ -527,6 +527,18 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
         const uid = requireUserId(ctx);
         if (!uid) return ctx.json({ error: 'Authenticated subject missing' }, 401);
 
+        const pool = getPool(config);
+
+        // Pro-only: multi_repo clustering is a paid feature. Hard server guard
+        // (the UI also hides the trigger for non-pro, but never trust the client).
+        const planRes = await pool.query<{ plan: string }>(
+            `SELECT plan FROM users WHERE id = $1::uuid`,
+            [uid],
+        );
+        if ((planRes.rows[0]?.plan ?? 'free') !== 'pro') {
+            return ctx.json({ error: 'Multi-repo projects require Pro' }, 403);
+        }
+
         const image = getJobImage('job-strategist');
         if (!isImageConfigured(image)) {
             console.error('[projects/clustering] image URI unresolved');
@@ -534,7 +546,6 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
         }
 
         const pipelineRunId = randomUUID();
-        const pool = getPool(config);
 
         try {
             await withUser(pool, uid, async (db) => {

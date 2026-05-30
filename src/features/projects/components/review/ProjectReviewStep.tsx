@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { CheckCircle2, Sparkles, Wand2 } from 'lucide-react'
+import { adminKeys } from '@/lib/api/query-keys'
+import { getMeFn } from '@/server/me'
 import { projectsQueries } from '../../server/queries'
 import {
   useArchiveProject,
@@ -16,9 +18,15 @@ export interface ProjectReviewStepProps {
 
 export function ProjectReviewStep({ onComplete }: ProjectReviewStepProps) {
   const { data, isPending, isError, error } = useQuery(projectsQueries.proposals())
+  const { data: me } = useQuery({ queryKey: adminKeys.me.detail(), queryFn: getMeFn })
   const confirm   = useConfirmProject()
   const archive   = useArchiveProject()
   const clustering = useRunClustering()
+
+  // Multi-repo clustering is a Pro-only capability (the server returns 403 for
+  // non-pro on POST /clustering/run). Hide the trigger so non-pro users never
+  // reach a guaranteed-failing action. 'trial' and 'free' do not count as pro.
+  const isPro = me?.plan?.effectivePlan === 'pro'
 
   const [pendingId, setPendingId] = useState<string | null>(null)
 
@@ -35,7 +43,7 @@ export function ProjectReviewStep({ onComplete }: ProjectReviewStepProps) {
   const proposals = data?.items ?? []
 
   if (proposals.length === 0) {
-    return <AllReviewed onComplete={onComplete} clustering={clustering} />
+    return <AllReviewed onComplete={onComplete} clustering={clustering} isPro={isPro} />
   }
 
   const accept = (id: string) => {
@@ -86,9 +94,11 @@ export function ProjectReviewStep({ onComplete }: ProjectReviewStepProps) {
 function AllReviewed({
   onComplete,
   clustering,
+  isPro,
 }: {
   readonly onComplete?: () => void
   readonly clustering:  ReturnType<typeof useRunClustering>
+  readonly isPro:       boolean
 }) {
   return (
     <div className="flex flex-col items-center gap-4 rounded-2xl bg-white/2 px-6 py-16 text-center inset-ring inset-ring-white/10">
@@ -98,19 +108,22 @@ function AllReviewed({
       <div className="max-w-sm space-y-1">
         <h2 className="text-base font-semibold text-zinc-100">No proposals to review</h2>
         <p className="text-sm text-zinc-500">
-          Everything's been reviewed. You can re-run detection if you've connected new repositories.
+          Everything's been reviewed.
+          {isPro && ' You can re-run detection if you\'ve connected new repositories.'}
         </p>
       </div>
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => clustering.mutate()}
-          disabled={clustering.isPending}
-          className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1.5 text-xs font-medium text-zinc-200 inset-ring inset-ring-white/10 transition-colors hover:bg-white/10 disabled:opacity-50"
-        >
-          <Wand2 className="size-3.5" />
-          {clustering.isPending ? 'Starting…' : 'Re-run detection'}
-        </button>
+        {isPro && (
+          <button
+            type="button"
+            onClick={() => clustering.mutate()}
+            disabled={clustering.isPending}
+            className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1.5 text-xs font-medium text-zinc-200 inset-ring inset-ring-white/10 transition-colors hover:bg-white/10 disabled:opacity-50"
+          >
+            <Wand2 className="size-3.5" />
+            {clustering.isPending ? 'Starting…' : 'Re-run detection'}
+          </button>
+        )}
         {onComplete && (
           <button
             type="button"
