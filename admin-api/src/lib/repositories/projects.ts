@@ -16,6 +16,17 @@ import { randomUUID } from 'node:crypto';
 
 import type { Queryable } from '../pg.js';
 
+/**
+ * Per-user project slug from a repo full_name. Mirrors migration 031:
+ * lower-case, non-[a-z0-9] runs → single dash, trim leading/trailing dashes.
+ */
+export function deriveRepoSlug(fullName: string): string {
+  return fullName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 export interface ProjectSummary {
