@@ -19,6 +19,8 @@ jest.unstable_mockModule('../lib/repositories/projects.js', () => ({
   patchProject:      async () => ({ updated: 1 }),
   // archiveProject: updated=1 so the handler doesn't 404-exit before invalidating
   archiveProject:    async () => ({ updated: 1 }),
+  // archiveSupersededDefaults returns the archived default ids (none in these tests)
+  archiveSupersededDefaults: async () => [],
   confirmProject:    async () => ({ updated: 1 }),
   // patchDecision: updated=1 so the handler doesn't 404-exit before invalidating
   patchDecision:     async () => ({ updated: 1 }),

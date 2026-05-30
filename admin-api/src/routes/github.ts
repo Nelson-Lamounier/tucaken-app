@@ -50,6 +50,7 @@ import type { V1Job } from '@kubernetes/client-node';
 import { getBatchApi } from '../lib/k8s.js';
 import { traceParentEnv, observabilityEnv, ingestionModelEnv } from '../lib/k8s-job-builder.js';
 import { getPool } from '../lib/pg.js';
+import { ensureDefaultProject } from '../lib/repositories/projects.js';
 import { secondsUntilNextMonthUTC } from '../lib/retry-after.js';
 import { AdminApiBindings, requireUserId } from '../lib/types.js';
 
@@ -192,18 +193,37 @@ async function listConnectedRepos(pool: Pool, userId: string): Promise<Connected
     return rows;
 }
 
-async function insertRepository(
+/**
+ * Insert the repositories row AND its default single_repo project in one
+ * transaction. Fatal-by-design: if project creation fails, the repo insert
+ * rolls back too (a repo with no project is the bug we're preventing).
+ * Uses the superuser pool (these tables are written without RLS today).
+ */
+export async function connectRepoWithDefaultProject(
     pool: Pool,
     userId: string,
     fullName: string,
     defaultBranch: string,
 ): Promise<void> {
-    await pool.query(
-        `INSERT INTO repositories (user_id, provider, full_name, default_branch, index_status)
-         VALUES ($1::uuid, 'github', $2, $3, 'pending')
-         ON CONFLICT (user_id, provider, full_name) DO NOTHING`,
-        [userId, fullName, defaultBranch],
-    );
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const r = await client.query<{ id: string }>(
+            `INSERT INTO repositories (user_id, provider, full_name, default_branch, index_status)
+             VALUES ($1::uuid, 'github', $2, $3, 'pending')
+             ON CONFLICT (user_id, provider, full_name) DO UPDATE SET full_name = EXCLUDED.full_name
+             RETURNING id`,
+            [userId, fullName, defaultBranch],
+        );
+        const repoId = r.rows[0]!.id;
+        await ensureDefaultProject(client, userId, repoId, fullName);
+        await client.query('COMMIT');
+    } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+    } finally {
+        client.release();
+    }
 }
 
 async function markRepoPending(pool: Pool, userId: string, fullName: string): Promise<void> {
@@ -348,7 +368,7 @@ async function autoDispatchRepos(
             break;
         }
 
-        await insertRepository(pool, userId, repo.full_name, repo.default_branch ?? 'main');
+        await connectRepoWithDefaultProject(pool, userId, repo.full_name, repo.default_branch ?? 'main');
         await markRepoPending(pool, userId, repo.full_name);
         await markSyncTriggered(pool, userId, repo.full_name);
 
@@ -957,7 +977,7 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         // no quota consumed, no Job dispatched. POST /connected-repos/sync
         // dispatches the actual ingestion for every queued repo later.
         if (body.deferSync === true) {
-            await insertRepository(pool, uid, repoFullName, defaultBranch);
+            await connectRepoWithDefaultProject(pool, uid, repoFullName, defaultBranch);
             await markRepoPending(pool, uid, repoFullName);
             return ctx.json({ status: 'queued', repoFullName, jobName: null }, 202);
         }
@@ -982,7 +1002,7 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         // Wrapped in try/catch: if anything after the quota increment fails,
         // decrement the counter so the user doesn't lose a monthly credit.
         try {
-            await insertRepository(pool, uid, repoFullName, defaultBranch);
+            await connectRepoWithDefaultProject(pool, uid, repoFullName, defaultBranch);
             await markRepoPending(pool, uid, repoFullName);
             await markSyncTriggered(pool, uid, repoFullName);
 

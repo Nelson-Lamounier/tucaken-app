@@ -61,6 +61,7 @@ import { invalidateProject } from '../lib/redis-cache.js';
 import { insertPipelineRun } from '../lib/repositories/pipeline-runs.js';
 import {
     archiveProject,
+    archiveSupersededDefaults,
     createProject,
     deleteDecision,
     getProjectDetail,
@@ -314,7 +315,8 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
                   WHERE id = $1`,
                 [id],
             );
-            return { ok: true as const };
+            const archivedDefaults = await archiveSupersededDefaults(db, uid, id);
+            return { ok: true as const, archivedDefaults };
         });
         if (!guarded.ok) return ctx.json({ error: guarded.msg }, guarded.code);
         void invalidateProject(id);
@@ -322,19 +324,21 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
         const dispatch = await dispatchCaseStudyJob(pool, config, uid, id, 'confirm');
         if (dispatch.ok) {
             return ctx.json({
-                confirmed:      true,
-                dispatched:     true,
-                pipelineRunId:  dispatch.pipelineRunId,
-                jobName:        dispatch.jobName,
-                projectId:      id,
+                confirmed:        true,
+                dispatched:       true,
+                pipelineRunId:    dispatch.pipelineRunId,
+                jobName:          dispatch.jobName,
+                projectId:        id,
+                archivedDefaults: guarded.archivedDefaults,
             }, 202);
         }
         if (dispatch.fatal) return ctx.json({ error: dispatch.reason }, 500);
         return ctx.json({
-            confirmed:  true,
-            dispatched: false,
-            reason:     dispatch.reason,
-            projectId:  id,
+            confirmed:        true,
+            dispatched:       false,
+            reason:           dispatch.reason,
+            projectId:        id,
+            archivedDefaults: guarded.archivedDefaults,
         });
     });
 

@@ -42,11 +42,32 @@ jest.unstable_mockModule('../../src/lib/github-app.js', () => ({
 // pg pool mock
 // ---------------------------------------------------------------------------
 
-const poolQueryMock = jest.fn() as jest.Mock<() => Promise<{ rows: object[] }>>;
+const poolQueryMock = jest.fn() as jest.Mock<(sql?: string) => Promise<{ rows: object[]; rowCount?: number }>>;
 poolQueryMock.mockResolvedValue({ rows: [] });
 
+// connectRepoWithDefaultProject() acquires a client via pool.connect() and runs
+// its repo-insert + default-project transaction on THAT client (not poolQueryMock).
+// The txClient is fully self-contained — it answers BEGIN/COMMIT, the repo
+// INSERT…RETURNING id, and the project_repositories guard itself, and never
+// delegates to poolQueryMock. The guard reports an existing link so
+// ensureDefaultProject no-ops (these E2E tests assert the route's own
+// non-transaction DB sequence on poolQueryMock, not project creation).
+const txClient = {
+    query: jest.fn(async (sql?: string) => {
+        if (typeof sql === 'string' && /INSERT INTO repositories/i.test(sql)) {
+            return { rows: [{ id: 'repo-uuid-test' }], rowCount: 1 };
+        }
+        if (typeof sql === 'string' && /SELECT 1 FROM project_repositories/i.test(sql)) {
+            return { rows: [{ '?column?': 1 }], rowCount: 1 };
+        }
+        // BEGIN / COMMIT / ROLLBACK and anything else stay on this client.
+        return { rows: [], rowCount: 0 };
+    }),
+    release: jest.fn(),
+};
+
 jest.unstable_mockModule('../../src/lib/pg.js', () => ({
-    getPool:    () => ({ query: poolQueryMock }),
+    getPool:    () => ({ query: poolQueryMock, connect: async () => txClient }),
     _resetPool: () => {},
 }));
 
@@ -583,7 +604,9 @@ describe('POST /connected-repos', () => {
         seedQuery([connectedRow]);       // 1. getConnection
         seedQuery([]);                   // 2. plan SELECT (empty rows → defaults to 'free')
         seedQuery([{ count: 1 }]);       // 3. quota INSERT…RETURNING: count=1 → allowed
-        // 4. insertRepository, 5. markRepoPending, 6. markSyncTriggered → default { rows: [] }
+        // The repo INSERT now runs inside connectRepoWithDefaultProject on a
+        // dedicated transaction client (BEGIN/INSERT…RETURNING/guard/COMMIT) — it
+        // does NOT go through poolQueryMock. 4. markRepoPending, 5. markSyncTriggered.
 
         const res  = await buildApp().request('/connected-repos', {
             method:  'POST',
@@ -599,8 +622,9 @@ describe('POST /connected-repos', () => {
         expect(body.jobName.length).toBeLessThanOrEqual(63);
 
         // getConnection (1) + plan SELECT (1) + quota INSERT…RETURNING (1, atomic)
-        // + insertRepository (1) + markRepoPending (1) + markSyncTriggered (1)
-        expect(poolQueryMock).toHaveBeenCalledTimes(6);
+        // + markRepoPending (1) + markSyncTriggered (1). The repo INSERT runs on
+        // the transaction client (pool.connect()), not poolQueryMock.
+        expect(poolQueryMock).toHaveBeenCalledTimes(5);
 
         // Installation token generated for this user's installation
         expect(mockGenerateInstallationToken).toHaveBeenCalledWith('999999', testConfig.githubPrivateKey, '12345');
@@ -638,7 +662,8 @@ describe('POST /connected-repos', () => {
 
     it('deferSync:true connects as pending without quota or Job dispatch', async () => {
         seedQuery([connectedRow]);   // 1. getConnection
-        // 2. insertRepository, 3. markRepoPending → default { rows: [] }
+        // The repo INSERT runs on the transaction client (connectRepoWithDefaultProject),
+        // not poolQueryMock. 2. markRepoPending → default { rows: [] }.
 
         const res  = await buildApp().request('/connected-repos', {
             method:  'POST',
@@ -650,9 +675,9 @@ describe('POST /connected-repos', () => {
         expect(res.status).toBe(202);
         expect(body).toEqual({ status: 'queued', repoFullName: 'Nelson-Lamounier/cdk-monitoring', jobName: null });
 
-        // getConnection + insertRepository + markRepoPending only — no plan
-        // SELECT, no quota INSERT, no markSyncTriggered.
-        expect(poolQueryMock).toHaveBeenCalledTimes(3);
+        // getConnection + markRepoPending only — no plan SELECT, no quota INSERT,
+        // no markSyncTriggered. The repo INSERT is on the transaction client.
+        expect(poolQueryMock).toHaveBeenCalledTimes(2);
         const calls = poolQueryMock.mock.calls.map(c => (c[0] as string));
         expect(calls.some(s => /usage_quotas/.test(s))).toBe(false);
         expect(calls.some(s => /last_sync_triggered_at/.test(s))).toBe(false);
@@ -698,9 +723,9 @@ describe('POST /connected-repos/sync', () => {
         ]);
         seedQuery([]);                 // 3. plan SELECT → free
         seedQuery([{ count: 1 }]);     // 4. quota INSERT…RETURNING repo 1 → allowed
-        seedQuery([]); seedQuery([]); seedQuery([]); // 5-7 insert/markPending/markTriggered repo 1
-        seedQuery([{ count: 2 }]);     // 8. quota INSERT…RETURNING repo 2 → allowed
-        seedQuery([]); seedQuery([]); seedQuery([]); // 9-11 insert/markPending/markTriggered repo 2
+        seedQuery([]); seedQuery([]);  // 5-6 markPending/markTriggered repo 1 (repo INSERT is on the tx client)
+        seedQuery([{ count: 2 }]);     // 7. quota INSERT…RETURNING repo 2 → allowed
+        seedQuery([]); seedQuery([]);  // 8-9 markPending/markTriggered repo 2 (repo INSERT is on the tx client)
 
         const res  = await buildApp().request('/connected-repos/sync', { method: 'POST' });
         const body = await res.json() as { started: number };

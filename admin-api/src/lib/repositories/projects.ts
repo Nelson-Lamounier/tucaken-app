@@ -16,6 +16,64 @@ import { randomUUID } from 'node:crypto';
 
 import type { Queryable } from '../pg.js';
 
+/**
+ * Per-user project slug from a repo full_name. Mirrors migration 031:
+ * lower-case, non-[a-z0-9] runs → single dash, trim leading/trailing dashes.
+ */
+export function deriveRepoSlug(fullName: string): string {
+  return fullName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/**
+ * Ensure a repo has a default single_repo project. Mirrors migration 031 for
+ * one repo. Idempotent: no-ops if the repo already has any project_repositories
+ * link. Runs against the caller's Queryable (Pool or PoolClient) — the caller
+ * owns the transaction so repo-insert + project-create commit/rollback together.
+ */
+export async function ensureDefaultProject(
+  db: Queryable,
+  userId: string,
+  repositoryId: string,
+  repoFullName: string,
+): Promise<void> {
+  const guard = await db.query(
+    `SELECT 1 FROM project_repositories WHERE repository_id = $1::uuid LIMIT 1`,
+    [repositoryId],
+  );
+  if ((guard.rowCount ?? 0) > 0) return;
+
+  const projectId   = randomUUID();
+  const componentId = randomUUID();
+  const slug        = deriveRepoSlug(repoFullName);
+  const name        = repoFullName.split('/')[1] || repoFullName;
+
+  await db.query(
+    `INSERT INTO projects (
+        id, user_id, slug, name, shape, is_ai_suggested, is_user_confirmed,
+        status, role_exhibited, visibility
+     ) VALUES (
+        $1::uuid, $2::uuid, $3, $4, 'single_repo', FALSE, FALSE,
+        'active', 'sole_builder', 'private'
+     )
+     ON CONFLICT (user_id, slug) DO NOTHING`,
+    [projectId, userId, slug, name],
+  );
+  await db.query(
+    `INSERT INTO project_components (id, user_id, project_id, name, kind, order_index)
+     VALUES ($1::uuid, $2::uuid, $3::uuid, 'Main', 'shared', 0)`,
+    [componentId, userId, projectId],
+  );
+  await db.query(
+    `INSERT INTO project_repositories (user_id, project_component_id, repository_id, subpath)
+     VALUES ($1::uuid, $2::uuid, $3::uuid, '')
+     ON CONFLICT (project_component_id, repository_id, subpath) DO NOTHING`,
+    [userId, componentId, repositoryId],
+  );
+}
+
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 export interface ProjectSummary {
@@ -400,6 +458,45 @@ export async function archiveProject(db: Queryable, id: string): Promise<{ updat
         [id],
     );
     return { updated: r.rowCount ?? 0 };
+}
+
+/**
+ * When a multi_repo proposal is confirmed, archive the now-redundant default
+ * single_repo projects for the same repos — but ONLY pristine ones (untouched
+ * by the user). Edited/published defaults survive for manual resolution.
+ * Returns the archived project ids. Caller runs this inside withUser (RLS).
+ */
+export async function archiveSupersededDefaults(
+  db: Queryable,
+  userId: string,
+  confirmedProjectId: string,
+): Promise<string[]> {
+  const r = await db.query<{ id: string }>(
+    `UPDATE projects p
+        SET status = 'archived', updated_at = NOW()
+      WHERE p.user_id = $1::uuid
+        AND p.id <> $2::uuid
+        AND p.shape = 'single_repo'
+        AND p.is_user_confirmed = FALSE
+        AND p.case_study_status IS NULL
+        AND COALESCE(p.user_overrides, '{}'::jsonb) = '{}'::jsonb
+        AND p.status <> 'archived'
+        AND EXISTS (
+          SELECT 1
+            FROM project_repositories def_pr
+            JOIN project_components  def_pc ON def_pc.id = def_pr.project_component_id
+           WHERE def_pc.project_id = p.id
+             AND def_pr.repository_id IN (
+               SELECT con_pr.repository_id
+                 FROM project_repositories con_pr
+                 JOIN project_components  con_pc ON con_pc.id = con_pr.project_component_id
+                WHERE con_pc.project_id = $2::uuid
+             )
+        )
+      RETURNING p.id`,
+    [userId, confirmedProjectId],
+  );
+  return r.rows.map((row) => row.id);
 }
 
 export async function confirmProject(db: Queryable, id: string): Promise<{ updated: number }> {
