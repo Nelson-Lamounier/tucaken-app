@@ -3,69 +3,25 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { DashboardPage } from '@/components/layouts/DashboardPage'
-import { Stats } from '@/components/ui/Stats'
 import { Button } from '@/components/ui/Button'
 import { useGitHubConnectedRepos } from '@/features/github/hooks/use-github-connected-repos'
 import { useProfileSummary } from '@/features/profile/hooks/use-profile-summary'
 import { adminKeys } from '@/lib/api/query-keys'
 import { listResumeImportsFn, listCareerEntriesFn } from '@/server/resume-imports'
+import { AnimatedTabs } from '@/components/ui/AnimatedTabs'
 import { MirrorPanel } from '@/features/profile/components/MirrorPanel'
 import { DirectionPanel } from '@/features/profile/components/DirectionPanel'
 import { ReconciliationPanel } from '@/features/profile/components/ReconciliationPanel'
-import { DiagnosticPanel } from '@/features/profile/components/DiagnosticPanel'
+import { KbScorePanel } from './KbScorePanel'
+import { KbStatsPanel } from './KbStatsPanel'
+import { KbSetupChecklist } from './KbSetupChecklist'
+import { KbActivityFeed } from './KbActivityFeed'
 import { RepoProfileCards } from './RepoProfileCards'
 import { CareerDataBreakdown } from './CareerDataBreakdown'
 import { ResumeFilesList } from './ResumeFilesList'
 import { KbQuickActions } from './KbQuickActions'
 import { deriveKbStats } from '../lib/kb-stats'
-import type { KbStats } from '../lib/kb-stats'
-import type { Stat } from '@/components/ui/Stats'
-
-function buildHeroStats(isLoading: boolean, stats: KbStats): Stat[] {
-  const uploadsChangeType: 'positive' | 'negative' =
-    stats.failedImportCount > 0 ? 'negative' : 'positive'
-
-  const kbChangeType: 'positive' | 'negative' = stats.isReady ? 'positive' : 'negative'
-
-  let kbValue: string
-  if (isLoading)          { kbValue = '…' }
-  else if (stats.isReady) { kbValue = 'Ready' }
-  else                    { kbValue = 'Needs setup' }
-
-  let kbChange: string
-  if (isLoading)          { kbChange = '' }
-  else if (stats.isReady) { kbChange = 'AI agent has data to work with' }
-  else                    { kbChange = 'Upload a resume or connect a repo' }
-
-  return [
-    {
-      name: 'Connected Repositories',
-      value: isLoading ? '…' : stats.repoCount.toString(),
-      change: isLoading ? '' : `${stats.syncedRepoCount} synced · ${stats.pendingRepoCount} pending`,
-      changeType: 'positive',
-    },
-    {
-      name: 'Career Entries',
-      value: isLoading ? '…' : stats.careerEntryCount.toString(),
-      change: isLoading
-        ? ''
-        : `${stats.experienceCount} experience · ${stats.educationCount} education · ${stats.skillCount} skills`,
-      changeType: 'positive',
-    },
-    {
-      name: 'Resume Uploads',
-      value: isLoading ? '…' : stats.importCount.toString(),
-      change: isLoading ? '' : `${stats.processedImportCount} processed · ${stats.failedImportCount} failed`,
-      changeType: uploadsChangeType,
-    },
-    {
-      name: 'Knowledge Base',
-      value: kbValue,
-      change: kbChange,
-      changeType: kbChangeType,
-    },
-  ]
-}
+import { buildHeroTiles, deriveHeroSparks, deriveHeroMeta } from '../lib/hero-tiles'
 
 export function UserDashboard() {
   const { data: repos = [], isLoading: loadingRepos } = useGitHubConnectedRepos()
@@ -84,7 +40,12 @@ export function UserDashboard() {
   const isLoading    = loadingRepos || loadingImports || loadingEntries
   const stats        = deriveKbStats(repos, entries, imports)
   const latestImport = imports[0]
-  const heroStats    = buildHeroStats(isLoading, stats)
+  const heroTiles    = buildHeroTiles(
+    isLoading,
+    stats,
+    deriveHeroSparks(repos, entries, imports),
+    deriveHeroMeta(repos, entries, imports),
+  )
 
   return (
     <DashboardPage
@@ -97,18 +58,61 @@ export function UserDashboard() {
       }
     >
       <div className="space-y-8">
-        <Stats stats={heroStats} />
-        {profileSummary && <DiagnosticPanel summary={profileSummary} />}
-        {profileSummary && <MirrorPanel summary={profileSummary} />}
-        {profileSummary && <DirectionPanel summary={profileSummary} />}
-        {profileSummary && <ReconciliationPanel summary={profileSummary} hasResume={entries.length > 0} />}
-        <RepoProfileCards repos={repos} isLoading={loadingRepos} />
-        <CareerDataBreakdown
-          entries={entries}
-          latestImport={latestImport}
-          isLoading={loadingEntries || loadingImports}
-        />
-        <ResumeFilesList imports={imports} isLoading={loadingImports} />
+        {/* Hero band: readiness gauge + KPI tiles */}
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_1fr] xl:items-stretch">
+          <KbScorePanel diagnostic={profileSummary?.diagnostic ?? null} isLoading={isLoading} />
+          <KbStatsPanel tiles={heroTiles} />
+        </div>
+
+        {/* Main column + health rail */}
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_340px] xl:items-start">
+          <main className="flex min-w-0 flex-col gap-8">
+            {profileSummary && (
+              <section className="space-y-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Profile Intelligence</h3>
+                  <p className="mt-0.5 text-xs text-zinc-500">
+                    What your data says about you — expand any panel for the full read
+                  </p>
+                </div>
+                <AnimatedTabs
+                  items={[
+                    {
+                      id: 'mirror',
+                      title: 'Profile mirror',
+                      content: <MirrorPanel summary={profileSummary} />,
+                    },
+                    {
+                      id: 'direction',
+                      title: 'Career direction',
+                      content: <DirectionPanel summary={profileSummary} />,
+                    },
+                    {
+                      id: 'reconciliation',
+                      title: 'Résumé reconciliation',
+                      content: (
+                        <ReconciliationPanel summary={profileSummary} hasResume={entries.length > 0} />
+                      ),
+                    },
+                  ]}
+                />
+              </section>
+            )}
+            <RepoProfileCards repos={repos} isLoading={loadingRepos} />
+          </main>
+
+          <aside className="flex flex-col gap-6">
+            <KbSetupChecklist stats={stats} />
+            <CareerDataBreakdown
+              entries={entries}
+              latestImport={latestImport}
+              isLoading={loadingEntries || loadingImports}
+            />
+            <ResumeFilesList imports={imports} isLoading={loadingImports} />
+            <KbActivityFeed imports={imports} repos={repos} />
+          </aside>
+        </div>
+
         <KbQuickActions />
       </div>
     </DashboardPage>
