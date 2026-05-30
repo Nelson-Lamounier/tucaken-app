@@ -11,6 +11,7 @@ const listProjectsMock = vi.fn()
 const confirmMock = vi.fn()
 const archiveMock = vi.fn()
 const runClusteringMock = vi.fn()
+const meMock = vi.fn()
 
 vi.mock('@/server/projects', () => ({
   listProjectsFn:      (args: unknown) => listProjectsMock(args),
@@ -20,6 +21,22 @@ vi.mock('@/server/projects', () => ({
   archiveProjectFn:    (args: unknown) => archiveMock(args),
   runClusteringFn:     (args: unknown) => runClusteringMock(args),
 }))
+
+vi.mock('@/server/me', () => ({
+  getMeFn: () => meMock(),
+}))
+
+function me(effectivePlan: 'pro' | 'trial' | 'free') {
+  return {
+    id: 'u', email: 'u@example.com', isNew: false,
+    plan: {
+      plan: effectivePlan, effectivePlan, role: 'user',
+      trialStartedAt: null, trialEndsAt: null, trialDaysRemaining: null,
+      subscriptionStatus: null, stripeCustomerId: null, stripeSubscriptionId: null,
+      cancelAtPeriodEnd: false, currentPeriodEnd: null,
+    },
+  }
+}
 
 import { ProjectReviewStep } from '@/features/projects/components/review/ProjectReviewStep'
 import type { ProjectSummary } from '@/features/projects/lib/types'
@@ -54,6 +71,7 @@ describe('ProjectReviewStep', () => {
     confirmMock.mockReset().mockResolvedValue({ confirmed: true, dispatched: true, projectId: 'x' })
     archiveMock.mockReset().mockResolvedValue({ archived: true })
     runClusteringMock.mockReset().mockResolvedValue({ status: 'queued', pipelineRunId: 'p', jobName: 'j' })
+    meMock.mockReset().mockResolvedValue(me('pro'))
   })
 
   it('renders the all-reviewed empty state when there are no proposals', async () => {
@@ -99,5 +117,26 @@ describe('ProjectReviewStep', () => {
     await waitFor(() => screen.getByText(/no proposals to review/i))
     await userEvent.click(screen.getByRole('button', { name: /re-run detection/i }))
     expect(runClusteringMock).toHaveBeenCalled()
+  })
+
+  it('hides the run-clustering trigger for a free-plan user', async () => {
+    meMock.mockResolvedValue(me('free'))
+    listProjectsMock.mockResolvedValue({ total: 0, limit: 100, offset: 0, items: [] })
+    renderStep()
+    await waitFor(() => screen.getByText(/no proposals to review/i))
+    await waitFor(() =>
+      expect(meMock).toHaveBeenCalled(),
+    )
+    expect(screen.queryByRole('button', { name: /re-run detection/i })).toBeNull()
+  })
+
+  it('shows the run-clustering trigger for a pro-plan user', async () => {
+    meMock.mockResolvedValue(me('pro'))
+    listProjectsMock.mockResolvedValue({ total: 0, limit: 100, offset: 0, items: [] })
+    renderStep()
+    await waitFor(() => screen.getByText(/no proposals to review/i))
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /re-run detection/i })).toBeTruthy(),
+    )
   })
 })
