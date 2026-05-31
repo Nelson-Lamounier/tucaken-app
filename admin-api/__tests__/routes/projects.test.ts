@@ -323,7 +323,6 @@ describe('POST /:id/confirm', () => {
             .mockResolvedValueOnce({ rows: [{ status: 'active' }], rowCount: 1 })  // guard SELECT
             .mockResolvedValueOnce({ rows: [], rowCount: 1 })                       // UPDATE confirm+pending
             .mockResolvedValueOnce({ rows: [], rowCount: 0 })                       // archiveSupersededDefaults UPDATE ... RETURNING
-            .mockResolvedValueOnce({ rows: [{ installation_id: '999' }], rowCount: 1 }) // installation
             .mockResolvedValueOnce({ rows: [], rowCount: 1 });                      // INSERT pipeline_run
 
         const res = await buildApp().request(`/${TEST_PROJECT_UUID}/confirm`, { method: 'POST' });
@@ -340,9 +339,10 @@ describe('POST /:id/confirm', () => {
         expect(String(poolQueryMock.mock.calls[1][0])).toMatch(/case_study_status = 'pending'/);
 
         // Dispatched with triggeredBy='confirm' in metadata + the case-study command.
-        expect(generateInstallationTokenMock).toHaveBeenCalledTimes(1);
+        // The case-study Job reads commits/PRs from RDS, so dispatch no longer
+        // mints a GitHub token.
         expect(createNamespacedJobMock).toHaveBeenCalledTimes(1);
-        const insertCall = poolQueryMock.mock.calls[4] as unknown as [string, unknown[]];
+        const insertCall = poolQueryMock.mock.calls[3] as unknown as [string, unknown[]];
         const params = insertCall[1];
         const metadata = JSON.parse(params[4] as string) as { projectId: string; triggeredBy: string };
         expect(metadata.triggeredBy).toBe('confirm');
@@ -350,6 +350,8 @@ describe('POST /:id/confirm', () => {
         const container = jobBody.spec.template.spec.containers[0]!;
         expect(container.command).toEqual(['node', 'dist/run-case-study.js']);
         expect(jobBody.metadata?.labels?.trigger).toBe('confirm');
+        // No GitHub token in the case-study Job env.
+        expect(container.env.find((e) => e.name === 'GITHUB_TOKEN')).toBeUndefined();
     });
 
     it('archives superseded default projects and reports them in the response', async () => {
@@ -357,7 +359,6 @@ describe('POST /:id/confirm', () => {
             .mockResolvedValueOnce({ rows: [{ status: 'active' }], rowCount: 1 })          // guard SELECT
             .mockResolvedValueOnce({ rows: [], rowCount: 1 })                               // UPDATE confirm+pending
             .mockResolvedValueOnce({ rows: [{ id: 'archived-1' }], rowCount: 1 })           // archiveSupersededDefaults UPDATE ... RETURNING
-            .mockResolvedValueOnce({ rows: [{ installation_id: '999' }], rowCount: 1 })     // installation
             .mockResolvedValueOnce({ rows: [], rowCount: 1 });                              // INSERT pipeline_run
 
         const res = await buildApp().request(`/${TEST_PROJECT_UUID}/confirm`, { method: 'POST' });
@@ -366,23 +367,6 @@ describe('POST /:id/confirm', () => {
         expect(body.confirmed).toBe(true);
         expect(body.dispatched).toBe(true);
         expect(body.archivedDefaults).toContain('archived-1');
-    });
-
-    it('confirms without dispatching when the user has no GitHub connection', async () => {
-        poolQueryMock
-            .mockResolvedValueOnce({ rows: [{ status: 'active' }], rowCount: 1 })   // guard SELECT
-            .mockResolvedValueOnce({ rows: [], rowCount: 1 })                        // UPDATE
-            .mockResolvedValueOnce({ rows: [], rowCount: 0 })                        // archiveSupersededDefaults
-            .mockResolvedValueOnce({ rows: [{ installation_id: null }], rowCount: 1 }); // installation lookup
-
-        const res = await buildApp().request(`/${TEST_PROJECT_UUID}/confirm`, { method: 'POST' });
-        expect(res.status).toBe(200);
-        const body = await res.json() as { confirmed: boolean; dispatched: boolean; reason: string };
-        expect(body.confirmed).toBe(true);
-        expect(body.dispatched).toBe(false);
-        expect(body.reason).toBe('github_not_connected');
-        expect(generateInstallationTokenMock).not.toHaveBeenCalled();
-        expect(createNamespacedJobMock).not.toHaveBeenCalled();
     });
 
     it('confirms without dispatching when the image is unresolved', async () => {
@@ -592,19 +576,18 @@ describe('POST /:id/regenerate', () => {
         poolQueryMock
             .mockResolvedValueOnce({ rows: [{ is_user_confirmed: true, status: 'active' }], rowCount: 1 }) // guard SELECT
             .mockResolvedValueOnce({ rows: [], rowCount: 1 })                                              // UPDATE status='pending'
-            .mockResolvedValueOnce({ rows: [{ installation_id: '999' }], rowCount: 1 })                    // installation lookup
             .mockResolvedValueOnce({ rows: [], rowCount: 1 });                                             // INSERT pipeline_run
         const res = await buildApp().request(`/${TEST_PROJECT_UUID}/regenerate`, { method: 'POST' });
         expect(res.status).toBe(202);
         const body = await res.json() as { status: string; pipelineRunId: string; projectId: string; jobName: string };
         expect(body.status).toBe('queued');
         expect(body.projectId).toBe(TEST_PROJECT_UUID);
-        expect(generateInstallationTokenMock).toHaveBeenCalledWith('111111', expect.any(String), '999');
         expect(createNamespacedJobMock).toHaveBeenCalledTimes(1);
         const jobBody = (createNamespacedJobMock.mock.calls[0] as unknown as [{ body: { spec: { template: { spec: { containers: { command: string[]; env: { name: string; value: string }[] }[] } } } } }])[0].body;
         const container = jobBody.spec.template.spec.containers[0]!;
         expect(container.command).toEqual(['node', 'dist/run-case-study.js']);
-        expect(container.env.find((e) => e.name === 'GITHUB_TOKEN')?.value).toBe('ghs_installation_token_TEST');
+        // Case-study Job reads commits/PRs from RDS — no GitHub token injected.
+        expect(container.env.find((e) => e.name === 'GITHUB_TOKEN')).toBeUndefined();
         expect(container.env.find((e) => e.name === 'PROJECT_ID')?.value).toBe(TEST_PROJECT_UUID);
     });
 
@@ -627,13 +610,4 @@ describe('POST /:id/regenerate', () => {
         expect(res.status).toBe(409);
     });
 
-    it('412s when the user has no GitHub connection', async () => {
-        poolQueryMock
-            .mockResolvedValueOnce({ rows: [{ is_user_confirmed: true, status: 'active' }], rowCount: 1 })
-            .mockResolvedValueOnce({ rows: [], rowCount: 1 })
-            .mockResolvedValueOnce({ rows: [{ installation_id: null }], rowCount: 1 });
-        const res = await buildApp().request(`/${TEST_PROJECT_UUID}/regenerate`, { method: 'POST' });
-        expect(res.status).toBe(412);
-        expect(generateInstallationTokenMock).not.toHaveBeenCalled();
-    });
 });
