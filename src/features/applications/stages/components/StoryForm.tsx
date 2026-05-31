@@ -12,6 +12,8 @@ interface StoryFormProps {
   readonly onSubmit: (draft: StoryDraft) => void
   /** Present when editing an existing story. */
   readonly initial?: StoryDraft
+  /** Pre-selected themes for a new story (e.g. drafting from a principle). */
+  readonly defaultThemes?: readonly StoryTheme[]
 }
 
 const EMPTY: StoryDraft = { title: '', situation: '', task: '', action: '', result: '', themes: [] }
@@ -28,8 +30,8 @@ const STAR_FIELDS: readonly { key: 'situation' | 'task' | 'action' | 'result'; l
 
 /** Create / edit a STAR story. Guided manual authoring — the "generate from
  *  portfolio" path is a separate follow-on stub. */
-export function StoryForm({ open, onClose, onSubmit, initial }: StoryFormProps) {
-  const [form, setForm] = useState<StoryDraft>(initial ?? EMPTY)
+export function StoryForm({ open, onClose, onSubmit, initial, defaultThemes }: StoryFormProps) {
+  const [form, setForm] = useState<StoryDraft>(initial ?? { ...EMPTY, themes: defaultThemes ?? [] })
 
   function toggleTheme(theme: StoryTheme) {
     setForm(prev => ({

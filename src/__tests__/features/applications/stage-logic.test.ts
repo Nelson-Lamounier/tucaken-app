@@ -6,6 +6,8 @@ import {
   isInterviewStage,
 } from '@/features/applications/stages/types/stage'
 import { interviewPrepToWorkspace, researchToTopics } from '@/features/applications/stages/types/workspace'
+import { LEADERSHIP_PRINCIPLES, storiesForPrinciple, coverageStrength } from '@/features/applications/stages/types/principles'
+import type { StarStory } from '@/features/applications/stages/types/workspace'
 import type { InterviewPrepOutput, ResearchOutput } from '@/lib/types/applications.types'
 
 describe('stage ordering', () => {
@@ -88,5 +90,24 @@ describe('researchToTopics adapter', () => {
 
   it('returns empty for null research', () => {
     expect(researchToTopics(null)).toEqual([])
+  })
+})
+
+describe('leadership-principle coverage', () => {
+  it('coverageStrength tiers by story count', () => {
+    expect(coverageStrength(0)).toBe('none')
+    expect(coverageStrength(1)).toBe('moderate')
+    expect(coverageStrength(3)).toBe('strong')
+  })
+
+  it('storiesForPrinciple matches by shared theme', () => {
+    const principle = LEADERSHIP_PRINCIPLES.find(p => p.id === 'customer-obsession')!
+    const stories: StarStory[] = [
+      { id: '1', title: 'A', situation: '', task: '', action: '', result: '', themes: ['Customer'] },
+      { id: '2', title: 'B', situation: '', task: '', action: '', result: '', themes: ['Conflict'] },
+    ]
+    const matched = storiesForPrinciple(principle, stories)
+    expect(matched).toHaveLength(1)
+    expect(matched[0].id).toBe('1')
   })
 })

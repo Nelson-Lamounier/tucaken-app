@@ -20,6 +20,7 @@ import { PhoneScreenWorkspace } from '@/features/applications/stages/workspaces/
 import { SystemDesignWorkspace } from '@/features/applications/stages/workspaces/SystemDesignWorkspace'
 import { TradeoffBadge } from '@/features/applications/stages/components/TradeoffBadge'
 import { BehaviouralWorkspace } from '@/features/applications/stages/workspaces/BehaviouralWorkspace'
+import { BarRaiserWorkspace } from '@/features/applications/stages/workspaces/BarRaiserWorkspace'
 import { useStoryBank } from '@/features/applications/stages/hooks/useStoryBank'
 import type { StarStory, EvidenceTopic } from '@/features/applications/stages/types/workspace'
 import type { ApplicationDetail } from '@/lib/types/applications.types'
@@ -178,5 +179,23 @@ describe('BehaviouralWorkspace', () => {
     expect(screen.getAllByText('Gap — consider drafting').length).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole('button', { name: /Add story/i }))
     expect(screen.getByText('Add a story')).toBeTruthy()
+  })
+})
+
+describe('BarRaiserWorkspace', () => {
+  const detail = {
+    slug: 'br-acme', targetCompany: 'Acme', targetRole: 'SDE', status: 'interviewing',
+    interviewStage: 'bar-raiser', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z',
+    context: { pipelineId: 'p', cumulativeInputTokens: 0, cumulativeOutputTokens: 0, cumulativeThinkingTokens: 0, cumulativeCostUsd: 0 },
+    research: null, analysis: null, interviewPrep: null,
+  } satisfies ApplicationDetail
+
+  it('renders the values matrix and a draft CTA for uncovered principles', () => {
+    window.localStorage.clear()
+    render(<BarRaiserWorkspace detail={detail} />)
+    expect(screen.getByText('Company values matrix')).toBeTruthy()
+    expect(screen.getAllByText('Customer Obsession').length).toBeGreaterThan(0)
+    // empty bank → all principles uncovered → draft CTAs present
+    expect(screen.getAllByRole('button', { name: /Draft a story from this evidence/i }).length).toBeGreaterThan(0)
   })
 })

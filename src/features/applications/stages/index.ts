@@ -20,6 +20,14 @@ export { TechnicalWorkspace } from './workspaces/TechnicalWorkspace'
 export { PhoneScreenWorkspace } from './workspaces/PhoneScreenWorkspace'
 export { SystemDesignWorkspace } from './workspaces/SystemDesignWorkspace'
 export { BehaviouralWorkspace } from './workspaces/BehaviouralWorkspace'
+export { BarRaiserWorkspace } from './workspaces/BarRaiserWorkspace'
+
+export {
+  LEADERSHIP_PRINCIPLES,
+  storiesForPrinciple,
+  coverageStrength,
+} from './types/principles'
+export type { LeadershipPrinciple } from './types/principles'
 
 export { useStageDraft } from './hooks/useStageDraft'
 export type { StageDraft } from './hooks/useStageDraft'
