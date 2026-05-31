@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { NewAnalysisPanel } from '@/features/applications/components/NewAnalysisPanel'
 import { ResumeSelect } from '@/features/applications/components/ResumeSelect'
-import { FullWidthBar, type FullWidthBarStep } from '../components/ui/FullWidthBar'
+import { FullWidthBar, type FullWidthBarStep } from '@/components/ui/FullWidthBar'
 import { DashboardPage } from '@/components/layouts/DashboardPage'
 
 export const Route = createFileRoute('/_dashboard/applications/new')({

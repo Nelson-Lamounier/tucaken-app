@@ -5,8 +5,8 @@ import {
   AcademicCapIcon,
 } from '@heroicons/react/24/outline'
 import { Sparkles, Github } from 'lucide-react'
-import { GridListActions, type GridListActionGroup } from '../components/ui/GridListActions'
-import { DashboardPage } from '../components/layouts/DashboardPage'
+import { GridListActions, type GridListActionGroup } from '@/components/ui/GridListActions'
+import { DashboardPage } from '@/components/layouts/DashboardPage'
 
 const actionGroups: GridListActionGroup[] = [
   {
