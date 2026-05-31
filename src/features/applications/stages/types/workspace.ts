@@ -128,6 +128,26 @@ export function researchToTopics(research: ResearchOutput | null): readonly Evid
 }
 
 /**
+ * Factual negotiation leverage points derived from the Research Agent output —
+ * portfolio depth and demonstrated fit, stated directly (no breathless tone).
+ */
+export function negotiationLeverage(research: ResearchOutput | null): readonly string[] {
+  if (!research) return []
+  const points: string[] = []
+  if (research.fitRating === 'STRONG_FIT') {
+    points.push("You clear the role's core bar — the fit assessment rates you a strong match.")
+  }
+  if (research.verifiedMatches.length > 0) {
+    points.push(`${research.verifiedMatches.length} required skills are verified directly in your work, not just claimed.`)
+  }
+  const scale = research.experienceSignals?.scale
+  if (scale) {
+    points.push(`You've demonstrated impact at ${scale} scale.`)
+  }
+  return points
+}
+
+/**
  * Adapter: real Coach `InterviewPrepOutput` → the subset of `StageWorkspaceData`
  * that has a backing today. Evidence/project/story fields stay empty here and
  * are filled by per-workspace mock until the backend lands (ADR-0003).

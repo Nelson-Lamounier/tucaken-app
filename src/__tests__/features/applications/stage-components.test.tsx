@@ -11,6 +11,11 @@ vi.mock('@tanstack/react-router', () => ({
   ),
 }))
 
+const statusMutate = vi.fn()
+vi.mock('@/hooks/use-admin-applications', () => ({
+  useApplicationStatus: () => ({ mutate: statusMutate, isPending: false }),
+}))
+
 import { EvidenceIndicator } from '@/features/applications/stages/components/EvidenceIndicator'
 import { StoryCard } from '@/features/applications/stages/components/StoryCard'
 import { StageProgressBar } from '@/features/applications/stages/components/StageProgressBar'
@@ -21,6 +26,7 @@ import { SystemDesignWorkspace } from '@/features/applications/stages/workspaces
 import { TradeoffBadge } from '@/features/applications/stages/components/TradeoffBadge'
 import { BehaviouralWorkspace } from '@/features/applications/stages/workspaces/BehaviouralWorkspace'
 import { BarRaiserWorkspace } from '@/features/applications/stages/workspaces/BarRaiserWorkspace'
+import { FinalWorkspace } from '@/features/applications/stages/workspaces/FinalWorkspace'
 import { useStoryBank } from '@/features/applications/stages/hooks/useStoryBank'
 import type { StarStory, EvidenceTopic } from '@/features/applications/stages/types/workspace'
 import type { ApplicationDetail } from '@/lib/types/applications.types'
@@ -197,5 +203,27 @@ describe('BarRaiserWorkspace', () => {
     expect(screen.getAllByText('Customer Obsession').length).toBeGreaterThan(0)
     // empty bank → all principles uncovered → draft CTAs present
     expect(screen.getAllByRole('button', { name: /Draft a story from this evidence/i }).length).toBeGreaterThan(0)
+  })
+})
+
+describe('FinalWorkspace', () => {
+  const detail = {
+    slug: 'final-acme', targetCompany: 'Acme', targetRole: 'Staff', status: 'offer-received',
+    interviewStage: 'final', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z',
+    context: { pipelineId: 'p', cumulativeInputTokens: 0, cumulativeOutputTokens: 0, cumulativeThinkingTokens: 0, cumulativeCostUsd: 0 },
+    research: null, analysis: null, interviewPrep: null,
+  } satisfies ApplicationDetail
+
+  it('computes a counter from base and confirms a decision action', () => {
+    window.localStorage.clear()
+    render(<FinalWorkspace detail={detail} />)
+    expect(screen.getByText('Fit 50%')).toBeTruthy() // default factors 5/5
+    fireEvent.change(screen.getByLabelText('Base'), { target: { value: '100,000' } })
+    expect(screen.getByText('110,000')).toBeTruthy() // suggested counter
+    fireEvent.click(screen.getByRole('button', { name: 'Decline' }))
+    expect(screen.getByText('Decline this offer?')).toBeTruthy()
+    const confirm = screen.getAllByRole('button', { name: 'Decline' }).find(b => b.className.includes('bg-red-600'))
+    fireEvent.click(confirm as HTMLElement)
+    expect(statusMutate).toHaveBeenCalledWith({ slug: 'final-acme', status: 'rejected' })
   })
 })

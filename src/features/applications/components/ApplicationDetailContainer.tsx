@@ -20,6 +20,7 @@ import { PhoneScreenWorkspace } from '../stages/workspaces/PhoneScreenWorkspace'
 import { SystemDesignWorkspace } from '../stages/workspaces/SystemDesignWorkspace'
 import { BehaviouralWorkspace } from '../stages/workspaces/BehaviouralWorkspace'
 import { BarRaiserWorkspace } from '../stages/workspaces/BarRaiserWorkspace'
+import { FinalWorkspace } from '../stages/workspaces/FinalWorkspace'
 import { STAGE_ORDER, stageIndex } from '../stages/types/stage'
 import { Button } from '@/components/ui/Button'
 import DropDownOptions from '@/components/ui/DropDownOptions'
@@ -44,6 +45,7 @@ function renderWorkspace(stage: InterviewStage, detail: ApplicationDetail) {
   if (stage === 'system-design') return <SystemDesignWorkspace detail={detail} />
   if (stage === 'behavioural') return <BehaviouralWorkspace detail={detail} />
   if (stage === 'bar-raiser') return <BarRaiserWorkspace detail={detail} />
+  if (stage === 'final') return <FinalWorkspace detail={detail} />
   return <StageWorkspacePlaceholder stage={stage} />
 }
 

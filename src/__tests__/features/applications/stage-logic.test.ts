@@ -5,7 +5,8 @@ import {
   stageProgress,
   isInterviewStage,
 } from '@/features/applications/stages/types/stage'
-import { interviewPrepToWorkspace, researchToTopics } from '@/features/applications/stages/types/workspace'
+import { interviewPrepToWorkspace, researchToTopics, negotiationLeverage } from '@/features/applications/stages/types/workspace'
+import { personalFitScore } from '@/features/applications/stages/hooks/useOfferDraft'
 import { LEADERSHIP_PRINCIPLES, storiesForPrinciple, coverageStrength } from '@/features/applications/stages/types/principles'
 import type { StarStory } from '@/features/applications/stages/types/workspace'
 import type { InterviewPrepOutput, ResearchOutput } from '@/lib/types/applications.types'
@@ -109,5 +110,27 @@ describe('leadership-principle coverage', () => {
     const matched = storiesForPrinciple(principle, stories)
     expect(matched).toHaveLength(1)
     expect(matched[0].id).toBe('1')
+  })
+})
+
+describe('offer logic', () => {
+  it('personalFitScore is weighted satisfaction across factors', () => {
+    expect(personalFitScore([{ key: 'a', weight: 5, score: 5 }])).toBe(50)
+    expect(personalFitScore([{ key: 'a', weight: 10, score: 10 }])).toBe(100)
+    expect(personalFitScore([{ key: 'a', weight: 0, score: 0 }])).toBe(0)
+  })
+
+  it('negotiationLeverage derives factual points from research', () => {
+    const research: ResearchOutput = {
+      fitSummary: '', fitRating: 'STRONG_FIT',
+      verifiedMatches: [{ skill: 'K8s', sourceCitation: 'x', depthBadge: 'd', recency: '2025' }],
+      partialMatches: [], gaps: [],
+      experienceSignals: { yearsExpected: '5', domain: 'infra', leadership: 'IC', scale: 'large' },
+      technologyInventory: { languages: [], frameworks: [], infrastructure: [], tools: [], methodologies: [] },
+    }
+    const points = negotiationLeverage(research)
+    expect(points.length).toBeGreaterThanOrEqual(3)
+    expect(points.some(p => p.includes('1 required skills'))).toBe(true)
+    expect(negotiationLeverage(null)).toEqual([])
   })
 })
