@@ -57,12 +57,12 @@ export function ApplicationDetailContainer({ slug }: { readonly slug: string }) 
         <button
           type="button"
           onClick={() => navigate({ to: '/applications/list' })}
-          className="mb-4 flex items-center gap-2 text-sm text-zinc-400 hover:text-zinc-200"
+          className="mb-4 flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Applications
         </button>
-        <div className="flex items-center gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+        <div className="flex items-center gap-3 rounded-xl border border-red-600/20 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400 px-4 py-3 text-sm">
           <AlertCircle className="h-5 w-5 shrink-0" />
           <span>{error.message}</span>
         </div>
@@ -84,7 +84,7 @@ export function ApplicationDetailContainer({ slug }: { readonly slug: string }) 
       <button
         type="button"
         onClick={() => navigate({ to: '/applications/list' })}
-        className="mb-6 flex items-center gap-2 text-sm text-zinc-400 transition-colors hover:text-zinc-200"
+        className="mb-6 flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 transition-colors hover:text-zinc-900 dark:hover:text-zinc-200"
       >
         <ArrowLeft className="h-4 w-4" />
         Back to Applications
@@ -95,14 +95,14 @@ export function ApplicationDetailContainer({ slug }: { readonly slug: string }) 
         <div className="flex items-start justify-between">
           <div>
             <div className="flex items-center gap-3">
-              <Building2 className="h-5 w-5 text-zinc-400" />
-              <h1 className="text-2xl font-bold tracking-tight text-zinc-100">
+              <Building2 className="h-5 w-5 text-zinc-500 dark:text-zinc-400" />
+              <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
                 {detail.targetCompany}
               </h1>
             </div>
             <div className="mt-1 flex items-center gap-3">
               <Briefcase className="h-4 w-4 text-zinc-500" />
-              <span className="text-base text-zinc-400">{detail.targetRole}</span>
+              <span className="text-base text-zinc-600 dark:text-zinc-400">{detail.targetRole}</span>
             </div>
           </div>
 
