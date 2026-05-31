@@ -16,6 +16,7 @@ import { StageProgressBar } from '../stages/components/StageProgressBar'
 import { StageWorkspacePlaceholder } from '../stages/components/StageWorkspacePlaceholder'
 import { NotesAndTimelinePanel } from '../stages/components/NotesAndTimelinePanel'
 import { TechnicalWorkspace } from '../stages/workspaces/TechnicalWorkspace'
+import { PhoneScreenWorkspace } from '../stages/workspaces/PhoneScreenWorkspace'
 import { STAGE_ORDER, stageIndex } from '../stages/types/stage'
 import { Button } from '@/components/ui/Button'
 import DropDownOptions from '@/components/ui/DropDownOptions'
@@ -35,6 +36,7 @@ import {
  *  honest placeholder until their workspace lands (per the PR sequencing). */
 function renderWorkspace(stage: InterviewStage, detail: ApplicationDetail) {
   if (stage === 'applied') return <ApplicationReviewDetail detail={detail} />
+  if (stage === 'phone-screen') return <PhoneScreenWorkspace detail={detail} />
   if (stage === 'technical') return <TechnicalWorkspace detail={detail} />
   return <StageWorkspacePlaceholder stage={stage} />
 }

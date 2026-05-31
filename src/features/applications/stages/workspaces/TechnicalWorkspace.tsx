@@ -6,6 +6,7 @@ import { Sparkles, Timer, FolderOpen } from 'lucide-react'
 import type { ApplicationDetail } from '@/lib/types/applications.types'
 import { Card } from '@/components/ui/Card'
 import { ScheduleCard } from '../components/ScheduleCard'
+import { SectionHeading } from '../components/SectionHeading'
 import { TopicCard } from '../components/TopicCard'
 import { PracticeModal } from '../components/PracticeModal'
 import { useStageDraft } from '../hooks/useStageDraft'
@@ -27,15 +28,6 @@ const PRACTICE_GENERATE: PracticeState = {
 const PRACTICE_MOCK: PracticeState = {
   title: 'Self-mock: time-boxed exercise',
   blurb: 'A timed exercise that mirrors the real round format, so you can rehearse under pressure.',
-}
-
-function SectionHeading({ title, subtitle }: { readonly title: string; readonly subtitle?: string }) {
-  return (
-    <div>
-      <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">{title}</h3>
-      {subtitle && <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">{subtitle}</p>}
-    </div>
-  )
 }
 
 /**

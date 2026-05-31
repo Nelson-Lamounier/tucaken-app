@@ -16,6 +16,7 @@ import { StoryCard } from '@/features/applications/stages/components/StoryCard'
 import { StageProgressBar } from '@/features/applications/stages/components/StageProgressBar'
 import { EvidenceCard } from '@/features/applications/stages/components/EvidenceCard'
 import { TechnicalWorkspace } from '@/features/applications/stages/workspaces/TechnicalWorkspace'
+import { PhoneScreenWorkspace } from '@/features/applications/stages/workspaces/PhoneScreenWorkspace'
 import type { StarStory, EvidenceTopic } from '@/features/applications/stages/types/workspace'
 import type { ApplicationDetail } from '@/lib/types/applications.types'
 
@@ -112,5 +113,15 @@ describe('TechnicalWorkspace', () => {
     expect(screen.queryByText(/Coming soon/)).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /Generate a practice question/i }))
     expect(screen.getByText(/Coming soon/)).toBeTruthy()
+  })
+
+  it('Phone Screen surfaces talking points, questions, and an editable comp target', () => {
+    render(<PhoneScreenWorkspace detail={detail} />)
+    expect(screen.getByText('Your talking points')).toBeTruthy()
+    expect(screen.getByText('Kubernetes')).toBeTruthy() // verified match → talking point
+    expect(screen.getByText(/What does success look like/)).toBeTruthy() // default question
+    const comp = screen.getByLabelText('Your target')
+    fireEvent.change(comp, { target: { value: '£100k base' } })
+    expect(screen.getByText(/£100k base/)).toBeTruthy() // reflected in suggested response
   })
 })

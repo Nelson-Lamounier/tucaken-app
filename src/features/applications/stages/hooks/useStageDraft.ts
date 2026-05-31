@@ -18,6 +18,8 @@ export interface StageDraft {
   readonly scheduleAt: string
   /** Free-text format breakdown (e.g. "30m coding + 30m systems"). */
   readonly formatNote: string
+  /** User's saved comp target (Phone Screen comp conversation). */
+  readonly compTarget: string
 }
 
 const EMPTY_DRAFT: StageDraft = {
@@ -26,6 +28,7 @@ const EMPTY_DRAFT: StageDraft = {
   selectedStoryIds: [],
   scheduleAt: '',
   formatNote: '',
+  compTarget: '',
 }
 
 function storageKey(slug: string, stage: InterviewStage): string {
@@ -51,6 +54,8 @@ interface UseStageDraft {
   readonly toggleChecked: (id: string) => void
   readonly toggleStory: (id: string) => void
   readonly setSchedule: (patch: Partial<Pick<StageDraft, 'scheduleAt' | 'formatNote'>>) => void
+  /** Merge any scalar draft fields (e.g. compTarget). */
+  readonly patch: (patch: Partial<StageDraft>) => void
 }
 
 export function useStageDraft(slug: string, stage: InterviewStage): UseStageDraft {
@@ -82,12 +87,16 @@ export function useStageDraft(slug: string, stage: InterviewStage): UseStageDraf
     setDraft(prev => ({ ...prev, selectedStoryIds: toggleId(prev.selectedStoryIds, id) }))
   }, [])
 
+  const patch = useCallback((p: Partial<StageDraft>) => {
+    setDraft(prev => ({ ...prev, ...p }))
+  }, [])
+
   const setSchedule = useCallback(
-    (patch: Partial<Pick<StageDraft, 'scheduleAt' | 'formatNote'>>) => {
-      setDraft(prev => ({ ...prev, ...patch }))
+    (p: Partial<Pick<StageDraft, 'scheduleAt' | 'formatNote'>>) => {
+      setDraft(prev => ({ ...prev, ...p }))
     },
     [],
   )
 
-  return { draft, setNotes, toggleChecked, toggleStory, setSchedule }
+  return { draft, setNotes, toggleChecked, toggleStory, setSchedule, patch }
 }
