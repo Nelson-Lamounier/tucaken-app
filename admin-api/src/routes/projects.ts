@@ -81,6 +81,16 @@ const VALID_CONFIDENCE   = new Set(['high', 'medium', 'low']);
 
 const SLUG_REGEX = /^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$/;
 
+// Non-secret redis-cache connection env for the job-strategist Jobs
+// (case-study + clustering). The password is mounted separately via the
+// job-strategist-redis-cache secret (envFromSecretRefs). When the secret is
+// absent the Jobs fail-open to "cache disabled" and run uncached — never broken.
+const REDIS_CACHE_ENV: { name: string; value: string }[] = [
+    { name: 'REDIS_CACHE_HOST', value: 'redis-cache-master.redis-cache.svc.cluster.local' },
+    { name: 'REDIS_CACHE_PORT', value: '6379' },
+    { name: 'REDIS_CACHE_TLS',  value: 'false' },
+];
+
 function isUuid(value: unknown): value is string {
     return typeof value === 'string'
         && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
@@ -579,8 +589,9 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
             env: [
                 { name: 'CLUSTERING_PIPELINE_RUN_ID', value: pipelineRunId },
                 { name: 'USER_ID',                    value: uid },
+                ...REDIS_CACHE_ENV,
             ],
-            envFromSecretRefs: ['platform-rds-credentials'],
+            envFromSecretRefs: ['platform-rds-credentials', 'job-strategist-redis-cache'],
         });
 
         try {
@@ -723,8 +734,9 @@ async function dispatchCaseStudyJob(
             { name: 'CASE_STUDY_PIPELINE_RUN_ID', value: pipelineRunId },
             { name: 'PROJECT_ID',                 value: projectId },
             { name: 'USER_ID',                    value: userId },
+            ...REDIS_CACHE_ENV,
         ],
-        envFromSecretRefs: ['platform-rds-credentials'],
+        envFromSecretRefs: ['platform-rds-credentials', 'job-strategist-redis-cache'],
     });
 
     try {
