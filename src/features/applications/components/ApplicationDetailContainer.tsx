@@ -10,8 +10,10 @@ import {
   GraduationCap,
 } from 'lucide-react'
 import { useApplicationDetail, useApplicationStatus } from '@/hooks/use-admin-applications'
-import type { ApplicationStatus } from '@/lib/types/applications.types'
+import type { ApplicationStatus, InterviewStage } from '@/lib/types/applications.types'
 import { ApplicationReviewDetail } from './ApplicationReviewDetail'
+import { StageProgressBar } from '../stages/components/StageProgressBar'
+import { StageWorkspacePlaceholder } from '../stages/components/StageWorkspacePlaceholder'
 import DropDownOptions from '@/components/ui/DropDownOptions'
 
 import {
@@ -25,7 +27,14 @@ import {
 
 
 
-export function ApplicationDetailContainer({ slug }: { readonly slug: string }) {
+interface ApplicationDetailContainerProps {
+  readonly slug: string
+  /** Active Stage from the `?stage` search param. Falls back to the
+   *  application's Current Stage once the detail loads. */
+  readonly activeStage?: InterviewStage
+}
+
+export function ApplicationDetailContainer({ slug, activeStage }: ApplicationDetailContainerProps) {
   const navigate = useNavigate()
   const statusMutation = useApplicationStatus()
 
@@ -37,6 +46,13 @@ export function ApplicationDetailContainer({ slug }: { readonly slug: string }) 
       statusMutation.mutate({ slug, status: newStatus })
     },
     [slug, statusMutation],
+  )
+
+  const handleStageSelect = useCallback(
+    (stage: InterviewStage) => {
+      void navigate({ to: '/applications/$slug', params: { slug }, search: { stage } })
+    },
+    [slug, navigate],
   )
 
 
@@ -71,6 +87,9 @@ export function ApplicationDetailContainer({ slug }: { readonly slug: string }) 
   }
 
   if (!detail) return null
+
+  // Active Stage = explicit ?stage param, else the application's Current Stage.
+  const resolvedStage: InterviewStage = activeStage ?? detail.interviewStage
 
   const dateStr = new Date(detail.createdAt).toLocaleDateString('en-GB', {
     day: 'numeric',
@@ -150,8 +169,22 @@ export function ApplicationDetailContainer({ slug }: { readonly slug: string }) 
         </div>
       </div>
 
+      {/* Stage navigation */}
+      <div className="mt-2">
+        <StageProgressBar
+          current={detail.interviewStage}
+          active={resolvedStage}
+          onSelect={handleStageSelect}
+        />
+      </div>
+
+      {/* Active stage workspace */}
       <div className="mt-8 space-y-12">
-        <ApplicationReviewDetail detail={detail} />
+        {resolvedStage === 'applied' ? (
+          <ApplicationReviewDetail detail={detail} />
+        ) : (
+          <StageWorkspacePlaceholder stage={resolvedStage} />
+        )}
       </div>
     </div>
   )
