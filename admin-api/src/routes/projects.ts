@@ -53,7 +53,6 @@ import { Hono } from 'hono';
 import type { Pool } from 'pg';
 
 import { getJobImage, isImageConfigured, type AdminApiConfig } from '../lib/config.js';
-import { generateInstallationToken } from '../lib/github-app.js';
 import { buildPipelineJob, sanitizeLabel } from '../lib/k8s-job-builder.js';
 import { getBatchApi } from '../lib/k8s.js';
 import { getPool, withUser } from '../lib/pg.js';
@@ -659,28 +658,18 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
 // Connection rows live outside RLS-scoped tables; the helper queries the
 // pool directly using the superuser connection.
 // ───────────────────────────────────────────────────────────────────────────
-async function getGitHubInstallation(
-    pool: Pool,
-    userId: string,
-): Promise<{ installation_id: string } | null> {
-    const r = await pool.query<{ installation_id: string | null }>(
-        `SELECT installation_id FROM oauth_connections
-          WHERE user_id = $1::uuid AND provider = 'github'`,
-        [userId],
-    );
-    const row = r.rows[0];
-    if (!row?.installation_id) return null;
-    return { installation_id: row.installation_id };
-}
-
 // ───────────────────────────────────────────────────────────────────────────
 // Case-study Job dispatch helper.
 //
 // Used by both /:id/confirm (best-effort) and /:id/regenerate (strict —
 // the caller propagates the failure). Returns a discriminated union so
-// callers can distinguish "user can retry later" failures (no GitHub
-// connection, image not yet configured, K8s rejection) from "data
-// integrity broken" failures (pipeline_runs INSERT failed).
+// callers can distinguish "user can retry later" failures (image not yet
+// configured, K8s rejection) from "data integrity broken" failures
+// (pipeline_runs INSERT failed).
+//
+// The case-study Job reads commit/PR evidence from RDS (repo_commits /
+// repo_pull_requests), so it needs no GitHub token — ingestion is the only
+// GitHub scan.
 //
 // `triggeredBy` lands on pipeline_runs.metadata so analytics can split
 // confirm-driven from manual regenerations.
@@ -696,27 +685,9 @@ async function dispatchCaseStudyJob(
     projectId: string,
     triggeredBy: 'confirm' | 'manual',
 ): Promise<DispatchResult> {
-    const { githubAppId, githubPrivateKey } = config;
-    if (!githubAppId || !githubPrivateKey) {
-        return { ok: false, fatal: false, reason: 'github_app_not_configured' };
-    }
-
     const image = getJobImage('job-strategist');
     if (!isImageConfigured(image)) {
         return { ok: false, fatal: false, reason: 'image_not_configured' };
-    }
-
-    const installation = await getGitHubInstallation(pool, userId);
-    if (!installation) return { ok: false, fatal: false, reason: 'github_not_connected' };
-
-    let githubToken: string;
-    try {
-        githubToken = await generateInstallationToken(
-            githubAppId, githubPrivateKey, installation.installation_id,
-        );
-    } catch (err) {
-        console.error('[projects/dispatch] installation token failed', err);
-        return { ok: false, fatal: false, reason: 'installation_token_failed' };
     }
 
     const pipelineRunId = randomUUID();
@@ -752,7 +723,6 @@ async function dispatchCaseStudyJob(
             { name: 'CASE_STUDY_PIPELINE_RUN_ID', value: pipelineRunId },
             { name: 'PROJECT_ID',                 value: projectId },
             { name: 'USER_ID',                    value: userId },
-            { name: 'GITHUB_TOKEN',               value: githubToken },
         ],
         envFromSecretRefs: ['platform-rds-credentials'],
     });
