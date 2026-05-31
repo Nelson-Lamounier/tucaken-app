@@ -14,6 +14,9 @@ import type { ApplicationStatus, InterviewStage } from '@/lib/types/applications
 import { ApplicationReviewDetail } from './ApplicationReviewDetail'
 import { StageProgressBar } from '../stages/components/StageProgressBar'
 import { StageWorkspacePlaceholder } from '../stages/components/StageWorkspacePlaceholder'
+import { NotesAndTimelinePanel } from '../stages/components/NotesAndTimelinePanel'
+import { STAGE_ORDER, stageIndex } from '../stages/types/stage'
+import { Button } from '@/components/ui/Button'
 import DropDownOptions from '@/components/ui/DropDownOptions'
 
 import {
@@ -53,6 +56,16 @@ export function ApplicationDetailContainer({ slug, activeStage }: ApplicationDet
       void navigate({ to: '/applications/$slug', params: { slug }, search: { stage } })
     },
     [slug, navigate],
+  )
+
+  const handleAdvance = useCallback(
+    (current: InterviewStage, status: ApplicationStatus) => {
+      const next = STAGE_ORDER[stageIndex(current) + 1]
+      if (!next) return
+      statusMutation.mutate({ slug, status, interviewStage: next })
+      void navigate({ to: '/applications/$slug', params: { slug }, search: { stage: next } })
+    },
+    [slug, navigate, statusMutation],
   )
 
 
@@ -178,13 +191,31 @@ export function ApplicationDetailContainer({ slug, activeStage }: ApplicationDet
         />
       </div>
 
-      {/* Active stage workspace */}
-      <div className="mt-8 space-y-12">
-        {resolvedStage === 'applied' ? (
-          <ApplicationReviewDetail detail={detail} />
-        ) : (
-          <StageWorkspacePlaceholder stage={resolvedStage} />
-        )}
+      {/* Active stage workspace + persistent notes/timeline panel */}
+      <div className="mt-8 flex flex-col gap-6 lg:flex-row lg:items-start">
+        <div className="min-w-0 flex-1 space-y-8">
+          {resolvedStage === 'applied' ? (
+            <ApplicationReviewDetail detail={detail} />
+          ) : (
+            <StageWorkspacePlaceholder stage={resolvedStage} />
+          )}
+
+          {stageIndex(resolvedStage) < STAGE_ORDER.length - 1 && (
+            <div className="flex justify-end border-t border-zinc-200 pt-6 dark:border-white/10">
+              <Button
+                variant="primary"
+                disabled={statusMutation.isPending}
+                onClick={() => handleAdvance(resolvedStage, detail.status)}
+              >
+                Mark complete and advance
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <div className="lg:sticky lg:top-6">
+          <NotesAndTimelinePanel detail={detail} activeStage={resolvedStage} />
+        </div>
       </div>
     </div>
   )
