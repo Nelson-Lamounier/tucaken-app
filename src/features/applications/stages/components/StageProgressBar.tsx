@@ -74,7 +74,7 @@ function StageDot({ completed, current }: { readonly completed: boolean; readonl
     )
   }
   if (current) {
-    return <span className="size-4 rounded-full bg-[var(--accent)] ring-2 ring-[color-mix(in_oklab,var(--accent)_30%,transparent)]" aria-hidden />
+    return <span className="size-4 rounded-full bg-(--accent) ring-2 ring-[color-mix(in_oklab,var(--accent)_30%,transparent)]" aria-hidden />
   }
   return <span className="size-4 rounded-full border border-zinc-300 dark:border-zinc-600" aria-hidden />
 }

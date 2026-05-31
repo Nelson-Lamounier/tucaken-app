@@ -17,7 +17,7 @@ export function ChecklistItem({ entry, checked, onToggle }: ChecklistItemProps) 
         type="checkbox"
         checked={checked}
         onChange={() => onToggle(entry.id)}
-        className="mt-0.5 size-4 rounded border-zinc-300 bg-white text-[var(--accent)] focus:ring-teal-500/30 dark:border-zinc-600 dark:bg-zinc-800"
+        className="mt-0.5 size-4 rounded border-zinc-300 bg-white text-(--accent) focus:ring-teal-500/30 dark:border-zinc-600 dark:bg-zinc-800"
       />
       <span className="min-w-0 flex-1">
         <span className="block text-sm text-zinc-800 dark:text-zinc-200">{entry.label}</span>

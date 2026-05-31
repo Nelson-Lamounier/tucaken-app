@@ -10,11 +10,12 @@ import {
   GraduationCap,
 } from 'lucide-react'
 import { useApplicationDetail, useApplicationStatus } from '@/hooks/use-admin-applications'
-import type { ApplicationStatus, InterviewStage } from '@/lib/types/applications.types'
+import type { ApplicationStatus, InterviewStage, ApplicationDetail } from '@/lib/types/applications.types'
 import { ApplicationReviewDetail } from './ApplicationReviewDetail'
 import { StageProgressBar } from '../stages/components/StageProgressBar'
 import { StageWorkspacePlaceholder } from '../stages/components/StageWorkspacePlaceholder'
 import { NotesAndTimelinePanel } from '../stages/components/NotesAndTimelinePanel'
+import { TechnicalWorkspace } from '../stages/workspaces/TechnicalWorkspace'
 import { STAGE_ORDER, stageIndex } from '../stages/types/stage'
 import { Button } from '@/components/ui/Button'
 import DropDownOptions from '@/components/ui/DropDownOptions'
@@ -29,6 +30,14 @@ import {
 } from './ApplicationTypes'
 
 
+
+/** Active-stage body. Applied + Technical have workspaces; the rest show an
+ *  honest placeholder until their workspace lands (per the PR sequencing). */
+function renderWorkspace(stage: InterviewStage, detail: ApplicationDetail) {
+  if (stage === 'applied') return <ApplicationReviewDetail detail={detail} />
+  if (stage === 'technical') return <TechnicalWorkspace detail={detail} />
+  return <StageWorkspacePlaceholder stage={stage} />
+}
 
 interface ApplicationDetailContainerProps {
   readonly slug: string
@@ -194,11 +203,7 @@ export function ApplicationDetailContainer({ slug, activeStage }: ApplicationDet
       {/* Active stage workspace + persistent notes/timeline panel */}
       <div className="mt-8 flex flex-col gap-6 lg:flex-row lg:items-start">
         <div className="min-w-0 flex-1 space-y-8">
-          {resolvedStage === 'applied' ? (
-            <ApplicationReviewDetail detail={detail} />
-          ) : (
-            <StageWorkspacePlaceholder stage={resolvedStage} />
-          )}
+          {renderWorkspace(resolvedStage, detail)}
 
           {stageIndex(resolvedStage) < STAGE_ORDER.length - 1 && (
             <div className="flex justify-end border-t border-zinc-200 pt-6 dark:border-white/10">

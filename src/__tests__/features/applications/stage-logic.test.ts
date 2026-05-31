@@ -5,8 +5,8 @@ import {
   stageProgress,
   isInterviewStage,
 } from '@/features/applications/stages/types/stage'
-import { interviewPrepToWorkspace } from '@/features/applications/stages/types/workspace'
-import type { InterviewPrepOutput } from '@/lib/types/applications.types'
+import { interviewPrepToWorkspace, researchToTopics } from '@/features/applications/stages/types/workspace'
+import type { InterviewPrepOutput, ResearchOutput } from '@/lib/types/applications.types'
 
 describe('stage ordering', () => {
   it('has the seven stages in canonical order', () => {
@@ -65,5 +65,28 @@ describe('interviewPrepToWorkspace adapter', () => {
     const ws = interviewPrepToWorkspace('phone-screen', null)
     expect(ws.questionsToAsk).toEqual([])
     expect(ws.coachingNotes).toBeNull()
+  })
+})
+
+describe('researchToTopics adapter', () => {
+  it('maps verified/partial/gap matches to strength-tiered topics', () => {
+    const research: ResearchOutput = {
+      fitSummary: '',
+      fitRating: 'STRONG_FIT',
+      verifiedMatches: [{ skill: 'Kubernetes', sourceCitation: 'repo X', depthBadge: 'deep', recency: '2025' }],
+      partialMatches: [{ skill: 'Kafka', gapDescription: 'light usage', transferableFoundation: 'queues', framingSuggestion: 'frame via SQS' }],
+      gaps: [{ skill: 'Rust', gapType: 'hard', severity: 'major', isDisqualifying: true }],
+      experienceSignals: { yearsExpected: '5', domain: 'infra', leadership: 'IC', scale: 'mid' },
+      technologyInventory: { languages: [], frameworks: [], infrastructure: [], tools: [], methodologies: [] },
+    }
+    const topics = researchToTopics(research)
+    expect(topics.map(t => t.strength)).toEqual(['strong', 'moderate', 'none'])
+    expect(topics[0].title).toBe('Kubernetes')
+    expect(topics[1].beHonest).toBe('frame via SQS')
+    expect(topics[2].beHonest).toContain('weighted heavily')
+  })
+
+  it('returns empty for null research', () => {
+    expect(researchToTopics(null)).toEqual([])
   })
 })

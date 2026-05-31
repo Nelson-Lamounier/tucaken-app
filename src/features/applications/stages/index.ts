@@ -9,6 +9,10 @@ export { TopicCard } from './components/TopicCard'
 export { ProjectReferenceCard } from './components/ProjectReferenceCard'
 export { ChecklistItem } from './components/ChecklistItem'
 export { StoryCard } from './components/StoryCard'
+export { ScheduleCard } from './components/ScheduleCard'
+export { PracticeModal } from './components/PracticeModal'
+
+export { TechnicalWorkspace } from './workspaces/TechnicalWorkspace'
 
 export { useStageDraft } from './hooks/useStageDraft'
 export type { StageDraft } from './hooks/useStageDraft'
@@ -24,6 +28,7 @@ export type { StageProgress } from './types/stage'
 export {
   STORY_THEMES,
   interviewPrepToWorkspace,
+  researchToTopics,
 } from './types/workspace'
 export type {
   EvidenceStrength,

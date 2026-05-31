@@ -1,6 +1,7 @@
 import type {
   InterviewStage,
   InterviewPrepOutput,
+  ResearchOutput,
 } from '@/lib/types/applications.types'
 
 // =============================================================================
@@ -89,6 +90,41 @@ export interface StageWorkspaceData {
   readonly questionsToAsk: readonly ChecklistEntry[]
   /** Free-text coaching notes (Markdown) — real, from the Coach Agent. */
   readonly coachingNotes: string | null
+}
+
+/**
+ * Adapter: real Research Agent output → Evidence Topics. Verified matches are
+ * `strong`, partial matches `moderate` (with the framing suggestion as the
+ * be-honest guidance), gaps `none` (with their transferable foundation). This
+ * is genuine evidence — not mock. Project deep-links per topic have no backend
+ * yet, so `projectRefs` stays empty until the topic→project linkage lands.
+ */
+export function researchToTopics(research: ResearchOutput | null): readonly EvidenceTopic[] {
+  if (!research) return []
+  const strong: EvidenceTopic[] = research.verifiedMatches.map((m, i) => ({
+    id: `vm-${String(i)}`,
+    title: m.skill,
+    strength: 'strong',
+    summary: m.sourceCitation,
+    projectRefs: [], // BACKEND: follow-on (topic→project linkage)
+  }))
+  const moderate: EvidenceTopic[] = research.partialMatches.map((m, i) => ({
+    id: `pm-${String(i)}`,
+    title: m.skill,
+    strength: 'moderate',
+    summary: m.gapDescription,
+    projectRefs: [],
+    beHonest: m.framingSuggestion,
+  }))
+  const none: EvidenceTopic[] = research.gaps.map((g, i) => ({
+    id: `gap-${String(i)}`,
+    title: g.skill,
+    strength: 'none',
+    summary: g.severity,
+    projectRefs: [],
+    beHonest: `Acknowledge the gap directly${g.isDisqualifying ? ' — this one is weighted heavily for the role' : ''}.`,
+  }))
+  return [...strong, ...moderate, ...none]
 }
 
 /**

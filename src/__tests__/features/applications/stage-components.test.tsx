@@ -15,7 +15,9 @@ import { EvidenceIndicator } from '@/features/applications/stages/components/Evi
 import { StoryCard } from '@/features/applications/stages/components/StoryCard'
 import { StageProgressBar } from '@/features/applications/stages/components/StageProgressBar'
 import { EvidenceCard } from '@/features/applications/stages/components/EvidenceCard'
+import { TechnicalWorkspace } from '@/features/applications/stages/workspaces/TechnicalWorkspace'
 import type { StarStory, EvidenceTopic } from '@/features/applications/stages/types/workspace'
+import type { ApplicationDetail } from '@/lib/types/applications.types'
 
 describe('EvidenceIndicator', () => {
   it('renders a textual label, never colour-only', () => {
@@ -77,5 +79,38 @@ describe('StageProgressBar', () => {
     expect(screen.getAllByRole('tab')).toHaveLength(7)
     fireEvent.click(screen.getByRole('tab', { name: /Behavioural/i }))
     expect(onSelect).toHaveBeenCalledWith('behavioural')
+  })
+})
+
+describe('TechnicalWorkspace', () => {
+  const detail = {
+    slug: 'acme-sre',
+    targetCompany: 'Acme',
+    targetRole: 'SRE',
+    status: 'interviewing',
+    interviewStage: 'technical',
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-02T00:00:00Z',
+    context: { pipelineId: 'p', cumulativeInputTokens: 0, cumulativeOutputTokens: 0, cumulativeThinkingTokens: 0, cumulativeCostUsd: 0 },
+    research: {
+      fitSummary: '',
+      fitRating: 'STRONG_FIT',
+      verifiedMatches: [{ skill: 'Kubernetes', sourceCitation: 'repo X', depthBadge: 'deep', recency: '2025' }],
+      partialMatches: [],
+      gaps: [],
+      experienceSignals: { yearsExpected: '5', domain: 'infra', leadership: 'IC', scale: 'mid' },
+      technologyInventory: { languages: [], frameworks: [], infrastructure: [], tools: [], methodologies: [] },
+    },
+    analysis: null,
+    interviewPrep: null,
+  } satisfies ApplicationDetail
+
+  it('renders evidence topics from research and opens the practice modal', () => {
+    render(<TechnicalWorkspace detail={detail} />)
+    expect(screen.getByText('Kubernetes')).toBeTruthy()
+    expect(screen.getByText('Strong evidence')).toBeTruthy()
+    expect(screen.queryByText(/Coming soon/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Generate a practice question/i }))
+    expect(screen.getByText(/Coming soon/)).toBeTruthy()
   })
 })
