@@ -15,6 +15,7 @@ import { ApplicationReviewDetail } from './ApplicationReviewDetail'
 import { StageProgressBar } from '../stages/components/StageProgressBar'
 import { StageWorkspacePlaceholder } from '../stages/components/StageWorkspacePlaceholder'
 import { NotesAndTimelinePanel } from '../stages/components/NotesAndTimelinePanel'
+import { StageWorkspaceSkeleton } from '../stages/components/StageWorkspaceSkeleton'
 import { TechnicalWorkspace } from '../stages/workspaces/TechnicalWorkspace'
 import { PhoneScreenWorkspace } from '../stages/workspaces/PhoneScreenWorkspace'
 import { SystemDesignWorkspace } from '../stages/workspaces/SystemDesignWorkspace'
@@ -89,13 +90,9 @@ export function ApplicationDetailContainer({ slug, activeStage }: ApplicationDet
 
 
 
-  // Loading state
+  // Loading state — layout-matched skeleton, not a spinner
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-32">
-        <Loader2 className="h-8 w-8 animate-spin text-violet-400" />
-      </div>
-    )
+    return <StageWorkspaceSkeleton />
   }
 
   // Error state

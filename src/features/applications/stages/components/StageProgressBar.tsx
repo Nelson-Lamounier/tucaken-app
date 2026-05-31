@@ -39,6 +39,7 @@ export function StageProgressBar({ current, active, onSelect }: StageProgressBar
               type="button"
               role="tab"
               aria-selected={isActive}
+              aria-current={isCurrent ? 'step' : undefined}
               onClick={() => onSelect(stage)}
               className={`relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-500 ${
                 isActive

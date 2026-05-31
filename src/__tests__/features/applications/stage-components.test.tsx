@@ -24,6 +24,7 @@ import { TechnicalWorkspace } from '@/features/applications/stages/workspaces/Te
 import { PhoneScreenWorkspace } from '@/features/applications/stages/workspaces/PhoneScreenWorkspace'
 import { SystemDesignWorkspace } from '@/features/applications/stages/workspaces/SystemDesignWorkspace'
 import { TradeoffBadge } from '@/features/applications/stages/components/TradeoffBadge'
+import { StageWorkspaceSkeleton } from '@/features/applications/stages/components/StageWorkspaceSkeleton'
 import { BehaviouralWorkspace } from '@/features/applications/stages/workspaces/BehaviouralWorkspace'
 import { BarRaiserWorkspace } from '@/features/applications/stages/workspaces/BarRaiserWorkspace'
 import { FinalWorkspace } from '@/features/applications/stages/workspaces/FinalWorkspace'
@@ -149,6 +150,14 @@ describe('TradeoffBadge', () => {
   it('renders its label', () => {
     render(<TradeoffBadge label="RDS+pgvector over a dedicated vector DB" />)
     expect(screen.getByText('RDS+pgvector over a dedicated vector DB')).toBeTruthy()
+  })
+})
+
+describe('StageWorkspaceSkeleton', () => {
+  it('exposes an aria-busy loading region (skeleton, not a spinner)', () => {
+    const { container } = render(<StageWorkspaceSkeleton />)
+    expect(container.querySelector('[aria-busy="true"]')).toBeTruthy()
+    expect(container.querySelector('.animate-pulse')).toBeTruthy()
   })
 })
 

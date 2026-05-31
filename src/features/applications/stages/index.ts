@@ -2,6 +2,7 @@
 
 export { StageProgressBar } from './components/StageProgressBar'
 export { StageWorkspacePlaceholder } from './components/StageWorkspacePlaceholder'
+export { StageWorkspaceSkeleton } from './components/StageWorkspaceSkeleton'
 export { NotesAndTimelinePanel } from './components/NotesAndTimelinePanel'
 export { EvidenceIndicator } from './components/EvidenceIndicator'
 export { EvidenceCard } from './components/EvidenceCard'

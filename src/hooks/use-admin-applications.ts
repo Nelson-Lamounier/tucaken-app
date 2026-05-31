@@ -205,21 +205,3 @@ export function usePipelineRunStatus(runId: string | null, enabled: boolean) {
   return data ?? null
 }
 
-export function useApplicationCoach() {
-  const queryClient = useQueryClient()
-
-  return useMutation<unknown, Error, { readonly applicationSlug: string; readonly interviewStage: InterviewStage }>({
-    mutationFn: async (variables) => {
-      // Stubbed network call for FAKE interaction
-      return { success: true, applicationSlug: variables.applicationSlug }
-    },
-    onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({
-        queryKey: adminKeys.applications.detail(variables.applicationSlug),
-      })
-      void queryClient.invalidateQueries({
-        queryKey: adminKeys.applications.all,
-      })
-    },
-  })
-}
