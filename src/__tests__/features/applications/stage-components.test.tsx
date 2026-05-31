@@ -17,6 +17,8 @@ import { StageProgressBar } from '@/features/applications/stages/components/Stag
 import { EvidenceCard } from '@/features/applications/stages/components/EvidenceCard'
 import { TechnicalWorkspace } from '@/features/applications/stages/workspaces/TechnicalWorkspace'
 import { PhoneScreenWorkspace } from '@/features/applications/stages/workspaces/PhoneScreenWorkspace'
+import { SystemDesignWorkspace } from '@/features/applications/stages/workspaces/SystemDesignWorkspace'
+import { TradeoffBadge } from '@/features/applications/stages/components/TradeoffBadge'
 import type { StarStory, EvidenceTopic } from '@/features/applications/stages/types/workspace'
 import type { ApplicationDetail } from '@/lib/types/applications.types'
 
@@ -123,5 +125,20 @@ describe('TechnicalWorkspace', () => {
     const comp = screen.getByLabelText('Your target')
     fireEvent.change(comp, { target: { value: '£100k base' } })
     expect(screen.getByText(/£100k base/)).toBeTruthy() // reflected in suggested response
+  })
+
+  it('System Design shows question patterns and expands a framework step', () => {
+    render(<SystemDesignWorkspace detail={detail} />)
+    expect(screen.getByText('Common question patterns')).toBeTruthy()
+    expect(screen.queryByText(/functional vs non-functional/)).toBeNull() // collapsed
+    fireEvent.click(screen.getByRole('button', { name: /Requirements & scope/i }))
+    expect(screen.getByText(/functional vs non-functional/)).toBeTruthy()
+  })
+})
+
+describe('TradeoffBadge', () => {
+  it('renders its label', () => {
+    render(<TradeoffBadge label="RDS+pgvector over a dedicated vector DB" />)
+    expect(screen.getByText('RDS+pgvector over a dedicated vector DB')).toBeTruthy()
   })
 })
