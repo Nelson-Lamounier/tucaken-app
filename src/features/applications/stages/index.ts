@@ -14,13 +14,17 @@ export { PracticeModal } from './components/PracticeModal'
 export { SectionHeading } from './components/SectionHeading'
 export { TradeoffBadge } from './components/TradeoffBadge'
 export { CollapsibleSection } from './components/CollapsibleSection'
+export { StoryForm } from './components/StoryForm'
 
 export { TechnicalWorkspace } from './workspaces/TechnicalWorkspace'
 export { PhoneScreenWorkspace } from './workspaces/PhoneScreenWorkspace'
 export { SystemDesignWorkspace } from './workspaces/SystemDesignWorkspace'
+export { BehaviouralWorkspace } from './workspaces/BehaviouralWorkspace'
 
 export { useStageDraft } from './hooks/useStageDraft'
 export type { StageDraft } from './hooks/useStageDraft'
+export { useStoryBank } from './hooks/useStoryBank'
+export type { StoryDraft } from './hooks/useStoryBank'
 
 export {
   STAGE_ORDER,

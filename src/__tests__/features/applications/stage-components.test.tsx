@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, renderHook, act } from '@testing-library/react'
 
 vi.mock('@tanstack/react-router', () => ({
   Link: ({ children, ...rest }: { children: React.ReactNode } & Record<string, unknown>) => (
@@ -19,6 +19,8 @@ import { TechnicalWorkspace } from '@/features/applications/stages/workspaces/Te
 import { PhoneScreenWorkspace } from '@/features/applications/stages/workspaces/PhoneScreenWorkspace'
 import { SystemDesignWorkspace } from '@/features/applications/stages/workspaces/SystemDesignWorkspace'
 import { TradeoffBadge } from '@/features/applications/stages/components/TradeoffBadge'
+import { BehaviouralWorkspace } from '@/features/applications/stages/workspaces/BehaviouralWorkspace'
+import { useStoryBank } from '@/features/applications/stages/hooks/useStoryBank'
 import type { StarStory, EvidenceTopic } from '@/features/applications/stages/types/workspace'
 import type { ApplicationDetail } from '@/lib/types/applications.types'
 
@@ -140,5 +142,41 @@ describe('TradeoffBadge', () => {
   it('renders its label', () => {
     render(<TradeoffBadge label="RDS+pgvector over a dedicated vector DB" />)
     expect(screen.getByText('RDS+pgvector over a dedicated vector DB')).toBeTruthy()
+  })
+})
+
+describe('useStoryBank', () => {
+  it('adds, updates, and removes stories (persisted by slug)', () => {
+    window.localStorage.clear()
+    const { result } = renderHook(() => useStoryBank('beh-test'))
+    expect(result.current.stories).toHaveLength(0)
+
+    act(() => result.current.addStory({ title: 'Outage', situation: 's', task: 't', action: 'a', result: 'r', themes: ['Leadership'] }))
+    expect(result.current.stories).toHaveLength(1)
+    const id = result.current.stories[0].id
+
+    act(() => result.current.updateStory(id, { title: 'Major outage', situation: 's', task: 't', action: 'a', result: 'r', themes: ['Leadership', 'Impact'] }))
+    expect(result.current.stories[0].title).toBe('Major outage')
+
+    act(() => result.current.removeStory(id))
+    expect(result.current.stories).toHaveLength(0)
+  })
+})
+
+describe('BehaviouralWorkspace', () => {
+  const detail = {
+    slug: 'beh-acme', targetCompany: 'Acme', targetRole: 'SRE', status: 'interviewing',
+    interviewStage: 'behavioural', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z',
+    context: { pipelineId: 'p', cumulativeInputTokens: 0, cumulativeOutputTokens: 0, cumulativeThinkingTokens: 0, cumulativeCostUsd: 0 },
+    research: null, analysis: null, interviewPrep: null,
+  } satisfies ApplicationDetail
+
+  it('shows empty bank, gaps for typical questions, and opens the add-story form', () => {
+    window.localStorage.clear()
+    render(<BehaviouralWorkspace detail={detail} />)
+    expect(screen.getByText(/story bank is empty/i)).toBeTruthy()
+    expect(screen.getAllByText('Gap — consider drafting').length).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('button', { name: /Add story/i }))
+    expect(screen.getByText('Add a story')).toBeTruthy()
   })
 })

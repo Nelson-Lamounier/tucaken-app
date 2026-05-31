@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, Play } from 'lucide-react'
+import { ChevronDown, Play, Pencil, Trash2 } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import type { StarStory } from '../types/workspace'
 
@@ -9,6 +9,8 @@ interface StoryCardProps {
   readonly story: StarStory
   /** "Practice telling this" — opens a rehearsal flow (stub in v1). */
   readonly onPractice?: (id: string) => void
+  readonly onEdit?: (id: string) => void
+  readonly onDelete?: (id: string) => void
 }
 
 type StarField = 'situation' | 'task' | 'action' | 'result'
@@ -24,7 +26,7 @@ const STAR_ROWS: readonly { key: StarField; label: string }[] = [
  * Situation/Task/Action/Result breakdown. See the Story term in
  * src/features/applications/CONTEXT.md.
  */
-export function StoryCard({ story, onPractice }: StoryCardProps) {
+export function StoryCard({ story, onPractice, onEdit, onDelete }: StoryCardProps) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -43,15 +45,29 @@ export function StoryCard({ story, onPractice }: StoryCardProps) {
             ))}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setOpen(o => !o)}
-          aria-expanded={open}
-          className="shrink-0 rounded-md p-1 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-white/5"
-        >
-          <ChevronDown className={`size-4 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
-          <span className="sr-only">{open ? 'Collapse' : 'Expand'} story</span>
-        </button>
+        <div className="flex shrink-0 items-center gap-0.5">
+          {onEdit && (
+            <button type="button" onClick={() => onEdit(story.id)} className="rounded-md p-1 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-white/5">
+              <Pencil className="size-3.5" aria-hidden />
+              <span className="sr-only">Edit story</span>
+            </button>
+          )}
+          {onDelete && (
+            <button type="button" onClick={() => onDelete(story.id)} className="rounded-md p-1 text-zinc-500 hover:bg-zinc-100 hover:text-red-600 dark:hover:bg-white/5 dark:hover:text-red-400">
+              <Trash2 className="size-3.5" aria-hidden />
+              <span className="sr-only">Delete story</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setOpen(o => !o)}
+            aria-expanded={open}
+            className="rounded-md p-1 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-white/5"
+          >
+            <ChevronDown className={`size-4 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
+            <span className="sr-only">{open ? 'Collapse' : 'Expand'} story</span>
+          </button>
+        </div>
       </div>
 
       {open && (
