@@ -109,21 +109,21 @@ export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }:
 
   if (submittedSlug) {
     return (
-      <div className="mb-8 overflow-hidden rounded-lg border border-white/10 bg-white/5 shadow-sm">
+      <div className="mb-8 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-white/10 dark:bg-white/5 shadow-sm">
         <ProgressBars slug={submittedSlug} pipelineRunId={submittedRunId ?? undefined} />
       </div>
     )
   }
 
   return (
-    <div className="mb-8 overflow-hidden rounded-lg border border-white/10 bg-white/5 shadow-sm">
-      <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-white/10">
+    <div className="mb-8 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-white/10 dark:bg-white/5 shadow-sm">
+      <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-zinc-200 dark:border-white/10">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl">
-            <Sparkles className="h-5 w-5 text-violet-400" />
+            <Sparkles className="h-5 w-5 text-violet-500 dark:text-violet-400" />
           </div>
           <div>
-            <h2 className="text-base font-semibold text-zinc-100">
+            <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
               Analyse New Job Description
             </h2>
             <p className="text-xs text-zinc-500">
@@ -135,12 +135,12 @@ export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }:
         </div>
         <div className="flex-none">
           {preselectedResumeId ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/10 px-2.5 py-1 text-xs font-medium text-indigo-400 ring-1 ring-inset ring-indigo-500/20">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 text-indigo-700 ring-indigo-600/20 dark:bg-indigo-500/10 dark:text-indigo-400 dark:ring-indigo-500/20 px-2.5 py-1 text-xs font-medium ring-1 ring-inset">
               <FileText className="size-3" />
               Resume selected
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-500/10 px-2.5 py-1 text-xs font-medium text-violet-400 ring-1 ring-inset ring-violet-500/20">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 text-violet-700 ring-violet-600/20 dark:bg-violet-500/10 dark:text-violet-400 dark:ring-violet-500/20 px-2.5 py-1 text-xs font-medium ring-1 ring-inset">
               <Wand2 className="size-3" />
               Building from scratch
             </span>
@@ -188,7 +188,7 @@ export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }:
           {/* Interview Stage + Resume Version row */}
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label htmlFor="interview-stage" className="mb-1.5 block text-sm/6 font-medium text-white">
+              <label htmlFor="interview-stage" className="mb-1.5 block text-sm/6 font-medium text-zinc-900 dark:text-white">
                 Interview Stage
               </label>
               <div className="mt-2">
@@ -201,10 +201,10 @@ export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }:
                       value={field.state.value}
                       onBlur={field.handleBlur}
                       onChange={(e) => field.handleChange(e.target.value as InterviewStage)}
-                      className="block p-2 w-full rounded-md border-0 bg-white/5 py-1.5 text-white shadow-sm ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm/6"
+                      className="block p-2 w-full rounded-md border-0 bg-zinc-50 dark:bg-white/5 py-1.5 text-zinc-900 dark:text-white shadow-sm ring-1 ring-inset ring-zinc-300 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-teal-500 sm:text-sm/6"
                     >
                       {INTERVIEW_STAGE_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value} className="bg-zinc-800 text-white">
+                        <option key={opt.value} value={opt.value} className="bg-white text-zinc-900 dark:bg-zinc-800 dark:text-white">
                           {opt.label}
                         </option>
                       ))}
@@ -232,11 +232,11 @@ export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }:
                     checked={field.state.value}
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.checked)}
-                    className="h-4 w-4 rounded border-zinc-700 bg-zinc-800 text-indigo-600 focus:ring-indigo-500/20 focus:ring-offset-0 focus:ring-offset-zinc-900"
+                    className="h-4 w-4 rounded border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-800 text-indigo-600 focus:ring-indigo-500/20 focus:ring-offset-0 focus:ring-offset-white dark:focus:ring-offset-zinc-900"
                   />
                 )}
               />
-              <label htmlFor="includeCoverLetter" className="text-sm font-medium text-zinc-300">
+              <label htmlFor="includeCoverLetter" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                 Generate Cover Letter
               </label>
             </div>
@@ -252,11 +252,11 @@ export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }:
                     checked={field.state.value}
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.checked)}
-                    className="h-4 w-4 rounded border-zinc-700 bg-zinc-800 text-emerald-500 focus:ring-emerald-500/20 focus:ring-offset-0 focus:ring-offset-zinc-900"
+                    className="h-4 w-4 rounded border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-800 text-emerald-500 focus:ring-emerald-500/20 focus:ring-offset-0 focus:ring-offset-white dark:focus:ring-offset-zinc-900"
                   />
                 )}
               />
-              <label htmlFor="testMode" className="text-sm font-medium text-emerald-400">
+              <label htmlFor="testMode" className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
                 Run in Test Mode (Mock API)
               </label>
             </div>
@@ -265,7 +265,7 @@ export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }:
           {/* Job Description textarea */}
           <div className="mt-4">
             <div className="mb-1.5 flex items-center justify-between">
-              <label htmlFor="job-description" className="block text-sm/6 font-medium text-white">
+              <label htmlFor="job-description" className="block text-sm/6 font-medium text-zinc-900 dark:text-white">
                 Job Description
               </label>
               <form.Subscribe
@@ -293,7 +293,7 @@ export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }:
                     onChange={(e) => field.handleChange(e.target.value)}
                     placeholder="Paste the full job description here. Include responsibilities, requirements, qualifications, and any other relevant details…"
                     rows={12}
-                    className="block p-2 w-full rounded-md border-0 bg-white/5 py-1.5 text-white shadow-sm ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm/6"
+                    className="block p-2 w-full rounded-md border-0 bg-zinc-50 dark:bg-white/5 py-1.5 text-zinc-900 dark:text-white shadow-sm ring-1 ring-inset ring-zinc-300 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-teal-500 sm:text-sm/6"
                   />
                 </div>
               )}
@@ -302,12 +302,12 @@ export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }:
 
           {/* Error */}
           {trigger.error && (
-            <div className="mt-4 flex flex-col gap-2 rounded-lg bg-red-500/10 px-4 py-3 text-sm text-red-500 border border-red-500/20">
+            <div className="mt-4 flex flex-col gap-2 rounded-lg bg-red-50 text-red-700 border border-red-600/20 dark:bg-red-500/10 dark:text-red-500 dark:border-red-500/20 px-4 py-3 text-sm">
               <div className="flex items-center gap-2 font-semibold">
                 <AlertCircle className="h-4 w-4 shrink-0" />
                 Analysis trigger failed
               </div>
-              <p className="text-red-400 whitespace-pre-wrap break-words">{trigger.error.message}</p>
+              <p className="text-red-600 dark:text-red-400 whitespace-pre-wrap break-words">{trigger.error.message}</p>
             </div>
           )}
 
