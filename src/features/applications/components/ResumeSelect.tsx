@@ -18,7 +18,7 @@ export function ResumeSelect({ onSelect }: ResumeSelectProps) {
   if (isLoading) {
     return (
       <div className="flex h-48 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-400" />
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-500 dark:text-indigo-400" />
       </div>
     )
   }
@@ -27,10 +27,10 @@ export function ResumeSelect({ onSelect }: ResumeSelectProps) {
 
   if (!hasResumes) {
     return (
-      <div className="mx-auto max-w-lg text-center mt-12 mb-8 overflow-hidden rounded-lg border border-white/10 bg-white/5 shadow-sm p-12">
+      <div className="mx-auto max-w-lg text-center mt-12 mb-8 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-white/10 dark:bg-white/5 shadow-sm p-12">
         <DocumentTextIcon className="mx-auto h-12 w-12 text-zinc-400" />
-        <h3 className="mt-2 text-sm font-semibold text-white">No resumes found</h3>
-        <p className="mt-1 text-sm text-zinc-400">
+        <h3 className="mt-2 text-sm font-semibold text-zinc-900 dark:text-white">No resumes found</h3>
+        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
           Create a resume first, or let the agent build one from your portfolio knowledge base.
         </p>
         <div className="mt-6 flex flex-col items-center gap-3">
@@ -44,7 +44,7 @@ export function ResumeSelect({ onSelect }: ResumeSelectProps) {
           <button
             type="button"
             onClick={() => onSelect('')}
-            className="inline-flex items-center gap-1.5 text-sm text-violet-400 hover:text-violet-300 transition-colors"
+            className="inline-flex items-center gap-1.5 text-sm text-violet-600 dark:text-violet-400 hover:text-violet-500 dark:hover:text-violet-300 transition-colors"
           >
             <Wand2 className="size-4" />
             Build from scratch with the agent
@@ -63,20 +63,20 @@ export function ResumeSelect({ onSelect }: ResumeSelectProps) {
 
   return (
     <div className="mx-auto max-w-2xl mt-8">
-      <h2 className="text-base font-semibold text-white">Select a Resume</h2>
-      <p className="mt-1 text-sm text-zinc-400">Choose the resume version you want to use for this analysis.</p>
-      
-      <ul role="list" className="mt-6 divide-y divide-white/10 border-y border-white/10">
+      <h2 className="text-base font-semibold text-zinc-900 dark:text-white">Select a Resume</h2>
+      <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Choose the resume version you want to use for this analysis.</p>
+
+      <ul role="list" className="mt-6 divide-y divide-zinc-200 dark:divide-white/10 border-y border-zinc-200 dark:border-white/10">
         {sortedResumes.map((resume) => (
           <li key={resume.resumeId}>
             <div 
-              className="group relative flex items-start space-x-3 py-4 cursor-pointer hover:bg-white/5 transition-colors"
+              className="group relative flex items-start space-x-3 py-4 cursor-pointer hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
               onClick={() => onSelect(resume.resumeId)}
             >
               <div className="shrink-0 ml-4">
                 <span
                   className={classNames(
-                    resume.isActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-indigo-500/20 text-indigo-400',
+                    resume.isActive ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-400',
                     'inline-flex size-10 items-center justify-center rounded-lg'
                   )}
                 >
@@ -84,15 +84,15 @@ export function ResumeSelect({ onSelect }: ResumeSelectProps) {
                 </span>
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium text-white flex items-center gap-2">
+                <div className="text-sm font-medium text-zinc-900 dark:text-white flex items-center gap-2">
                   <span>{resume.label}</span>
                   {resume.isActive && (
-                    <span className="inline-flex items-center rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-400 ring-1 ring-inset ring-emerald-500/20">
+                    <span className="inline-flex items-center rounded-md bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20 px-2 py-1 text-xs font-medium ring-1 ring-inset">
                       Active
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-zinc-400 mt-1">
+                <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
                   Last updated {new Date(resume.updatedAt).toLocaleDateString()}
                 </p>
               </div>
@@ -105,14 +105,14 @@ export function ResumeSelect({ onSelect }: ResumeSelectProps) {
       </ul>
       
       <div className="mt-6 flex items-center justify-between pl-4">
-        <Link to="/resumes/new" className="hidden sm:inline-flex items-center text-sm font-medium text-indigo-400 hover:text-indigo-300">
+        <Link to="/resumes/new" className="hidden sm:inline-flex items-center text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300">
           Or create a new resume
           <span aria-hidden="true" className="ml-1">&rarr;</span>
         </Link>
         <button
           type="button"
           onClick={() => onSelect('')}
-          className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-violet-400 transition-colors"
+          className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
         >
           <Wand2 className="size-4" />
           Build from scratch with the agent

@@ -130,7 +130,7 @@ export function ApplicationsList({ initialStage }: { initialStage?: string }) {
       )}
 
       {error && (
-        <div className="flex items-center gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+        <div className="flex items-center gap-3 rounded-xl border border-red-600/20 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400 px-4 py-3 text-sm">
             <AlertCircle className="h-5 w-5 shrink-0" />
             <span>Failed to load applications: {error.message}</span>
         </div>
@@ -138,11 +138,11 @@ export function ApplicationsList({ initialStage }: { initialStage?: string }) {
 
       {!isLoading && !error && filteredApps.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <Target className="mb-4 h-12 w-12 text-zinc-700" />
-          <h3 className="text-lg font-medium text-zinc-400">
+          <Target className="mb-4 h-12 w-12 text-zinc-300 dark:text-zinc-700" />
+          <h3 className="text-lg font-medium text-zinc-700 dark:text-zinc-400">
             No applications found
           </h3>
-          <p className="mt-1 text-sm text-zinc-600">
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-600">
             {searchQuery
               ? 'Try adjusting your search or filters'
               : 'Start by analysing a new job description above'}

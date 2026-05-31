@@ -49,9 +49,9 @@ export function CoverLetterForm({
       className="flex h-full flex-col px-4 pb-12 sm:px-6"
     >
       <div className="flex-1 space-y-12">
-        <div className="border-b border-white/10 pb-12 pt-4">
-          <h2 className="text-base/7 font-semibold text-white">Cover Letter Content</h2>
-          <p className="mt-1 text-sm/6 text-zinc-400">
+        <div className="border-b border-zinc-200 dark:border-white/10 pb-12 pt-4">
+          <h2 className="text-base/7 font-semibold text-zinc-900 dark:text-white">Cover Letter Content</h2>
+          <p className="mt-1 text-sm/6 text-zinc-600 dark:text-zinc-400">
             Edit the content of the tailored cover letter directly.
           </p>
           <div className="mt-6">
@@ -71,7 +71,7 @@ export function CoverLetterForm({
         </div>
       </div>
 
-      <div className="mt-8 flex items-center justify-end gap-x-4 border-t border-white/10 pt-8">
+      <div className="mt-8 flex items-center justify-end gap-x-4 border-t border-zinc-200 dark:border-white/10 pt-8">
         <Button variant="ghost" type="button" onClick={onCancel}>
           Cancel
         </Button>

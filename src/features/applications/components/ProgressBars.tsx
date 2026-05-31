@@ -188,12 +188,12 @@ export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRu
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h3 className="text-sm font-semibold text-zinc-100">{heading}</h3>
+          <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{heading}</h3>
           <p className="mt-1 text-xs text-zinc-500">{subheading}</p>
         </div>
 
         {!isFinished && !isFailed && (
-          <div className="flex-none flex items-center gap-1.5 rounded-md bg-zinc-800 px-2.5 py-1.5 font-mono text-xs text-zinc-400 tabular-nums">
+          <div className="flex-none flex items-center gap-1.5 rounded-md bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 px-2.5 py-1.5 font-mono text-xs tabular-nums">
             <Clock className="w-3 h-3 shrink-0" />
             {formatElapsed(elapsedMs)}
           </div>
@@ -219,7 +219,7 @@ export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRu
                     status === 'complete'            ? 'bg-emerald-500/35' :
                     status === 'current'             ? 'bg-violet-500/25' :
                     status === 'failed'              ? 'bg-rose-500/25' :
-                    /* upcoming */                     'bg-zinc-800',
+                    /* upcoming */                     'bg-zinc-200 dark:bg-zinc-800',
                   ].join(' ')}
                 />
               )}
@@ -228,23 +228,23 @@ export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRu
                 {/* Step icon */}
                 <div className="relative flex-none mt-0.5" aria-hidden="true">
                   {status === 'complete' && (
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/15 ring-1 ring-emerald-500/30">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 ring-emerald-600/20 dark:bg-emerald-500/15 dark:ring-emerald-500/30 ring-1">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                     </span>
                   )}
                   {status === 'current' && (
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-500/15 ring-1 ring-violet-500/35 animate-pulse">
-                      <Loader2 className="w-4 h-4 text-violet-400 animate-spin" />
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-50 ring-violet-600/25 dark:bg-violet-500/15 dark:ring-violet-500/35 ring-1 animate-pulse">
+                      <Loader2 className="w-4 h-4 text-violet-600 dark:text-violet-400 animate-spin" />
                     </span>
                   )}
                   {status === 'failed' && (
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-rose-500/15 ring-1 ring-rose-500/30">
-                      <AlertTriangle className="w-4 h-4 text-rose-400" />
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-rose-50 ring-rose-600/20 dark:bg-rose-500/15 dark:ring-rose-500/30 ring-1">
+                      <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400" />
                     </span>
                   )}
                   {status === 'upcoming' && (
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800/60 ring-1 ring-zinc-700/50">
-                      <Icon className="w-3.5 h-3.5 text-zinc-600" />
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-100 ring-1 ring-zinc-200 dark:bg-zinc-800/60 dark:ring-zinc-700/50">
+                      <Icon className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-600" />
                     </span>
                   )}
                 </div>
@@ -253,16 +253,16 @@ export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRu
                 <div className="min-w-0 flex-1 pt-1">
                   <p className={[
                     'text-sm font-medium leading-none',
-                    status === 'complete' ? 'text-zinc-200' :
-                    status === 'current'  ? 'text-violet-300' :
-                    status === 'failed'   ? 'text-rose-300' :
-                    /* upcoming */          'text-zinc-600',
+                    status === 'complete' ? 'text-zinc-700 dark:text-zinc-200' :
+                    status === 'current'  ? 'text-violet-600 dark:text-violet-300' :
+                    status === 'failed'   ? 'text-rose-600 dark:text-rose-300' :
+                    /* upcoming */          'text-zinc-400 dark:text-zinc-600',
                   ].join(' ')}>
                     {stage.name}
                   </p>
                   <p className={[
                     'mt-1 text-xs leading-relaxed',
-                    status === 'upcoming' ? 'text-zinc-700' : 'text-zinc-500',
+                    status === 'upcoming' ? 'text-zinc-400 dark:text-zinc-700' : 'text-zinc-500',
                   ].join(' ')}>
                     {stage.description}
                   </p>
@@ -271,7 +271,7 @@ export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRu
                 {/* Running badge */}
                 {status === 'current' && (
                   <div className="flex-none pt-0.5">
-                    <span className="inline-flex items-center rounded-full bg-violet-500/10 px-2 py-0.5 text-[10px] font-medium text-violet-400 ring-1 ring-inset ring-violet-500/20">
+                    <span className="inline-flex items-center rounded-full bg-violet-50 text-violet-700 ring-violet-600/20 dark:bg-violet-500/10 dark:text-violet-400 dark:ring-violet-500/20 px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset">
                       running
                     </span>
                   </div>
@@ -284,7 +284,7 @@ export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRu
 
       {/* Footer */}
       <div className="flex items-center justify-between gap-4">
-        <p className="text-xs text-zinc-600">
+        <p className="text-xs text-zinc-500 dark:text-zinc-600">
           Feel free to navigate away — you'll be notified when complete.
         </p>
 
@@ -293,7 +293,7 @@ export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRu
             type="button"
             onClick={() => requeue.mutate({ slug })}
             disabled={requeue.isPending || requeue.isSuccess}
-            className="inline-flex flex-none items-center gap-1.5 rounded-lg bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-400 ring-1 ring-inset ring-rose-500/20 hover:bg-rose-500/15 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex flex-none items-center gap-1.5 rounded-lg bg-rose-50 text-rose-700 ring-rose-600/20 hover:bg-rose-100 dark:bg-rose-500/10 dark:text-rose-400 dark:ring-rose-500/20 dark:hover:bg-rose-500/15 px-3 py-1.5 text-xs font-medium ring-1 ring-inset disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {requeue.isPending ? (
               <Loader2 className="w-3 h-3 animate-spin" />
@@ -306,7 +306,7 @@ export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRu
           <Link
             to="/applications/$slug"
             params={{ slug }}
-            className="flex-none text-xs text-zinc-600 hover:text-zinc-300 transition-colors"
+            className="flex-none text-xs text-zinc-500 dark:text-zinc-600 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
           >
             Go to overview →
           </Link>
@@ -315,7 +315,7 @@ export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRu
 
       {/* DLQ error feedback */}
       {requeue.isError && (
-        <p className="text-xs text-rose-400">
+        <p className="text-xs text-rose-600 dark:text-rose-400">
           Requeue failed: {requeue.error instanceof Error ? requeue.error.message : 'Unknown error'}
         </p>
       )}
