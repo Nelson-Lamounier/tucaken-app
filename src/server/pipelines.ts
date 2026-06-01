@@ -259,15 +259,12 @@ export const patchStageFn = createServerFn({ method: 'POST' })
  * asynchronous on the admin-api side.
  *
  * Sent to Lambda (analyse operation):
- *   operation, jobDescription, targetCompany, targetRole, resumeId, includeCoverLetter
- *
- * NOT sent (unsupported by AnalyseRequestSchema):
- *   interviewStage — hardcoded to 'applied' inside the Lambda for analyse runs
+ *   jobDescription, targetCompany, targetRole, interviewStage, resumeId, includeCoverLetter
  *
  * @param data.jobDescription - Job description
  * @param data.targetCompany - Target company
  * @param data.targetRole - Target role
- * @param data.interviewStage - Stored locally; NOT forwarded to the Lambda
+ * @param data.interviewStage - Starting interview stage (forwarded to admin-api for stage seeding)
  * @param data.resumeId - Resume ID (optional — empty string triggers build-from-scratch mode)
  * @param data.includeCoverLetter - Whether to generate cover letter
  * @returns Trigger response with pipelineId and applicationSlug
