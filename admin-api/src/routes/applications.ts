@@ -52,6 +52,15 @@ const VALID_STATUSES = new Set([
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
+ * Normalises a company name into a stable key for company_interview_profiles lookup.
+ * Rule: lowercase, strip all non-alphanumeric characters.
+ * E.g. "Stripe, Inc." → "stripeinc", "Meta Platforms" → "metaplatforms"
+ */
+function normalizeCompanyKey(company: string): string {
+  return company.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/**
  * Maps raw research agent output (pipeline field names) to the ResearchOutput
  * shape expected by the UI (applications.types.ts).
  *
@@ -63,6 +72,7 @@ const VALID_STATUSES = new Set([
  *   skillGap.impactSeverity              → severity
  *   skillGap.impactSeverity === 'blocking' → isDisqualifying
  *   overallFitRating spaces              → underscores (UI FitRating enum)
+ *   dsaTopicCalibration                  → passed through verbatim
  */
 function normaliseResearch(raw: Record<string, unknown>): Record<string, unknown> {
   const signals = raw['experienceSignals'] as Record<string, unknown> | undefined;
@@ -84,7 +94,7 @@ function normaliseResearch(raw: Record<string, unknown>): Record<string, unknown
     isDisqualifying: g['impactSeverity'] === 'blocking',
   }));
 
-  return {
+  const result: Record<string, unknown> = {
     fitSummary:   raw['fitSummary'] ?? '',
     fitRating,
     verifiedMatches,
@@ -98,6 +108,13 @@ function normaliseResearch(raw: Record<string, unknown>): Record<string, unknown
     } : undefined,
     technologyInventory: raw['technologyInventory'] ?? null,
   };
+
+  // Pass dsaTopicCalibration through verbatim when present.
+  if (raw['dsaTopicCalibration'] !== undefined) {
+    result['dsaTopicCalibration'] = raw['dsaTopicCalibration'];
+  }
+
+  return result;
 }
 
 // ── Router factory ────────────────────────────────────────────────────────────
@@ -196,6 +213,28 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
         [slug],
       );
 
+      // Resolve technicalRoundType from company_interview_profiles.
+      // company_key is: lowercase + strip non-alphanumeric (mirrors normalizeCompanyKey).
+      const companyKey = normalizeCompanyKey(application.company);
+      const profileResult = await db.query<{
+        process_shape: unknown[] | null;
+      }>(
+        `SELECT process_shape
+           FROM company_interview_profiles
+          WHERE company_key = $1
+          LIMIT 1`,
+        [companyKey],
+      );
+      const processShape = profileResult.rows[0]?.process_shape ?? null;
+      // Find the first stage element whose `stage` starts with 'technical'.
+      const technicalStage = Array.isArray(processShape)
+        ? (processShape as Record<string, unknown>[]).find(
+            (s) => typeof s['stage'] === 'string' && s['stage'].startsWith('technical'),
+          )
+        : null;
+      const technicalRoundType: string =
+        (technicalStage?.['round_type'] as string | undefined) ?? 'dsa';
+
       const rawAnalysis  = latestAnalysis?.metadata?.['analysis']  as Record<string, unknown> | null | undefined;
       const rawResearch  = latestAnalysis?.metadata?.['research']  as Record<string, unknown> | null | undefined;
       const persistedResume = resumeResult.rows[0]?.content_json ?? null;
@@ -237,6 +276,7 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
           },
           research,
           analysis,
+          technicalRoundType,
           interviewPrep:       null,
           latestAnalysisRunId: latestAnalysis?.id ?? null,
           coaching:            coachingResult.rows.reduce<Record<string, unknown>>((acc, row) => {
