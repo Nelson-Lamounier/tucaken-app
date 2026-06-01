@@ -86,10 +86,24 @@ export function useStageDraft(
     mergeDraft(readDraft(slug, stage), initialUserState),
   )
 
+  // Tracks the last successfully synced snapshot to avoid PATCH storms.
+  // Initialized to the hydrated draft so the first effect run is a no-op.
+  const lastSyncedRef = useRef<string>(
+    JSON.stringify(mergeDraft(readDraft(slug, stage), initialUserState)),
+  )
+  // Tracks the previous scheduleAt so we can detect the empty→non-empty transition.
+  const prevScheduleAtRef = useRef<string>(
+    mergeDraft(readDraft(slug, stage), initialUserState).scheduleAt,
+  )
+
   // Re-hydrate when slug/stage changes (navigating between active stages).
   // Prefer localStorage if present; fall back to server state.
   useEffect(() => {
-    setDraft(mergeDraft(readDraft(slug, stage), initialUserState))
+    const hydrated = mergeDraft(readDraft(slug, stage), initialUserState)
+    setDraft(hydrated)
+    // Reset sync refs so the newly-hydrated draft isn't considered already synced.
+    lastSyncedRef.current = JSON.stringify(hydrated)
+    prevScheduleAtRef.current = hydrated.scheduleAt
     // initialUserState intentionally excluded: server value is only used when
     // localStorage is absent; we don't want to overwrite in-session edits.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -118,13 +132,29 @@ export function useStageDraft(
   useEffect(() => {
     if (patchTimerRef.current) clearTimeout(patchTimerRef.current)
     patchTimerRef.current = setTimeout(() => {
+      const snapshot = JSON.stringify(draft)
+      // Skip PATCH if nothing has changed since the last successful sync.
+      if (snapshot === lastSyncedRef.current) return
+
       // Cast to Record<string, unknown> — patchStageFn accepts z.record(z.any())
       const userState = draft as unknown as Record<string, unknown>
-      void patchStageFn({ data: { slug, stage, userState } })
+      void patchStageFn({
+        data: { slug, stage, userState, scheduleAt: draft.scheduleAt || null },
+      })
         .then(() => {
-          void queryClient.invalidateQueries({
-            queryKey: adminKeys.applications.detail(slug),
-          })
+          lastSyncedRef.current = snapshot
+
+          // Only invalidate when scheduleAt just transitioned empty → non-empty,
+          // i.e. a coach dispatch happened server-side. Plain notes/checklist syncs
+          // must not trigger a refetch.
+          const wasEmpty = !prevScheduleAtRef.current
+          const isNowSet = Boolean(draft.scheduleAt)
+          prevScheduleAtRef.current = draft.scheduleAt
+          if (wasEmpty && isNowSet) {
+            void queryClient.invalidateQueries({
+              queryKey: adminKeys.applications.detail(slug),
+            })
+          }
         })
         .catch(() => {
           // Swallow — localStorage remains the cache; server sync is best-effort.

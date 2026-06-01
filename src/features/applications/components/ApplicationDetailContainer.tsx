@@ -30,6 +30,7 @@ import { Button } from '@/components/ui/Button'
 import DropDownOptions from '@/components/ui/DropDownOptions'
 import { triggerCoachFn } from '@/server/pipelines'
 import { ConfirmModal } from '../stages/components/ConfirmModal'
+import { useToastStore } from '@/lib/stores/toast-store'
 
 import {
   STATUS_OPTIONS,
@@ -63,6 +64,7 @@ export function ApplicationDetailContainer({ slug, activeStage }: ApplicationDet
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const statusMutation = useApplicationStatus()
+  const { addToast } = useToastStore()
 
   const { data: detail, isLoading, error } = useApplicationDetail(slug)
 
@@ -109,19 +111,27 @@ export function ApplicationDetailContainer({ slug, activeStage }: ApplicationDet
     const stage = confirmGenStage
     const force = confirmGenForce
     setConfirmGenStage(null)
-    void triggerCoachFn({ data: { slug, interviewStage: stage, force } }).then(() => {
-      void queryClient.invalidateQueries({ queryKey: adminKeys.applications.detail(slug) })
-    })
-  }, [confirmGenStage, confirmGenForce, slug, queryClient])
+    void triggerCoachFn({ data: { slug, interviewStage: stage, force } })
+      .then(() => {
+        void queryClient.invalidateQueries({ queryKey: adminKeys.applications.detail(slug) })
+      })
+      .catch((err: unknown) => {
+        addToast('error', err instanceof Error ? err.message : 'Failed to dispatch coach')
+      })
+  }, [confirmGenStage, confirmGenForce, slug, queryClient, addToast])
 
   /** Schedule: trigger a non-force dispatch so the stage row is seeded, then refetch. */
   const handleSchedule = useCallback(
     (stage: InterviewStage) => {
-      void triggerCoachFn({ data: { slug, interviewStage: stage, force: false } }).then(() => {
-        void queryClient.invalidateQueries({ queryKey: adminKeys.applications.detail(slug) })
-      })
+      void triggerCoachFn({ data: { slug, interviewStage: stage, force: false } })
+        .then(() => {
+          void queryClient.invalidateQueries({ queryKey: adminKeys.applications.detail(slug) })
+        })
+        .catch((err: unknown) => {
+          addToast('error', err instanceof Error ? err.message : 'Failed to dispatch coach')
+        })
     },
-    [slug, queryClient],
+    [slug, queryClient, addToast],
   )
 
 
