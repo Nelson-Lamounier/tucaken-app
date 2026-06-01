@@ -12,6 +12,7 @@ export interface Application {
     jobUrl:         string | null;
     jobDescription: string;
     kanbanStatus:   string;
+    interviewStage: string;
     appliedAt:      Date | null;
     createdAt?:     Date | undefined;
     updatedAt?:     Date | undefined;
@@ -21,16 +22,17 @@ const LIST_APPLICATIONS_LIMIT = 200;
 
 function rowToApplication(row: Record<string, unknown>): Application {
     return {
-        id:             row['id']              as string,
-        userId:         row['user_id']         as string | null,
-        company:        row['company']         as string,
-        role:           row['role']            as string,
-        jobUrl:         row['job_url']         as string | null,
-        jobDescription: row['job_description'] as string,
-        kanbanStatus:   row['kanban_status']   as string,
-        appliedAt:      row['applied_at']      ? new Date(row['applied_at']  as string) : null,
-        createdAt:      row['created_at']      ? new Date(row['created_at']  as string) : undefined,
-        updatedAt:      row['updated_at']      ? new Date(row['updated_at']  as string) : undefined,
+        id:             row['id']               as string,
+        userId:         row['user_id']          as string | null,
+        company:        row['company']          as string,
+        role:           row['role']             as string,
+        jobUrl:         row['job_url']          as string | null,
+        jobDescription: row['job_description']  as string,
+        kanbanStatus:   row['kanban_status']    as string,
+        interviewStage: (row['interview_stage'] as string | null | undefined) ?? 'applied',
+        appliedAt:      row['applied_at']       ? new Date(row['applied_at']  as string) : null,
+        createdAt:      row['created_at']       ? new Date(row['created_at']  as string) : undefined,
+        updatedAt:      row['updated_at']       ? new Date(row['updated_at']  as string) : undefined,
     };
 }
 
@@ -63,7 +65,7 @@ export async function upsertApplication(pool: Queryable, application: Applicatio
 export async function getApplication(pool: Queryable, id: string): Promise<Application | null> {
     const result = await pool.query(
         `SELECT id, user_id, company, role, job_url, job_description,
-                kanban_status, applied_at, created_at, updated_at
+                kanban_status, interview_stage, applied_at, created_at, updated_at
          FROM job_applications WHERE id = $1`,
         [id],
     );
@@ -75,7 +77,7 @@ export async function listApplications(pool: Queryable, kanbanStatus?: string): 
     if (kanbanStatus !== undefined) {
         const result = await pool.query(
             `SELECT id, user_id, company, role, job_url, job_description,
-                    kanban_status, applied_at, created_at, updated_at
+                    kanban_status, interview_stage, applied_at, created_at, updated_at
              FROM job_applications WHERE kanban_status = $1 ORDER BY created_at DESC LIMIT ${LIST_APPLICATIONS_LIMIT}`,
             [kanbanStatus],
         );
@@ -83,7 +85,7 @@ export async function listApplications(pool: Queryable, kanbanStatus?: string): 
     }
     const result = await pool.query(
         `SELECT id, user_id, company, role, job_url, job_description,
-                kanban_status, applied_at, created_at, updated_at
+                kanban_status, interview_stage, applied_at, created_at, updated_at
          FROM job_applications ORDER BY created_at DESC LIMIT ${LIST_APPLICATIONS_LIMIT}`,
     );
     return (result.rows as Record<string, unknown>[]).map(rowToApplication);

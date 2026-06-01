@@ -32,6 +32,12 @@ import {
   updateInterviewStage,
   deleteApplication as pgDeleteApplication,
 } from '../lib/repositories/applications.js';
+import {
+  upsertStageUserState,
+  markNotApplicable as pgMarkNotApplicable,
+  linkCoachRun,
+  getStagesForApp,
+} from '../lib/repositories/interview-stages.js';
 import { insertPipelineRun } from '../lib/repositories/pipeline-runs.js';
 import type { AdminApiBindings } from '../lib/types.js';
 
@@ -274,6 +280,8 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
       // the UI types (applications.types.ts), so we normalise here.
       const research = rawResearch ? normaliseResearch(rawResearch) : null;
 
+      const stages = await getStagesForApp(db, application.id);
+
       return ctx.json({
         application: {
           id:                  application.id,
@@ -283,7 +291,7 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
           jobUrl:              application.jobUrl,
           jobDescription:      application.jobDescription,
           status:              application.kanbanStatus,
-          interviewStage:      'applied',
+          interviewStage:      application.interviewStage,
           createdAt:           application.createdAt,
           updatedAt:           application.updatedAt,
           context: {
@@ -305,6 +313,7 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
             };
             return acc;
           }, {}),
+          stages:              Object.fromEntries(stages.map(s => [s.stage_type, s])),
         },
       });
     });
@@ -320,6 +329,55 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
     return withUser(getPool(config), userId, async (db) => {
       await pgDeleteApplication(db, slug);
       return ctx.json({ deleted: true, slug });
+    });
+  });
+
+  // ── PATCH /:slug/stages/:stage — update per-stage user state / schedule / N/A ──
+  app.patch('/:slug/stages/:stage', async (ctx) => {
+    const userId = ctx.get('userId');
+    if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
+
+    const slug  = ctx.req.param('slug');
+    const stage = ctx.req.param('stage');
+
+    let body: { userState?: Record<string, unknown>; scheduleAt?: string | null; markNotApplicable?: boolean };
+    try { body = await ctx.req.json(); }
+    catch { return ctx.json({ error: 'Body must be valid JSON' }, 400); }
+
+    return withUser(getPool(config), userId, async (db) => {
+      const application = await getApplication(db, slug);
+      if (!application) return ctx.json({ error: `Application not found: ${slug}` }, 404);
+
+      if (body.markNotApplicable === true) {
+        await pgMarkNotApplicable(db, application.id, stage);
+        return ctx.json({ success: true });
+      }
+
+      await upsertStageUserState(db, application.id, stage, body.userState ?? {}, body.scheduleAt ?? null);
+
+      if (body.scheduleAt && isPrepStage(stage)) {
+        const { createJob, insertCoachRunAdapter } = makeCoachAdapters(config, slug);
+        try {
+          const result = await dispatchCoach(
+            db,
+            {
+              application: { id: application.id, company: application.company, role: application.role, job_description: application.jobDescription },
+              slug,
+              userId,
+              interviewStage: stage,
+            },
+            createJob,
+            insertCoachRunAdapter,
+          );
+          if (result.status === 'dispatched') {
+            await linkCoachRun(db, application.id, stage, result.coachPipelineRunId!);
+          }
+        } catch (err) {
+          console.error('[applications/stages] coach dispatch failed (non-fatal)', err);
+        }
+      }
+
+      return ctx.json({ success: true });
     });
   });
 
@@ -410,6 +468,9 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
       const result = await dispatchCoach(db, dispatchArgs, createJob, insertCoachRunAdapter);
 
       if (result.status === 'dispatched') {
+        if (dispatchArgs.interviewStage) {
+          await linkCoachRun(db, application.id, dispatchArgs.interviewStage, result.coachPipelineRunId!);
+        }
         return ctx.json({ status: 'queued', coachPipelineRunId: result.coachPipelineRunId }, 202);
       }
       if (result.status === 'skipped') {

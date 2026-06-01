@@ -32,6 +32,15 @@ jest.unstable_mockModule('../../src/lib/repositories/applications.js', () => ({
   getApplication:          pgGetApplicationMock,
   deleteApplication:       pgDeleteApplicationMock,
   updateApplicationStatus: pgUpdateApplicationStatusMock,
+  updateInterviewStage:    jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+}));
+
+jest.unstable_mockModule('../../src/lib/repositories/interview-stages.js', () => ({
+  upsertStageUserState: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  markNotApplicable:    jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  linkCoachRun:         jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  getStagesForApp:      jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
+  reconcilePrepStatus:  jest.fn(),
 }));
 
 jest.unstable_mockModule('../../src/lib/repositories/pipeline-runs.js', () => ({
