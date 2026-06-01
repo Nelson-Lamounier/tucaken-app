@@ -78,6 +78,18 @@ export function PhoneScreenWorkspace({ detail }: PhoneScreenWorkspaceProps) {
         />
       </section>
 
+      {/* Career arc — phone-screen narrative from the Coach Agent */}
+      {prep?.careerArcSummary ? (
+        <section className="space-y-3">
+          <SectionHeading title="Your career arc" subtitle="A tight narrative to open the call with." />
+          <Card className="p-4">
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
+              {prep.careerArcSummary}
+            </p>
+          </Card>
+        </section>
+      ) : null}
+
       {/* What to expect / Talking points */}
       <section className="grid gap-4 lg:grid-cols-2">
         <Card className="p-4">
@@ -94,7 +106,19 @@ export function PhoneScreenWorkspace({ detail }: PhoneScreenWorkspaceProps) {
 
         <Card className="p-4">
           <SectionHeading title="Your talking points" subtitle="Strengths to lead with, from your verified evidence." />
-          {talkingPoints.length > 0 ? (
+          {prep?.jdTalkingPoints && prep.jdTalkingPoints.length > 0 ? (
+            <ul className="mt-3 space-y-3">
+              {prep.jdTalkingPoints.map((tp, i) => (
+                <li key={`${tp.point}-${String(i)}`} className="flex items-start gap-2 text-sm">
+                  <Lightbulb className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
+                  <span className="text-zinc-700 dark:text-zinc-300">
+                    <span className="font-medium text-zinc-900 dark:text-zinc-100">{tp.point}</span>
+                    {tp.evidence ? <span className="text-zinc-500 dark:text-zinc-400"> — {tp.evidence}</span> : null}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : talkingPoints.length > 0 ? (
             <ul className="mt-3 space-y-2">
               {talkingPoints.map(point => (
                 <li key={point} className="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">
@@ -115,10 +139,19 @@ export function PhoneScreenWorkspace({ detail }: PhoneScreenWorkspaceProps) {
       <section className="space-y-3">
         <SectionHeading title="Comp conversation" />
         <Card className="space-y-4 p-4">
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            Market range for this role and location lands once comp data is wired up. Set your target now so
-            you&apos;re ready if it comes up.
-          </p>
+          {prep?.compScript ? (
+            <>
+              <p className="text-sm text-zinc-700 dark:text-zinc-300">{prep.compScript.targetEcho}</p>
+              {prep.compScript.marketContext ? (
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">{prep.compScript.marketContext}</p>
+              ) : null}
+            </>
+          ) : (
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              Market range for this role and location lands once comp data is wired up. Set your target now so
+              you&apos;re ready if it comes up.
+            </p>
+          )}
           <div>
             <label htmlFor="comp-target" className="mb-1.5 block text-xs font-medium text-zinc-500">
               Your target
@@ -133,8 +166,7 @@ export function PhoneScreenWorkspace({ detail }: PhoneScreenWorkspaceProps) {
             />
           </div>
           <p className="rounded-lg bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:bg-white/5 dark:text-zinc-400">
-            Suggested response: &ldquo;I&apos;m focused on finding the right fit. Based on the role and my
-            experience I&apos;m targeting {draft.compTarget.trim() || '[your target]'} — is that in range?&rdquo;
+            Suggested response: &ldquo;{prep?.compScript?.deflectTemplate ?? `I'm focused on finding the right fit. Based on the role and my experience I'm targeting ${draft.compTarget.trim() || '[your target]'} — is that in range?`}&rdquo;
           </p>
         </Card>
       </section>
