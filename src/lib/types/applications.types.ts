@@ -320,6 +320,19 @@ export interface QuestionToAsk {
   readonly rationale: string
 }
 
+/** Phone-screen talking point: a verified strength cross-referenced against the JD */
+export interface PhoneScreenTalkingPoint {
+  readonly point: string
+  readonly evidence: string
+}
+
+/** Phone-screen compensation conversation script */
+export interface CompScript {
+  readonly targetEcho: string
+  readonly marketContext: string | null
+  readonly deflectTemplate: string
+}
+
 /** Coach Agent output — part of ApplicationDetail */
 export interface InterviewPrepOutput {
   /** Current interview stage */
@@ -338,6 +351,12 @@ export interface InterviewPrepOutput {
   readonly questionsToAsk: QuestionToAsk[]
   /** Free-text coaching notes (Markdown) */
   readonly coachingNotes: string
+  /** Phone-screen only: 2-3 sentence career-arc narrative */
+  readonly careerArcSummary?: string
+  /** Phone-screen only: JD-cross-referenced verified talking points */
+  readonly jdTalkingPoints?: readonly PhoneScreenTalkingPoint[]
+  /** Phone-screen only: compensation conversation script */
+  readonly compScript?: CompScript
 }
 
 /**
