@@ -41,7 +41,8 @@ const FRAMEWORK: readonly { step: string; prompts: readonly string[] }[] = [
  * pattern lands when the linkage ships). See ADR-0003.
  */
 export function SystemDesignWorkspace({ detail }: SystemDesignWorkspaceProps) {
-  const { draft, setSchedule } = useStageDraft(detail.slug, 'system-design')
+  const stageUserState = detail.stages?.['system-design']?.user_state as Partial<import('../hooks/useStageDraft').StageDraft> | undefined
+  const { draft, setSchedule } = useStageDraft(detail.slug, 'system-design', stageUserState)
 
   return (
     <div className="space-y-8">

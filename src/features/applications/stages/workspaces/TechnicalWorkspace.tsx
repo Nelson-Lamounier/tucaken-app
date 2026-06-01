@@ -44,7 +44,8 @@ const PRACTICE_MOCK: PracticeState = {
  * backend linkage (ADR-0003).
  */
 export function TechnicalWorkspace({ detail }: TechnicalWorkspaceProps) {
-  const { draft, setSchedule } = useStageDraft(detail.slug, 'technical')
+  const stageUserState = detail.stages?.['technical']?.user_state as Partial<import('../hooks/useStageDraft').StageDraft> | undefined
+  const { draft, setSchedule } = useStageDraft(detail.slug, 'technical', stageUserState)
   const [practice, setPractice] = useState<PracticeState | null>(null)
 
   const topics = useMemo(() => researchToTopics(detail.research), [detail.research])

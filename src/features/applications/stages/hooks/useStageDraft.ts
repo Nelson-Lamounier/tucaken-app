@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import type { InterviewStage } from '@/lib/types/applications.types'
+import { adminKeys } from '@/lib/api/query-keys'
+import { patchStageFn } from '@/server/pipelines'
 
 /**
- * Per-stage interactive state not yet backed by an API (notes, checklist ticks,
- * story selections, offer edits, decision weights). Persisted to localStorage
- * in v1 behind this single hook — the one swap-point to a future
- * `PATCH /stages/:stage`. See ADR-0003 and src/features/applications/CONTEXT.md.
+ * Per-stage interactive state persisted to localStorage (primary cache) and
+ * synced to RDS via PATCH /stages/:stage (secondary, debounced). The hook
+ * hydrates from the server's user_state on first load, then treats localStorage
+ * as the authoritative in-session store. See ADR-0003 and CONTEXT.md.
  */
 export interface StageDraft {
   /** Free-form "after the round" notes (auto-saved). */
@@ -31,21 +34,35 @@ const EMPTY_DRAFT: StageDraft = {
   compTarget: '',
 }
 
+/** Debounce delay for RDS PATCH (ms). */
+const PATCH_DEBOUNCE_MS = 800
+
 function storageKey(slug: string, stage: InterviewStage): string {
   return `appstage:${slug}:${stage}`
 }
 
-function readDraft(slug: string, stage: InterviewStage): StageDraft {
-  if (typeof window === 'undefined') return EMPTY_DRAFT
+function readDraft(slug: string, stage: InterviewStage): StageDraft | null {
+  if (typeof window === 'undefined') return null
   const raw = window.localStorage.getItem(storageKey(slug, stage))
-  if (!raw) return EMPTY_DRAFT
+  if (!raw) return null
   try {
     const parsed: unknown = JSON.parse(raw)
-    if (typeof parsed !== 'object' || parsed === null) return EMPTY_DRAFT
+    if (typeof parsed !== 'object' || parsed === null) return null
     return { ...EMPTY_DRAFT, ...(parsed as Partial<StageDraft>) }
   } catch {
-    return EMPTY_DRAFT
+    return null
   }
+}
+
+function mergeDraft(
+  local: StageDraft | null,
+  server: Partial<StageDraft> | undefined,
+): StageDraft {
+  // Server value is authoritative on first load; localStorage wins in-session.
+  // If localStorage has data (user was editing), prefer it. Otherwise use server.
+  if (local !== null) return local
+  if (server) return { ...EMPTY_DRAFT, ...server }
+  return EMPTY_DRAFT
 }
 
 interface UseStageDraft {
@@ -58,19 +75,65 @@ interface UseStageDraft {
   readonly patch: (patch: Partial<StageDraft>) => void
 }
 
-export function useStageDraft(slug: string, stage: InterviewStage): UseStageDraft {
-  const [draft, setDraft] = useState<StageDraft>(() => readDraft(slug, stage))
+export function useStageDraft(
+  slug: string,
+  stage: InterviewStage,
+  initialUserState?: Partial<StageDraft>,
+): UseStageDraft {
+  const queryClient = useQueryClient()
 
-  // Re-hydrate when slug/stage changes (navigating between Active Stages).
+  const [draft, setDraft] = useState<StageDraft>(() =>
+    mergeDraft(readDraft(slug, stage), initialUserState),
+  )
+
+  // Re-hydrate when slug/stage changes (navigating between active stages).
+  // Prefer localStorage if present; fall back to server state.
   useEffect(() => {
-    setDraft(readDraft(slug, stage))
+    setDraft(mergeDraft(readDraft(slug, stage), initialUserState))
+    // initialUserState intentionally excluded: server value is only used when
+    // localStorage is absent; we don't want to overwrite in-session edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, stage])
 
-  // Persist on every change.
+  // When the server provides a fresh initialUserState and localStorage is empty,
+  // hydrate (e.g. opening the page for the first time on a new device).
+  const prevServerStateRef = useRef(initialUserState)
+  useEffect(() => {
+    if (initialUserState === prevServerStateRef.current) return
+    prevServerStateRef.current = initialUserState
+    const local = readDraft(slug, stage)
+    if (local === null && initialUserState) {
+      setDraft({ ...EMPTY_DRAFT, ...initialUserState })
+    }
+  }, [initialUserState, slug, stage])
+
+  // Persist to localStorage on every draft change.
   useEffect(() => {
     if (typeof window === 'undefined') return
     window.localStorage.setItem(storageKey(slug, stage), JSON.stringify(draft))
   }, [slug, stage, draft])
+
+  // Debounced RDS PATCH — fires 800ms after the last draft change.
+  const patchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (patchTimerRef.current) clearTimeout(patchTimerRef.current)
+    patchTimerRef.current = setTimeout(() => {
+      // Cast to Record<string, unknown> — patchStageFn accepts z.record(z.any())
+      const userState = draft as unknown as Record<string, unknown>
+      void patchStageFn({ data: { slug, stage, userState } })
+        .then(() => {
+          void queryClient.invalidateQueries({
+            queryKey: adminKeys.applications.detail(slug),
+          })
+        })
+        .catch(() => {
+          // Swallow — localStorage remains the cache; server sync is best-effort.
+        })
+    }, PATCH_DEBOUNCE_MS)
+    return () => {
+      if (patchTimerRef.current) clearTimeout(patchTimerRef.current)
+    }
+  }, [slug, stage, draft, queryClient])
 
   const setNotes = useCallback((notes: string) => {
     setDraft(prev => ({ ...prev, notes }))
