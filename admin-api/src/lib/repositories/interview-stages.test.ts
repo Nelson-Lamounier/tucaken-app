@@ -5,6 +5,7 @@ import {
   upsertStageUserState,
   markNotApplicable,
   getStagesForApp,
+  advanceStageLifecycle,
 } from './interview-stages.js';
 
 function fakePool(rows: unknown[]) {
@@ -41,6 +42,32 @@ describe('markNotApplicable', () => {
     const sql = (query.mock.calls[0] as unknown[])[0] as string;
     expect(sql).toMatch(/INSERT INTO interview_stages/);
     expect(sql).toMatch(/not_applicable/);
+  });
+});
+
+describe('advanceStageLifecycle', () => {
+  it('issues UPDATE completed then INSERT/ON CONFLICT current', async () => {
+    const query = jest.fn(async () => ({ rows: [] }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pool = { query } as any;
+    await advanceStageLifecycle(pool, 'app-1', 'technical');
+
+    expect(query).toHaveBeenCalledTimes(2);
+
+    const firstSql = (query.mock.calls[0] as unknown[])[0] as string;
+    expect(firstSql).toMatch(/UPDATE interview_stages/);
+    expect(firstSql).toMatch(/stage_status = 'completed'/);
+    expect(firstSql).toMatch(/stage_status = 'current'/);
+    expect(firstSql).toMatch(/stage_type <> \$2/);
+    const firstParams = (query.mock.calls[0] as unknown[])[1] as unknown[];
+    expect(firstParams).toEqual(['app-1', 'technical']);
+
+    const secondSql = (query.mock.calls[1] as unknown[])[0] as string;
+    expect(secondSql).toMatch(/INSERT INTO interview_stages/);
+    expect(secondSql).toMatch(/ON CONFLICT \(job_application_id, stage_type\)/);
+    expect(secondSql).toMatch(/stage_status = 'current'/);
+    const secondParams = (query.mock.calls[1] as unknown[])[1] as unknown[];
+    expect(secondParams).toEqual(['app-1', 'technical']);
   });
 });
 

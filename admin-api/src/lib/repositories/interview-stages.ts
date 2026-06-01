@@ -54,6 +54,21 @@ export async function linkCoachRun(
   );
 }
 
+/** Advance lifecycle: demote the prior current stage to completed, set the new stage current. */
+export async function advanceStageLifecycle(db: Queryable, appId: string, newStage: string): Promise<void> {
+  await db.query(
+    `UPDATE interview_stages SET stage_status = 'completed'
+      WHERE job_application_id = $1 AND stage_status = 'current' AND stage_type <> $2`,
+    [appId, newStage],
+  );
+  await db.query(
+    `INSERT INTO interview_stages (job_application_id, stage_type, stage_status)
+     VALUES ($1, $2, 'current')
+     ON CONFLICT (job_application_id, stage_type) DO UPDATE SET stage_status = 'current'`,
+    [appId, newStage],
+  );
+}
+
 export interface StageRow {
   stage_type: string;
   stage_status: string;

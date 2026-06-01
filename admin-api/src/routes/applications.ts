@@ -37,6 +37,7 @@ import {
   markNotApplicable as pgMarkNotApplicable,
   linkCoachRun,
   getStagesForApp,
+  advanceStageLifecycle,
 } from '../lib/repositories/interview-stages.js';
 import { insertPipelineRun } from '../lib/repositories/pipeline-runs.js';
 import type { AdminApiBindings } from '../lib/types.js';
@@ -400,17 +401,23 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
         if (app) {
           await updateInterviewStage(db, app.id, body.interviewStage);
 
+          try { await advanceStageLifecycle(db, app.id, body.interviewStage); }
+          catch (err) { console.error('[applications/status] stage lifecycle update failed (non-fatal)', err); }
+
           if (isPrepStage(body.interviewStage)) {
             const coachImageConfigured = isImageConfigured(getJobImage('job-strategist'));
             if (coachImageConfigured) {
               const { createJob, insertCoachRunAdapter } = makeCoachAdapters(config, slug);
               try {
-                await dispatchCoach(
+                const result = await dispatchCoach(
                   db,
                   { application: { id: app.id, company: app.company, role: app.role, job_description: app.jobDescription }, slug, userId, interviewStage: body.interviewStage },
                   createJob,
                   insertCoachRunAdapter,
                 );
+                if (result.status === 'dispatched' && result.coachPipelineRunId) {
+                  await linkCoachRun(db, app.id, body.interviewStage, result.coachPipelineRunId);
+                }
               } catch (err) {
                 console.error('[applications/status] coach dispatch failed (non-fatal)', err);
               }

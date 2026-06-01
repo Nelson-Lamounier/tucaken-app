@@ -39,16 +39,17 @@ function rowToApplication(row: Record<string, unknown>): Application {
 export async function upsertApplication(pool: Queryable, application: Application): Promise<void> {
     await pool.query(
         `INSERT INTO job_applications
-             (id, user_id, company, role, job_url, job_description, kanban_status, applied_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             (id, user_id, company, role, job_url, job_description, kanban_status, interview_stage, applied_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          ON CONFLICT (id) DO UPDATE SET
-             company        = EXCLUDED.company,
-             role           = EXCLUDED.role,
-             job_url        = EXCLUDED.job_url,
+             company         = EXCLUDED.company,
+             role            = EXCLUDED.role,
+             job_url         = EXCLUDED.job_url,
              job_description = EXCLUDED.job_description,
-             kanban_status  = EXCLUDED.kanban_status,
-             applied_at     = EXCLUDED.applied_at,
-             updated_at     = NOW()`,
+             kanban_status   = EXCLUDED.kanban_status,
+             interview_stage = EXCLUDED.interview_stage,
+             applied_at      = EXCLUDED.applied_at,
+             updated_at      = NOW()`,
         [
             application.id,
             application.userId ?? null,
@@ -57,6 +58,7 @@ export async function upsertApplication(pool: Queryable, application: Applicatio
             application.jobUrl ?? null,
             application.jobDescription,
             application.kanbanStatus,
+            application.interviewStage ?? 'applied',
             application.appliedAt ?? null,
         ],
     );

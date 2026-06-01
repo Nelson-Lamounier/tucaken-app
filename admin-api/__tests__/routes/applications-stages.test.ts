@@ -55,11 +55,12 @@ const linkCoachRunMock         = jest.fn<() => Promise<void>>().mockResolvedValu
 const getStagesForAppMock      = jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]);
 
 jest.unstable_mockModule('../../src/lib/repositories/interview-stages.js', () => ({
-  upsertStageUserState: upsertStageUserStateMock,
-  markNotApplicable:    markNotApplicableMock,
-  linkCoachRun:         linkCoachRunMock,
-  getStagesForApp:      getStagesForAppMock,
-  reconcilePrepStatus:  jest.fn(),
+  upsertStageUserState:  upsertStageUserStateMock,
+  markNotApplicable:     markNotApplicableMock,
+  linkCoachRun:          linkCoachRunMock,
+  getStagesForApp:       getStagesForAppMock,
+  reconcilePrepStatus:   jest.fn(),
+  advanceStageLifecycle: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 }));
 
 // ---------------------------------------------------------------------------

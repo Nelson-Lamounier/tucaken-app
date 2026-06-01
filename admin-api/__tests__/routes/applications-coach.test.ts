@@ -44,6 +44,19 @@ jest.unstable_mockModule('../../src/lib/repositories/pipeline-runs.js', () => ({
   getPipelineRun:    jest.fn(),
 }));
 
+// Mock the interview-stages repo
+const linkCoachRunMock          = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
+const advanceStageLifecycleMock = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
+
+jest.unstable_mockModule('../../src/lib/repositories/interview-stages.js', () => ({
+  upsertStageUserState:   jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  markNotApplicable:      jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  linkCoachRun:           linkCoachRunMock,
+  getStagesForApp:        jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
+  reconcilePrepStatus:    jest.fn(),
+  advanceStageLifecycle:  advanceStageLifecycleMock,
+}));
+
 // Mock the applications repo — getApplication, updateApplicationStatus, updateInterviewStage
 const getApplicationMock          = jest.fn<() => Promise<unknown>>().mockResolvedValue(null);
 const updateApplicationStatusMock = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
@@ -312,6 +325,8 @@ describe('POST /:slug/status', () => {
     jest.clearAllMocks();
     createNamespacedJobMock.mockResolvedValue({});
     insertPipelineRunMock.mockResolvedValue(undefined);
+    linkCoachRunMock.mockResolvedValue(undefined);
+    advanceStageLifecycleMock.mockResolvedValue(undefined);
     getApplicationMock.mockResolvedValue(null);
     updateApplicationStatusMock.mockResolvedValue(undefined);
     updateInterviewStageMock.mockResolvedValue(undefined);
@@ -405,6 +420,47 @@ describe('POST /:slug/status', () => {
     const body = await res.json() as { success: boolean };
     expect(body.success).toBe(true);
     consoleSpy.mockRestore();
+  });
+
+  // ── A3 test 4: dispatch calls linkCoachRun with the returned coachPipelineRunId ──
+  it('calls linkCoachRun with the dispatched coachPipelineRunId when interviewStage=technical', async () => {
+    getApplicationMock.mockResolvedValueOnce(appRow);
+    pgQueryMock
+      .mockResolvedValueOnce({ rows: [] })           // coachInFlightOrFresh: not in-flight
+      .mockResolvedValueOnce({ rows: [strategistRow] }); // resolveStrategistRunId
+
+    const app = await buildAuthedApp();
+    const res = await app.request('/acme-eng/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'interviewing', interviewStage: 'technical' }),
+    });
+    expect(res.status).toBe(200);
+
+    expect(linkCoachRunMock).toHaveBeenCalledTimes(1);
+    const [, linkedAppId, linkedStage, linkedRunId] = linkCoachRunMock.mock.calls[0] as unknown[];
+    expect(linkedAppId).toBe('app-123');
+    expect(linkedStage).toBe('technical');
+    expect(typeof linkedRunId).toBe('string');
+    expect((linkedRunId as string).length).toBeGreaterThan(0);
+  });
+
+  // ── A3 test 5: advanceStageLifecycle is called for every interviewStage (incl. non-prep) ──
+  it('calls advanceStageLifecycle regardless of whether the stage is a prep stage', async () => {
+    getApplicationMock.mockResolvedValueOnce(appRow);
+
+    const app = await buildAuthedApp();
+    const res = await app.request('/acme-eng/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'applied', interviewStage: 'applied' }),
+    });
+    expect(res.status).toBe(200);
+    expect(advanceStageLifecycleMock).toHaveBeenCalledTimes(1);
+    expect(advanceStageLifecycleMock).toHaveBeenCalledWith(expect.anything(), 'app-123', 'applied');
+    // No coach dispatch for non-prep stage
+    expect(createNamespacedJobMock).not.toHaveBeenCalled();
+    expect(linkCoachRunMock).not.toHaveBeenCalled();
   });
 });
 
