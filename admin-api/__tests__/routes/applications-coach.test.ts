@@ -218,6 +218,40 @@ describe('POST /:slug/coach', () => {
     expect(envMap['JOB_DESCRIPTION']).toBe('Build cool stuff');
     expect(envMap['MODE']).toBe('standard');
   });
+
+  it('forwards COMPENSATION_TARGET and REGION env vars when supplied', async () => {
+    const app = await buildAuthedApp();
+    const res = await app.request('/acme-eng/coach', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...validBody, compensationTarget: '95000', region: 'uk' }),
+    });
+    expect(res.status).toBe(202);
+    const callArgs = createNamespacedJobMock.mock.calls[0] as unknown as [{
+      body: { spec: { template: { spec: { containers: Array<{ env: Array<{ name: string; value: string }> }> } } } };
+    }];
+    const env = callArgs[0].body.spec.template.spec.containers[0]!.env;
+    const envMap = Object.fromEntries(env.map(e => [e.name, e.value]));
+    expect(envMap['COMPENSATION_TARGET']).toBe('95000');
+    expect(envMap['REGION']).toBe('uk');
+  });
+
+  it('omits COMPENSATION_TARGET and defaults REGION when not supplied', async () => {
+    const app = await buildAuthedApp();
+    const res = await app.request('/acme-eng/coach', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(validBody),
+    });
+    expect(res.status).toBe(202);
+    const callArgs = createNamespacedJobMock.mock.calls[0] as unknown as [{
+      body: { spec: { template: { spec: { containers: Array<{ env: Array<{ name: string; value: string }> }> } } } };
+    }];
+    const env = callArgs[0].body.spec.template.spec.containers[0]!.env;
+    const envMap = Object.fromEntries(env.map(e => [e.name, e.value]));
+    expect(envMap['COMPENSATION_TARGET']).toBeUndefined();
+    expect(envMap['REGION']).toBe('eu-remote');
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -30,11 +30,11 @@ const actionGroups: GridListActionGroup[] = [
       },
       {
         title: 'Prepare for Interview',
-        href: '/applications/interview-prep',
+        href: '/applications/list',
         icon: AcademicCapIcon,
         iconForeground: 'text-indigo-400',
         iconBackground: 'bg-indigo-500/10',
-        description: 'Focus on applications currently in the interview stage to prep and practice.',
+        description: 'Open an application to prep and practice across its interview stages.',
       },
     ],
   },

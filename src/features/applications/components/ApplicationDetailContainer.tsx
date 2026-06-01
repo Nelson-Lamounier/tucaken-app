@@ -10,8 +10,20 @@ import {
   GraduationCap,
 } from 'lucide-react'
 import { useApplicationDetail, useApplicationStatus } from '@/hooks/use-admin-applications'
-import type { ApplicationStatus } from '@/lib/types/applications.types'
+import type { ApplicationStatus, InterviewStage, ApplicationDetail } from '@/lib/types/applications.types'
 import { ApplicationReviewDetail } from './ApplicationReviewDetail'
+import { StageProgressBar } from '../stages/components/StageProgressBar'
+import { StageWorkspacePlaceholder } from '../stages/components/StageWorkspacePlaceholder'
+import { NotesAndTimelinePanel } from '../stages/components/NotesAndTimelinePanel'
+import { StageWorkspaceSkeleton } from '../stages/components/StageWorkspaceSkeleton'
+import { TechnicalWorkspace } from '../stages/workspaces/TechnicalWorkspace'
+import { PhoneScreenWorkspace } from '../stages/workspaces/PhoneScreenWorkspace'
+import { SystemDesignWorkspace } from '../stages/workspaces/SystemDesignWorkspace'
+import { BehaviouralWorkspace } from '../stages/workspaces/BehaviouralWorkspace'
+import { BarRaiserWorkspace } from '../stages/workspaces/BarRaiserWorkspace'
+import { FinalWorkspace } from '../stages/workspaces/FinalWorkspace'
+import { STAGE_ORDER, stageIndex } from '../stages/types/stage'
+import { Button } from '@/components/ui/Button'
 import DropDownOptions from '@/components/ui/DropDownOptions'
 
 import {
@@ -25,7 +37,27 @@ import {
 
 
 
-export function ApplicationDetailContainer({ slug }: { readonly slug: string }) {
+/** Active-stage body. Applied + Technical have workspaces; the rest show an
+ *  honest placeholder until their workspace lands (per the PR sequencing). */
+function renderWorkspace(stage: InterviewStage, detail: ApplicationDetail) {
+  if (stage === 'applied') return <ApplicationReviewDetail detail={detail} />
+  if (stage === 'phone-screen') return <PhoneScreenWorkspace detail={detail} />
+  if (stage === 'technical') return <TechnicalWorkspace detail={detail} />
+  if (stage === 'system-design') return <SystemDesignWorkspace detail={detail} />
+  if (stage === 'behavioural') return <BehaviouralWorkspace detail={detail} />
+  if (stage === 'bar-raiser') return <BarRaiserWorkspace detail={detail} />
+  if (stage === 'final') return <FinalWorkspace detail={detail} />
+  return <StageWorkspacePlaceholder stage={stage} />
+}
+
+interface ApplicationDetailContainerProps {
+  readonly slug: string
+  /** Active Stage from the `?stage` search param. Falls back to the
+   *  application's Current Stage once the detail loads. */
+  readonly activeStage?: InterviewStage
+}
+
+export function ApplicationDetailContainer({ slug, activeStage }: ApplicationDetailContainerProps) {
   const navigate = useNavigate()
   const statusMutation = useApplicationStatus()
 
@@ -39,15 +71,28 @@ export function ApplicationDetailContainer({ slug }: { readonly slug: string }) 
     [slug, statusMutation],
   )
 
+  const handleStageSelect = useCallback(
+    (stage: InterviewStage) => {
+      void navigate({ to: '/applications/$slug', params: { slug }, search: { stage } })
+    },
+    [slug, navigate],
+  )
+
+  const handleAdvance = useCallback(
+    (current: InterviewStage, status: ApplicationStatus) => {
+      const next = STAGE_ORDER[stageIndex(current) + 1]
+      if (!next) return
+      statusMutation.mutate({ slug, status, interviewStage: next })
+      void navigate({ to: '/applications/$slug', params: { slug }, search: { stage: next } })
+    },
+    [slug, navigate, statusMutation],
+  )
 
 
-  // Loading state
+
+  // Loading state — layout-matched skeleton, not a spinner
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-32">
-        <Loader2 className="h-8 w-8 animate-spin text-violet-400" />
-      </div>
-    )
+    return <StageWorkspaceSkeleton />
   }
 
   // Error state
@@ -71,6 +116,9 @@ export function ApplicationDetailContainer({ slug }: { readonly slug: string }) 
   }
 
   if (!detail) return null
+
+  // Active Stage = explicit ?stage param, else the application's Current Stage.
+  const resolvedStage: InterviewStage = activeStage ?? detail.interviewStage
 
   const dateStr = new Date(detail.createdAt).toLocaleDateString('en-GB', {
     day: 'numeric',
@@ -150,8 +198,36 @@ export function ApplicationDetailContainer({ slug }: { readonly slug: string }) 
         </div>
       </div>
 
-      <div className="mt-8 space-y-12">
-        <ApplicationReviewDetail detail={detail} />
+      {/* Stage navigation */}
+      <div className="mt-2">
+        <StageProgressBar
+          current={detail.interviewStage}
+          active={resolvedStage}
+          onSelect={handleStageSelect}
+        />
+      </div>
+
+      {/* Active stage workspace + persistent notes/timeline panel */}
+      <div className="mt-8 flex flex-col gap-6 lg:flex-row lg:items-start">
+        <div className="min-w-0 flex-1 space-y-8">
+          {renderWorkspace(resolvedStage, detail)}
+
+          {stageIndex(resolvedStage) < STAGE_ORDER.length - 1 && (
+            <div className="flex justify-end border-t border-zinc-200 pt-6 dark:border-white/10">
+              <Button
+                variant="primary"
+                disabled={statusMutation.isPending}
+                onClick={() => handleAdvance(resolvedStage, detail.status)}
+              >
+                Mark complete and advance
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <div className="lg:sticky lg:top-6">
+          <NotesAndTimelinePanel detail={detail} activeStage={resolvedStage} />
+        </div>
       </div>
     </div>
   )

@@ -297,6 +297,8 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
       targetRole?:              string;
       jobDescription?:          string;
       mode?:                    string;
+      compensationTarget?:      string | number;
+      region?:                  string;
     };
     try { body = await ctx.req.json(); }
     catch { return ctx.json({ error: 'Body must be valid JSON' }, 400); }
@@ -313,6 +315,9 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
       if (!v) return ctx.json({ error: `"${k}" is required` }, 400);
     }
     const mode = body.mode?.trim() || 'standard';
+    const compensationTarget =
+      body.compensationTarget != null ? String(body.compensationTarget).trim() : '';
+    const region = body.region?.trim() || 'eu-remote';
 
     const strategistPipelineImage = getJobImage('job-strategist');
     if (!isImageConfigured(strategistPipelineImage)) {
@@ -364,6 +369,8 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
           { name: 'JOB_DESCRIPTION',            value: f.jobDescription! },
           { name: 'INTERVIEW_STAGE',            value: f.interviewStage! },
           { name: 'MODE',                       value: mode },
+          ...(compensationTarget ? [{ name: 'COMPENSATION_TARGET', value: compensationTarget }] : []),
+          { name: 'REGION', value: region },
         ],
         envFromSecretRefs: ['platform-rds-credentials'],
       });
