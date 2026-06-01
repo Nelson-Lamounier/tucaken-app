@@ -340,6 +340,28 @@ export interface InterviewPrepOutput {
   readonly coachingNotes: string
 }
 
+/**
+ * Per-stage coaching payload as the detail endpoint actually returns it
+ * (`application.coaching[stage]`). `topics` is the FULL `InterviewCoachResult`
+ * JSON the Coach Agent emitted (the admin-api stores it under `topics_to_study`
+ * and returns it verbatim); `questions` is the grouped subset; `personal` is the
+ * extracted highlights array (shape not guaranteed — left `unknown`).
+ */
+export interface StageCoaching {
+  readonly topics: InterviewPrepOutput | null
+  readonly questions: {
+    readonly technical?: InterviewQuestion[]
+    readonly behavioural?: InterviewQuestion[]
+    readonly difficult?: DifficultQuestion[]
+  } | null
+  /**
+   * Extracted personal highlights. The Coach Agent's persisted shape isn't
+   * guaranteed; typed as a string array (the common case) and not rendered in
+   * the v1 wiring. Widen if a richer shape is confirmed.
+   */
+  readonly personal: readonly string[] | null
+}
+
 /** Pipeline execution context with token/cost tracking */
 export interface PipelineContext {
   readonly pipelineId: string
@@ -376,6 +398,12 @@ export interface ApplicationDetail {
   readonly analysis: AnalysisOutput | null
   /** Coach Agent output (may be null if no interview prep yet) */
   readonly interviewPrep: InterviewPrepOutput | null
+  /**
+   * Per-stage coaching, keyed by stage_type. The detail endpoint populates this
+   * (and leaves `interviewPrep` null); each stage's `.topics` is the full Coach
+   * output for that stage. May be absent until the Coach Job has run for a stage.
+   */
+  readonly coaching?: Record<string, StageCoaching> | null
 }
 
 // =============================================================================

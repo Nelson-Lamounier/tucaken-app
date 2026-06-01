@@ -1,4 +1,5 @@
 import type {
+  ApplicationDetail,
   InterviewStage,
   InterviewPrepOutput,
   ResearchOutput,
@@ -167,4 +168,19 @@ export function interviewPrepToWorkspace(
     })),
     coachingNotes: prep?.coachingNotes ?? null,
   }
+}
+
+/**
+ * Resolve the Coach `InterviewPrepOutput` for a given stage from the detail
+ * payload. The detail endpoint returns the real coaching under
+ * `detail.coaching[stage].topics` (the full Coach output) and leaves the
+ * top-level `interviewPrep` null, so prefer the per-stage coaching and fall
+ * back to `interviewPrep` for any older shape. Returns null when no coaching
+ * has been generated for this stage yet (the Coach Job is not auto-run).
+ */
+export function resolveStagePrep(
+  detail: ApplicationDetail,
+  stage: InterviewStage,
+): InterviewPrepOutput | null {
+  return detail.coaching?.[stage]?.topics ?? detail.interviewPrep ?? null
 }

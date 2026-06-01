@@ -5,11 +5,11 @@ import {
   stageProgress,
   isInterviewStage,
 } from '@/features/applications/stages/types/stage'
-import { interviewPrepToWorkspace, researchToTopics, negotiationLeverage } from '@/features/applications/stages/types/workspace'
+import { interviewPrepToWorkspace, researchToTopics, negotiationLeverage, resolveStagePrep } from '@/features/applications/stages/types/workspace'
 import { personalFitScore } from '@/features/applications/stages/hooks/useOfferDraft'
 import { LEADERSHIP_PRINCIPLES, storiesForPrinciple, coverageStrength } from '@/features/applications/stages/types/principles'
 import type { StarStory } from '@/features/applications/stages/types/workspace'
-import type { InterviewPrepOutput, ResearchOutput } from '@/lib/types/applications.types'
+import type { ApplicationDetail, InterviewPrepOutput, ResearchOutput } from '@/lib/types/applications.types'
 
 describe('stage ordering', () => {
   it('has the seven stages in canonical order', () => {
@@ -132,5 +132,46 @@ describe('offer logic', () => {
     expect(points.length).toBeGreaterThanOrEqual(3)
     expect(points.some(p => p.includes('1 required skills'))).toBe(true)
     expect(negotiationLeverage(null)).toEqual([])
+  })
+})
+
+describe('resolveStagePrep', () => {
+  const prep: InterviewPrepOutput = {
+    stage: 'phone-screen',
+    stageDescription: 'First call',
+    technicalQuestions: [],
+    behaviouralQuestions: [],
+    difficultQuestions: [],
+    technicalPrepChecklist: [],
+    questionsToAsk: [{ question: 'What does the team look like?', rationale: 'Team fit' }],
+    coachingNotes: 'Be concise.',
+  }
+  function detail(overrides: Partial<ApplicationDetail>): ApplicationDetail {
+    return {
+      slug: 'a', targetCompany: 'C', targetRole: 'R', status: 'interview-prep',
+      interviewStage: 'phone-screen', createdAt: '', updatedAt: '',
+      context: { pipelineId: 'p', cumulativeInputTokens: 0, cumulativeOutputTokens: 0, cumulativeThinkingTokens: 0, cumulativeCostUsd: 0 },
+      research: null, analysis: null, interviewPrep: null,
+      ...overrides,
+    } as ApplicationDetail
+  }
+
+  it('reads the per-stage coaching topics for the requested stage', () => {
+    const d = detail({ coaching: { 'phone-screen': { topics: prep, questions: null, personal: null } } })
+    expect(resolveStagePrep(d, 'phone-screen')).toBe(prep)
+  })
+
+  it('returns null for a stage with no coaching', () => {
+    const d = detail({ coaching: { 'phone-screen': { topics: prep, questions: null, personal: null } } })
+    expect(resolveStagePrep(d, 'technical')).toBeNull()
+  })
+
+  it('falls back to top-level interviewPrep when coaching is absent', () => {
+    const d = detail({ interviewPrep: prep })
+    expect(resolveStagePrep(d, 'phone-screen')).toBe(prep)
+  })
+
+  it('returns null when neither coaching nor interviewPrep exist', () => {
+    expect(resolveStagePrep(detail({}), 'phone-screen')).toBeNull()
   })
 })

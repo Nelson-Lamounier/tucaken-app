@@ -8,7 +8,7 @@ import { ScheduleCard } from '../components/ScheduleCard'
 import { SectionHeading } from '../components/SectionHeading'
 import { ChecklistItem } from '../components/ChecklistItem'
 import { useStageDraft } from '../hooks/useStageDraft'
-import { interviewPrepToWorkspace } from '../types/workspace'
+import { interviewPrepToWorkspace, resolveStagePrep } from '../types/workspace'
 import type { ChecklistEntry } from '../types/workspace'
 
 interface PhoneScreenWorkspaceProps {
@@ -58,10 +58,12 @@ export function PhoneScreenWorkspace({ detail }: PhoneScreenWorkspaceProps) {
     [detail.research],
   )
 
+  const prep = useMemo(() => resolveStagePrep(detail, 'phone-screen'), [detail])
+
   const questions = useMemo(() => {
-    const coach = interviewPrepToWorkspace('phone-screen', detail.interviewPrep).questionsToAsk
+    const coach = interviewPrepToWorkspace('phone-screen', prep).questionsToAsk
     return dedupeQuestions([...coach, ...DEFAULT_QUESTIONS])
-  }, [detail.interviewPrep])
+  }, [prep])
 
   return (
     <div className="space-y-8">
@@ -134,6 +136,22 @@ export function PhoneScreenWorkspace({ detail }: PhoneScreenWorkspaceProps) {
             Suggested response: &ldquo;I&apos;m focused on finding the right fit. Based on the role and my
             experience I&apos;m targeting {draft.compTarget.trim() || '[your target]'} — is that in range?&rdquo;
           </p>
+        </Card>
+      </section>
+
+      {/* Coaching notes — real, from the Coach Agent (when generated for this stage) */}
+      <section className="space-y-3">
+        <SectionHeading title="Coaching notes" subtitle="Stage-specific guidance from your interview coach." />
+        <Card className="p-4">
+          {prep?.coachingNotes ? (
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
+              {prep.coachingNotes}
+            </p>
+          ) : (
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              No coaching generated for this stage yet. Generate interview prep to see tailored guidance here.
+            </p>
+          )}
         </Card>
       </section>
 
