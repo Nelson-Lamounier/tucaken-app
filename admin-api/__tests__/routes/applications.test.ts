@@ -307,7 +307,7 @@ describe('GET /:slug — application detail', () => {
       .mockResolvedValueOnce({
         rows: [{
           process_shape: [
-            { stage: 'phone-screen', round_type: 'behavioral' },
+            { stage: 'phone-screen', round_type: 'behavioural' },
             { stage: 'technical-1',  round_type: 'practical'  },
             { stage: 'system-design', round_type: 'system-design' },
           ],
@@ -329,7 +329,7 @@ describe('GET /:slug — application detail', () => {
       .mockResolvedValueOnce({
         rows: [{
           process_shape: [
-            { stage: 'phone-screen', round_type: 'behavioral' },
+            { stage: 'phone-screen', round_type: 'behavioural' },
           ],
         }],
       });

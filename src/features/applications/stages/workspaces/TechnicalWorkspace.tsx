@@ -56,7 +56,7 @@ export function TechnicalWorkspace({ detail }: TechnicalWorkspaceProps) {
   const topics = useMemo(() => researchToTopics(detail.research), [detail.research])
   const prep = useMemo(() => resolveStagePrep(detail, 'technical'), [detail])
 
-  const showDsaSection = DSA_ROUND_TYPES.has(detail.technicalRoundType)
+  const showDsaSection = !detail.technicalRoundType || DSA_ROUND_TYPES.has(detail.technicalRoundType)
   const dsaCalibration = detail.research?.dsaTopicCalibration
 
   return (

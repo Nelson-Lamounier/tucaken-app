@@ -437,7 +437,7 @@ export interface ApplicationDetail {
    * The type of technical round inferred from the company's interview profile.
    * Defaults to 'dsa' when no company profile or round_type is available.
    */
-  readonly technicalRoundType?: 'dsa' | 'practical' | 'take-home' | 'system-design' | 'behavioral' | 'mixed'
+  readonly technicalRoundType?: 'dsa' | 'practical' | 'take-home' | 'system-design' | 'behavioural' | 'mixed'
   /** Coach Agent output (may be null if no interview prep yet) */
   readonly interviewPrep: InterviewPrepOutput | null
   /**

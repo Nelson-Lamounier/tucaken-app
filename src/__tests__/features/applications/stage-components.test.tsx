@@ -137,9 +137,9 @@ describe('TechnicalWorkspace', () => {
     expect(screen.queryByLabelText('DSA / Coding section')).toBeNull()
   })
 
-  it('does not render Section B when technicalRoundType is undefined', () => {
+  it('renders Section B when technicalRoundType is undefined (safe-mode: default to dsa)', () => {
     render(<TechnicalWorkspace detail={detail} />)
-    expect(screen.queryByLabelText('DSA / Coding section')).toBeNull()
+    expect(screen.getByLabelText('DSA / Coding section')).toBeTruthy()
   })
 
   it('renders Section B with DSA banner for dsa round type', () => {
