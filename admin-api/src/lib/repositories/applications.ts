@@ -99,3 +99,10 @@ export async function updateApplicationStatus(pool: Queryable, id: string, kanba
 export async function deleteApplication(pool: Queryable, id: string): Promise<void> {
     await pool.query(`DELETE FROM job_applications WHERE id = $1`, [id]);
 }
+
+export async function updateInterviewStage(pool: Queryable, id: string, stage: string): Promise<void> {
+    await pool.query(
+        `UPDATE job_applications SET interview_stage = $1, updated_at = NOW() WHERE id = $2`,
+        [stage, id],
+    );
+}
