@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { useNavigate } from '@tanstack/react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft,
   Loader2,
@@ -10,9 +11,11 @@ import {
   GraduationCap,
 } from 'lucide-react'
 import { useApplicationDetail, useApplicationStatus } from '@/hooks/use-admin-applications'
+import { adminKeys } from '@/lib/api/query-keys'
 import type { ApplicationStatus, InterviewStage, ApplicationDetail } from '@/lib/types/applications.types'
 import { ApplicationReviewDetail } from './ApplicationReviewDetail'
 import { StageProgressBar } from '../stages/components/StageProgressBar'
+import { StagePrepGate } from '../stages/components/StagePrepGate'
 import { StageWorkspacePlaceholder } from '../stages/components/StageWorkspacePlaceholder'
 import { NotesAndTimelinePanel } from '../stages/components/NotesAndTimelinePanel'
 import { StageWorkspaceSkeleton } from '../stages/components/StageWorkspaceSkeleton'
@@ -25,6 +28,7 @@ import { FinalWorkspace } from '../stages/workspaces/FinalWorkspace'
 import { STAGE_ORDER, stageIndex } from '../stages/types/stage'
 import { Button } from '@/components/ui/Button'
 import DropDownOptions from '@/components/ui/DropDownOptions'
+import { triggerCoachFn } from '@/server/pipelines'
 
 import {
   STATUS_OPTIONS,
@@ -35,11 +39,8 @@ import {
   FIT_RATING_LABELS,
 } from './ApplicationTypes'
 
-
-
-/** Active-stage body. Applied + Technical have workspaces; the rest show an
- *  honest placeholder until their workspace lands (per the PR sequencing). */
-function renderWorkspace(stage: InterviewStage, detail: ApplicationDetail) {
+/** Returns the bare workspace node for a stage — no gate, no callbacks. */
+function stageWorkspaceNode(stage: InterviewStage, detail: ApplicationDetail) {
   if (stage === 'applied') return <ApplicationReviewDetail detail={detail} />
   if (stage === 'phone-screen') return <PhoneScreenWorkspace detail={detail} />
   if (stage === 'technical') return <TechnicalWorkspace detail={detail} />
@@ -59,8 +60,8 @@ interface ApplicationDetailContainerProps {
 
 export function ApplicationDetailContainer({ slug, activeStage }: ApplicationDetailContainerProps) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const statusMutation = useApplicationStatus()
-
 
   const { data: detail, isLoading, error } = useApplicationDetail(slug)
 
@@ -86,6 +87,26 @@ export function ApplicationDetailContainer({ slug, activeStage }: ApplicationDet
       void navigate({ to: '/applications/$slug', params: { slug }, search: { stage: next } })
     },
     [slug, navigate, statusMutation],
+  )
+
+  /** Trigger the coach for a given stage, then invalidate the detail cache. */
+  const handleGeneratePrep = useCallback(
+    (stage: InterviewStage, force = true) => {
+      void triggerCoachFn({ data: { slug, interviewStage: stage, force } }).then(() => {
+        void queryClient.invalidateQueries({ queryKey: adminKeys.applications.detail(slug) })
+      })
+    },
+    [slug, queryClient],
+  )
+
+  /** Schedule: trigger a non-force dispatch so the stage row is seeded, then refetch. */
+  const handleSchedule = useCallback(
+    (stage: InterviewStage) => {
+      void triggerCoachFn({ data: { slug, interviewStage: stage, force: false } }).then(() => {
+        void queryClient.invalidateQueries({ queryKey: adminKeys.applications.detail(slug) })
+      })
+    },
+    [slug, queryClient],
   )
 
 
@@ -204,13 +225,28 @@ export function ApplicationDetailContainer({ slug, activeStage }: ApplicationDet
           current={detail.interviewStage}
           active={resolvedStage}
           onSelect={handleStageSelect}
+          stages={detail.stages}
         />
       </div>
 
       {/* Active stage workspace + persistent notes/timeline panel */}
       <div className="mt-8 flex flex-col gap-6 lg:flex-row lg:items-start">
         <div className="min-w-0 flex-1 space-y-8">
-          {renderWorkspace(resolvedStage, detail)}
+          {resolvedStage === 'applied'
+            ? stageWorkspaceNode('applied', detail)
+            : (
+              <StagePrepGate
+                stage={resolvedStage}
+                state={detail.stages?.[resolvedStage]}
+                stageLabel={STAGE_LABELS[resolvedStage]}
+                onSchedule={() => handleSchedule(resolvedStage)}
+                onAdvance={() => handleAdvance(resolvedStage, detail.status)}
+                onGenerate={() => handleGeneratePrep(resolvedStage, true)}
+              >
+                {stageWorkspaceNode(resolvedStage, detail)}
+              </StagePrepGate>
+            )
+          }
 
           {stageIndex(resolvedStage) < STAGE_ORDER.length - 1 && (
             <div className="flex justify-end border-t border-zinc-200 pt-6 dark:border-white/10">

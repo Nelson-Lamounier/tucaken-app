@@ -30,7 +30,7 @@ import { BarRaiserWorkspace } from '@/features/applications/stages/workspaces/Ba
 import { FinalWorkspace } from '@/features/applications/stages/workspaces/FinalWorkspace'
 import { useStoryBank } from '@/features/applications/stages/hooks/useStoryBank'
 import type { StarStory, EvidenceTopic } from '@/features/applications/stages/types/workspace'
-import type { ApplicationDetail } from '@/lib/types/applications.types'
+import type { ApplicationDetail, StageState } from '@/lib/types/applications.types'
 
 describe('EvidenceIndicator', () => {
   it('renders a textual label, never colour-only', () => {
@@ -85,6 +85,17 @@ describe('StoryCard', () => {
   })
 })
 
+function makeStageState(overrides: Partial<StageState> = {}): StageState {
+  return {
+    stage_status: 'upcoming',
+    prep_status: 'none',
+    scheduled_at: null,
+    user_state: {},
+    coach_run_id: null,
+    ...overrides,
+  }
+}
+
 describe('StageProgressBar', () => {
   it('renders all seven stages and fires onSelect', () => {
     const onSelect = vi.fn()
@@ -92,6 +103,60 @@ describe('StageProgressBar', () => {
     expect(screen.getAllByRole('tab')).toHaveLength(7)
     fireEvent.click(screen.getByRole('tab', { name: /Behavioural/i }))
     expect(onSelect).toHaveBeenCalledWith('behavioural')
+  })
+
+  it('without stages prop: falls back to index math — stages before current show completed aria', () => {
+    const onSelect = vi.fn()
+    render(<StageProgressBar current="technical" active="technical" onSelect={onSelect} />)
+    // phone-screen is before technical → completed (check icon present within that button)
+    const phoneTab = screen.getByRole('tab', { name: /Phone Screen/i })
+    expect(phoneTab.querySelector('svg')).toBeTruthy() // Check icon rendered for completed
+  })
+
+  it('with stages given: a completed stage renders completed styling (check icon)', () => {
+    const onSelect = vi.fn()
+    const stages: Record<string, StageState> = {
+      'phone-screen': makeStageState({ stage_status: 'completed', prep_status: 'ready' }),
+    }
+    render(<StageProgressBar current="applied" active="applied" onSelect={onSelect} stages={stages} />)
+    // phone-screen is marked completed via stages — check icon should be present
+    const phoneTab = screen.getByRole('tab', { name: /Phone Screen/i })
+    expect(phoneTab.querySelector('svg')).toBeTruthy()
+  })
+
+  it('with stages given: a not_applicable stage renders with dashed-border dot and aria label', () => {
+    const onSelect = vi.fn()
+    const stages: Record<string, StageState> = {
+      'bar-raiser': makeStageState({ stage_status: 'not_applicable', prep_status: 'none' }),
+    }
+    render(<StageProgressBar current="behavioural" active="behavioural" onSelect={onSelect} stages={stages} />)
+    const barTab = screen.getByRole('tab', { name: /bar raiser.*not applicable/i })
+    expect(barTab).toBeTruthy()
+  })
+
+  it('with stages given: a queued stage shows the pulsing generating affordance', () => {
+    const onSelect = vi.fn()
+    const stages: Record<string, StageState> = {
+      'phone-screen': makeStageState({ stage_status: 'current', prep_status: 'queued' }),
+    }
+    render(<StageProgressBar current="phone-screen" active="phone-screen" onSelect={onSelect} stages={stages} />)
+    const phoneTab = screen.getByRole('tab', { name: /phone screen.*generating/i })
+    expect(phoneTab).toBeTruthy()
+    // pulsing dot has animate-pulse class
+    expect(phoneTab.querySelector('.animate-pulse')).toBeTruthy()
+  })
+
+  it('with stages given: stages without a row fall back to index math', () => {
+    const onSelect = vi.fn()
+    // Only provide 'phone-screen'; 'technical' has no row → should fall back to index math
+    const stages: Record<string, StageState> = {
+      'phone-screen': makeStageState({ stage_status: 'completed', prep_status: 'ready' }),
+    }
+    // current = technical; technical has no stages row → fallback makes it 'current'
+    render(<StageProgressBar current="technical" active="technical" onSelect={onSelect} stages={stages} />)
+    // technical tab should have aria-current="step" from the fallback
+    const techTab = screen.getByRole('tab', { name: /Technical/i })
+    expect(techTab.getAttribute('aria-current')).toBe('step')
   })
 })
 
