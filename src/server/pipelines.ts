@@ -27,6 +27,11 @@ import type { TriggerResponse } from '@/lib/types/applications.types'
 
 type PipelineState = 'pending' | 'processing' | 'review' | 'published' | 'rejected' | 'flagged' | 'failed'
 
+/** JSON-serialisable value — avoids `unknown` in index signatures which breaks TanStack Start's strict serialization check. */
+type JsonPrimitive = string | number | boolean | null
+type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue }
+type JsonRecord = { [key: string]: JsonValue }
+
 // =============================================================================
 // Input Schemas
 // =============================================================================
@@ -38,12 +43,21 @@ const pipelineActionSchema = z.object({
   action: z.enum(['approve', 'reject']),
 })
 
-const strategistCoachSchema = z.object({
+const coachSchema = z.object({
   slug: z.string().min(1),
-  coachingType: z.enum(['GENERAL', 'TECHNICAL', 'BEHAVIOURAL', 'CULTURAL']),
-  targetCompany: z.string().min(1),
-  targetRole: z.string().min(1),
-  resumeId: z.string().optional(),
+  interviewStage: z.string().min(1),
+  compensationTarget: z.string().optional(),
+  region: z.string().optional(),
+  force: z.boolean().optional(),
+})
+
+const patchStageSchema = z.object({
+  slug: z.string().min(1),
+  stage: z.string().min(1),
+  // z.record(z.unknown()) breaks TanStack Start serialization — use z.any() and narrow at the call site
+  userState: z.record(z.any()).optional(),
+  scheduleAt: z.string().nullable().optional(),
+  markNotApplicable: z.boolean().optional(),
 })
 
 const analyseTriggerSchema = z.object({
@@ -180,38 +194,60 @@ export const triggerPipelineActionFn = createServerFn({ method: 'POST' })
   })
 
 /**
- * Triggers the strategist coaching Lambda for interview preparation via admin-api.
+ * Triggers the Coach pipeline for a specific interview stage via admin-api.
  *
  * @param data.slug - Application slug
- * @param data.coachingType - Type of coaching session
- * @param data.targetCompany - Target company name
- * @param data.targetRole - Target role title
- * @param data.resumeId - Optional resume ID to include
- * @returns Parsed Lambda response body from admin-api
+ * @param data.interviewStage - Interview stage to prepare for
+ * @param data.compensationTarget - Optional compensation target string
+ * @param data.region - Optional region for market context
+ * @param data.force - Re-run even if prep already exists
+ * @returns Coach trigger response from admin-api
  */
-export const triggerStrategistCoachFn = createServerFn({ method: 'POST' })
-  .inputValidator(strategistCoachSchema)
+export const triggerCoachFn = createServerFn({ method: 'POST' })
+  .inputValidator(coachSchema)
   .handler(async ({ data }) => {
     await requireAuth()
-
-    const body = await apiFetch<Record<string, object>>(
-      '/pipelines/strategist-job',
+    return apiFetch<JsonRecord>(
+      `/applications/${encodeURIComponent(data.slug)}/coach`,
       {
         method: 'POST',
+        pathTemplate: '/applications/:slug/coach',
         body: JSON.stringify({
-          pipelineId: `COACH-${Date.now()}`,
-          slug: data.slug,
-          context: {
-            coachingType: data.coachingType,
-            targetCompany: data.targetCompany,
-            targetRole: data.targetRole,
-            resumeId: data.resumeId,
-          },
+          interviewStage: data.interviewStage,
+          compensationTarget: data.compensationTarget,
+          region: data.region,
+          force: data.force,
         }),
       },
     )
+  })
 
-    return body
+/**
+ * Patches per-stage user state for an application via admin-api.
+ *
+ * @param data.slug - Application slug
+ * @param data.stage - Stage type to patch (e.g. 'phone-screen')
+ * @param data.userState - Arbitrary user annotations for the stage
+ * @param data.scheduleAt - ISO 8601 schedule timestamp (null to clear)
+ * @param data.markNotApplicable - Mark the stage as not applicable
+ * @returns Patch response from admin-api
+ */
+export const patchStageFn = createServerFn({ method: 'POST' })
+  .inputValidator(patchStageSchema)
+  .handler(async ({ data }) => {
+    await requireAuth()
+    return apiFetch<JsonRecord>(
+      `/applications/${encodeURIComponent(data.slug)}/stages/${encodeURIComponent(data.stage)}`,
+      {
+        method: 'PATCH',
+        pathTemplate: '/applications/:slug/stages/:stage',
+        body: JSON.stringify({
+          userState: data.userState,
+          scheduleAt: data.scheduleAt,
+          markNotApplicable: data.markNotApplicable,
+        }),
+      },
+    )
   })
 
 /**
@@ -266,6 +302,7 @@ export const triggerApplicationsAnalysisFn = createServerFn({ method: 'POST' })
           jobDescription: data.jobDescription,
           targetCompany: data.targetCompany,
           targetRole: data.targetRole,
+          ...(data.interviewStage ? { interviewStage: data.interviewStage } : {}),
           ...(data.resumeId ? { resumeId: data.resumeId } : {}),
         }),
       },
