@@ -117,11 +117,18 @@ export function useApplicationDetail(slug: string) {
     refetchInterval: (queryResult) => {
       if (timedOut) return false
 
-      const status = queryResult.state.data?.status
+      const detail = queryResult.state.data
+      const status = detail?.status
       if (!status) return false
 
       const isActive = ACTIVE_PIPELINE_STATUSES.has(status)
-      if (!isActive) return false
+
+      // Also poll while any stage has prep_status === 'queued'
+      const hasQueuedStage =
+        detail?.stages != null &&
+        Object.values(detail.stages).some((s) => s.prep_status === 'queued')
+
+      if (!isActive && !hasQueuedStage) return false
 
       // Start timeout timer on first active poll
       if (!pollStartRef.current) {
@@ -139,14 +146,19 @@ export function useApplicationDetail(slug: string) {
     },
   })
 
-  // Reset timeout state when status changes to non-active
+  // Reset timeout state when status changes to non-active and no queued stages
   useEffect(() => {
-    const status = query.data?.status
-    if (status && !ACTIVE_PIPELINE_STATUSES.has(status)) {
+    const detail = query.data
+    const status = detail?.status
+    if (!status) return
+    const hasQueuedStage =
+      detail?.stages != null &&
+      Object.values(detail.stages).some((s) => s.prep_status === 'queued')
+    if (!ACTIVE_PIPELINE_STATUSES.has(status) && !hasQueuedStage) {
       pollStartRef.current = null
       setTimedOut(false)
     }
-  }, [query.data?.status])
+  }, [query.data])
 
   return { ...query, timedOut }
 }

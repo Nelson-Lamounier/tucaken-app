@@ -4,6 +4,8 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen, fireEvent, renderHook, act } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { ReactNode } from 'react'
 
 vi.mock('@tanstack/react-router', () => ({
   Link: ({ children, ...rest }: { children: React.ReactNode } & Record<string, unknown>) => (
@@ -15,6 +17,23 @@ const statusMutate = vi.fn()
 vi.mock('@/hooks/use-admin-applications', () => ({
   useApplicationStatus: () => ({ mutate: statusMutate, isPending: false }),
 }))
+
+// Stub patchStageFn so useStageDraft's debounced PATCH doesn't fail in tests
+vi.mock('@/server/pipelines', () => ({
+  patchStageFn: vi.fn().mockResolvedValue({}),
+  triggerCoachFn: vi.fn().mockResolvedValue({}),
+}))
+
+function createWrapper() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+  )
+}
+
+function renderWithQuery(ui: React.ReactElement) {
+  return render(ui, { wrapper: createWrapper() })
+}
 
 import { EvidenceIndicator } from '@/features/applications/stages/components/EvidenceIndicator'
 import { StoryCard } from '@/features/applications/stages/components/StoryCard'
@@ -184,7 +203,7 @@ describe('TechnicalWorkspace', () => {
   } satisfies ApplicationDetail
 
   it('renders evidence topics from research and opens the practice modal', () => {
-    render(<TechnicalWorkspace detail={detail} />)
+    renderWithQuery(<TechnicalWorkspace detail={detail} />)
     expect(screen.getByText('Kubernetes')).toBeTruthy()
     expect(screen.getByText('Strong evidence')).toBeTruthy()
     expect(screen.queryByText(/Coming soon/)).toBeNull()
@@ -193,7 +212,7 @@ describe('TechnicalWorkspace', () => {
   })
 
   it('Phone Screen surfaces talking points, questions, and an editable comp target', () => {
-    render(<PhoneScreenWorkspace detail={detail} />)
+    renderWithQuery(<PhoneScreenWorkspace detail={detail} />)
     expect(screen.getByText('Your talking points')).toBeTruthy()
     expect(screen.getByText('Kubernetes')).toBeTruthy() // verified match → talking point
     expect(screen.getByText(/What does success look like/)).toBeTruthy() // default question
@@ -203,7 +222,7 @@ describe('TechnicalWorkspace', () => {
   })
 
   it('System Design shows question patterns and expands a framework step', () => {
-    render(<SystemDesignWorkspace detail={detail} />)
+    renderWithQuery(<SystemDesignWorkspace detail={detail} />)
     expect(screen.getByText('Common question patterns')).toBeTruthy()
     expect(screen.queryByText(/functional vs non-functional/)).toBeNull() // collapsed
     fireEvent.click(screen.getByRole('button', { name: /Requirements & scope/i }))
@@ -254,7 +273,7 @@ describe('BehaviouralWorkspace', () => {
 
   it('shows empty bank, gaps for typical questions, and opens the add-story form', () => {
     window.localStorage.clear()
-    render(<BehaviouralWorkspace detail={detail} />)
+    renderWithQuery(<BehaviouralWorkspace detail={detail} />)
     expect(screen.getByText(/story bank is empty/i)).toBeTruthy()
     expect(screen.getAllByText('Gap — consider drafting').length).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole('button', { name: /Add story/i }))
@@ -272,7 +291,7 @@ describe('BarRaiserWorkspace', () => {
 
   it('renders the values matrix and a draft CTA for uncovered principles', () => {
     window.localStorage.clear()
-    render(<BarRaiserWorkspace detail={detail} />)
+    renderWithQuery(<BarRaiserWorkspace detail={detail} />)
     expect(screen.getByText('Company values matrix')).toBeTruthy()
     expect(screen.getAllByText('Customer Obsession').length).toBeGreaterThan(0)
     // empty bank → all principles uncovered → draft CTAs present

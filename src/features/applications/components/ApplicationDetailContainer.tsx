@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import {
@@ -29,6 +29,7 @@ import { STAGE_ORDER, stageIndex } from '../stages/types/stage'
 import { Button } from '@/components/ui/Button'
 import DropDownOptions from '@/components/ui/DropDownOptions'
 import { triggerCoachFn } from '@/server/pipelines'
+import { ConfirmModal } from '../stages/components/ConfirmModal'
 
 import {
   STATUS_OPTIONS,
@@ -65,6 +66,10 @@ export function ApplicationDetailContainer({ slug, activeStage }: ApplicationDet
 
   const { data: detail, isLoading, error } = useApplicationDetail(slug)
 
+  /** Confirm-generate modal state */
+  const [confirmGenStage, setConfirmGenStage] = useState<InterviewStage | null>(null)
+  const [confirmGenForce, setConfirmGenForce] = useState(true)
+
   const handleStatusChange = useCallback(
     (newStatus: ApplicationStatus) => {
       statusMutation.mutate({ slug, status: newStatus })
@@ -89,15 +94,25 @@ export function ApplicationDetailContainer({ slug, activeStage }: ApplicationDet
     [slug, navigate, statusMutation],
   )
 
-  /** Trigger the coach for a given stage, then invalidate the detail cache. */
+  /** Open the confirm modal before triggering the coach for a given stage. */
   const handleGeneratePrep = useCallback(
     (stage: InterviewStage, force = true) => {
-      void triggerCoachFn({ data: { slug, interviewStage: stage, force } }).then(() => {
-        void queryClient.invalidateQueries({ queryKey: adminKeys.applications.detail(slug) })
-      })
+      setConfirmGenStage(stage)
+      setConfirmGenForce(force)
     },
-    [slug, queryClient],
+    [],
   )
+
+  /** Confirmed: actually trigger the coach, then invalidate the detail cache. */
+  const handleConfirmGenerate = useCallback(() => {
+    if (!confirmGenStage) return
+    const stage = confirmGenStage
+    const force = confirmGenForce
+    setConfirmGenStage(null)
+    void triggerCoachFn({ data: { slug, interviewStage: stage, force } }).then(() => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.applications.detail(slug) })
+    })
+  }, [confirmGenStage, confirmGenForce, slug, queryClient])
 
   /** Schedule: trigger a non-force dispatch so the stage row is seeded, then refetch. */
   const handleSchedule = useCallback(
@@ -265,6 +280,15 @@ export function ApplicationDetailContainer({ slug, activeStage }: ApplicationDet
           <NotesAndTimelinePanel detail={detail} activeStage={resolvedStage} />
         </div>
       </div>
+      {/* Confirm modal for AI coach dispatch */}
+      <ConfirmModal
+        open={confirmGenStage !== null}
+        onClose={() => setConfirmGenStage(null)}
+        onConfirm={handleConfirmGenerate}
+        title="Generate interview prep?"
+        body={`This will dispatch the AI coach to generate prep for the ${confirmGenStage ? STAGE_LABELS[confirmGenStage] : ''} stage. It takes a minute or two.`}
+        confirmLabel="Generate"
+      />
     </div>
   )
 }
