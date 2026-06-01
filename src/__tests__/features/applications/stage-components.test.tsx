@@ -118,13 +118,131 @@ describe('TechnicalWorkspace', () => {
     interviewPrep: null,
   } satisfies ApplicationDetail
 
-  it('renders evidence topics from research and opens the practice modal', () => {
+  it('renders evidence topics from research and shows external practice links', () => {
     render(<TechnicalWorkspace detail={detail} />)
     expect(screen.getByText('Kubernetes')).toBeTruthy()
     expect(screen.getByText('Strong evidence')).toBeTruthy()
-    expect(screen.queryByText(/Coming soon/)).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: /Generate a practice question/i }))
-    expect(screen.getByText(/Coming soon/)).toBeTruthy()
+    // Practice section now has external links, no in-product modal
+    expect(screen.getByRole('link', { name: /Practice on LeetCode/i })).toBeTruthy()
+    expect(screen.getByRole('link', { name: /Practice on NeetCode/i })).toBeTruthy()
+  })
+
+  it('does not render Section B for system-design round type', () => {
+    render(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'system-design' }} />)
+    expect(screen.queryByLabelText('DSA / Coding section')).toBeNull()
+  })
+
+  it('does not render Section B for take-home round type', () => {
+    render(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'take-home' }} />)
+    expect(screen.queryByLabelText('DSA / Coding section')).toBeNull()
+  })
+
+  it('does not render Section B when technicalRoundType is undefined', () => {
+    render(<TechnicalWorkspace detail={detail} />)
+    expect(screen.queryByLabelText('DSA / Coding section')).toBeNull()
+  })
+
+  it('renders Section B with DSA banner for dsa round type', () => {
+    render(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'dsa' }} />)
+    expect(screen.getByLabelText('DSA / Coding section')).toBeTruthy()
+    expect(screen.getByText(/calibrate which DSA topics matter/)).toBeTruthy()
+  })
+
+  it('renders Section B for mixed round type', () => {
+    render(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'mixed' }} />)
+    expect(screen.getByLabelText('DSA / Coding section')).toBeTruthy()
+  })
+
+  it('renders calibrated DSA topics for dsa round type', () => {
+    const detailWithDsa = {
+      ...detail,
+      technicalRoundType: 'dsa' as const,
+      research: {
+        ...detail.research!,
+        dsaTopicCalibration: {
+          likelyTopics: [
+            {
+              canonicalName: 'binary-search',
+              displayName: 'Binary Search',
+              confidence: 0.8,
+              rationale: 'JD references efficient lookup at scale.',
+              jdEvidenceQuote: 'efficient search algorithms',
+            },
+            {
+              canonicalName: 'graph-bfs',
+              displayName: 'Graph BFS/DFS',
+              confidence: 0.4,
+              rationale: 'Graph traversal patterns mentioned.',
+              jdEvidenceQuote: 'graph-based data',
+            },
+          ],
+          honestyNote: 'Confidence is inferred from JD signals, not validated against test data.',
+        },
+      },
+    }
+    render(<TechnicalWorkspace detail={detailWithDsa} />)
+    expect(screen.getByText('Binary Search')).toBeTruthy()
+    expect(screen.getByText('High relevance')).toBeTruthy()
+    expect(screen.getByText('Graph BFS/DFS')).toBeTruthy()
+    expect(screen.getByText('Medium relevance')).toBeTruthy()
+    // Honest "practice externally" pointer present
+    expect(screen.getAllByText(/Not assessed from your code/).length).toBeGreaterThan(0)
+    // NO fake "your work shows this" text
+    expect(screen.queryByText(/your work shows/i)).toBeNull()
+    // Honesty footnote rendered
+    expect(screen.getByText(/Confidence is inferred from JD signals/)).toBeTruthy()
+  })
+
+  it('shows "no DSA round" message when likelyTopics is empty for dsa round type', () => {
+    const detailWithEmptyDsa = {
+      ...detail,
+      technicalRoundType: 'dsa' as const,
+      research: {
+        ...detail.research!,
+        dsaTopicCalibration: {
+          likelyTopics: [],
+          honestyNote: '',
+        },
+      },
+    }
+    render(<TechnicalWorkspace detail={detailWithEmptyDsa} />)
+    expect(screen.getByLabelText('DSA / Coding section')).toBeTruthy()
+    expect(screen.getByText(/This role likely has no DSA round/)).toBeTruthy()
+  })
+
+  it('shows "no DSA round" message when no calibration data present for dsa round type', () => {
+    render(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'dsa' }} />)
+    expect(screen.getByText(/This role likely has no DSA round/)).toBeTruthy()
+  })
+
+  it('shows practical coding note for practical round type', () => {
+    render(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'practical' }} />)
+    expect(screen.getByText(/favours practical coding over algorithm puzzles/)).toBeTruthy()
+  })
+
+  it('never renders a green check or "your work shows" state in DSA section', () => {
+    const detailWithDsa = {
+      ...detail,
+      technicalRoundType: 'dsa' as const,
+      research: {
+        ...detail.research!,
+        dsaTopicCalibration: {
+          likelyTopics: [
+            {
+              canonicalName: 'arrays',
+              displayName: 'Arrays & Hashing',
+              confidence: 0.9,
+              rationale: 'Core DS.',
+              jdEvidenceQuote: 'data structures',
+            },
+          ],
+          honestyNote: '',
+        },
+      },
+    }
+    render(<TechnicalWorkspace detail={detailWithDsa} />)
+    expect(screen.queryByText('🟢')).toBeNull()
+    expect(screen.queryByText(/your work shows/i)).toBeNull()
   })
 
   it('Phone Screen surfaces talking points, questions, and an editable comp target', () => {
