@@ -106,7 +106,6 @@ export function useStageDraft(
     prevScheduleAtRef.current = hydrated.scheduleAt
     // initialUserState intentionally excluded: server value is only used when
     // localStorage is absent; we don't want to overwrite in-session edits.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, stage])
 
   // When the server provides a fresh initialUserState and localStorage is empty,
