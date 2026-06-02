@@ -554,6 +554,35 @@ describe('TechnicalWorkspace', () => {
     fireEvent.click(screen.getByRole('button', { name: /Requirements & scope/i }))
     expect(screen.getByText(/functional vs non-functional/)).toBeTruthy()
   })
+
+  const systemTour = {
+    area: 'Async ingestion pipeline',
+    context: 'High-throughput event processing for the analytics lane.',
+    keyDecisions: [{ decision: 'Use SQS for buffering', rationale: 'Decouples producers from consumers' }],
+    tradeoffs: [{ tension: 'cost vs latency', chosenPath: 'micro-batching', cost: 'higher p99 latency' }],
+    systemMap: { diagramFormat: 'mermaid' as const, nodes: [{ id: 'a', label: 'Producer' }], edges: [{ from: 'a', to: 'b' }] },
+    outcomes: ['Cut spend by 40%'],
+    whatIdChange: ['Add a dead-letter queue alarm'],
+  }
+
+  it('System Design renders a tour walkthrough (area/decision) when systemTours present + round is system-design', () => {
+    renderWithQuery(<SystemDesignWorkspace detail={{ ...detail, technicalRoundType: 'system-design', systemTours: [systemTour] }} />)
+    expect(screen.getByText('Async ingestion pipeline')).toBeTruthy()
+    expect(screen.getByText('Use SQS for buffering')).toBeTruthy()
+    // empty-state fallback must NOT be shown when tours render
+    expect(screen.queryByText('Open your projects')).toBeNull()
+  })
+
+  it('System Design also renders the tour for architecture-review rounds', () => {
+    renderWithQuery(<SystemDesignWorkspace detail={{ ...detail, technicalRoundType: 'architecture-review', systemTours: [systemTour] }} />)
+    expect(screen.getByText('Async ingestion pipeline')).toBeTruthy()
+  })
+
+  it('System Design shows the empty-state fallback when systemTours is empty', () => {
+    renderWithQuery(<SystemDesignWorkspace detail={{ ...detail, technicalRoundType: 'system-design', systemTours: [] }} />)
+    expect(screen.getByText('Open your projects')).toBeTruthy()
+    expect(screen.queryByText('Async ingestion pipeline')).toBeNull()
+  })
 })
 
 describe('TradeoffBadge', () => {

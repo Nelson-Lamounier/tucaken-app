@@ -2,8 +2,9 @@
 
 import { Link } from '@tanstack/react-router'
 import { ListChecks, FolderOpen } from 'lucide-react'
-import type { ApplicationDetail } from '@/lib/types/applications.types'
+import type { ApplicationDetail, SystemTour } from '@/lib/types/applications.types'
 import { Card } from '@/components/ui/Card'
+import { ArchitectureDiagram } from '@/features/projects/components/ArchitectureDiagram'
 import { ScheduleCard } from '../components/ScheduleCard'
 import { SectionHeading } from '../components/SectionHeading'
 import { CollapsibleSection } from '../components/CollapsibleSection'
@@ -33,6 +34,100 @@ const FRAMEWORK: readonly { step: string; prompts: readonly string[] }[] = [
   { step: '6. Bottlenecks & wrap-up', prompts: ['Where does it fail under load?', 'What would I monitor and how would I scale next?'] },
 ]
 
+/** Round types for which the system-tour walkthrough is surfaced. Undefined
+ *  (safe-mode) also shows it — the data is the user's own and grounded. */
+const TOUR_ROUND_TYPES: ReadonlySet<NonNullable<ApplicationDetail['technicalRoundType']>> =
+  new Set(['system-design', 'architecture-review'])
+
+/** Renders a single grounded system-tour walkthrough. Real content only. */
+function SystemTourCard({ tour }: { readonly tour: SystemTour }) {
+  const { systemMap } = tour
+  return (
+    <Card className="space-y-5 p-5">
+      <div className="space-y-1">
+        <h4 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">{tour.area}</h4>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">{tour.context}</p>
+      </div>
+
+      {tour.keyDecisions.length > 0 && (
+        <section className="space-y-2">
+          <h5 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Key decisions</h5>
+          <ul className="space-y-2">
+            {tour.keyDecisions.map((d) => (
+              <li key={d.decision} className="text-sm text-zinc-700 dark:text-zinc-300">
+                <span className="font-medium text-zinc-900 dark:text-zinc-100">{d.decision}</span>
+                {' — '}
+                <span className="text-zinc-600 dark:text-zinc-400">{d.rationale}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {tour.tradeoffs.length > 0 && (
+        <section className="space-y-2">
+          <h5 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Trade-offs</h5>
+          <ul className="space-y-2">
+            {tour.tradeoffs.map((t) => (
+              <li key={t.tension} className="text-sm text-zinc-700 dark:text-zinc-300">
+                <span className="font-medium text-zinc-900 dark:text-zinc-100">{t.tension}</span>
+                {' → chose '}
+                <span className="text-zinc-700 dark:text-zinc-300">{t.chosenPath}</span>
+                <span className="text-zinc-500 dark:text-zinc-400">{' (cost: '}{t.cost}{')'}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {systemMap && (
+        <section className="space-y-2">
+          <h5 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">System map</h5>
+          {systemMap.diagramSource ? (
+            <ArchitectureDiagram format={systemMap.diagramFormat} source={systemMap.diagramSource} />
+          ) : (
+            <ul className="space-y-1 text-sm text-zinc-700 dark:text-zinc-300">
+              {systemMap.nodes.map((n) => (
+                <li key={n.id}>
+                  <span className="font-medium text-zinc-900 dark:text-zinc-100">{n.label}</span>
+                  {n.kind ? <span className="text-zinc-500"> ({n.kind})</span> : null}
+                </li>
+              ))}
+              {systemMap.edges.map((e) => (
+                <li key={`${e.from}->${e.to}`} className="text-zinc-500 dark:text-zinc-400">
+                  {e.from} → {e.to}{e.label ? `: ${e.label}` : ''}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+      {tour.outcomes.length > 0 && (
+        <section className="space-y-2">
+          <h5 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Outcomes</h5>
+          <ul className="list-disc space-y-1 pl-5 text-sm text-zinc-700 dark:text-zinc-300">
+            {tour.outcomes.map((o) => (
+              <li key={o}>{o}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {tour.whatIdChange.length > 0 && (
+        <section className="space-y-2">
+          <h5 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">What I&apos;d change</h5>
+          <ul className="list-disc space-y-1 pl-5 text-sm text-zinc-700 dark:text-zinc-300">
+            {tour.whatIdChange.map((w) => (
+              <li key={w}>{w}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </Card>
+  )
+}
+
 /**
  * System Design workspace (Stage 4). Question patterns + the six-step
  * framework are generic, genuinely-useful content. "Your own system design
@@ -43,6 +138,14 @@ const FRAMEWORK: readonly { step: string; prompts: readonly string[] }[] = [
 export function SystemDesignWorkspace({ detail }: SystemDesignWorkspaceProps) {
   const stageUserState = detail.stages?.['system-design']?.user_state as Partial<import('../hooks/useStageDraft').StageDraft> | undefined
   const { draft, setSchedule } = useStageDraft(detail.slug, 'system-design', stageUserState)
+
+  // Surface the grounded system-tour walkthroughs only when the user actually
+  // has tours AND the round is a system-design / architecture-review round (or
+  // undefined safe-mode). Otherwise keep the honest empty-state fallback.
+  const roundType = detail.technicalRoundType
+  const tourGateOpen = roundType === undefined || TOUR_ROUND_TYPES.has(roundType)
+  const tours = tourGateOpen ? (detail.systemTours ?? []) : []
+  const hasTours = tours.length > 0
 
   return (
     <div className="space-y-8">
@@ -71,17 +174,26 @@ export function SystemDesignWorkspace({ detail }: SystemDesignWorkspaceProps) {
       </section>
 
       <section className="space-y-3">
-        <SectionHeading title="Your own system design work" subtitle="The tradeoffs you actually made, ready to cite." />
-        <Card className="flex flex-col items-center gap-3 px-4 py-8 text-center">
-          <FolderOpen className="size-6 text-zinc-400" aria-hidden />
-          <p className="max-w-md text-sm text-zinc-500 dark:text-zinc-400">
-            Your projects&apos; architectural tradeoffs will surface here as badges once decision
-            detection is wired into prep. For now, review the decisions in your case-studies.
-          </p>
-          <Link to="/projects" className="text-sm font-medium text-accent hover:underline">
-            Open your projects
-          </Link>
-        </Card>
+        <SectionHeading title="Your own system design work" subtitle="The architecture you actually built, ready to cite." />
+        {hasTours ? (
+          <div className="space-y-4">
+            {tours.map((tour) => (
+              <SystemTourCard key={tour.area} tour={tour} />
+            ))}
+          </div>
+        ) : (
+          <Card className="flex flex-col items-center gap-3 px-4 py-8 text-center">
+            <FolderOpen className="size-6 text-zinc-400" aria-hidden />
+            <p className="max-w-md text-sm text-zinc-500 dark:text-zinc-400">
+              Your projects&apos; architectural tradeoffs will surface here as a grounded walkthrough once a
+              case-study (and its system tour) has been generated. For now, review the decisions in your
+              case-studies.
+            </p>
+            <Link to="/projects" className="text-sm font-medium text-accent hover:underline">
+              Open your projects
+            </Link>
+          </Card>
+        )}
       </section>
 
       <section className="space-y-3">

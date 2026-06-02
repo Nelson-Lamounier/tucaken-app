@@ -423,6 +423,24 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
         logger.warn({ err }, `[devops] evidence aggregation failed (non-fatal): ${msg}`);
       }
 
+      // System tours (per-project architecture walkthroughs). RLS-scoped via the
+      // outer withUser db client — a user only sees their own tours. Cap 3, newest
+      // first. Each row.content is a SystemTour. Fail-open (query error → omit).
+      let systemTours: unknown[] | undefined;
+      try {
+        const { rows: tourRows } = await db.query<{ content: unknown }>(
+          `SELECT content
+             FROM project_system_tours
+            WHERE user_id = current_setting('app.current_user_id')::uuid
+            ORDER BY generated_at DESC
+            LIMIT 3`,
+        );
+        systemTours = tourRows.map((r) => r.content);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        logger.warn({ err }, `[system-tour] serve failed (non-fatal): ${msg}`);
+      }
+
       const stages = await getStagesForApp(db, application.id);
 
       return ctx.json({
@@ -459,6 +477,7 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
             return acc;
           }, {}),
           ...(devopsEvidence !== undefined ? { devopsEvidence } : {}),
+          ...(systemTours !== undefined ? { systemTours } : {}),
           stages:              Object.fromEntries(stages.map(s => [s.stage_type, s])),
         },
       });
