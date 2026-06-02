@@ -298,6 +298,13 @@ describe('GET /:slug — application detail', () => {
         samples:            [{ repo: 'o/r', file: 'main.tf', line: 3, rawName: 'terraform' }],
       },
     ]);
+    // Honesty/RLS guardrails must be in the executed SQL: user-scoped + prose-suppressed.
+    const devopsSql = poolQueryMock.mock.calls
+      .map((c) => String(c[0]))
+      .find((s) => /devops_topic_mappings/.test(s)) ?? '';
+    expect(devopsSql).toMatch(/current_setting\('app\.current_user_id'\)/);
+    expect(devopsSql).toMatch(/source_layer NOT IN \('readme','code-prose'\)/);
+    expect(devopsSql).toMatch(/file_path !~\* /);
   });
 
   it('fail-open: devops query throws → field omitted, still 200', async () => {

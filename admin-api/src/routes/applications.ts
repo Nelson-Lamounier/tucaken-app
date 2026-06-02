@@ -241,7 +241,8 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
              FROM technology_evidence e
              JOIN technology_ontology o ON o.id = e.technology_id
              JOIN devops_topic_mappings m
-               ON o.category IN (SELECT jsonb_array_elements_text(m.mapped_ontology_categories))
+               ON o.category = ANY (SELECT jsonb_array_elements_text(m.mapped_ontology_categories))
+               OR o.canonical_name = ANY (SELECT jsonb_array_elements_text(m.mapped_canonicals))
             WHERE e.user_id = current_setting('app.current_user_id')::uuid
               AND e.source_layer NOT IN ('readme','code-prose')
               AND e.file_path !~* '\\.(md|markdown)$'
