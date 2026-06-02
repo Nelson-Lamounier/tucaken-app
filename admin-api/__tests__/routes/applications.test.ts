@@ -212,7 +212,9 @@ describe('GET /:slug — application detail', () => {
           content_json: { basics: { name: 'Nelson' } },
           generated_at: new Date('2026-04-03T00:00:00Z'),
         }],
-      });
+      })
+      // company_interview_profiles — no profile for this company
+      .mockResolvedValueOnce({ rows: [] });
 
     const res = await buildApp().request('/app-uuid-1');
     expect(res.status).toBe(200);
@@ -246,6 +248,8 @@ describe('GET /:slug — application detail', () => {
       },
       technologyInventory: null,
     });
+    // technicalRoundType defaults to 'dsa' when no company profile exists.
+    expect(body.application['technicalRoundType']).toBe('dsa');
     expect(body.application['latestAnalysisRunId']).toBe('run-1');
     expect(body.application['context']).toEqual({
       pipelineId:               'run-1',
@@ -263,12 +267,95 @@ describe('GET /:slug — application detail', () => {
     });
   });
 
+  it('includes dsaTopicCalibration in research when present in pipeline metadata', async () => {
+    pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
+    const calibration = {
+      likelyTopics: [{
+        canonicalName:    'binary-search',
+        displayName:      'Binary Search',
+        confidence:       0.9,
+        rationale:        'Mentioned in JD',
+        jdEvidenceQuote:  'strong algorithmic skills required',
+      }],
+      honestyNote: 'Based on limited public data',
+    };
+    poolQueryMock
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'run-2',
+          metadata: {
+            analysis: null,
+            research: {
+              fitSummary:            'Good fit',
+              overallFitRating:      'REASONABLE FIT',
+              verifiedMatches:       [],
+              gaps:                  [],
+              dsaTopicCalibration:   calibration,
+            },
+          },
+          created_at: new Date('2026-04-04T00:00:00Z'),
+        }],
+      })
+      .mockResolvedValueOnce({ rows: [] })  // coaching_content
+      .mockResolvedValueOnce({ rows: [] })  // resumes
+      .mockResolvedValueOnce({ rows: [] }); // company_interview_profiles
+
+    const res = await buildApp().request('/app-uuid-1');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { application: Record<string, unknown> };
+    const research = body.application['research'] as Record<string, unknown>;
+    expect(research['dsaTopicCalibration']).toEqual(calibration);
+  });
+
+  it('resolves technicalRoundType from a mocked company profile', async () => {
+    pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
+    poolQueryMock
+      .mockResolvedValueOnce({ rows: [] })  // pipeline_runs
+      .mockResolvedValueOnce({ rows: [] })  // coaching_content
+      .mockResolvedValueOnce({ rows: [] })  // resumes
+      // company_interview_profiles — profile with a technical stage
+      .mockResolvedValueOnce({
+        rows: [{
+          process_shape: [
+            { stage: 'phone-screen', round_type: 'behavioural' },
+            { stage: 'technical-1',  round_type: 'practical'  },
+            { stage: 'system-design', round_type: 'system-design' },
+          ],
+        }],
+      });
+
+    const res = await buildApp().request('/app-uuid-1');
+    const body = (await res.json()) as { application: Record<string, unknown> };
+    expect(body.application['technicalRoundType']).toBe('practical');
+  });
+
+  it('defaults technicalRoundType to "dsa" when the profile has no technical stage', async () => {
+    pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
+    poolQueryMock
+      .mockResolvedValueOnce({ rows: [] })  // pipeline_runs
+      .mockResolvedValueOnce({ rows: [] })  // coaching_content
+      .mockResolvedValueOnce({ rows: [] })  // resumes
+      // company_interview_profiles — profile with no technical round
+      .mockResolvedValueOnce({
+        rows: [{
+          process_shape: [
+            { stage: 'phone-screen', round_type: 'behavioural' },
+          ],
+        }],
+      });
+
+    const res = await buildApp().request('/app-uuid-1');
+    const body = (await res.json()) as { application: Record<string, unknown> };
+    expect(body.application['technicalRoundType']).toBe('dsa');
+  });
+
   it('returns null analysis/resume when no rows exist', async () => {
     pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
     poolQueryMock
       .mockResolvedValueOnce({ rows: [] })  // pipeline_runs
       .mockResolvedValueOnce({ rows: [] })  // coaching_content
-      .mockResolvedValueOnce({ rows: [] }); // resumes
+      .mockResolvedValueOnce({ rows: [] })  // resumes
+      .mockResolvedValueOnce({ rows: [] }); // company_interview_profiles
 
     const res = await buildApp().request('/app-uuid-1');
     const body = (await res.json()) as { application: Record<string, unknown> };
@@ -276,6 +363,7 @@ describe('GET /:slug — application detail', () => {
     expect(body.application['research']).toBeNull();
     expect(body.application['latestAnalysisRunId']).toBeNull();
     expect(body.application['coaching']).toEqual({});
+    expect(body.application['technicalRoundType']).toBe('dsa');
   });
 });
 

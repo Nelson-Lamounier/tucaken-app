@@ -216,6 +216,22 @@ export interface TechnologyInventory {
   readonly methodologies: string[]
 }
 
+/**
+ * DSA topic calibration from the job-strategist research agent.
+ * Present in pipeline_runs.metadata.research when the research run includes
+ * DSA topic inference (optional field — absent for older runs).
+ */
+export interface DsaTopicCalibration {
+  readonly likelyTopics: readonly {
+    readonly canonicalName: string
+    readonly displayName: string
+    readonly confidence: number
+    readonly rationale: string
+    readonly jdEvidenceQuote: string
+  }[]
+  readonly honestyNote: string
+}
+
 /** Research Agent output — part of ApplicationDetail */
 export interface ResearchOutput {
   readonly fitSummary: string
@@ -225,6 +241,8 @@ export interface ResearchOutput {
   readonly gaps: SkillGap[]
   readonly experienceSignals: ExperienceSignal
   readonly technologyInventory: TechnologyInventory
+  /** DSA topic calibration — present only when the research agent inferred topics */
+  readonly dsaTopicCalibration?: DsaTopicCalibration
 }
 
 /** Analysis metadata from the Applications Agent */
@@ -424,6 +442,11 @@ export interface ApplicationDetail {
   readonly research: ResearchOutput | null
   /** Applications Agent output (may be null while analysing) */
   readonly analysis: AnalysisOutput | null
+  /**
+   * The type of technical round inferred from the company's interview profile.
+   * Defaults to 'dsa' when no company profile or round_type is available.
+   */
+  readonly technicalRoundType?: 'dsa' | 'practical' | 'take-home' | 'system-design' | 'behavioural' | 'mixed'
   /** Coach Agent output (may be null if no interview prep yet) */
   readonly interviewPrep: InterviewPrepOutput | null
   /**
