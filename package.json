@@ -6,6 +6,10 @@
   "workspaces": [
     "admin-api"
   ],
+  "resolutions": {
+    "@grpc/proto-loader/protobufjs": "^7.6.2",
+    "@opentelemetry/otlp-transformer/protobufjs": "^8.5.0"
+  },
   "imports": {},
   "scripts": {
     "dev": "vite dev --port 5001",
@@ -90,6 +94,6 @@
     "vinxi": "^0.5.11",
     "vite": "^8.0.5",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^3.0.5"
+    "vitest": "^4.1.8"
   }
 }
