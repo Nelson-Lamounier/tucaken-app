@@ -351,6 +351,19 @@ describe('GET /:slug — application detail', () => {
     expect(body.application['technicalRoundType']).toBe('practical');
   });
 
+  it('accepts a new DevOps/AI round type (hands-on-lab) without rewriting it to dsa', async () => {
+    pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
+    poolQueryMock
+      .mockResolvedValueOnce({ rows: [] })  // pipeline_runs
+      .mockResolvedValueOnce({ rows: [] })  // coaching_content
+      .mockResolvedValueOnce({ rows: [] })  // resumes
+      .mockResolvedValueOnce({ rows: [{ process_shape: [{ stage: 'technical-1', round_type: 'hands-on-lab' }] }] })  // company_interview_profiles
+      .mockResolvedValueOnce({ rows: [] }); // dsa_evidence
+    const res = await buildApp().request('/app-uuid-1');
+    const body = (await res.json()) as { application: Record<string, unknown> };
+    expect(body.application['technicalRoundType']).toBe('hands-on-lab');
+  });
+
   it('defaults technicalRoundType to "dsa" when the profile has no technical stage', async () => {
     pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
     poolQueryMock

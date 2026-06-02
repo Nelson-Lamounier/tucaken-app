@@ -61,9 +61,11 @@ const VALID_STATUSES = new Set([
 
 /** Technical round types served to the UI (mirrors ApplicationDetail.technicalRoundType). */
 type TechnicalRoundType =
-  | 'dsa' | 'practical' | 'take-home' | 'system-design' | 'behavioural' | 'mixed';
+  | 'dsa' | 'practical' | 'take-home' | 'system-design' | 'behavioural' | 'mixed'
+  | 'troubleshooting' | 'architecture-review' | 'hands-on-lab';
 const VALID_ROUND_TYPES = new Set<TechnicalRoundType>([
   'dsa', 'practical', 'take-home', 'system-design', 'behavioural', 'mixed',
+  'troubleshooting', 'architecture-review', 'hands-on-lab',
 ]);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
