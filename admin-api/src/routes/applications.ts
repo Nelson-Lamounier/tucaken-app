@@ -15,21 +15,30 @@
  *   GET    /:slug/coaching/:stage         — read coaching_content row
  */
 
-import { randomUUID } from 'node:crypto';
-
 import { Hono } from 'hono';
 
 import type { AdminApiConfig } from '../lib/config.js';
 import { getJobImage, isImageConfigured } from '../lib/config.js';
+import { dispatchCoach, isPrepStage } from '../lib/coach-dispatch.js';
+import type { CoachJobEnv } from '../lib/coach-dispatch.js';
 import { buildPipelineJob, sanitizeLabel } from '../lib/k8s-job-builder.js';
 import { getBatchApi } from '../lib/k8s.js';
 import { getPool, withUser } from '../lib/pg.js';
+import type { Queryable } from '../lib/pg.js';
 import {
   listApplications,
   getApplication,
   updateApplicationStatus as pgUpdateStatus,
+  updateInterviewStage,
   deleteApplication as pgDeleteApplication,
 } from '../lib/repositories/applications.js';
+import {
+  upsertStageUserState,
+  markNotApplicable as pgMarkNotApplicable,
+  linkCoachRun,
+  getStagesForApp,
+  advanceStageLifecycle,
+} from '../lib/repositories/interview-stages.js';
 import { insertPipelineRun } from '../lib/repositories/pipeline-runs.js';
 import type { AdminApiBindings } from '../lib/types.js';
 
@@ -98,6 +107,62 @@ function normaliseResearch(raw: Record<string, unknown>): Record<string, unknown
     } : undefined,
     technologyInventory: raw['technologyInventory'] ?? null,
   };
+}
+
+// ── Shared coach dispatch helpers ─────────────────────────────────────────────
+
+/**
+ * Builds the `createJob` closure and `insertCoachRun` adapter shared by both
+ * the `/coach` and `/status` handlers so K8s job construction is not duplicated.
+ */
+function makeCoachAdapters(config: AdminApiConfig, slug: string) {
+  function createJob(env: CoachJobEnv): Promise<void> {
+    const job = buildPipelineJob({
+      namespace:          config.strategistPipelineNamespace,
+      image:              getJobImage('job-strategist'),
+      serviceAccountName: config.strategistPipelineServiceAccount,
+      nameStem:           `coach-${sanitizeLabel(slug)}-${sanitizeLabel(env.interviewStage)}`,
+      suffixInput:        `${env.coachPipelineRunId}:${env.applicationId}:${env.interviewStage}:${Date.now()}`,
+      labels: {
+        app:   'coach-pipeline',
+        userId: env.userId,
+        slug:  sanitizeLabel(slug),
+        stage: sanitizeLabel(env.interviewStage),
+      },
+      command: ['node', 'dist/run-coach.js'],
+      env: [
+        { name: 'COACH_PIPELINE_RUN_ID',      value: env.coachPipelineRunId },
+        { name: 'STRATEGIST_PIPELINE_RUN_ID', value: env.strategistPipelineRunId },
+        { name: 'APPLICATION_ID',             value: env.applicationId },
+        { name: 'APPLICATION_SLUG',           value: env.slug },
+        { name: 'USER_ID',                    value: env.userId },
+        { name: 'TARGET_COMPANY',             value: env.targetCompany },
+        { name: 'TARGET_ROLE',                value: env.targetRole },
+        { name: 'JOB_DESCRIPTION',            value: env.jobDescription },
+        { name: 'INTERVIEW_STAGE',            value: env.interviewStage },
+        { name: 'MODE',                       value: 'standard' },
+        ...(env.compensationTarget ? [{ name: 'COMPENSATION_TARGET', value: env.compensationTarget }] : []),
+        { name: 'REGION',                     value: env.region },
+      ],
+      envFromSecretRefs: ['platform-rds-credentials'],
+    });
+    return getBatchApi().createNamespacedJob({ namespace: config.strategistPipelineNamespace, body: job }).then(() => undefined);
+  }
+
+  function insertCoachRunAdapter(
+    db: Queryable,
+    row: { id: string; userId: string; referenceId: string; metadata: Record<string, unknown> },
+  ): Promise<void> {
+    return insertPipelineRun(db, {
+      id:           row.id,
+      userId:       row.userId,
+      pipelineType: 'coach',
+      referenceId:  row.referenceId,
+      metadata:     row.metadata,
+    });
+  }
+
+  return { createJob, insertCoachRunAdapter };
 }
 
 // ── Router factory ────────────────────────────────────────────────────────────
@@ -216,6 +281,8 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
       // the UI types (applications.types.ts), so we normalise here.
       const research = rawResearch ? normaliseResearch(rawResearch) : null;
 
+      const stages = await getStagesForApp(db, application.id);
+
       return ctx.json({
         application: {
           id:                  application.id,
@@ -225,7 +292,7 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
           jobUrl:              application.jobUrl,
           jobDescription:      application.jobDescription,
           status:              application.kanbanStatus,
-          interviewStage:      'applied',
+          interviewStage:      application.interviewStage,
           createdAt:           application.createdAt,
           updatedAt:           application.updatedAt,
           context: {
@@ -247,6 +314,7 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
             };
             return acc;
           }, {}),
+          stages:              Object.fromEntries(stages.map(s => [s.stage_type, s])),
         },
       });
     });
@@ -265,6 +333,55 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
     });
   });
 
+  // ── PATCH /:slug/stages/:stage — update per-stage user state / schedule / N/A ──
+  app.patch('/:slug/stages/:stage', async (ctx) => {
+    const userId = ctx.get('userId');
+    if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
+
+    const slug  = ctx.req.param('slug');
+    const stage = ctx.req.param('stage');
+
+    let body: { userState?: Record<string, unknown>; scheduleAt?: string | null; markNotApplicable?: boolean };
+    try { body = await ctx.req.json(); }
+    catch { return ctx.json({ error: 'Body must be valid JSON' }, 400); }
+
+    return withUser(getPool(config), userId, async (db) => {
+      const application = await getApplication(db, slug);
+      if (!application) return ctx.json({ error: `Application not found: ${slug}` }, 404);
+
+      if (body.markNotApplicable === true) {
+        await pgMarkNotApplicable(db, application.id, stage);
+        return ctx.json({ success: true });
+      }
+
+      await upsertStageUserState(db, application.id, stage, body.userState ?? {}, body.scheduleAt ?? null);
+
+      if (body.scheduleAt && isPrepStage(stage)) {
+        const { createJob, insertCoachRunAdapter } = makeCoachAdapters(config, slug);
+        try {
+          const result = await dispatchCoach(
+            db,
+            {
+              application: { id: application.id, company: application.company, role: application.role, job_description: application.jobDescription },
+              slug,
+              userId,
+              interviewStage: stage,
+            },
+            createJob,
+            insertCoachRunAdapter,
+          );
+          if (result.status === 'dispatched') {
+            await linkCoachRun(db, application.id, stage, result.coachPipelineRunId!);
+          }
+        } catch (err) {
+          console.error('[applications/stages] coach dispatch failed (non-fatal)', err);
+        }
+      }
+
+      return ctx.json({ success: true });
+    });
+  });
+
   // ── POST /:slug/status — update status ────────────────────────────────────
   app.post('/:slug/status', async (ctx) => {
     const userId = ctx.get('userId');
@@ -278,6 +395,37 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
 
     return withUser(getPool(config), userId, async (db) => {
       await pgUpdateStatus(db, slug, body.status!);
+
+      if (body.interviewStage) {
+        const app = await getApplication(db, slug);
+        if (app) {
+          await updateInterviewStage(db, app.id, body.interviewStage);
+
+          try { await advanceStageLifecycle(db, app.id, body.interviewStage); }
+          catch (err) { console.error('[applications/status] stage lifecycle update failed (non-fatal)', err); }
+
+          if (isPrepStage(body.interviewStage)) {
+            const coachImageConfigured = isImageConfigured(getJobImage('job-strategist'));
+            if (coachImageConfigured) {
+              const { createJob, insertCoachRunAdapter } = makeCoachAdapters(config, slug);
+              try {
+                const result = await dispatchCoach(
+                  db,
+                  { application: { id: app.id, company: app.company, role: app.role, job_description: app.jobDescription }, slug, userId, interviewStage: body.interviewStage },
+                  createJob,
+                  insertCoachRunAdapter,
+                );
+                if (result.status === 'dispatched' && result.coachPipelineRunId) {
+                  await linkCoachRun(db, app.id, body.interviewStage, result.coachPipelineRunId);
+                }
+              } catch (err) {
+                console.error('[applications/status] coach dispatch failed (non-fatal)', err);
+              }
+            }
+          }
+        }
+      }
+
       return ctx.json({ success: true, status: body.status });
     });
   });
@@ -290,34 +438,13 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
     const slug = ctx.req.param('slug');
 
     let body: {
-      strategistPipelineRunId?: string;
-      interviewStage?:          string;
-      applicationId?:           string;
-      targetCompany?:           string;
-      targetRole?:              string;
-      jobDescription?:          string;
-      mode?:                    string;
-      compensationTarget?:      string | number;
-      region?:                  string;
+      interviewStage?:     string;
+      compensationTarget?: string | number;
+      region?:             string;
+      force?:              boolean;
     };
     try { body = await ctx.req.json(); }
     catch { return ctx.json({ error: 'Body must be valid JSON' }, 400); }
-
-    const f = {
-      strategistPipelineRunId: body.strategistPipelineRunId?.trim(),
-      interviewStage:          body.interviewStage?.trim(),
-      applicationId:           body.applicationId?.trim(),
-      targetCompany:           body.targetCompany?.trim(),
-      targetRole:              body.targetRole?.trim(),
-      jobDescription:          body.jobDescription?.trim(),
-    };
-    for (const [k, v] of Object.entries(f)) {
-      if (!v) return ctx.json({ error: `"${k}" is required` }, 400);
-    }
-    const mode = body.mode?.trim() || 'standard';
-    const compensationTarget =
-      body.compensationTarget != null ? String(body.compensationTarget).trim() : '';
-    const region = body.region?.trim() || 'eu-remote';
 
     const strategistPipelineImage = getJobImage('job-strategist');
     if (!isImageConfigured(strategistPipelineImage)) {
@@ -325,69 +452,42 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
       return ctx.json({ error: 'Strategist pipeline image not yet configured — wait ~60s for ESO/kubelet sync' }, 502);
     }
 
-    const coachPipelineRunId = randomUUID();
-
     return withUser(getPool(config), userId, async (db) => {
-      try {
-        await insertPipelineRun(db, {
-          id:           coachPipelineRunId,
-          userId,
-          pipelineType: 'coach',
-          referenceId:  f.applicationId!,
-          metadata: {
-            applicationSlug:         slug,
-            interviewStage:          f.interviewStage,
-            strategistPipelineRunId: f.strategistPipelineRunId,
-          },
-        });
-      } catch (err: unknown) {
-        console.error('[applications/coach] failed to insert pipeline_run', err);
-        return ctx.json({ error: 'Failed to record pipeline run' }, 500);
+      const application = await getApplication(db, slug);
+      if (!application) return ctx.json({ error: `Application not found: ${slug}` }, 404);
+
+      const { createJob, insertCoachRunAdapter } = makeCoachAdapters(config, slug);
+
+      const dispatchArgs: Parameters<typeof dispatchCoach>[1] = {
+        application: { id: application.id, company: application.company, role: application.role, job_description: application.jobDescription },
+        slug,
+        userId,
+        interviewStage: body.interviewStage?.trim() ?? '',
+        force:          body.force === true,
+      };
+      if (body.compensationTarget != null) {
+        dispatchArgs.compensationTarget = String(body.compensationTarget).trim();
+      }
+      if (body.region?.trim()) {
+        dispatchArgs.region = body.region.trim();
       }
 
-      const job = buildPipelineJob({
-        namespace:          config.strategistPipelineNamespace,
-        image:              strategistPipelineImage,
-        serviceAccountName: config.strategistPipelineServiceAccount,
-        nameStem:           `coach-${sanitizeLabel(slug)}-${sanitizeLabel(f.interviewStage!)}`,
-        suffixInput:        `${coachPipelineRunId}:${f.applicationId}:${f.interviewStage}:${Date.now()}`,
-        labels: {
-          app:    'coach-pipeline',
-          userId,
-          slug:   sanitizeLabel(slug),
-          stage:  sanitizeLabel(f.interviewStage!),
-        },
-        command: ['node', 'dist/run-coach.js'],
-        env: [
-          { name: 'COACH_PIPELINE_RUN_ID',      value: coachPipelineRunId },
-          { name: 'STRATEGIST_PIPELINE_RUN_ID', value: f.strategistPipelineRunId! },
-          { name: 'APPLICATION_ID',             value: f.applicationId! },
-          { name: 'APPLICATION_SLUG',           value: slug },
-          { name: 'USER_ID',                    value: userId },
-          { name: 'TARGET_COMPANY',             value: f.targetCompany! },
-          { name: 'TARGET_ROLE',                value: f.targetRole! },
-          { name: 'JOB_DESCRIPTION',            value: f.jobDescription! },
-          { name: 'INTERVIEW_STAGE',            value: f.interviewStage! },
-          { name: 'MODE',                       value: mode },
-          ...(compensationTarget ? [{ name: 'COMPENSATION_TARGET', value: compensationTarget }] : []),
-          { name: 'REGION', value: region },
-        ],
-        envFromSecretRefs: ['platform-rds-credentials'],
-      });
+      const result = await dispatchCoach(db, dispatchArgs, createJob, insertCoachRunAdapter);
 
-      try { await getBatchApi().createNamespacedJob({ namespace: config.strategistPipelineNamespace, body: job }); }
-      catch (err: unknown) {
-        console.error('[applications/coach] failed to create K8s Job', err);
-        return ctx.json({ error: 'Failed to schedule coach Job' }, 502);
+      if (result.status === 'dispatched') {
+        if (dispatchArgs.interviewStage) {
+          await linkCoachRun(db, application.id, dispatchArgs.interviewStage, result.coachPipelineRunId!);
+        }
+        return ctx.json({ status: 'queued', coachPipelineRunId: result.coachPipelineRunId }, 202);
       }
-
-      return ctx.json({
-        status:             'queued',
-        coachPipelineRunId,
-        jobName:            job.metadata!.name!,
-        applicationId:      f.applicationId,
-        interviewStage:     f.interviewStage,
-      }, 202);
+      if (result.status === 'skipped') {
+        return ctx.json({ status: 'skipped' }, 200);
+      }
+      if (result.status === 'gated') {
+        return ctx.json({ error: result.reason }, 400);
+      }
+      // no-analysis
+      return ctx.json({ error: result.reason }, 409);
     });
   });
 

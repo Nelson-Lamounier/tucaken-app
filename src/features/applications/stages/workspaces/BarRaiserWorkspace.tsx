@@ -31,7 +31,8 @@ interface BarRaiserWorkspaceProps {
  * evidence detection has no backend yet (honest copy; ADR-0003).
  */
 export function BarRaiserWorkspace({ detail }: BarRaiserWorkspaceProps) {
-  const { draft, setSchedule } = useStageDraft(detail.slug, 'bar-raiser')
+  const stageUserState = detail.stages?.['bar-raiser']?.user_state as Partial<import('../hooks/useStageDraft').StageDraft> | undefined
+  const { draft, setSchedule } = useStageDraft(detail.slug, 'bar-raiser', stageUserState)
   const { stories, addStory } = useStoryBank(detail.slug)
 
   const [selectedId, setSelectedId] = useState<string | null>(null)

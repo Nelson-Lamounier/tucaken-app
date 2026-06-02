@@ -81,7 +81,9 @@ describe('DecisionLog', () => {
   })
 
   it('calls deleteDecisionFn when the trash button is clicked and confirmed', async () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    // happy-dom does not implement window.confirm, so stub the global rather
+    // than spy on it (vitest 4's vi.spyOn requires an existing function target).
+    vi.stubGlobal('confirm', vi.fn(() => true))
     try {
       renderWithClient([makeDecision()])
       await userEvent.click(screen.getByRole('button', { name: /delete decision/i }))
@@ -89,7 +91,7 @@ describe('DecisionLog', () => {
         data: { projectId: PROJECT_ID, decisionId: '22222222-2222-2222-2222-222222222222' },
       })
     } finally {
-      confirmSpy.mockRestore()
+      vi.unstubAllGlobals()
     }
   })
 })
