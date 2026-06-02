@@ -214,6 +214,8 @@ describe('GET /:slug — application detail', () => {
         }],
       })
       // company_interview_profiles — no profile for this company
+      .mockResolvedValueOnce({ rows: [] })
+      // dsa_evidence — no rows for this user
       .mockResolvedValueOnce({ rows: [] });
 
     const res = await buildApp().request('/app-uuid-1');
@@ -298,7 +300,8 @@ describe('GET /:slug — application detail', () => {
       })
       .mockResolvedValueOnce({ rows: [] })  // coaching_content
       .mockResolvedValueOnce({ rows: [] })  // resumes
-      .mockResolvedValueOnce({ rows: [] }); // company_interview_profiles
+      .mockResolvedValueOnce({ rows: [] })  // company_interview_profiles
+      .mockResolvedValueOnce({ rows: [] }); // dsa_evidence
 
     const res = await buildApp().request('/app-uuid-1');
     expect(res.status).toBe(200);
@@ -322,7 +325,8 @@ describe('GET /:slug — application detail', () => {
             { stage: 'system-design', round_type: 'system-design' },
           ],
         }],
-      });
+      })
+      .mockResolvedValueOnce({ rows: [] }); // dsa_evidence
 
     const res = await buildApp().request('/app-uuid-1');
     const body = (await res.json()) as { application: Record<string, unknown> };
@@ -342,7 +346,8 @@ describe('GET /:slug — application detail', () => {
             { stage: 'phone-screen', round_type: 'behavioural' },
           ],
         }],
-      });
+      })
+      .mockResolvedValueOnce({ rows: [] }); // dsa_evidence
 
     const res = await buildApp().request('/app-uuid-1');
     const body = (await res.json()) as { application: Record<string, unknown> };
@@ -356,6 +361,7 @@ describe('GET /:slug — application detail', () => {
       .mockResolvedValueOnce({ rows: [] })  // coaching_content
       .mockResolvedValueOnce({ rows: [] })  // resumes
       .mockResolvedValueOnce({ rows: [] })  // company_interview_profiles
+      .mockResolvedValueOnce({ rows: [] })  // dsa_evidence
       .mockResolvedValueOnce({ rows: [] }); // devops_topic_mappings
 
     const res = await buildApp().request('/app-uuid-1');
@@ -374,6 +380,7 @@ describe('GET /:slug — application detail', () => {
       .mockResolvedValueOnce({ rows: [] })  // coaching_content
       .mockResolvedValueOnce({ rows: [] })  // resumes
       .mockResolvedValueOnce({ rows: [] })  // company_interview_profiles
+      .mockResolvedValueOnce({ rows: [] })  // dsa_evidence
       // devops_topic_mappings aggregation
       .mockResolvedValueOnce({
         rows: [{
@@ -406,6 +413,73 @@ describe('GET /:slug — application detail', () => {
     expect(devopsSql).toMatch(/file_path !~\* /);
   });
 
+  it('returns dsaRealWork aggregated by topic when dsa_evidence rows exist', async () => {
+    pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
+    const dsaRows = [
+      {
+        dsa_topic:      'graphs',
+        match_count:    '3',
+        top_confidence: 0.82,
+        signals:        ['networkx_import'],
+        samples:        [
+          { repo: 'user/algo-repo', file: 'graph.py', line: 42 },
+          { repo: 'user/algo-repo', file: 'bfs.py',   line: 10 },
+        ],
+      },
+      {
+        dsa_topic:      'heaps',
+        match_count:    '1',
+        top_confidence: 0.75,
+        signals:        ['heap'],
+        samples:        [{ repo: 'user/algo-repo', file: 'heap.py', line: 5 }],
+      },
+    ];
+    poolQueryMock
+      .mockResolvedValueOnce({ rows: [] })       // pipeline_runs
+      .mockResolvedValueOnce({ rows: [] })       // coaching_content
+      .mockResolvedValueOnce({ rows: [] })       // resumes
+      .mockResolvedValueOnce({ rows: [] })       // company_interview_profiles
+      .mockResolvedValueOnce({ rows: dsaRows }); // dsa_evidence
+
+    const res = await buildApp().request('/app-uuid-1');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { application: Record<string, unknown> };
+    const dsaRealWork = body.application['dsaRealWork'] as Array<Record<string, unknown>>;
+    expect(Array.isArray(dsaRealWork)).toBe(true);
+    expect(dsaRealWork).toHaveLength(2);
+
+    const graphsTopic = dsaRealWork.find(t => t['canonicalName'] === 'graphs')!;
+    expect(graphsTopic).toBeDefined();
+    expect(graphsTopic['matchCount']).toBe(3);
+    expect(graphsTopic['topConfidence']).toBe(0.82);
+    expect(graphsTopic['signals']).toEqual(['networkx_import']);
+    expect(graphsTopic['samples']).toHaveLength(2);
+    expect(graphsTopic['samples'][0]).toEqual({ repo: 'user/algo-repo', file: 'graph.py', line: 42 });
+
+    const heapsTopic = dsaRealWork.find(t => t['canonicalName'] === 'heaps')!;
+    expect(heapsTopic).toBeDefined();
+    expect(heapsTopic['matchCount']).toBe(1);
+  });
+
+  it('omits dsaRealWork and still returns 200 when the dsa_evidence query throws', async () => {
+    pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
+    poolQueryMock
+      .mockResolvedValueOnce({ rows: [] })      // pipeline_runs
+      .mockResolvedValueOnce({ rows: [] })      // coaching_content
+      .mockResolvedValueOnce({ rows: [] })      // resumes
+      .mockResolvedValueOnce({ rows: [] })      // company_interview_profiles
+      .mockRejectedValueOnce(new Error('relation "dsa_evidence" does not exist')); // dsa_evidence fails
+
+    const res = await buildApp().request('/app-uuid-1');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { application: Record<string, unknown> };
+    // dsaRealWork must be absent (fail-open), not present as null or an error
+    expect(body.application['dsaRealWork']).toBeUndefined();
+    // Other fields must still be present
+    expect(body.application['id']).toBe('app-uuid-1');
+    expect(body.application['technicalRoundType']).toBe('dsa');
+  });
+
   it('fail-open: devops query throws → field omitted, still 200', async () => {
     pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
     poolQueryMock
@@ -413,12 +487,28 @@ describe('GET /:slug — application detail', () => {
       .mockResolvedValueOnce({ rows: [] })  // coaching_content
       .mockResolvedValueOnce({ rows: [] })  // resumes
       .mockResolvedValueOnce({ rows: [] })  // company_interview_profiles
+      .mockResolvedValueOnce({ rows: [] })  // dsa_evidence
       .mockRejectedValueOnce(new Error('devops query exploded')); // devops_topic_mappings
 
     const res = await buildApp().request('/app-uuid-1');
     expect(res.status).toBe(200);
     const body = (await res.json()) as { application: Record<string, unknown> };
     expect(body.application['devopsEvidence']).toBeUndefined();
+  });
+
+  it('returns empty dsaRealWork array when user has no dsa_evidence rows', async () => {
+    pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
+    poolQueryMock
+      .mockResolvedValueOnce({ rows: [] })  // pipeline_runs
+      .mockResolvedValueOnce({ rows: [] })  // coaching_content
+      .mockResolvedValueOnce({ rows: [] })  // resumes
+      .mockResolvedValueOnce({ rows: [] })  // company_interview_profiles
+      .mockResolvedValueOnce({ rows: [] }); // dsa_evidence — no rows
+
+    const res = await buildApp().request('/app-uuid-1');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { application: Record<string, unknown> };
+    expect(body.application['dsaRealWork']).toEqual([]);
   });
 });
 

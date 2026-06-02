@@ -38,6 +38,19 @@ const confidenceBadge = (confidence: number): string => {
 /** Round types that should show the DSA / Coding section */
 const DSA_ROUND_TYPES = new Set<ApplicationDetail['technicalRoundType']>(['dsa', 'mixed', 'practical'])
 
+/**
+ * Honest, specific phrases for each detector signal.
+ * The phrasing is import/type-grounded — it describes what the code *does*,
+ * not a mastery claim.
+ */
+const SIGNAL_PHRASE: Record<string, string> = {
+  networkx_import: 'imports networkx (graph algorithms)',
+  heap:            'uses a heap / priority queue',
+  tree_type:       'defines a tree/trie type',
+  memoization:     'uses memoization (@lru_cache/@cache)',
+  comparator:      'uses a custom sort comparator',
+}
+
 interface TechnicalWorkspaceProps {
   readonly detail: ApplicationDetail
 }
@@ -59,6 +72,22 @@ export function TechnicalWorkspace({ detail }: TechnicalWorkspaceProps) {
 
   const showDsaSection = !detail.technicalRoundType || DSA_ROUND_TYPES.has(detail.technicalRoundType)
   const dsaCalibration = detail.research?.dsaTopicCalibration
+
+  // Real-work evidence map: canonicalName → DsaRealWorkTopic (fail-open: absent = no evidence)
+  const evidenceByTopic = useMemo(
+    () => new Map((detail.dsaRealWork ?? []).map(e => [e.canonicalName, e])),
+    [detail.dsaRealWork],
+  )
+
+  // Topics with evidence that are NOT in the calibrated list → yellow secondary block
+  const calibratedNames = useMemo(
+    () => new Set((dsaCalibration?.likelyTopics ?? []).map(t => t.canonicalName)),
+    [dsaCalibration],
+  )
+  const extraEvidenceTopics = useMemo(
+    () => (detail.dsaRealWork ?? []).filter(e => !calibratedNames.has(e.canonicalName)),
+    [detail.dsaRealWork, calibratedNames],
+  )
 
   return (
     <div className="space-y-8">
@@ -92,7 +121,7 @@ export function TechnicalWorkspace({ detail }: TechnicalWorkspaceProps) {
         )}
       </section>
 
-      {/* Section B — DSA / Coding (calibration only; honest gaps; no fake real-work evidence) */}
+      {/* Section B — DSA / Coding (calibration + real-work evidence badges) */}
       {showDsaSection && (
         <section className="space-y-3" aria-label="DSA / Coding section">
           <SectionHeading
@@ -100,11 +129,17 @@ export function TechnicalWorkspace({ detail }: TechnicalWorkspaceProps) {
             subtitle="Topic calibration for this role."
           />
 
-          {/* Honesty banner */}
+          {/* Narrow-coverage honesty banner — ALWAYS shown when Section B renders */}
+          <Card className="border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">
+            Real-work detection covers a limited pattern set (graphs, heaps, trees/tries,
+            memoization, custom sort). No green badge ≠ you can&apos;t do it — most DSA practice
+            happens off-GitHub.
+          </Card>
+
+          {/* Calibration honesty banner */}
           <Card className="border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
             We calibrate which DSA topics matter for this role and flag gaps. DSA practice happens
             off-GitHub — we point you to LeetCode/NeetCode; we don&apos;t drill.
-            (Real-work pattern detection is coming.)
           </Card>
 
           {/* Practical-coding note */}
@@ -115,51 +150,148 @@ export function TechnicalWorkspace({ detail }: TechnicalWorkspaceProps) {
             </p>
           )}
 
-          {/* Topic cards */}
+          {/* Primary topic cards — calibrated topics with 🟢/🔴 treatment */}
           {dsaCalibration && dsaCalibration.likelyTopics.length > 0 ? (
             <div className="space-y-3">
-              {dsaCalibration.likelyTopics.map(topic => (
-                <Card key={topic.canonicalName} className="space-y-2 p-4">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${confidenceBadge(topic.confidence)}`}
-                    >
-                      {CONFIDENCE_LABEL(topic.confidence)}
-                    </span>
-                    <h4 className="text-sm font-semibold text-zinc-900 dark:text-white">
-                      {topic.displayName}
-                    </h4>
-                  </div>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400">{topic.rationale}</p>
-                  {/* DSA v1: external pointers, not in-product practice */}
-                  <p className="text-xs text-zinc-400 dark:text-zinc-500">
-                    Not assessed from your code — practice on{' '}
-                    <a
-                      href="https://leetcode.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-0.5 font-medium underline underline-offset-2 hover:text-zinc-600 dark:hover:text-zinc-300"
-                    >
-                      LeetCode <ExternalLink className="size-3" aria-hidden />
-                    </a>
-                    {' '}or{' '}
-                    <a
-                      href="https://neetcode.io"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-0.5 font-medium underline underline-offset-2 hover:text-zinc-600 dark:hover:text-zinc-300"
-                    >
-                      NeetCode <ExternalLink className="size-3" aria-hidden />
-                    </a>
-                    {' '}before this round.
-                  </p>
-                </Card>
-              ))}
+              {dsaCalibration.likelyTopics.map(topic => {
+                const ev = evidenceByTopic.get(topic.canonicalName)
+                const sample = ev?.samples[0]
+                const signalKey = ev?.signals[0] ?? ''
+                const signalPhrase = SIGNAL_PHRASE[signalKey] ?? 'shows real-work DSA'
+                const ghUrl = sample
+                  ? `https://github.com/${sample.repo}/blob/HEAD/${sample.file}#L${sample.line}`
+                  : undefined
+
+                if (ev) {
+                  // 🟢 — calibrated AND has real-work evidence (an evidence row exists).
+                  // The file:line sample is shown when present; a row without a sample still
+                  // earns green (degraded) rather than silently dropping to the 🔴 path.
+                  return (
+                    <Card key={topic.canonicalName} className="space-y-2 border-emerald-200 p-4 dark:border-emerald-500/20">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20">
+                          Real-work signal
+                        </span>
+                        <span
+                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${confidenceBadge(topic.confidence)}`}
+                        >
+                          {CONFIDENCE_LABEL(topic.confidence)}
+                        </span>
+                        <h4 className="text-sm font-semibold text-zinc-900 dark:text-white">
+                          {topic.displayName}
+                        </h4>
+                      </div>
+                      <p className="text-sm text-zinc-600 dark:text-zinc-400">{topic.rationale}</p>
+                      {/* Green evidence line: repo/file:line (when sampled) + signal phrase */}
+                      <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                        Your{' '}
+                        {sample && ghUrl ? (
+                          <>
+                            <a
+                              href={ghUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-0.5 font-mono font-medium underline underline-offset-2 hover:text-emerald-600"
+                            >
+                              {sample.repo}/{sample.file}:{sample.line}{' '}
+                              <ExternalLink className="size-3" aria-hidden />
+                            </a>{' '}
+                          </>
+                        ) : sample ? (
+                          <span className="font-mono">{sample.repo}/{sample.file}:{sample.line} </span>
+                        ) : (
+                          <>code </>
+                        )}
+                        {signalPhrase}{' '}
+                        <span className="text-zinc-400 dark:text-zinc-500">
+                          (in {ev.matchCount} place{ev.matchCount > 1 ? 's' : ''})
+                        </span>
+                      </p>
+                      {/* Import-grounded caveat — honesty constraint */}
+                      <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                        import/type-grounded — concrete work to talk to, not a mastery score.
+                      </p>
+                    </Card>
+                  )
+                }
+
+                // 🔴 — calibrated, no evidence — v1 treatment unchanged
+                return (
+                  <Card key={topic.canonicalName} className="space-y-2 p-4">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${confidenceBadge(topic.confidence)}`}
+                      >
+                        {CONFIDENCE_LABEL(topic.confidence)}
+                      </span>
+                      <h4 className="text-sm font-semibold text-zinc-900 dark:text-white">
+                        {topic.displayName}
+                      </h4>
+                    </div>
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400">{topic.rationale}</p>
+                    {/* DSA v1: external pointers, not in-product practice */}
+                    <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                      Not assessed from your code — practice on{' '}
+                      <a
+                        href="https://leetcode.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-0.5 font-medium underline underline-offset-2 hover:text-zinc-600 dark:hover:text-zinc-300"
+                      >
+                        LeetCode <ExternalLink className="size-3" aria-hidden />
+                      </a>
+                      {' '}or{' '}
+                      <a
+                        href="https://neetcode.io"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-0.5 font-medium underline underline-offset-2 hover:text-zinc-600 dark:hover:text-zinc-300"
+                      >
+                        NeetCode <ExternalLink className="size-3" aria-hidden />
+                      </a>
+                      {' '}before this round.
+                    </p>
+                  </Card>
+                )
+              })}
             </div>
           ) : (
             <Card className="px-4 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
               This role likely has no DSA round — focus on system design / practical work.
             </Card>
+          )}
+
+          {/* 🟡 Secondary block — evidence topics NOT in calibrated list */}
+          {extraEvidenceTopics.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">
+                Other real-work DSA signals
+              </h4>
+              <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                Your code shows these patterns; this role didn&apos;t emphasise them.
+              </p>
+              {extraEvidenceTopics.map(ev => {
+                const sample = ev.samples[0]
+                const signalKey = ev.signals[0] ?? ''
+                const signalPhrase = SIGNAL_PHRASE[signalKey] ?? 'shows real-work DSA'
+                return (
+                  <Card key={ev.canonicalName} className="space-y-1.5 border-amber-200 p-3 dark:border-amber-500/20">
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      {signalPhrase}
+                      {sample && (
+                        <span className="ml-1 font-mono text-zinc-400 dark:text-zinc-500">
+                          ({sample.repo}/{sample.file}:{sample.line})
+                        </span>
+                      )}
+                      {' '}
+                      <span className="text-zinc-400 dark:text-zinc-500">
+                        — {ev.matchCount} place{ev.matchCount > 1 ? 's' : ''}
+                      </span>
+                    </p>
+                  </Card>
+                )
+              })}
+            </div>
           )}
 
           {/* Honesty footnote */}
@@ -195,8 +327,8 @@ export function TechnicalWorkspace({ detail }: TechnicalWorkspaceProps) {
         />
         {prep && prep.technicalPrepChecklist.length > 0 ? (
           <div className="space-y-3">
-            {prep.technicalPrepChecklist.map((item, i) => (
-              <Card key={`prep-${String(i)}`} className="space-y-1.5 p-4">
+            {prep.technicalPrepChecklist.map(item => (
+              <Card key={item.topic} className="space-y-1.5 p-4">
                 <div className="flex items-center gap-2">
                   <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${priorityBadge(item.priority)}`}>
                     {item.priority}
@@ -227,8 +359,8 @@ export function TechnicalWorkspace({ detail }: TechnicalWorkspaceProps) {
             subtitle="How to bridge honestly from a gap to an adjacent strength."
           />
           <div className="space-y-3">
-            {prep.difficultQuestions.map((q, i) => (
-              <Card key={`dq-${String(i)}`} className="space-y-1.5 p-4">
+            {prep.difficultQuestions.map(q => (
+              <Card key={q.question} className="space-y-1.5 p-4">
                 <h4 className="text-sm font-semibold text-zinc-900 dark:text-white">{q.question}</h4>
                 <p className="text-sm text-zinc-600 dark:text-zinc-400">{q.answerFramework}</p>
                 <p className="rounded-lg bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:bg-white/5 dark:text-zinc-400">

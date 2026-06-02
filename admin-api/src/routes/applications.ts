@@ -59,6 +59,13 @@ const VALID_STATUSES = new Set([
   'rejected',
 ]);
 
+/** Technical round types served to the UI (mirrors ApplicationDetail.technicalRoundType). */
+type TechnicalRoundType =
+  | 'dsa' | 'practical' | 'take-home' | 'system-design' | 'behavioural' | 'mixed';
+const VALID_ROUND_TYPES = new Set<TechnicalRoundType>([
+  'dsa', 'practical', 'take-home', 'system-design', 'behavioural', 'mixed',
+]);
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
@@ -298,10 +305,53 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
             (s) => typeof s['stage'] === 'string' && s['stage'].startsWith('technical'),
           )
         : null;
-      const technicalRoundType: string =
-        (technicalStage?.['round_type'] as string | undefined) ?? 'dsa';
+      const rawRoundType = technicalStage?.['round_type'];
+      const technicalRoundType: TechnicalRoundType =
+        typeof rawRoundType === 'string' && VALID_ROUND_TYPES.has(rawRoundType as TechnicalRoundType)
+          ? (rawRoundType as TechnicalRoundType)
+          : 'dsa';
 
       const rawAnalysis  = latestAnalysis?.metadata?.['analysis']  as Record<string, unknown> | null | undefined;
+
+      // Real-work DSA evidence (RLS — user's own rows, all repos). Fail-open.
+      let dsaRealWork: Array<{
+        canonicalName: string;
+        matchCount: number;
+        topConfidence: number;
+        signals: string[];
+        samples: { repo: string; file: string; line: number }[];
+      }> | undefined;
+      try {
+        // Reuse the outer RLS-scoped client `db` (withUser already SET LOCAL app.current_user_id) —
+        // no second pool checkout. dsa_evidence is RLS-protected; the WHERE is belt-and-braces.
+        const { rows } = await db.query<{
+          dsa_topic: string;
+          match_count: string;
+          top_confidence: number;
+          signals: string[];
+          samples: { repo: string; file: string; line: number }[];
+        }>(
+          `SELECT dsa_topic,
+                  COUNT(*)::int                 AS match_count,
+                  MAX(confidence)               AS top_confidence,
+                  ARRAY_AGG(DISTINCT signal)    AS signals,
+                  (ARRAY_AGG(
+                     json_build_object('repo', repo_full_name, 'file', file_path, 'line', line_start)
+                     ORDER BY confidence DESC))[1:3] AS samples
+             FROM dsa_evidence
+            WHERE user_id = current_setting('app.current_user_id')::uuid
+            GROUP BY dsa_topic`,
+        );
+        dsaRealWork = rows.map((r) => ({
+          canonicalName: r.dsa_topic,
+          matchCount:    Number(r.match_count),
+          topConfidence: r.top_confidence,
+          signals:       r.signals ?? [],
+          samples:       r.samples ?? [],
+        }));
+      } catch (err) {
+        console.error('[dsa] real-work aggregation failed (non-fatal)', (err as Error).message);
+      }
       const rawResearch  = latestAnalysis?.metadata?.['research']  as Record<string, unknown> | null | undefined;
       const persistedResume = resumeResult.rows[0]?.content_json ?? null;
 
@@ -390,6 +440,7 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
           research,
           analysis,
           technicalRoundType,
+          ...(dsaRealWork !== undefined ? { dsaRealWork } : {}),
           interviewPrep:       null,
           latestAnalysisRunId: latestAnalysis?.id ?? null,
           coaching:            coachingResult.rows.reduce<Record<string, unknown>>((acc, row) => {
