@@ -236,6 +236,46 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
         (technicalStage?.['round_type'] as string | undefined) ?? 'dsa';
 
       const rawAnalysis  = latestAnalysis?.metadata?.['analysis']  as Record<string, unknown> | null | undefined;
+
+      // Real-work DSA evidence (RLS — user's own rows, all repos). Fail-open.
+      let dsaRealWork: Array<{
+        canonicalName: string;
+        matchCount: number;
+        topConfidence: number;
+        signals: string[];
+        samples: { repo: string; file: string; line: number }[];
+      }> | undefined;
+      try {
+        dsaRealWork = await withUser(getPool(config), userId, async (client) => {
+          const { rows } = await client.query<{
+            dsa_topic: string;
+            match_count: string;
+            top_confidence: number;
+            signals: string[];
+            samples: { repo: string; file: string; line: number }[];
+          }>(
+            `SELECT dsa_topic,
+                    COUNT(*)::int                 AS match_count,
+                    MAX(confidence)               AS top_confidence,
+                    ARRAY_AGG(DISTINCT signal)    AS signals,
+                    (ARRAY_AGG(
+                       json_build_object('repo', repo_full_name, 'file', file_path, 'line', line_start)
+                       ORDER BY confidence DESC))[1:3] AS samples
+               FROM dsa_evidence
+              WHERE user_id = current_setting('app.current_user_id')::uuid
+              GROUP BY dsa_topic`,
+          );
+          return rows.map((r) => ({
+            canonicalName: r.dsa_topic,
+            matchCount:    Number(r.match_count),
+            topConfidence: r.top_confidence,
+            signals:       r.signals ?? [],
+            samples:       r.samples ?? [],
+          }));
+        });
+      } catch (err) {
+        console.error('[dsa] real-work aggregation failed (non-fatal)', (err as Error).message);
+      }
       const rawResearch  = latestAnalysis?.metadata?.['research']  as Record<string, unknown> | null | undefined;
       const persistedResume = resumeResult.rows[0]?.content_json ?? null;
 
@@ -277,6 +317,7 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
           research,
           analysis,
           technicalRoundType,
+          ...(dsaRealWork !== undefined ? { dsaRealWork } : {}),
           interviewPrep:       null,
           latestAnalysisRunId: latestAnalysis?.id ?? null,
           coaching:            coachingResult.rows.reduce<Record<string, unknown>>((acc, row) => {
