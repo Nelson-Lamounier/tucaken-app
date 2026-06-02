@@ -127,6 +127,38 @@ describe('TechnicalWorkspace', () => {
     expect(screen.getByText(/Coming soon/)).toBeTruthy()
   })
 
+  it('renders DevOps/Infrastructure section with Tier-1 copy + file:line when devopsEvidence present', () => {
+    const devopsDetail = {
+      ...detail,
+      devopsEvidence: [
+        {
+          canonicalTopicName: 'devops_iac',
+          displayName: 'Infrastructure as Code',
+          topicGroup: 'iac',
+          artifactCount: 2,
+          samples: [{ repo: 'o/r', file: 'main.tf', line: 3, rawName: 'terraform' }],
+        },
+      ],
+    } satisfies ApplicationDetail
+    render(<TechnicalWorkspace detail={devopsDetail} />)
+    expect(screen.getByText(/DevOps \/ Infrastructure/i)).toBeTruthy()
+    expect(screen.getByText(/Infrastructure as Code/)).toBeTruthy()
+    expect(screen.getByText(/o\/r\/main\.tf:3/)).toBeTruthy()
+    // Tier-1: must NOT claim competence
+    expect(screen.queryByText(/expert|mastered|you know/i)).toBeNull()
+  })
+
+  it('hides DevOps/Infrastructure section when devopsEvidence is empty', () => {
+    const emptyDetail = { ...detail, devopsEvidence: [] } satisfies ApplicationDetail
+    render(<TechnicalWorkspace detail={emptyDetail} />)
+    expect(screen.queryByText(/DevOps \/ Infrastructure/i)).toBeNull()
+  })
+
+  it('hides DevOps/Infrastructure section when devopsEvidence is undefined', () => {
+    render(<TechnicalWorkspace detail={detail} />)
+    expect(screen.queryByText(/DevOps \/ Infrastructure/i)).toBeNull()
+  })
+
   it('Phone Screen surfaces talking points, questions, and an editable comp target', () => {
     render(<PhoneScreenWorkspace detail={detail} />)
     expect(screen.getByText('Your talking points')).toBeTruthy()
