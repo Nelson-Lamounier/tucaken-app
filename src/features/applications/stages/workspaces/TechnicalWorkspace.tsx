@@ -161,8 +161,10 @@ export function TechnicalWorkspace({ detail }: TechnicalWorkspaceProps) {
                   ? `https://github.com/${sample.repo}/blob/HEAD/${sample.file}#L${sample.line}`
                   : undefined
 
-                if (ev && sample) {
-                  // 🟢 — calibrated AND has real-work evidence
+                if (ev) {
+                  // 🟢 — calibrated AND has real-work evidence (an evidence row exists).
+                  // The file:line sample is shown when present; a row without a sample still
+                  // earns green (degraded) rather than silently dropping to the 🔴 path.
                   return (
                     <Card key={topic.canonicalName} className="space-y-2 border-emerald-200 p-4 dark:border-emerald-500/20">
                       <div className="flex items-center gap-2">
@@ -179,22 +181,26 @@ export function TechnicalWorkspace({ detail }: TechnicalWorkspaceProps) {
                         </h4>
                       </div>
                       <p className="text-sm text-zinc-600 dark:text-zinc-400">{topic.rationale}</p>
-                      {/* Green evidence line: repo/file:line + signal phrase */}
+                      {/* Green evidence line: repo/file:line (when sampled) + signal phrase */}
                       <p className="text-xs text-emerald-700 dark:text-emerald-400">
                         Your{' '}
-                        {ghUrl ? (
-                          <a
-                            href={ghUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-0.5 font-mono font-medium underline underline-offset-2 hover:text-emerald-600"
-                          >
-                            {sample.repo}/{sample.file}:{sample.line}{' '}
-                            <ExternalLink className="size-3" aria-hidden />
-                          </a>
+                        {sample && ghUrl ? (
+                          <>
+                            <a
+                              href={ghUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-0.5 font-mono font-medium underline underline-offset-2 hover:text-emerald-600"
+                            >
+                              {sample.repo}/{sample.file}:{sample.line}{' '}
+                              <ExternalLink className="size-3" aria-hidden />
+                            </a>{' '}
+                          </>
+                        ) : sample ? (
+                          <span className="font-mono">{sample.repo}/{sample.file}:{sample.line} </span>
                         ) : (
-                          <span className="font-mono">{sample.repo}/{sample.file}:{sample.line}</span>
-                        )}{' '}
+                          <>code </>
+                        )}
                         {signalPhrase}{' '}
                         <span className="text-zinc-400 dark:text-zinc-500">
                           (in {ev.matchCount} place{ev.matchCount > 1 ? 's' : ''})
