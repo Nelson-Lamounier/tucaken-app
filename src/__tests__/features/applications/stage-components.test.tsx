@@ -359,12 +359,12 @@ describe('TechnicalWorkspace', () => {
   }
 
   it('narrow-coverage banner is always present when Section B renders', () => {
-    render(<TechnicalWorkspace detail={dsaBaseDetail} />)
+    renderWithQuery(<TechnicalWorkspace detail={dsaBaseDetail} />)
     expect(screen.getByText(/Real-work detection covers a limited pattern set/)).toBeTruthy()
   })
 
   it('narrow-coverage banner is present even when dsaRealWork is undefined', () => {
-    render(<TechnicalWorkspace detail={{ ...dsaBaseDetail, dsaRealWork: undefined }} />)
+    renderWithQuery(<TechnicalWorkspace detail={{ ...dsaBaseDetail, dsaRealWork: undefined }} />)
     expect(screen.getByText(/Real-work detection covers a limited pattern set/)).toBeTruthy()
   })
 
@@ -381,7 +381,7 @@ describe('TechnicalWorkspace', () => {
         },
       ],
     }
-    render(<TechnicalWorkspace detail={detailWithEvidence} />)
+    renderWithQuery(<TechnicalWorkspace detail={detailWithEvidence} />)
     // Green treatment: sample repo/file:line rendered
     expect(screen.getByText(/user\/graph-utils\/src\/graph\.py:42/)).toBeTruthy()
     // Signal phrase rendered
@@ -405,7 +405,7 @@ describe('TechnicalWorkspace', () => {
         },
       ],
     }
-    render(<TechnicalWorkspace detail={detailWithEvidence} />)
+    renderWithQuery(<TechnicalWorkspace detail={detailWithEvidence} />)
     // binary-search is calibrated but has no evidence → red treatment intact
     expect(screen.getByText(/Not assessed from your code/)).toBeTruthy()
     expect(screen.getAllByText(/practice on/i).length).toBeGreaterThan(0)
@@ -424,7 +424,7 @@ describe('TechnicalWorkspace', () => {
         },
       ],
     }
-    render(<TechnicalWorkspace detail={detailWithExtra} />)
+    renderWithQuery(<TechnicalWorkspace detail={detailWithExtra} />)
     expect(screen.getByText('Other real-work DSA signals')).toBeTruthy()
     // The uncalibrated evidence topic shows up in the secondary block
     expect(screen.getByText(/uses a heap \/ priority queue/)).toBeTruthy()
@@ -443,12 +443,12 @@ describe('TechnicalWorkspace', () => {
         },
       ],
     }
-    render(<TechnicalWorkspace detail={detailAllCalibrated} />)
+    renderWithQuery(<TechnicalWorkspace detail={detailAllCalibrated} />)
     expect(screen.queryByText('Other real-work DSA signals')).toBeNull()
   })
 
   it('no green sample text when dsaRealWork is empty array', () => {
-    render(<TechnicalWorkspace detail={{ ...dsaBaseDetail, dsaRealWork: [] }} />)
+    renderWithQuery(<TechnicalWorkspace detail={{ ...dsaBaseDetail, dsaRealWork: [] }} />)
     // No import-grounded caveat
     expect(screen.queryByText(/import\/type-grounded/)).toBeNull()
     // All calibrated topics fall back to red treatment
@@ -457,7 +457,7 @@ describe('TechnicalWorkspace', () => {
 
   it('green badge strictly requires evidence lookup hit — calibration alone never goes green', () => {
     // No dsaRealWork at all
-    render(<TechnicalWorkspace detail={dsaBaseDetail} />)
+    renderWithQuery(<TechnicalWorkspace detail={dsaBaseDetail} />)
     // No green sample text
     expect(screen.queryByText(/import\/type-grounded/)).toBeNull()
     // No GitHub link for samples

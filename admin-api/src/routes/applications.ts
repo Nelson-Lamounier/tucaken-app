@@ -58,6 +58,13 @@ const VALID_STATUSES = new Set([
   'rejected',
 ]);
 
+/** Technical round types served to the UI (mirrors ApplicationDetail.technicalRoundType). */
+type TechnicalRoundType =
+  | 'dsa' | 'practical' | 'take-home' | 'system-design' | 'behavioural' | 'mixed';
+const VALID_ROUND_TYPES = new Set<TechnicalRoundType>([
+  'dsa', 'practical', 'take-home', 'system-design', 'behavioural', 'mixed',
+]);
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
@@ -297,8 +304,11 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
             (s) => typeof s['stage'] === 'string' && s['stage'].startsWith('technical'),
           )
         : null;
-      const technicalRoundType: string =
-        (technicalStage?.['round_type'] as string | undefined) ?? 'dsa';
+      const rawRoundType = technicalStage?.['round_type'];
+      const technicalRoundType: TechnicalRoundType =
+        typeof rawRoundType === 'string' && VALID_ROUND_TYPES.has(rawRoundType as TechnicalRoundType)
+          ? (rawRoundType as TechnicalRoundType)
+          : 'dsa';
 
       const rawAnalysis  = latestAnalysis?.metadata?.['analysis']  as Record<string, unknown> | null | undefined;
 

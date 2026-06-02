@@ -327,8 +327,8 @@ export function TechnicalWorkspace({ detail }: TechnicalWorkspaceProps) {
         />
         {prep && prep.technicalPrepChecklist.length > 0 ? (
           <div className="space-y-3">
-            {prep.technicalPrepChecklist.map((item, i) => (
-              <Card key={`prep-${String(i)}`} className="space-y-1.5 p-4">
+            {prep.technicalPrepChecklist.map(item => (
+              <Card key={item.topic} className="space-y-1.5 p-4">
                 <div className="flex items-center gap-2">
                   <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${priorityBadge(item.priority)}`}>
                     {item.priority}
@@ -359,8 +359,8 @@ export function TechnicalWorkspace({ detail }: TechnicalWorkspaceProps) {
             subtitle="How to bridge honestly from a gap to an adjacent strength."
           />
           <div className="space-y-3">
-            {prep.difficultQuestions.map((q, i) => (
-              <Card key={`dq-${String(i)}`} className="space-y-1.5 p-4">
+            {prep.difficultQuestions.map(q => (
+              <Card key={q.question} className="space-y-1.5 p-4">
                 <h4 className="text-sm font-semibold text-zinc-900 dark:text-white">{q.question}</h4>
                 <p className="text-sm text-zinc-600 dark:text-zinc-400">{q.answerFramework}</p>
                 <p className="rounded-lg bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:bg-white/5 dark:text-zinc-400">
