@@ -496,6 +496,42 @@ describe('TechnicalWorkspace', () => {
     expect(screen.queryByText(/user\//)).toBeNull()
   })
 
+  // ── Pillar classifier chip + markers (S2) ─────────────────────────────────
+
+  function makeDetail(overrides: { research?: Partial<typeof detail.research> & Record<string, unknown> }): ApplicationDetail {
+    return {
+      ...detail,
+      research: overrides.research
+        ? { ...detail.research!, ...(overrides.research as typeof detail.research) }
+        : detail.research,
+    } as ApplicationDetail
+  }
+
+  it('renders the Role focus chip with primary + secondary labels for a non-general pillar', () => {
+    const d = makeDetail({ research: { pillarClassification: {
+      primaryPillar: 'devops-sre-platform', secondaryPillars: ['ai-engineering' as const],
+      confidence: 0.8, jdEvidenceTokens: ['on-call', 'Kubernetes'], classificationNote: 'inferred from JD',
+    } } })
+    renderWithQuery(<TechnicalWorkspace detail={d} />)
+    expect(screen.getByText(/Role focus/i)).toBeTruthy()
+    expect(screen.getByText('DevOps / Platform')).toBeTruthy()
+    expect(screen.getByText('AI Engineering')).toBeTruthy()
+  })
+
+  it('shows NO Role focus chip for swe-general', () => {
+    const d = makeDetail({ research: { pillarClassification: {
+      primaryPillar: 'swe-general', secondaryPillars: [] as const,
+      confidence: 0.5, jdEvidenceTokens: [], classificationNote: 'general',
+    } } })
+    renderWithQuery(<TechnicalWorkspace detail={d} />)
+    expect(screen.queryByText(/Role focus/i)).toBeNull()
+  })
+
+  it('shows NO Role focus chip when pillarClassification absent', () => {
+    renderWithQuery(<TechnicalWorkspace detail={makeDetail({ research: {} })} />)
+    expect(screen.queryByText(/Role focus/i)).toBeNull()
+  })
+
   it('Phone Screen surfaces talking points, questions, and an editable comp target', () => {
     renderWithQuery(<PhoneScreenWorkspace detail={detail} />)
     expect(screen.getByText('Your talking points')).toBeTruthy()

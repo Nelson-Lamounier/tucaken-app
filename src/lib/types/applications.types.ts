@@ -235,6 +235,21 @@ export interface DsaRealWorkTopic {
   readonly samples: { repo: string; file: string; line: number }[]
 }
 
+/** Interview-prep pillar identifier. */
+export type Pillar = 'swe-general' | 'swe-dsa' | 'devops-sre-platform' | 'ai-engineering'
+
+/**
+ * JD interview-prep pillar classification emitted by the research agent (optional).
+ * Inferred from JD language only — not a guaranteed signal.
+ */
+export interface PillarClassification {
+  readonly primaryPillar: Pillar
+  readonly secondaryPillars: Pillar[]
+  readonly confidence: number
+  readonly jdEvidenceTokens: string[]
+  readonly classificationNote: string
+}
+
 /**
  * DSA topic calibration from the job-strategist research agent.
  * Present in pipeline_runs.metadata.research when the research run includes
@@ -262,6 +277,8 @@ export interface ResearchOutput {
   readonly technologyInventory: TechnologyInventory
   /** DSA topic calibration — present only when the research agent inferred topics */
   readonly dsaTopicCalibration?: DsaTopicCalibration
+  /** JD interview-prep pillar classification — present only when the research agent classified the role */
+  readonly pillarClassification?: PillarClassification
 }
 
 /** Analysis metadata from the Applications Agent */
