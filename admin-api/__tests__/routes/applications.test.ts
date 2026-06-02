@@ -32,6 +32,16 @@ jest.unstable_mockModule('../../src/lib/repositories/applications.js', () => ({
   getApplication:          pgGetApplicationMock,
   deleteApplication:       pgDeleteApplicationMock,
   updateApplicationStatus: pgUpdateApplicationStatusMock,
+  updateInterviewStage:    jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+}));
+
+jest.unstable_mockModule('../../src/lib/repositories/interview-stages.js', () => ({
+  upsertStageUserState:  jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  markNotApplicable:     jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  linkCoachRun:          jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  getStagesForApp:       jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
+  reconcilePrepStatus:   jest.fn(),
+  advanceStageLifecycle: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 }));
 
 jest.unstable_mockModule('../../src/lib/repositories/pipeline-runs.js', () => ({
@@ -429,15 +439,26 @@ describe('POST /:slug/status — update kanban status (PG-only)', () => {
     expect(pgUpdateApplicationStatusMock).not.toHaveBeenCalled();
   });
 
-  it('ignores interviewStage in the body (no PG column)', async () => {
+  it('processes interviewStage in the body when present', async () => {
+    pgGetApplicationMock.mockResolvedValueOnce({
+      id: 'app-uuid-1',
+      userId: 'user-1',
+      company: 'Acme',
+      role: 'Senior Engineer',
+      jobUrl: null,
+      jobDescription: 'Cool role',
+      kanbanStatus: 'applied',
+      interviewStage: 'applied',
+      appliedAt: null,
+    });
     const res = await buildApp().request('/app-uuid-1/status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'applied', interviewStage: 'screening' }),
+      body: JSON.stringify({ status: 'applied', interviewStage: 'applied' }),
     });
     expect(res.status).toBe(200);
     expect(pgUpdateApplicationStatusMock).toHaveBeenCalledTimes(1);
-    // signature is (pool, id, status) — interviewStage must not have leaked in
+    // updateApplicationStatus receives (pool, slug, status) — 3 args
     expect(pgUpdateApplicationStatusMock.mock.calls[0]?.length).toBe(3);
   });
 });

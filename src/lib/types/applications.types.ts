@@ -14,6 +14,15 @@
 import type { ResumeData } from '../resumes/resume-data'
 
 // =============================================================================
+// JSON VALUE — serialisable primitive used where Record<string, unknown> would
+// break TanStack Start's ValidateSerializableMapped strict-mode check.
+// =============================================================================
+
+type JsonPrimitive = string | number | boolean | null
+/** Recursively JSON-serialisable value. Replaces `unknown` in index signatures. */
+export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue }
+
+// =============================================================================
 // ENUMS / UNION TYPES
 // =============================================================================
 
@@ -446,6 +455,31 @@ export interface ApplicationDetail {
    * output for that stage. May be absent until the Coach Job has run for a stage.
    */
   readonly coaching?: Record<string, StageCoaching> | null
+  /**
+   * Per-stage lifecycle state, keyed by stage_type. Populated by the stages
+   * endpoint and used to drive the interview-prep UI (scheduling, prep status,
+   * user annotations). May be absent on older records.
+   */
+  readonly stages?: Record<string, StageState>
+}
+
+// =============================================================================
+// STAGE STATE
+// =============================================================================
+
+/**
+ * Per-stage lifecycle state as stored by the admin-api stages endpoint.
+ * Keyed by stage_type in `ApplicationDetail.stages`.
+ *
+ * @see PATCH /api/admin/applications/:slug/stages/:stage
+ */
+export interface StageState {
+  readonly stage_status: 'upcoming' | 'current' | 'completed' | 'not_applicable'
+  readonly prep_status: 'none' | 'queued' | 'ready' | 'failed'
+  readonly scheduled_at: string | null
+  /** Arbitrary user annotations — JSON-serialisable to satisfy TanStack Start's strict serialization check. */
+  readonly user_state: { [key: string]: JsonValue }
+  readonly coach_run_id: string | null
 }
 
 // =============================================================================
