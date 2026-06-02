@@ -28,8 +28,9 @@ runs:
     - name: Resolve Node.js Version
       id: resolve-node
       shell: bash
+      env:
+        INPUT: ${{ inputs.node-version }}
       run: |
-        INPUT="${{ inputs.node-version }}"
         if [ "$INPUT" = "auto" ]; then
           if [ -f .nvmrc ]; then
             VERSION=$(cat .nvmrc | tr -d '[:space:]')
