@@ -4,6 +4,8 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen, fireEvent, renderHook, act } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { ReactNode } from 'react'
 
 vi.mock('@tanstack/react-router', () => ({
   Link: ({ children, ...rest }: { children: React.ReactNode } & Record<string, unknown>) => (
@@ -15,6 +17,23 @@ const statusMutate = vi.fn()
 vi.mock('@/hooks/use-admin-applications', () => ({
   useApplicationStatus: () => ({ mutate: statusMutate, isPending: false }),
 }))
+
+// Stub patchStageFn so useStageDraft's debounced PATCH doesn't fail in tests
+vi.mock('@/server/pipelines', () => ({
+  patchStageFn: vi.fn().mockResolvedValue({}),
+  triggerCoachFn: vi.fn().mockResolvedValue({}),
+}))
+
+function createWrapper() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+  )
+}
+
+function renderWithQuery(ui: React.ReactElement) {
+  return render(ui, { wrapper: createWrapper() })
+}
 
 import { EvidenceIndicator } from '@/features/applications/stages/components/EvidenceIndicator'
 import { StoryCard } from '@/features/applications/stages/components/StoryCard'
@@ -30,7 +49,7 @@ import { BarRaiserWorkspace } from '@/features/applications/stages/workspaces/Ba
 import { FinalWorkspace } from '@/features/applications/stages/workspaces/FinalWorkspace'
 import { useStoryBank } from '@/features/applications/stages/hooks/useStoryBank'
 import type { StarStory, EvidenceTopic } from '@/features/applications/stages/types/workspace'
-import type { ApplicationDetail } from '@/lib/types/applications.types'
+import type { ApplicationDetail, StageState } from '@/lib/types/applications.types'
 
 describe('EvidenceIndicator', () => {
   it('renders a textual label, never colour-only', () => {
@@ -85,6 +104,17 @@ describe('StoryCard', () => {
   })
 })
 
+function makeStageState(overrides: Partial<StageState> = {}): StageState {
+  return {
+    stage_status: 'upcoming',
+    prep_status: 'none',
+    scheduled_at: null,
+    user_state: {},
+    coach_run_id: null,
+    ...overrides,
+  }
+}
+
 describe('StageProgressBar', () => {
   it('renders all seven stages and fires onSelect', () => {
     const onSelect = vi.fn()
@@ -92,6 +122,60 @@ describe('StageProgressBar', () => {
     expect(screen.getAllByRole('tab')).toHaveLength(7)
     fireEvent.click(screen.getByRole('tab', { name: /Behavioural/i }))
     expect(onSelect).toHaveBeenCalledWith('behavioural')
+  })
+
+  it('without stages prop: falls back to index math — stages before current show completed aria', () => {
+    const onSelect = vi.fn()
+    render(<StageProgressBar current="technical" active="technical" onSelect={onSelect} />)
+    // phone-screen is before technical → completed (check icon present within that button)
+    const phoneTab = screen.getByRole('tab', { name: /Phone Screen/i })
+    expect(phoneTab.querySelector('svg')).toBeTruthy() // Check icon rendered for completed
+  })
+
+  it('with stages given: a completed stage renders completed styling (check icon)', () => {
+    const onSelect = vi.fn()
+    const stages: Record<string, StageState> = {
+      'phone-screen': makeStageState({ stage_status: 'completed', prep_status: 'ready' }),
+    }
+    render(<StageProgressBar current="applied" active="applied" onSelect={onSelect} stages={stages} />)
+    // phone-screen is marked completed via stages — check icon should be present
+    const phoneTab = screen.getByRole('tab', { name: /Phone Screen/i })
+    expect(phoneTab.querySelector('svg')).toBeTruthy()
+  })
+
+  it('with stages given: a not_applicable stage renders with dashed-border dot and aria label', () => {
+    const onSelect = vi.fn()
+    const stages: Record<string, StageState> = {
+      'bar-raiser': makeStageState({ stage_status: 'not_applicable', prep_status: 'none' }),
+    }
+    render(<StageProgressBar current="behavioural" active="behavioural" onSelect={onSelect} stages={stages} />)
+    const barTab = screen.getByRole('tab', { name: /bar raiser.*not applicable/i })
+    expect(barTab).toBeTruthy()
+  })
+
+  it('with stages given: a queued stage shows the pulsing generating affordance', () => {
+    const onSelect = vi.fn()
+    const stages: Record<string, StageState> = {
+      'phone-screen': makeStageState({ stage_status: 'current', prep_status: 'queued' }),
+    }
+    render(<StageProgressBar current="phone-screen" active="phone-screen" onSelect={onSelect} stages={stages} />)
+    const phoneTab = screen.getByRole('tab', { name: /phone screen.*generating/i })
+    expect(phoneTab).toBeTruthy()
+    // pulsing dot has animate-pulse class
+    expect(phoneTab.querySelector('.animate-pulse')).toBeTruthy()
+  })
+
+  it('with stages given: stages without a row fall back to index math', () => {
+    const onSelect = vi.fn()
+    // Only provide 'phone-screen'; 'technical' has no row → should fall back to index math
+    const stages: Record<string, StageState> = {
+      'phone-screen': makeStageState({ stage_status: 'completed', prep_status: 'ready' }),
+    }
+    // current = technical; technical has no stages row → fallback makes it 'current'
+    render(<StageProgressBar current="technical" active="technical" onSelect={onSelect} stages={stages} />)
+    // technical tab should have aria-current="step" from the fallback
+    const techTab = screen.getByRole('tab', { name: /Technical/i })
+    expect(techTab.getAttribute('aria-current')).toBe('step')
   })
 })
 
@@ -119,7 +203,7 @@ describe('TechnicalWorkspace', () => {
   } satisfies ApplicationDetail
 
   it('renders evidence topics from research and shows external practice links', () => {
-    render(<TechnicalWorkspace detail={detail} />)
+    renderWithQuery(<TechnicalWorkspace detail={detail} />)
     expect(screen.getByText('Kubernetes')).toBeTruthy()
     expect(screen.getByText('Strong evidence')).toBeTruthy()
     // Practice section now has external links, no in-product modal
@@ -128,28 +212,28 @@ describe('TechnicalWorkspace', () => {
   })
 
   it('does not render Section B for system-design round type', () => {
-    render(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'system-design' }} />)
+    renderWithQuery(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'system-design' }} />)
     expect(screen.queryByLabelText('DSA / Coding section')).toBeNull()
   })
 
   it('does not render Section B for take-home round type', () => {
-    render(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'take-home' }} />)
+    renderWithQuery(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'take-home' }} />)
     expect(screen.queryByLabelText('DSA / Coding section')).toBeNull()
   })
 
   it('renders Section B when technicalRoundType is undefined (safe-mode: default to dsa)', () => {
-    render(<TechnicalWorkspace detail={detail} />)
+    renderWithQuery(<TechnicalWorkspace detail={detail} />)
     expect(screen.getByLabelText('DSA / Coding section')).toBeTruthy()
   })
 
   it('renders Section B with DSA banner for dsa round type', () => {
-    render(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'dsa' }} />)
+    renderWithQuery(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'dsa' }} />)
     expect(screen.getByLabelText('DSA / Coding section')).toBeTruthy()
     expect(screen.getByText(/calibrate which DSA topics matter/)).toBeTruthy()
   })
 
   it('renders Section B for mixed round type', () => {
-    render(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'mixed' }} />)
+    renderWithQuery(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'mixed' }} />)
     expect(screen.getByLabelText('DSA / Coding section')).toBeTruthy()
   })
 
@@ -180,7 +264,7 @@ describe('TechnicalWorkspace', () => {
         },
       },
     }
-    render(<TechnicalWorkspace detail={detailWithDsa} />)
+    renderWithQuery(<TechnicalWorkspace detail={detailWithDsa} />)
     expect(screen.getByText('Binary Search')).toBeTruthy()
     expect(screen.getByText('High relevance')).toBeTruthy()
     expect(screen.getByText('Graph BFS/DFS')).toBeTruthy()
@@ -205,18 +289,18 @@ describe('TechnicalWorkspace', () => {
         },
       },
     }
-    render(<TechnicalWorkspace detail={detailWithEmptyDsa} />)
+    renderWithQuery(<TechnicalWorkspace detail={detailWithEmptyDsa} />)
     expect(screen.getByLabelText('DSA / Coding section')).toBeTruthy()
     expect(screen.getByText(/This role likely has no DSA round/)).toBeTruthy()
   })
 
   it('shows "no DSA round" message when no calibration data present for dsa round type', () => {
-    render(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'dsa' }} />)
+    renderWithQuery(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'dsa' }} />)
     expect(screen.getByText(/This role likely has no DSA round/)).toBeTruthy()
   })
 
   it('shows practical coding note for practical round type', () => {
-    render(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'practical' }} />)
+    renderWithQuery(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'practical' }} />)
     expect(screen.getByText(/favours practical coding over algorithm puzzles/)).toBeTruthy()
   })
 
@@ -240,7 +324,7 @@ describe('TechnicalWorkspace', () => {
         },
       },
     }
-    render(<TechnicalWorkspace detail={detailWithDsa} />)
+    renderWithQuery(<TechnicalWorkspace detail={detailWithDsa} />)
     expect(screen.queryByText('🟢')).toBeNull()
     expect(screen.queryByText(/your work shows/i)).toBeNull()
   })
@@ -381,7 +465,7 @@ describe('TechnicalWorkspace', () => {
   })
 
   it('Phone Screen surfaces talking points, questions, and an editable comp target', () => {
-    render(<PhoneScreenWorkspace detail={detail} />)
+    renderWithQuery(<PhoneScreenWorkspace detail={detail} />)
     expect(screen.getByText('Your talking points')).toBeTruthy()
     expect(screen.getByText('Kubernetes')).toBeTruthy() // verified match → talking point
     expect(screen.getByText(/What does success look like/)).toBeTruthy() // default question
@@ -391,7 +475,7 @@ describe('TechnicalWorkspace', () => {
   })
 
   it('System Design shows question patterns and expands a framework step', () => {
-    render(<SystemDesignWorkspace detail={detail} />)
+    renderWithQuery(<SystemDesignWorkspace detail={detail} />)
     expect(screen.getByText('Common question patterns')).toBeTruthy()
     expect(screen.queryByText(/functional vs non-functional/)).toBeNull() // collapsed
     fireEvent.click(screen.getByRole('button', { name: /Requirements & scope/i }))
@@ -442,7 +526,7 @@ describe('BehaviouralWorkspace', () => {
 
   it('shows empty bank, gaps for typical questions, and opens the add-story form', () => {
     window.localStorage.clear()
-    render(<BehaviouralWorkspace detail={detail} />)
+    renderWithQuery(<BehaviouralWorkspace detail={detail} />)
     expect(screen.getByText(/story bank is empty/i)).toBeTruthy()
     expect(screen.getAllByText('Gap — consider drafting').length).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole('button', { name: /Add story/i }))
@@ -460,7 +544,7 @@ describe('BarRaiserWorkspace', () => {
 
   it('renders the values matrix and a draft CTA for uncovered principles', () => {
     window.localStorage.clear()
-    render(<BarRaiserWorkspace detail={detail} />)
+    renderWithQuery(<BarRaiserWorkspace detail={detail} />)
     expect(screen.getByText('Company values matrix')).toBeTruthy()
     expect(screen.getAllByText('Customer Obsession').length).toBeGreaterThan(0)
     // empty bank → all principles uncovered → draft CTAs present

@@ -51,7 +51,8 @@ function dedupeQuestions(entries: readonly ChecklistEntry[]): ChecklistEntry[] {
  * the user's target is editable and persisted (ADR-0003).
  */
 export function PhoneScreenWorkspace({ detail }: PhoneScreenWorkspaceProps) {
-  const { draft, setSchedule, toggleChecked, patch } = useStageDraft(detail.slug, 'phone-screen')
+  const stageUserState = detail.stages?.['phone-screen']?.user_state as Partial<import('../hooks/useStageDraft').StageDraft> | undefined
+  const { draft, setSchedule, toggleChecked, patch } = useStageDraft(detail.slug, 'phone-screen', stageUserState)
 
   const talkingPoints = useMemo(
     () => (detail.research?.verifiedMatches ?? []).map(m => m.skill),

@@ -38,7 +38,8 @@ const TYPICAL_QUESTIONS: readonly { question: string; theme: StoryTheme }[] = [
  * "generate from portfolio" is a separate follow-on.
  */
 export function BehaviouralWorkspace({ detail }: BehaviouralWorkspaceProps) {
-  const { draft, setSchedule } = useStageDraft(detail.slug, 'behavioural')
+  const stageUserState = detail.stages?.['behavioural']?.user_state as Partial<import('../hooks/useStageDraft').StageDraft> | undefined
+  const { draft, setSchedule } = useStageDraft(detail.slug, 'behavioural', stageUserState)
   const { stories, addStory, updateStory, removeStory } = useStoryBank(detail.slug)
 
   const [filter, setFilter] = useState<Filter>('All')

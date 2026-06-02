@@ -143,7 +143,7 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
     const userId = ctx.get('userId');
     if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
 
-    let body: { targetCompany?: string; targetRole?: string; jobDescription?: string; mode?: string; resumeId?: string };
+    let body: { targetCompany?: string; targetRole?: string; jobDescription?: string; mode?: string; resumeId?: string; interviewStage?: string };
     try { body = await ctx.req.json(); }
     catch { return ctx.json({ error: 'Body must be valid JSON' }, 400); }
 
@@ -189,11 +189,32 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
           jobUrl:         null,
           jobDescription: jobDescription!,
           kanbanStatus:   'analysing',
+          interviewStage: 'applied',
           appliedAt:      null,
         });
       } catch (err: unknown) {
         console.error('[pipelines/strategist-job] failed to insert job_application', err);
         return ctx.json({ error: 'Failed to create application record' }, 500);
+      }
+
+      // Seed interview_stage + completed stage rows for any stages before startStage.
+      const stageOrder = ['applied', 'phone-screen', 'technical', 'system-design', 'behavioural', 'bar-raiser', 'final'];
+      const startStage = (body.interviewStage ?? 'applied').trim();
+      const startIdx = Math.max(0, stageOrder.indexOf(startStage) === -1 ? 0 : stageOrder.indexOf(startStage));
+      await db.query(`UPDATE job_applications SET interview_stage = $1 WHERE id = $2`, [stageOrder[startIdx], applicationId]);
+      for (let i = 0; i < startIdx; i++) {
+        await db.query(
+          `INSERT INTO interview_stages (job_application_id, stage_type, stage_status)
+           VALUES ($1,$2,'completed') ON CONFLICT (job_application_id, stage_type) DO NOTHING`,
+          [applicationId, stageOrder[i]],
+        );
+      }
+      if (startIdx > 0) {
+        await db.query(
+          `INSERT INTO interview_stages (job_application_id, stage_type, stage_status)
+           VALUES ($1,$2,'current') ON CONFLICT (job_application_id, stage_type) DO UPDATE SET stage_status='current'`,
+          [applicationId, stageOrder[startIdx]],
+        );
       }
 
       try {

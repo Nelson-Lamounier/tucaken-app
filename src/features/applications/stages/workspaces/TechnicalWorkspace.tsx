@@ -64,7 +64,8 @@ interface TechnicalWorkspaceProps {
  * DSA v1: external pointers, not in-product practice.
  */
 export function TechnicalWorkspace({ detail }: TechnicalWorkspaceProps) {
-  const { draft, setSchedule } = useStageDraft(detail.slug, 'technical')
+  const stageUserState = detail.stages?.['technical']?.user_state as Partial<import('../hooks/useStageDraft').StageDraft> | undefined
+  const { draft, setSchedule } = useStageDraft(detail.slug, 'technical', stageUserState)
 
   const topics = useMemo(() => researchToTopics(detail.research), [detail.research])
   const prep = useMemo(() => resolveStagePrep(detail, 'technical'), [detail])
