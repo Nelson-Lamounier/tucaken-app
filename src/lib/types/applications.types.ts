@@ -477,7 +477,7 @@ export interface ApplicationDetail {
    * The type of technical round inferred from the company's interview profile.
    * Defaults to 'dsa' when no company profile or round_type is available.
    */
-  readonly technicalRoundType?: 'dsa' | 'practical' | 'take-home' | 'system-design' | 'behavioural' | 'mixed'
+  readonly technicalRoundType?: 'dsa' | 'practical' | 'take-home' | 'system-design' | 'behavioural' | 'mixed' | 'troubleshooting' | 'architecture-review' | 'hands-on-lab'
   /**
    * Real-work DSA evidence aggregated from `dsa_evidence` (user-scoped, all repos).
    * Absent when the query failed (fail-open) or no patterns were detected.

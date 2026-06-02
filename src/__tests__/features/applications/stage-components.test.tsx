@@ -221,6 +221,11 @@ describe('TechnicalWorkspace', () => {
     expect(screen.queryByLabelText('DSA / Coding section')).toBeNull()
   })
 
+  it('does not render Section B for a new DevOps/AI round type (architecture-review)', () => {
+    renderWithQuery(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'architecture-review' }} />)
+    expect(screen.queryByLabelText('DSA / Coding section')).toBeNull()
+  })
+
   it('renders Section B when technicalRoundType is undefined (safe-mode: default to dsa)', () => {
     renderWithQuery(<TechnicalWorkspace detail={detail} />)
     expect(screen.getByLabelText('DSA / Coding section')).toBeTruthy()
