@@ -32,6 +32,16 @@ jest.unstable_mockModule('../../src/lib/repositories/applications.js', () => ({
   getApplication:          pgGetApplicationMock,
   deleteApplication:       pgDeleteApplicationMock,
   updateApplicationStatus: pgUpdateApplicationStatusMock,
+  updateInterviewStage:    jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+}));
+
+jest.unstable_mockModule('../../src/lib/repositories/interview-stages.js', () => ({
+  upsertStageUserState:  jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  markNotApplicable:     jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  linkCoachRun:          jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  getStagesForApp:       jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
+  reconcilePrepStatus:   jest.fn(),
+  advanceStageLifecycle: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 }));
 
 jest.unstable_mockModule('../../src/lib/repositories/pipeline-runs.js', () => ({
@@ -202,7 +212,9 @@ describe('GET /:slug — application detail', () => {
           content_json: { basics: { name: 'Nelson' } },
           generated_at: new Date('2026-04-03T00:00:00Z'),
         }],
-      });
+      })
+      // company_interview_profiles — no profile for this company
+      .mockResolvedValueOnce({ rows: [] });
 
     const res = await buildApp().request('/app-uuid-1');
     expect(res.status).toBe(200);
@@ -236,6 +248,8 @@ describe('GET /:slug — application detail', () => {
       },
       technologyInventory: null,
     });
+    // technicalRoundType defaults to 'dsa' when no company profile exists.
+    expect(body.application['technicalRoundType']).toBe('dsa');
     expect(body.application['latestAnalysisRunId']).toBe('run-1');
     expect(body.application['context']).toEqual({
       pipelineId:               'run-1',
@@ -253,12 +267,95 @@ describe('GET /:slug — application detail', () => {
     });
   });
 
+  it('includes dsaTopicCalibration in research when present in pipeline metadata', async () => {
+    pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
+    const calibration = {
+      likelyTopics: [{
+        canonicalName:    'binary-search',
+        displayName:      'Binary Search',
+        confidence:       0.9,
+        rationale:        'Mentioned in JD',
+        jdEvidenceQuote:  'strong algorithmic skills required',
+      }],
+      honestyNote: 'Based on limited public data',
+    };
+    poolQueryMock
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'run-2',
+          metadata: {
+            analysis: null,
+            research: {
+              fitSummary:            'Good fit',
+              overallFitRating:      'REASONABLE FIT',
+              verifiedMatches:       [],
+              gaps:                  [],
+              dsaTopicCalibration:   calibration,
+            },
+          },
+          created_at: new Date('2026-04-04T00:00:00Z'),
+        }],
+      })
+      .mockResolvedValueOnce({ rows: [] })  // coaching_content
+      .mockResolvedValueOnce({ rows: [] })  // resumes
+      .mockResolvedValueOnce({ rows: [] }); // company_interview_profiles
+
+    const res = await buildApp().request('/app-uuid-1');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { application: Record<string, unknown> };
+    const research = body.application['research'] as Record<string, unknown>;
+    expect(research['dsaTopicCalibration']).toEqual(calibration);
+  });
+
+  it('resolves technicalRoundType from a mocked company profile', async () => {
+    pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
+    poolQueryMock
+      .mockResolvedValueOnce({ rows: [] })  // pipeline_runs
+      .mockResolvedValueOnce({ rows: [] })  // coaching_content
+      .mockResolvedValueOnce({ rows: [] })  // resumes
+      // company_interview_profiles — profile with a technical stage
+      .mockResolvedValueOnce({
+        rows: [{
+          process_shape: [
+            { stage: 'phone-screen', round_type: 'behavioural' },
+            { stage: 'technical-1',  round_type: 'practical'  },
+            { stage: 'system-design', round_type: 'system-design' },
+          ],
+        }],
+      });
+
+    const res = await buildApp().request('/app-uuid-1');
+    const body = (await res.json()) as { application: Record<string, unknown> };
+    expect(body.application['technicalRoundType']).toBe('practical');
+  });
+
+  it('defaults technicalRoundType to "dsa" when the profile has no technical stage', async () => {
+    pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
+    poolQueryMock
+      .mockResolvedValueOnce({ rows: [] })  // pipeline_runs
+      .mockResolvedValueOnce({ rows: [] })  // coaching_content
+      .mockResolvedValueOnce({ rows: [] })  // resumes
+      // company_interview_profiles — profile with no technical round
+      .mockResolvedValueOnce({
+        rows: [{
+          process_shape: [
+            { stage: 'phone-screen', round_type: 'behavioural' },
+          ],
+        }],
+      });
+
+    const res = await buildApp().request('/app-uuid-1');
+    const body = (await res.json()) as { application: Record<string, unknown> };
+    expect(body.application['technicalRoundType']).toBe('dsa');
+  });
+
   it('returns null analysis/resume when no rows exist', async () => {
     pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
     poolQueryMock
       .mockResolvedValueOnce({ rows: [] })  // pipeline_runs
       .mockResolvedValueOnce({ rows: [] })  // coaching_content
       .mockResolvedValueOnce({ rows: [] })  // resumes
+      .mockResolvedValueOnce({ rows: [] })  // company_interview_profiles
       .mockResolvedValueOnce({ rows: [] }); // devops_topic_mappings
 
     const res = await buildApp().request('/app-uuid-1');
@@ -267,6 +364,7 @@ describe('GET /:slug — application detail', () => {
     expect(body.application['research']).toBeNull();
     expect(body.application['latestAnalysisRunId']).toBeNull();
     expect(body.application['coaching']).toEqual({});
+    expect(body.application['technicalRoundType']).toBe('dsa');
   });
 
   it('serves devopsEvidence aggregated by topic', async () => {
@@ -275,6 +373,7 @@ describe('GET /:slug — application detail', () => {
       .mockResolvedValueOnce({ rows: [] })  // pipeline_runs
       .mockResolvedValueOnce({ rows: [] })  // coaching_content
       .mockResolvedValueOnce({ rows: [] })  // resumes
+      .mockResolvedValueOnce({ rows: [] })  // company_interview_profiles
       // devops_topic_mappings aggregation
       .mockResolvedValueOnce({
         rows: [{
@@ -313,6 +412,7 @@ describe('GET /:slug — application detail', () => {
       .mockResolvedValueOnce({ rows: [] })  // pipeline_runs
       .mockResolvedValueOnce({ rows: [] })  // coaching_content
       .mockResolvedValueOnce({ rows: [] })  // resumes
+      .mockResolvedValueOnce({ rows: [] })  // company_interview_profiles
       .mockRejectedValueOnce(new Error('devops query exploded')); // devops_topic_mappings
 
     const res = await buildApp().request('/app-uuid-1');
@@ -394,15 +494,26 @@ describe('POST /:slug/status — update kanban status (PG-only)', () => {
     expect(pgUpdateApplicationStatusMock).not.toHaveBeenCalled();
   });
 
-  it('ignores interviewStage in the body (no PG column)', async () => {
+  it('processes interviewStage in the body when present', async () => {
+    pgGetApplicationMock.mockResolvedValueOnce({
+      id: 'app-uuid-1',
+      userId: 'user-1',
+      company: 'Acme',
+      role: 'Senior Engineer',
+      jobUrl: null,
+      jobDescription: 'Cool role',
+      kanbanStatus: 'applied',
+      interviewStage: 'applied',
+      appliedAt: null,
+    });
     const res = await buildApp().request('/app-uuid-1/status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'applied', interviewStage: 'screening' }),
+      body: JSON.stringify({ status: 'applied', interviewStage: 'applied' }),
     });
     expect(res.status).toBe(200);
     expect(pgUpdateApplicationStatusMock).toHaveBeenCalledTimes(1);
-    // signature is (pool, id, status) — interviewStage must not have leaked in
+    // updateApplicationStatus receives (pool, slug, status) — 3 args
     expect(pgUpdateApplicationStatusMock.mock.calls[0]?.length).toBe(3);
   });
 });

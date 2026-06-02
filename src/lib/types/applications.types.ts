@@ -14,6 +14,15 @@
 import type { ResumeData } from '../resumes/resume-data'
 
 // =============================================================================
+// JSON VALUE — serialisable primitive used where Record<string, unknown> would
+// break TanStack Start's ValidateSerializableMapped strict-mode check.
+// =============================================================================
+
+type JsonPrimitive = string | number | boolean | null
+/** Recursively JSON-serialisable value. Replaces `unknown` in index signatures. */
+export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue }
+
+// =============================================================================
 // ENUMS / UNION TYPES
 // =============================================================================
 
@@ -207,6 +216,22 @@ export interface TechnologyInventory {
   readonly methodologies: string[]
 }
 
+/**
+ * DSA topic calibration from the job-strategist research agent.
+ * Present in pipeline_runs.metadata.research when the research run includes
+ * DSA topic inference (optional field — absent for older runs).
+ */
+export interface DsaTopicCalibration {
+  readonly likelyTopics: readonly {
+    readonly canonicalName: string
+    readonly displayName: string
+    readonly confidence: number
+    readonly rationale: string
+    readonly jdEvidenceQuote: string
+  }[]
+  readonly honestyNote: string
+}
+
 /** Research Agent output — part of ApplicationDetail */
 export interface ResearchOutput {
   readonly fitSummary: string
@@ -216,6 +241,8 @@ export interface ResearchOutput {
   readonly gaps: SkillGap[]
   readonly experienceSignals: ExperienceSignal
   readonly technologyInventory: TechnologyInventory
+  /** DSA topic calibration — present only when the research agent inferred topics */
+  readonly dsaTopicCalibration?: DsaTopicCalibration
 }
 
 /** Analysis metadata from the Applications Agent */
@@ -427,6 +454,11 @@ export interface ApplicationDetail {
   readonly research: ResearchOutput | null
   /** Applications Agent output (may be null while analysing) */
   readonly analysis: AnalysisOutput | null
+  /**
+   * The type of technical round inferred from the company's interview profile.
+   * Defaults to 'dsa' when no company profile or round_type is available.
+   */
+  readonly technicalRoundType?: 'dsa' | 'practical' | 'take-home' | 'system-design' | 'behavioural' | 'mixed'
   /** Coach Agent output (may be null if no interview prep yet) */
   readonly interviewPrep: InterviewPrepOutput | null
   /**
@@ -441,6 +473,31 @@ export interface ApplicationDetail {
    * Omitted when the join query fails (fail-open) or returns no rows.
    */
   readonly devopsEvidence?: DevopsTopicEvidence[]
+  /**
+   * Per-stage lifecycle state, keyed by stage_type. Populated by the stages
+   * endpoint and used to drive the interview-prep UI (scheduling, prep status,
+   * user annotations). May be absent on older records.
+   */
+  readonly stages?: Record<string, StageState>
+}
+
+// =============================================================================
+// STAGE STATE
+// =============================================================================
+
+/**
+ * Per-stage lifecycle state as stored by the admin-api stages endpoint.
+ * Keyed by stage_type in `ApplicationDetail.stages`.
+ *
+ * @see PATCH /api/admin/applications/:slug/stages/:stage
+ */
+export interface StageState {
+  readonly stage_status: 'upcoming' | 'current' | 'completed' | 'not_applicable'
+  readonly prep_status: 'none' | 'queued' | 'ready' | 'failed'
+  readonly scheduled_at: string | null
+  /** Arbitrary user annotations — JSON-serialisable to satisfy TanStack Start's strict serialization check. */
+  readonly user_state: { [key: string]: JsonValue }
+  readonly coach_run_id: string | null
 }
 
 // =============================================================================
