@@ -131,6 +131,11 @@ function normaliseResearch(raw: Record<string, unknown>): Record<string, unknown
     result['dsaTopicCalibration'] = raw['dsaTopicCalibration'];
   }
 
+  // Pass pillarClassification through verbatim when present (S2).
+  if (raw['pillarClassification'] !== undefined) {
+    result['pillarClassification'] = raw['pillarClassification'];
+  }
+
   return result;
 }
 

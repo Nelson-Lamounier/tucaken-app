@@ -38,6 +38,13 @@ const confidenceBadge = (confidence: number): string => {
 /** Round types that should show the DSA / Coding section */
 const DSA_ROUND_TYPES = new Set<ApplicationDetail['technicalRoundType']>(['dsa', 'mixed', 'practical'])
 
+const PILLAR_LABEL: Record<string, string> = {
+  'swe-general':           'General Software',
+  'swe-dsa':               'Algorithms / DSA',
+  'devops-sre-platform':   'DevOps / Platform',
+  'ai-engineering':        'AI Engineering',
+}
+
 /**
  * Honest, specific phrases for each detector signal.
  * The phrasing is import/type-grounded — it describes what the code *does*,
@@ -73,6 +80,12 @@ export function TechnicalWorkspace({ detail }: TechnicalWorkspaceProps) {
   const showDsaSection = !detail.technicalRoundType || DSA_ROUND_TYPES.has(detail.technicalRoundType)
   const dsaCalibration = detail.research?.dsaTopicCalibration
 
+  const pc = detail.research?.pillarClassification
+  const focusPillars = useMemo(
+    () => new Set(pc ? [pc.primaryPillar, ...pc.secondaryPillars] : []),
+    [pc],
+  )
+
   // Real-work evidence map: canonicalName → DsaRealWorkTopic (fail-open: absent = no evidence)
   const evidenceByTopic = useMemo(
     () => new Map((detail.dsaRealWork ?? []).map(e => [e.canonicalName, e])),
@@ -91,6 +104,26 @@ export function TechnicalWorkspace({ detail }: TechnicalWorkspaceProps) {
 
   return (
     <div className="space-y-8">
+      {/* Role focus chip — shown only when pillarClassification present AND primaryPillar !== 'swe-general' */}
+      {pc && pc.primaryPillar !== 'swe-general' && (() => {
+        const pillars = [pc.primaryPillar, ...pc.secondaryPillars]
+        return (
+          <Card className="space-y-1.5 border-accent/30 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Role focus</span>
+              {pillars.map(p => (
+                <span key={p} className="inline-flex rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent ring-1 ring-inset ring-accent/20">
+                  {PILLAR_LABEL[p] ?? p}
+                </span>
+              ))}
+            </div>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              Inferred from the JD{pc.jdEvidenceTokens.length > 0 ? `: "${pc.jdEvidenceTokens.join('", "')}"` : ''}. {pc.classificationNote}
+            </p>
+          </Card>
+        )
+      })()}
+
       {/* Schedule + format */}
       <section className="space-y-3">
         <SectionHeading title="Schedule &amp; format" />
@@ -124,10 +157,17 @@ export function TechnicalWorkspace({ detail }: TechnicalWorkspaceProps) {
       {/* Section B — DSA / Coding (calibration + real-work evidence badges) */}
       {showDsaSection && (
         <section className="space-y-3" aria-label="DSA / Coding section">
-          <SectionHeading
-            title="DSA / Coding"
-            subtitle="Topic calibration for this role."
-          />
+          <div className="flex items-center gap-2">
+            <SectionHeading
+              title="DSA / Coding"
+              subtitle="Topic calibration for this role."
+            />
+            {focusPillars.has('swe-dsa') && (
+              <span className="inline-flex rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent ring-1 ring-inset ring-accent/20">
+                Matches this role
+              </span>
+            )}
+          </div>
 
           {/* Narrow-coverage honesty banner — ALWAYS shown when Section B renders */}
           <Card className="border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">
@@ -375,10 +415,17 @@ export function TechnicalWorkspace({ detail }: TechnicalWorkspaceProps) {
       {/* DevOps / Infrastructure — evidence-driven; Tier-1 "you declared X"; no competence claim */}
       {detail.devopsEvidence && detail.devopsEvidence.length > 0 && (
         <section className="space-y-3">
-          <SectionHeading
-            title="DevOps / Infrastructure"
-            subtitle="The infrastructure artifacts your repos declare, with receipts."
-          />
+          <div className="flex items-center gap-2">
+            <SectionHeading
+              title="DevOps / Infrastructure"
+              subtitle="The infrastructure artifacts your repos declare, with receipts."
+            />
+            {focusPillars.has('devops-sre-platform') && (
+              <span className="inline-flex rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent ring-1 ring-inset ring-accent/20">
+                Matches this role
+              </span>
+            )}
+          </div>
           <Card className="border-blue-200 p-4 text-sm text-zinc-600 dark:border-blue-500/20 dark:text-zinc-400">
             The infrastructure artifacts your repos declare, with receipts — what you can speak to,
             not a competence score. Depth assessment is coming.

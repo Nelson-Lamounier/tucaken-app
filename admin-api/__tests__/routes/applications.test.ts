@@ -310,6 +310,24 @@ describe('GET /:slug — application detail', () => {
     expect(research['dsaTopicCalibration']).toEqual(calibration);
   });
 
+  it('passes pillarClassification through verbatim when present', async () => {
+    pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
+    poolQueryMock
+      .mockResolvedValueOnce({ rows: [{ id: 'run-1', metadata: { research: {
+        fitSummary: 'x', overallFitRating: 'STRONG FIT', verifiedMatches: [], gaps: [],
+        pillarClassification: { primaryPillar: 'devops-sre-platform', secondaryPillars: [], confidence: 0.8, jdEvidenceTokens: ['Kubernetes'], classificationNote: 'inferred' },
+      } }, created_at: new Date() }] })
+      .mockResolvedValueOnce({ rows: [] })  // coaching_content
+      .mockResolvedValueOnce({ rows: [] })  // resumes
+      .mockResolvedValueOnce({ rows: [] })  // company_interview_profiles
+      .mockResolvedValueOnce({ rows: [] }); // dsa_evidence
+    const res = await buildApp().request('/app-uuid-1');
+    const body = (await res.json()) as { application: { research: Record<string, unknown> } };
+    expect(body.application.research.pillarClassification).toEqual({
+      primaryPillar: 'devops-sre-platform', secondaryPillars: [], confidence: 0.8, jdEvidenceTokens: ['Kubernetes'], classificationNote: 'inferred',
+    });
+  });
+
   it('resolves technicalRoundType from a mocked company profile', async () => {
     pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
     poolQueryMock
