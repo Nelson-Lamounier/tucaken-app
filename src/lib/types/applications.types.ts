@@ -437,6 +437,18 @@ export interface PipelineContext {
 }
 
 /**
+ * A single DevOps/infrastructure topic found in the user's technology_evidence,
+ * mapped via devops_topic_mappings. Tier-1 only: artifact presence, not competence.
+ */
+export interface DevopsTopicEvidence {
+  readonly canonicalTopicName: string
+  readonly displayName: string
+  readonly topicGroup: string
+  readonly artifactCount: number
+  readonly samples: { repo: string; file: string; line: number; rawName: string }[]
+}
+
+/**
  * Full application detail — combines all three agent outputs.
  * Returned by `GET /api/admin/applications/applications/[slug]`.
  */
@@ -480,6 +492,12 @@ export interface ApplicationDetail {
    * output for that stage. May be absent until the Coach Job has run for a stage.
    */
   readonly coaching?: Record<string, StageCoaching> | null
+  /**
+   * DevOps/infrastructure evidence: technology_evidence rows resolved through
+   * devops_topic_mappings. Tier-1 (artifact presence) — never a competence claim.
+   * Omitted when the join query fails (fail-open) or returns no rows.
+   */
+  readonly devopsEvidence?: DevopsTopicEvidence[]
   /**
    * Per-stage lifecycle state, keyed by stage_type. Populated by the stages
    * endpoint and used to drive the interview-prep UI (scheduling, prep status,

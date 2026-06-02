@@ -25,6 +25,7 @@ import { buildPipelineJob, sanitizeLabel } from '../lib/k8s-job-builder.js';
 import { getBatchApi } from '../lib/k8s.js';
 import { getPool, withUser } from '../lib/pg.js';
 import type { Queryable } from '../lib/pg.js';
+import { logger } from '../lib/observability/logger.js';
 import {
   listApplications,
   getApplication,
@@ -370,6 +371,51 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
       // the UI types (applications.types.ts), so we normalise here.
       const research = rawResearch ? normaliseResearch(rawResearch) : null;
 
+      // DevOps real-work evidence: technology_evidence ⋈ technology_ontology ⋈ devops_topic_mappings.
+      // Reuses the outer withUser-scoped db client (RLS). Prose-suppressed. Fail-open.
+      let devopsEvidence: Array<{
+        canonicalTopicName: string;
+        displayName:        string;
+        topicGroup:         string;
+        artifactCount:      number;
+        samples:            { repo: string; file: string; line: number; rawName: string }[];
+      }> | undefined;
+      try {
+        const { rows: devopsRows } = await db.query<{
+          canonical_topic_name: string;
+          display_name:         string;
+          topic_group:          string;
+          artifact_count:       number;
+          samples:              { repo: string; file: string; line: number; rawName: string }[];
+        }>(
+          `SELECT m.canonical_topic_name, m.display_name, m.topic_group,
+                  COUNT(*)::int AS artifact_count,
+                  (ARRAY_AGG(json_build_object('repo', e.repo_full_name, 'file', e.file_path,
+                                               'line', e.line_start, 'rawName', e.raw_name)
+                             ORDER BY e.confidence DESC NULLS LAST))[1:3] AS samples
+             FROM technology_evidence e
+             JOIN technology_ontology o ON o.id = e.technology_id
+             JOIN devops_topic_mappings m
+               ON o.category = ANY (SELECT jsonb_array_elements_text(m.mapped_ontology_categories))
+               OR o.canonical_name = ANY (SELECT jsonb_array_elements_text(m.mapped_canonicals))
+            WHERE e.user_id = current_setting('app.current_user_id')::uuid
+              AND e.source_layer NOT IN ('readme','code-prose')
+              AND e.file_path !~* '\\.(md|markdown)$'
+            GROUP BY m.canonical_topic_name, m.display_name, m.topic_group
+            ORDER BY m.topic_group, m.canonical_topic_name`,
+        );
+        devopsEvidence = devopsRows.map((r) => ({
+          canonicalTopicName: r.canonical_topic_name,
+          displayName:        r.display_name,
+          topicGroup:         r.topic_group,
+          artifactCount:      Number(r.artifact_count),
+          samples:            r.samples ?? [],
+        }));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        logger.warn({ err }, `[devops] evidence aggregation failed (non-fatal): ${msg}`);
+      }
+
       const stages = await getStagesForApp(db, application.id);
 
       return ctx.json({
@@ -405,6 +451,7 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
             };
             return acc;
           }, {}),
+          ...(devopsEvidence !== undefined ? { devopsEvidence } : {}),
           stages:              Object.fromEntries(stages.map(s => [s.stage_type, s])),
         },
       });

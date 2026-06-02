@@ -361,7 +361,8 @@ describe('GET /:slug — application detail', () => {
       .mockResolvedValueOnce({ rows: [] })  // coaching_content
       .mockResolvedValueOnce({ rows: [] })  // resumes
       .mockResolvedValueOnce({ rows: [] })  // company_interview_profiles
-      .mockResolvedValueOnce({ rows: [] }); // dsa_evidence
+      .mockResolvedValueOnce({ rows: [] })  // dsa_evidence
+      .mockResolvedValueOnce({ rows: [] }); // devops_topic_mappings
 
     const res = await buildApp().request('/app-uuid-1');
     const body = (await res.json()) as { application: Record<string, unknown> };
@@ -370,6 +371,46 @@ describe('GET /:slug — application detail', () => {
     expect(body.application['latestAnalysisRunId']).toBeNull();
     expect(body.application['coaching']).toEqual({});
     expect(body.application['technicalRoundType']).toBe('dsa');
+  });
+
+  it('serves devopsEvidence aggregated by topic', async () => {
+    pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
+    poolQueryMock
+      .mockResolvedValueOnce({ rows: [] })  // pipeline_runs
+      .mockResolvedValueOnce({ rows: [] })  // coaching_content
+      .mockResolvedValueOnce({ rows: [] })  // resumes
+      .mockResolvedValueOnce({ rows: [] })  // company_interview_profiles
+      .mockResolvedValueOnce({ rows: [] })  // dsa_evidence
+      // devops_topic_mappings aggregation
+      .mockResolvedValueOnce({
+        rows: [{
+          canonical_topic_name: 'devops_iac',
+          display_name:         'Infrastructure as Code',
+          topic_group:          'iac',
+          artifact_count:       2,
+          samples:              [{ repo: 'o/r', file: 'main.tf', line: 3, rawName: 'terraform' }],
+        }],
+      });
+
+    const res = await buildApp().request('/app-uuid-1');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { application: Record<string, unknown> };
+    expect(body.application['devopsEvidence']).toEqual([
+      {
+        canonicalTopicName: 'devops_iac',
+        displayName:        'Infrastructure as Code',
+        topicGroup:         'iac',
+        artifactCount:      2,
+        samples:            [{ repo: 'o/r', file: 'main.tf', line: 3, rawName: 'terraform' }],
+      },
+    ]);
+    // Honesty/RLS guardrails must be in the executed SQL: user-scoped + prose-suppressed.
+    const devopsSql = poolQueryMock.mock.calls
+      .map((c) => String(c[0]))
+      .find((s) => /devops_topic_mappings/.test(s)) ?? '';
+    expect(devopsSql).toMatch(/current_setting\('app\.current_user_id'\)/);
+    expect(devopsSql).toMatch(/source_layer NOT IN \('readme','code-prose'\)/);
+    expect(devopsSql).toMatch(/file_path !~\* /);
   });
 
   it('returns dsaRealWork aggregated by topic when dsa_evidence rows exist', async () => {
@@ -437,6 +478,22 @@ describe('GET /:slug — application detail', () => {
     // Other fields must still be present
     expect(body.application['id']).toBe('app-uuid-1');
     expect(body.application['technicalRoundType']).toBe('dsa');
+  });
+
+  it('fail-open: devops query throws → field omitted, still 200', async () => {
+    pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
+    poolQueryMock
+      .mockResolvedValueOnce({ rows: [] })  // pipeline_runs
+      .mockResolvedValueOnce({ rows: [] })  // coaching_content
+      .mockResolvedValueOnce({ rows: [] })  // resumes
+      .mockResolvedValueOnce({ rows: [] })  // company_interview_profiles
+      .mockResolvedValueOnce({ rows: [] })  // dsa_evidence
+      .mockRejectedValueOnce(new Error('devops query exploded')); // devops_topic_mappings
+
+    const res = await buildApp().request('/app-uuid-1');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { application: Record<string, unknown> };
+    expect(body.application['devopsEvidence']).toBeUndefined();
   });
 
   it('returns empty dsaRealWork array when user has no dsa_evidence rows', async () => {

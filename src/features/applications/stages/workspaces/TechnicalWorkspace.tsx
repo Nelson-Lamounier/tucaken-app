@@ -372,6 +372,57 @@ export function TechnicalWorkspace({ detail }: TechnicalWorkspaceProps) {
         </section>
       )}
 
+      {/* DevOps / Infrastructure — evidence-driven; Tier-1 "you declared X"; no competence claim */}
+      {detail.devopsEvidence && detail.devopsEvidence.length > 0 && (
+        <section className="space-y-3">
+          <SectionHeading
+            title="DevOps / Infrastructure"
+            subtitle="The infrastructure artifacts your repos declare, with receipts."
+          />
+          <Card className="border-blue-200 p-4 text-sm text-zinc-600 dark:border-blue-500/20 dark:text-zinc-400">
+            The infrastructure artifacts your repos declare, with receipts — what you can speak to,
+            not a competence score. Depth assessment is coming.
+          </Card>
+          <div className="space-y-3">
+            {detail.devopsEvidence.map(topic => {
+              const s = topic.samples[0]
+              const ghUrl = s ? `https://github.com/${s.repo}/blob/HEAD/${s.file}#L${s.line}` : undefined
+              return (
+                <Card key={topic.canonicalTopicName} className="space-y-2 p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-500/20">
+                      {topic.topicGroup}
+                    </span>
+                    <h4 className="text-sm font-semibold text-zinc-900 dark:text-white">{topic.displayName}</h4>
+                  </div>
+                  {s && (
+                    <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                      You declared{' '}
+                      {ghUrl ? (
+                        <a
+                          href={ghUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-0.5 font-mono font-medium underline underline-offset-2 hover:text-blue-600"
+                        >
+                          {s.repo}/{s.file}:{s.line} <ExternalLink className="size-3" aria-hidden />
+                        </a>
+                      ) : (
+                        <span className="font-mono">{s.repo}/{s.file}:{s.line}</span>
+                      )}{' '}
+                      (<span className="font-mono">{s.rawName}</span>)
+                      {topic.artifactCount > 1 && (
+                        <span className="text-zinc-400 dark:text-zinc-500"> · {topic.artifactCount} artifacts</span>
+                      )}
+                    </p>
+                  )}
+                </Card>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
       {/* Practice — DSA v1: external pointers, not in-product practice */}
       <section className="space-y-3">
         <SectionHeading title="Practice" />
