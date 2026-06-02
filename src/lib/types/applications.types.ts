@@ -217,6 +217,25 @@ export interface TechnologyInventory {
 }
 
 /**
+ * A single DSA topic aggregated from real-work `dsa_evidence` rows.
+ * Served by admin-api `GET /:slug` → `ApplicationDetail.dsaRealWork`.
+ * User-scoped (RLS). Absent when no GitHub repos have been scanned or no
+ * DSA patterns were detected.
+ */
+export interface DsaRealWorkTopic {
+  /** Joins to `DsaTopicCalibration.likelyTopics[].canonicalName` */
+  readonly canonicalName: string
+  /** Total number of matching evidence rows across all user repos */
+  readonly matchCount: number
+  /** Highest confidence score among the matched rows (0–1) */
+  readonly topConfidence: number
+  /** Distinct detector signal names, e.g. ['networkx_import', 'heap'] */
+  readonly signals: string[]
+  /** Up to 3 highest-confidence sample locations */
+  readonly samples: { repo: string; file: string; line: number }[]
+}
+
+/**
  * DSA topic calibration from the job-strategist research agent.
  * Present in pipeline_runs.metadata.research when the research run includes
  * DSA topic inference (optional field — absent for older runs).
@@ -447,6 +466,12 @@ export interface ApplicationDetail {
    * Defaults to 'dsa' when no company profile or round_type is available.
    */
   readonly technicalRoundType?: 'dsa' | 'practical' | 'take-home' | 'system-design' | 'behavioural' | 'mixed'
+  /**
+   * Real-work DSA evidence aggregated from `dsa_evidence` (user-scoped, all repos).
+   * Absent when the query failed (fail-open) or no patterns were detected.
+   * Join to `research.dsaTopicCalibration.likelyTopics` on `canonicalName`.
+   */
+  readonly dsaRealWork?: DsaRealWorkTopic[]
   /** Coach Agent output (may be null if no interview prep yet) */
   readonly interviewPrep: InterviewPrepOutput | null
   /**

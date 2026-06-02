@@ -329,6 +329,141 @@ describe('TechnicalWorkspace', () => {
     expect(screen.queryByText(/your work shows/i)).toBeNull()
   })
 
+  // ── DSA real-work badges (v1.5) ──────────────────────────────────────────
+
+  const dsaBaseDetail = {
+    ...detail,
+    technicalRoundType: 'dsa' as const,
+    research: {
+      ...detail.research!,
+      dsaTopicCalibration: {
+        likelyTopics: [
+          {
+            canonicalName: 'graph-bfs',
+            displayName: 'Graph BFS/DFS',
+            confidence: 0.8,
+            rationale: 'Graph traversal patterns mentioned.',
+            jdEvidenceQuote: 'graph-based data',
+          },
+          {
+            canonicalName: 'binary-search',
+            displayName: 'Binary Search',
+            confidence: 0.5,
+            rationale: 'Efficient lookup at scale.',
+            jdEvidenceQuote: 'efficient search',
+          },
+        ],
+        honestyNote: 'Confidence inferred from JD signals.',
+      },
+    },
+  }
+
+  it('narrow-coverage banner is always present when Section B renders', () => {
+    renderWithQuery(<TechnicalWorkspace detail={dsaBaseDetail} />)
+    expect(screen.getByText(/Real-work detection covers a limited pattern set/)).toBeTruthy()
+  })
+
+  it('narrow-coverage banner is present even when dsaRealWork is undefined', () => {
+    renderWithQuery(<TechnicalWorkspace detail={{ ...dsaBaseDetail, dsaRealWork: undefined }} />)
+    expect(screen.getByText(/Real-work detection covers a limited pattern set/)).toBeTruthy()
+  })
+
+  it('calibrated topic WITH matching dsaRealWork renders green treatment with repo/file:line', () => {
+    const detailWithEvidence = {
+      ...dsaBaseDetail,
+      dsaRealWork: [
+        {
+          canonicalName: 'graph-bfs',
+          matchCount: 2,
+          topConfidence: 0.78,
+          signals: ['networkx_import'],
+          samples: [{ repo: 'user/graph-utils', file: 'src/graph.py', line: 42 }],
+        },
+      ],
+    }
+    renderWithQuery(<TechnicalWorkspace detail={detailWithEvidence} />)
+    // Green treatment: sample repo/file:line rendered
+    expect(screen.getByText(/user\/graph-utils\/src\/graph\.py:42/)).toBeTruthy()
+    // Signal phrase rendered
+    expect(screen.getByText(/imports networkx \(graph algorithms\)/)).toBeTruthy()
+    // matchCount copy
+    expect(screen.getByText(/in 2 place/)).toBeTruthy()
+    // Import-grounded caveat
+    expect(screen.getByText(/import\/type-grounded/)).toBeTruthy()
+  })
+
+  it('calibrated topic WITHOUT evidence still renders red "practice externally" treatment', () => {
+    const detailWithEvidence = {
+      ...dsaBaseDetail,
+      dsaRealWork: [
+        {
+          canonicalName: 'graph-bfs',
+          matchCount: 1,
+          topConfidence: 0.75,
+          signals: ['networkx_import'],
+          samples: [{ repo: 'user/graph-utils', file: 'src/graph.py', line: 42 }],
+        },
+      ],
+    }
+    renderWithQuery(<TechnicalWorkspace detail={detailWithEvidence} />)
+    // binary-search is calibrated but has no evidence → red treatment intact
+    expect(screen.getByText(/Not assessed from your code/)).toBeTruthy()
+    expect(screen.getAllByText(/practice on/i).length).toBeGreaterThan(0)
+  })
+
+  it('dsaRealWork topic NOT in likelyTopics appears in "Other real-work DSA signals" block', () => {
+    const detailWithExtra = {
+      ...dsaBaseDetail,
+      dsaRealWork: [
+        {
+          canonicalName: 'heap',
+          matchCount: 3,
+          topConfidence: 0.72,
+          signals: ['heap'],
+          samples: [{ repo: 'user/scheduler', file: 'lib/pq.py', line: 10 }],
+        },
+      ],
+    }
+    renderWithQuery(<TechnicalWorkspace detail={detailWithExtra} />)
+    expect(screen.getByText('Other real-work DSA signals')).toBeTruthy()
+    // The uncalibrated evidence topic shows up in the secondary block
+    expect(screen.getByText(/uses a heap \/ priority queue/)).toBeTruthy()
+  })
+
+  it('"Other real-work DSA signals" block is absent when all evidence topics are calibrated', () => {
+    const detailAllCalibrated = {
+      ...dsaBaseDetail,
+      dsaRealWork: [
+        {
+          canonicalName: 'graph-bfs',
+          matchCount: 1,
+          topConfidence: 0.75,
+          signals: ['networkx_import'],
+          samples: [{ repo: 'user/graph-utils', file: 'src/graph.py', line: 42 }],
+        },
+      ],
+    }
+    renderWithQuery(<TechnicalWorkspace detail={detailAllCalibrated} />)
+    expect(screen.queryByText('Other real-work DSA signals')).toBeNull()
+  })
+
+  it('no green sample text when dsaRealWork is empty array', () => {
+    renderWithQuery(<TechnicalWorkspace detail={{ ...dsaBaseDetail, dsaRealWork: [] }} />)
+    // No import-grounded caveat
+    expect(screen.queryByText(/import\/type-grounded/)).toBeNull()
+    // All calibrated topics fall back to red treatment
+    expect(screen.getAllByText(/Not assessed from your code/).length).toBeGreaterThan(0)
+  })
+
+  it('green badge strictly requires evidence lookup hit — calibration alone never goes green', () => {
+    // No dsaRealWork at all
+    renderWithQuery(<TechnicalWorkspace detail={dsaBaseDetail} />)
+    // No green sample text
+    expect(screen.queryByText(/import\/type-grounded/)).toBeNull()
+    // No GitHub link for samples
+    expect(screen.queryByText(/user\//)).toBeNull()
+  })
+
   it('Phone Screen surfaces talking points, questions, and an editable comp target', () => {
     renderWithQuery(<PhoneScreenWorkspace detail={detail} />)
     expect(screen.getByText('Your talking points')).toBeTruthy()
