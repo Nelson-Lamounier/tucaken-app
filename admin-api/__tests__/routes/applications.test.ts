@@ -527,6 +527,57 @@ describe('GET /:slug — application detail', () => {
     expect(body.application['devopsEvidence']).toBeUndefined();
   });
 
+  it('serves systemTours from a mocked project_system_tours query (RLS, newest first)', async () => {
+    pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
+    const tour = {
+      area:    'Async ingestion pipeline',
+      context: 'High-throughput event processing',
+      keyDecisions: [{ decision: 'Use SQS', rationale: 'Decouple producers' }],
+      tradeoffs:    [{ tension: 'cost vs latency', chosenPath: 'batch', cost: 'p99 latency' }],
+      systemMap:    { diagramFormat: 'mermaid', diagramSource: 'graph TD; A-->B', nodes: [], edges: [] },
+      outcomes:     ['Reduced spend 40%'],
+      whatIdChange: ['Add DLQ alarms'],
+    };
+    poolQueryMock
+      .mockResolvedValueOnce({ rows: [] })  // pipeline_runs
+      .mockResolvedValueOnce({ rows: [] })  // coaching_content
+      .mockResolvedValueOnce({ rows: [] })  // resumes
+      .mockResolvedValueOnce({ rows: [] })  // company_interview_profiles
+      .mockResolvedValueOnce({ rows: [] })  // dsa_evidence
+      .mockResolvedValueOnce({ rows: [] })  // devops_topic_mappings
+      .mockResolvedValueOnce({ rows: [{ content: tour }] }); // project_system_tours
+
+    const res = await buildApp().request('/app-uuid-1');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { application: Record<string, unknown> };
+    expect(body.application['systemTours']).toEqual([tour]);
+    // RLS guardrail must be in the executed SQL: user-scoped.
+    const tourSql = poolQueryMock.mock.calls
+      .map((c) => String(c[0]))
+      .find((s) => /project_system_tours/.test(s)) ?? '';
+    expect(tourSql).toMatch(/current_setting\('app\.current_user_id'\)/);
+    expect(tourSql).toMatch(/ORDER BY generated_at DESC/);
+    expect(tourSql).toMatch(/LIMIT 3/);
+  });
+
+  it('fail-open: project_system_tours query throws → field omitted, still 200', async () => {
+    pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
+    poolQueryMock
+      .mockResolvedValueOnce({ rows: [] })  // pipeline_runs
+      .mockResolvedValueOnce({ rows: [] })  // coaching_content
+      .mockResolvedValueOnce({ rows: [] })  // resumes
+      .mockResolvedValueOnce({ rows: [] })  // company_interview_profiles
+      .mockResolvedValueOnce({ rows: [] })  // dsa_evidence
+      .mockResolvedValueOnce({ rows: [] })  // devops_topic_mappings
+      .mockRejectedValueOnce(new Error('relation "project_system_tours" does not exist')); // tours fails
+
+    const res = await buildApp().request('/app-uuid-1');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { application: Record<string, unknown> };
+    expect(body.application['systemTours']).toBeUndefined();
+    expect(body.application['id']).toBe('app-uuid-1');
+  });
+
   it('returns empty dsaRealWork array when user has no dsa_evidence rows', async () => {
     pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
     poolQueryMock
