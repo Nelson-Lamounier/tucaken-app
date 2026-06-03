@@ -211,6 +211,30 @@ describe('TechnicalWorkspace', () => {
     expect(screen.getByRole('link', { name: /Practice on NeetCode/i })).toBeTruthy()
   })
 
+  it('renders a technicalPrepChecklist item with suggestedResources without crashing (field-name contract)', () => {
+    const withChecklist = {
+      ...detail,
+      coaching: {
+        technical: {
+          topics: {
+            stageDescription: 'Technical round',
+            technicalQuestions: [],
+            behaviouralQuestions: [],
+            difficultQuestions: [],
+            technicalPrepChecklist: [
+              { topic: 'Consistent hashing', priority: 'high', rationale: 'Sharding strategy', suggestedResources: ['DDIA ch.6'] },
+            ],
+            questionsToAsk: [],
+            coachingNotes: '',
+          },
+        },
+      },
+    } as unknown as ApplicationDetail
+    renderWithQuery(<TechnicalWorkspace detail={withChecklist} />)
+    expect(screen.getByText('Consistent hashing')).toBeTruthy()
+    expect(screen.getByText(/DDIA ch\.6/)).toBeTruthy()
+  })
+
   it('does not render Section B for system-design round type', () => {
     renderWithQuery(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'system-design' }} />)
     expect(screen.queryByLabelText('DSA / Coding section')).toBeNull()

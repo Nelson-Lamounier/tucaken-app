@@ -425,7 +425,8 @@ export interface TechnicalPrepItem {
   readonly topic: string
   readonly priority: string
   readonly rationale: string
-  readonly resources: string[]
+  /** Matches the Coach Agent contract field name (ai-applications strategist-types). */
+  readonly suggestedResources: string[]
 }
 
 /** Question to ask the interviewer */

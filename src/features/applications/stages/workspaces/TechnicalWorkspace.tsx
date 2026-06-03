@@ -376,9 +376,9 @@ export function TechnicalWorkspace({ detail }: TechnicalWorkspaceProps) {
                   <h4 className="text-sm font-semibold text-zinc-900 dark:text-white">{item.topic}</h4>
                 </div>
                 <p className="text-sm text-zinc-600 dark:text-zinc-400">{item.rationale}</p>
-                {item.resources.length > 0 && (
+                {item.suggestedResources && item.suggestedResources.length > 0 && (
                   <p className="text-xs text-zinc-500 dark:text-zinc-500">
-                    Resources: {item.resources.join(', ')}
+                    Resources: {item.suggestedResources.join(', ')}
                   </p>
                 )}
               </Card>
