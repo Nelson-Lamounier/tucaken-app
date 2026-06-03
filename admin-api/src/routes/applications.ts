@@ -173,6 +173,7 @@ function makeCoachAdapters(config: AdminApiConfig, slug: string) {
         { name: 'JOB_DESCRIPTION',            value: env.jobDescription },
         { name: 'INTERVIEW_STAGE',            value: env.interviewStage },
         { name: 'MODE',                       value: 'standard' },
+        { name: 'COACH_MODEL',                value: config.coachModel },
         ...(env.compensationTarget ? [{ name: 'COMPENSATION_TARGET', value: env.compensationTarget }] : []),
         { name: 'REGION',                     value: env.region },
       ],
