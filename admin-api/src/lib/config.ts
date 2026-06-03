@@ -242,6 +242,16 @@ export interface AdminApiConfig {
    */
   readonly foundationModel: string;
 
+  /**
+   * Bedrock model ID forwarded to coach K8s Jobs as COACH_MODEL. Optional —
+   * defaults to Claude Sonnet 4.6. The coach emits a large strict tool-schema
+   * brief; haiku frequently produces structurally-invalid output (missing
+   * `technicalQuestions`, per-item `bridgeStrategy`) → Zod hard-fail → transient
+   * prep `failed`. Sonnet follows the schema reliably (same reasoning the
+   * profile-synthesis agents already default to sonnet).
+   */
+  readonly coachModel: string;
+
   // Note: image URIs are NOT in this config object. Use getJobImage(name)
   // from this same module — it reads from the file mount on each call (with
   // a 30s cache) so a Secret rotation by ESO is picked up without restart.
@@ -344,5 +354,6 @@ export function loadConfig(): AdminApiConfig {
     techExtractorServiceAccount:     process.env['TECH_EXTRACTOR_SERVICE_ACCOUNT'] ?? 'tech-extractor-sa',
     researchModel:                   required['RESEARCH_MODEL']!,
     foundationModel:                 process.env['FOUNDATION_MODEL'] ?? 'eu.anthropic.claude-sonnet-4-6',
+    coachModel:                      process.env['COACH_MODEL'] ?? 'eu.anthropic.claude-sonnet-4-6',
   };
 }
