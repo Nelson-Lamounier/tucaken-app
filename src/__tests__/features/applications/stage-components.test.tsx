@@ -732,10 +732,20 @@ describe('BarRaiserWorkspace', () => {
 
   it('renders the values matrix and a draft CTA for uncovered principles', () => {
     window.localStorage.clear()
-    renderWithQuery(<BarRaiserWorkspace detail={detail} />)
+    renderWithQuery(
+      <WorkspaceShell detail={detail} activeStage="bar-raiser">
+        <BarRaiserWorkspace detail={detail} />
+      </WorkspaceShell>,
+    )
     expect(screen.getByText('Company values matrix')).toBeTruthy()
     expect(screen.getAllByText('Customer Obsession').length).toBeGreaterThan(0)
-    // empty bank → all principles uncovered → draft CTAs present
+    // empty bank → all principles uncovered → the draft CTA lives behind a
+    // principle row's detail (rail); open one to reveal it
+    const principleRow = screen
+      .getAllByText('Customer Obsession')
+      .map(el => el.closest('button'))
+      .find((btn): btn is HTMLButtonElement => btn?.getAttribute('aria-controls') === 'detail-rail-panel')
+    fireEvent.click(principleRow as HTMLElement)
     expect(screen.getAllByRole('button', { name: /Draft a story from this evidence/i }).length).toBeGreaterThan(0)
   })
 })
