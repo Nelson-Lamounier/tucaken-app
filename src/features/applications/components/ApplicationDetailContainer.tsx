@@ -17,8 +17,8 @@ import { ApplicationReviewDetail } from './ApplicationReviewDetail'
 import { StageProgressBar } from '../stages/components/StageProgressBar'
 import { StagePrepGate } from '../stages/components/StagePrepGate'
 import { StageWorkspacePlaceholder } from '../stages/components/StageWorkspacePlaceholder'
-import { NotesAndTimelinePanel } from '../stages/components/NotesAndTimelinePanel'
 import { StageWorkspaceSkeleton } from '../stages/components/StageWorkspaceSkeleton'
+import { WorkspaceShell } from '../stages/components/workspace-shell'
 import { TechnicalWorkspace } from '../stages/workspaces/TechnicalWorkspace'
 import { PhoneScreenWorkspace } from '../stages/workspaces/PhoneScreenWorkspace'
 import { SystemDesignWorkspace } from '../stages/workspaces/SystemDesignWorkspace'
@@ -58,9 +58,11 @@ interface ApplicationDetailContainerProps {
   /** Active Stage from the `?stage` search param. Falls back to the
    *  application's Current Stage once the detail loads. */
   readonly activeStage?: InterviewStage
+  /** Selected summary-row id from the `?focus` search param. */
+  readonly focus?: string
 }
 
-export function ApplicationDetailContainer({ slug, activeStage }: ApplicationDetailContainerProps) {
+export function ApplicationDetailContainer({ slug, activeStage, focus }: ApplicationDetailContainerProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const statusMutation = useApplicationStatus()
@@ -84,6 +86,17 @@ export function ApplicationDetailContainer({ slug, activeStage }: ApplicationDet
       void navigate({ to: '/applications/$slug', params: { slug }, search: { stage } })
     },
     [slug, navigate],
+  )
+
+  const handleFocusChange = useCallback(
+    (id: string | null) => {
+      void navigate({
+        to: '/applications/$slug',
+        params: { slug },
+        search: { stage: activeStage, focus: id ?? undefined },
+      })
+    },
+    [slug, activeStage, navigate],
   )
 
   const handleAdvance = useCallback(
@@ -254,9 +267,14 @@ export function ApplicationDetailContainer({ slug, activeStage }: ApplicationDet
         />
       </div>
 
-      {/* Active stage workspace + persistent notes/timeline panel */}
-      <div className="mt-8 flex flex-col gap-6 lg:flex-row lg:items-start">
-        <div className="min-w-0 flex-1 space-y-8">
+      {/* Active stage workspace — master–detail shell (left summary + right rail) */}
+      <div className="mt-8">
+        <WorkspaceShell
+          detail={detail}
+          activeStage={resolvedStage}
+          focus={focus}
+          onFocusChange={handleFocusChange}
+        >
           {resolvedStage === 'applied'
             ? stageWorkspaceNode('applied', detail)
             : (
@@ -284,11 +302,7 @@ export function ApplicationDetailContainer({ slug, activeStage }: ApplicationDet
               </Button>
             </div>
           )}
-        </div>
-
-        <div className="lg:sticky lg:top-6">
-          <NotesAndTimelinePanel detail={detail} activeStage={resolvedStage} />
-        </div>
+        </WorkspaceShell>
       </div>
       {/* Confirm modal for AI coach dispatch */}
       <ConfirmModal
