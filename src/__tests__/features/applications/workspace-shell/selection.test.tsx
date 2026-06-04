@@ -1,5 +1,5 @@
 /** @vitest-environment happy-dom */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import {
@@ -35,5 +35,17 @@ describe('useDetailRail', () => {
     }
     const { result } = renderHook(() => useDetailRail(), { wrapper: fwrapper })
     expect(result.current.pendingFocus).toBe('sharding')
+  })
+
+  it('clear() resets selected and calls onFocusChange with null', () => {
+    const onFocusChange = vi.fn()
+    function cwrapper({ children }: { children: ReactNode }) {
+      return <DetailRailProvider initialFocus={undefined} onFocusChange={onFocusChange}>{children}</DetailRailProvider>
+    }
+    const { result } = renderHook(() => useDetailRail(), { wrapper: cwrapper })
+    act(() => result.current.select({ id: 'x', label: 'X', node: null }))
+    act(() => result.current.clear())
+    expect(result.current.selected).toBeNull()
+    expect(onFocusChange).toHaveBeenLastCalledWith(null)
   })
 })

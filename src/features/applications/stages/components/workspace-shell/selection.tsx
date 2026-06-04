@@ -63,7 +63,7 @@ export function DetailRailProvider({
 
   const value = useMemo<DetailRailValue>(
     () => ({ tab, selected, pendingFocus: initialFocus, setTab, select, clear }),
-    [tab, selected, initialFocus, select, clear],
+    [tab, selected, initialFocus, setTab, select, clear],
   )
 
   return <DetailRailContext.Provider value={value}>{children}</DetailRailContext.Provider>
