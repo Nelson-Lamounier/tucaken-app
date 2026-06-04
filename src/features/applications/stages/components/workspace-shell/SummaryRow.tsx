@@ -1,7 +1,7 @@
 'use client'
 
 import { ChevronRight } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { useDetailRail } from './selection'
 
 interface SummaryRowProps {
@@ -17,8 +17,16 @@ interface SummaryRowProps {
 
 /** One scannable line in a SummaryGroup. Click → publishes `detail` to the rail. */
 export function SummaryRow({ id, label, detail, indicator, preview }: SummaryRowProps) {
-  const { selected, select } = useDetailRail()
+  const { selected, select, pendingFocus } = useDetailRail()
   const isActive = selected?.id === id
+  const autoSelected = useRef(false)
+
+  useEffect(() => {
+    if (!autoSelected.current && pendingFocus === id && !selected) {
+      autoSelected.current = true
+      select({ id, label, node: detail })
+    }
+  }, [pendingFocus, id, selected, select, label, detail])
 
   return (
     <button

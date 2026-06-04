@@ -44,4 +44,20 @@ describe('SummaryGroup / SummaryRow', () => {
     await user.click(screen.getByRole('button', { name: /Topics likely to come up/ }))
     await waitFor(() => expect(screen.queryByText('Caching')).toBeNull())
   })
+
+  it('auto-selects the row whose id matches the provider initialFocus', async () => {
+    function FocusFixture() {
+      return (
+        <DetailRailProvider initialFocus="sharding">
+          <SummaryGroup id="topics" title="Topics" count={2}>
+            <SummaryRow id="caching" label="Caching" detail={<p>Caching full text</p>} />
+            <SummaryRow id="sharding" label="Sharding" detail={<p>Sharding full text</p>} />
+          </SummaryGroup>
+          <Probe />
+        </DetailRailProvider>
+      )
+    }
+    render(<FocusFixture />)
+    await waitFor(() => expect(screen.getByTestId('probe').textContent).toBe('detail:sharding'))
+  })
 })
