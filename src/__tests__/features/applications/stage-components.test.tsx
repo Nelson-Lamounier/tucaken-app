@@ -760,9 +760,21 @@ describe('FinalWorkspace', () => {
 
   it('computes a counter from base and confirms a decision action', () => {
     window.localStorage.clear()
-    render(<FinalWorkspace detail={detail} />)
+    renderWithQuery(
+      <WorkspaceShell detail={detail} activeStage="final">
+        <FinalWorkspace detail={detail} />
+      </WorkspaceShell>,
+    )
+    // Fit badge lives in the decision-factors group header (always visible)
     expect(screen.getByText('Fit 50%')).toBeTruthy() // default factors 5/5
+    // Base input is the inline offer control
     fireEvent.change(screen.getByLabelText('Base'), { target: { value: '100,000' } })
+    // The suggested counter now lives behind the suggested-counter row's detail (rail)
+    const counterRow = screen
+      .getAllByText('Suggested counter')
+      .map(el => el.closest('button'))
+      .find((btn): btn is HTMLButtonElement => btn?.getAttribute('aria-controls') === 'detail-rail-panel')
+    fireEvent.click(counterRow as HTMLElement)
     expect(screen.getByText('110,000')).toBeTruthy() // suggested counter
     fireEvent.click(screen.getByRole('button', { name: 'Decline' }))
     expect(screen.getByText('Decline this offer?')).toBeTruthy()
