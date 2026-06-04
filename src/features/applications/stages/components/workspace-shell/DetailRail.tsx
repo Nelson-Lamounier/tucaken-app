@@ -53,7 +53,9 @@ export function DetailRail({ detail, activeStage }: DetailRailProps) {
                 key={t.id}
                 type="button"
                 role="tab"
+                id={`rail-tab-${t.id}`}
                 aria-selected={isActive}
+                aria-controls="detail-rail-content"
                 onClick={() => setTab(t.id)}
                 className={`relative flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                   isActive ? 'text-zinc-900 dark:text-white' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
@@ -71,14 +73,19 @@ export function DetailRail({ detail, activeStage }: DetailRailProps) {
             )
           })}
         </div>
-        <div className="min-h-40">
+        <div
+          id="detail-rail-content"
+          role="tabpanel"
+          aria-labelledby={`rail-tab-${tab}`}
+          className="min-h-40"
+        >
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={tab}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
-              style={{ willChange: 'opacity' }}
+              style={{ willChange: 'transform, opacity' }}
             >
               <DetailPane detail={detail} activeStage={activeStage} />
             </motion.div>
