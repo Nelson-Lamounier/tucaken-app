@@ -588,7 +588,11 @@ describe('TechnicalWorkspace', () => {
   })
 
   it('Phone Screen surfaces talking points, questions, and an editable comp target', () => {
-    renderWithQuery(<PhoneScreenWorkspace detail={detail} />)
+    renderWithQuery(
+      <WorkspaceShell detail={detail} activeStage="phone-screen">
+        <PhoneScreenWorkspace detail={detail} />
+      </WorkspaceShell>,
+    )
     expect(screen.getByText('Your talking points')).toBeTruthy()
     expect(screen.getByText('Kubernetes')).toBeTruthy() // verified match → talking point
     expect(screen.getByText(/What does success look like/)).toBeTruthy() // default question
