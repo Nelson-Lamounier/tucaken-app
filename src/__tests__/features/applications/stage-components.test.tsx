@@ -40,6 +40,7 @@ import { StoryCard } from '@/features/applications/stages/components/StoryCard'
 import { StageProgressBar } from '@/features/applications/stages/components/StageProgressBar'
 import { EvidenceCard } from '@/features/applications/stages/components/EvidenceCard'
 import { TechnicalWorkspace } from '@/features/applications/stages/workspaces/TechnicalWorkspace'
+import { WorkspaceShell } from '@/features/applications/stages/components/workspace-shell'
 import { PhoneScreenWorkspace } from '@/features/applications/stages/workspaces/PhoneScreenWorkspace'
 import { SystemDesignWorkspace } from '@/features/applications/stages/workspaces/SystemDesignWorkspace'
 import { TradeoffBadge } from '@/features/applications/stages/components/TradeoffBadge'
@@ -202,8 +203,24 @@ describe('TechnicalWorkspace', () => {
     interviewPrep: null,
   } satisfies ApplicationDetail
 
+  // Master–detail: the workspace renders SummaryGroups into the shell's left
+  // column; per-row detail (file:line, rationale, resources) lives in the rail
+  // and only appears after the row is clicked.
+  function renderTech(d: ApplicationDetail) {
+    return renderWithQuery(
+      <WorkspaceShell detail={d} activeStage="technical">
+        <TechnicalWorkspace detail={d} />
+      </WorkspaceShell>,
+    )
+  }
+
+  /** Click the summary row with the given accessible label to reveal its detail. */
+  function openRow(label: RegExp | string) {
+    fireEvent.click(screen.getByText(label).closest('button') as HTMLElement)
+  }
+
   it('renders evidence topics from research and shows external practice links', () => {
-    renderWithQuery(<TechnicalWorkspace detail={detail} />)
+    renderTech(detail)
     expect(screen.getByText('Kubernetes')).toBeTruthy()
     expect(screen.getByText('Strong evidence')).toBeTruthy()
     // Practice section now has external links, no in-product modal
@@ -230,40 +247,41 @@ describe('TechnicalWorkspace', () => {
         },
       },
     } as unknown as ApplicationDetail
-    renderWithQuery(<TechnicalWorkspace detail={withChecklist} />)
+    renderTech(withChecklist)
     expect(screen.getByText('Consistent hashing')).toBeTruthy()
+    openRow('Consistent hashing')
     expect(screen.getByText(/DDIA ch\.6/)).toBeTruthy()
   })
 
   it('does not render Section B for system-design round type', () => {
-    renderWithQuery(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'system-design' }} />)
-    expect(screen.queryByLabelText('DSA / Coding section')).toBeNull()
+    renderTech({ ...detail, technicalRoundType: 'system-design' })
+    expect(screen.queryByText('DSA / Coding')).toBeNull()
   })
 
   it('does not render Section B for take-home round type', () => {
-    renderWithQuery(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'take-home' }} />)
-    expect(screen.queryByLabelText('DSA / Coding section')).toBeNull()
+    renderTech({ ...detail, technicalRoundType: 'take-home' })
+    expect(screen.queryByText('DSA / Coding')).toBeNull()
   })
 
   it('does not render Section B for a new DevOps/AI round type (architecture-review)', () => {
-    renderWithQuery(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'architecture-review' }} />)
-    expect(screen.queryByLabelText('DSA / Coding section')).toBeNull()
+    renderTech({ ...detail, technicalRoundType: 'architecture-review' })
+    expect(screen.queryByText('DSA / Coding')).toBeNull()
   })
 
   it('renders Section B when technicalRoundType is undefined (safe-mode: default to dsa)', () => {
-    renderWithQuery(<TechnicalWorkspace detail={detail} />)
-    expect(screen.getByLabelText('DSA / Coding section')).toBeTruthy()
+    renderTech(detail)
+    expect(screen.getByText('DSA / Coding')).toBeTruthy()
   })
 
   it('renders Section B with DSA banner for dsa round type', () => {
-    renderWithQuery(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'dsa' }} />)
-    expect(screen.getByLabelText('DSA / Coding section')).toBeTruthy()
+    renderTech({ ...detail, technicalRoundType: 'dsa' })
+    expect(screen.getByText('DSA / Coding')).toBeTruthy()
     expect(screen.getByText(/calibrate which DSA topics matter/)).toBeTruthy()
   })
 
   it('renders Section B for mixed round type', () => {
-    renderWithQuery(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'mixed' }} />)
-    expect(screen.getByLabelText('DSA / Coding section')).toBeTruthy()
+    renderTech({ ...detail, technicalRoundType: 'mixed' })
+    expect(screen.getByText('DSA / Coding')).toBeTruthy()
   })
 
   it('renders calibrated DSA topics for dsa round type', () => {
@@ -293,16 +311,17 @@ describe('TechnicalWorkspace', () => {
         },
       },
     }
-    renderWithQuery(<TechnicalWorkspace detail={detailWithDsa} />)
+    renderTech(detailWithDsa)
     expect(screen.getByText('Binary Search')).toBeTruthy()
     expect(screen.getByText('High relevance')).toBeTruthy()
     expect(screen.getByText('Graph BFS/DFS')).toBeTruthy()
     expect(screen.getByText('Medium relevance')).toBeTruthy()
-    // Honest "practice externally" pointer present
+    // Honest "practice externally" pointer present in the row's detail
+    openRow('Binary Search')
     expect(screen.getAllByText(/Not assessed from your code/).length).toBeGreaterThan(0)
     // NO fake "your work shows this" text
     expect(screen.queryByText(/your work shows/i)).toBeNull()
-    // Honesty footnote rendered
+    // Honesty footnote rendered inline
     expect(screen.getByText(/Confidence is inferred from JD signals/)).toBeTruthy()
   })
 
@@ -318,18 +337,18 @@ describe('TechnicalWorkspace', () => {
         },
       },
     }
-    renderWithQuery(<TechnicalWorkspace detail={detailWithEmptyDsa} />)
-    expect(screen.getByLabelText('DSA / Coding section')).toBeTruthy()
+    renderTech(detailWithEmptyDsa)
+    expect(screen.getByText('DSA / Coding')).toBeTruthy()
     expect(screen.getByText(/This role likely has no DSA round/)).toBeTruthy()
   })
 
   it('shows "no DSA round" message when no calibration data present for dsa round type', () => {
-    renderWithQuery(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'dsa' }} />)
+    renderTech({ ...detail, technicalRoundType: 'dsa' })
     expect(screen.getByText(/This role likely has no DSA round/)).toBeTruthy()
   })
 
   it('shows practical coding note for practical round type', () => {
-    renderWithQuery(<TechnicalWorkspace detail={{ ...detail, technicalRoundType: 'practical' }} />)
+    renderTech({ ...detail, technicalRoundType: 'practical' })
     expect(screen.getByText(/favours practical coding over algorithm puzzles/)).toBeTruthy()
   })
 
@@ -353,7 +372,7 @@ describe('TechnicalWorkspace', () => {
         },
       },
     }
-    renderWithQuery(<TechnicalWorkspace detail={detailWithDsa} />)
+    renderTech(detailWithDsa)
     expect(screen.queryByText('🟢')).toBeNull()
     expect(screen.queryByText(/your work shows/i)).toBeNull()
   })
@@ -371,9 +390,10 @@ describe('TechnicalWorkspace', () => {
         },
       ],
     } satisfies ApplicationDetail
-    renderWithQuery(<TechnicalWorkspace detail={devopsDetail} />)
+    renderTech(devopsDetail)
     expect(screen.getByText(/DevOps \/ Infrastructure/i)).toBeTruthy()
     expect(screen.getByText(/Infrastructure as Code/)).toBeTruthy()
+    openRow(/Infrastructure as Code/)
     expect(screen.getByText(/o\/r\/main\.tf:3/)).toBeTruthy()
     // Tier-1: must NOT claim competence
     expect(screen.queryByText(/expert|mastered|you know/i)).toBeNull()
@@ -381,12 +401,12 @@ describe('TechnicalWorkspace', () => {
 
   it('hides DevOps/Infrastructure section when devopsEvidence is empty', () => {
     const emptyDetail = { ...detail, devopsEvidence: [] } satisfies ApplicationDetail
-    renderWithQuery(<TechnicalWorkspace detail={emptyDetail} />)
+    renderTech(emptyDetail)
     expect(screen.queryByText(/DevOps \/ Infrastructure/i)).toBeNull()
   })
 
   it('hides DevOps/Infrastructure section when devopsEvidence is undefined', () => {
-    renderWithQuery(<TechnicalWorkspace detail={detail} />)
+    renderTech(detail)
     expect(screen.queryByText(/DevOps \/ Infrastructure/i)).toBeNull()
   })
 
@@ -420,12 +440,12 @@ describe('TechnicalWorkspace', () => {
   }
 
   it('narrow-coverage banner is always present when Section B renders', () => {
-    renderWithQuery(<TechnicalWorkspace detail={dsaBaseDetail} />)
+    renderTech(dsaBaseDetail)
     expect(screen.getByText(/Real-work detection covers a limited pattern set/)).toBeTruthy()
   })
 
   it('narrow-coverage banner is present even when dsaRealWork is undefined', () => {
-    renderWithQuery(<TechnicalWorkspace detail={{ ...dsaBaseDetail, dsaRealWork: undefined }} />)
+    renderTech({ ...dsaBaseDetail, dsaRealWork: undefined })
     expect(screen.getByText(/Real-work detection covers a limited pattern set/)).toBeTruthy()
   })
 
@@ -442,7 +462,8 @@ describe('TechnicalWorkspace', () => {
         },
       ],
     }
-    renderWithQuery(<TechnicalWorkspace detail={detailWithEvidence} />)
+    renderTech(detailWithEvidence)
+    openRow('Graph BFS/DFS')
     // Green treatment: sample repo/file:line rendered
     expect(screen.getByText(/user\/graph-utils\/src\/graph\.py:42/)).toBeTruthy()
     // Signal phrase rendered
@@ -466,8 +487,9 @@ describe('TechnicalWorkspace', () => {
         },
       ],
     }
-    renderWithQuery(<TechnicalWorkspace detail={detailWithEvidence} />)
+    renderTech(detailWithEvidence)
     // binary-search is calibrated but has no evidence → red treatment intact
+    openRow('Binary Search')
     expect(screen.getByText(/Not assessed from your code/)).toBeTruthy()
     expect(screen.getAllByText(/practice on/i).length).toBeGreaterThan(0)
   })
@@ -485,9 +507,9 @@ describe('TechnicalWorkspace', () => {
         },
       ],
     }
-    renderWithQuery(<TechnicalWorkspace detail={detailWithExtra} />)
+    renderTech(detailWithExtra)
     expect(screen.getByText('Other real-work DSA signals')).toBeTruthy()
-    // The uncalibrated evidence topic shows up in the secondary block
+    // The uncalibrated evidence topic shows up in the secondary block (inline)
     expect(screen.getByText(/uses a heap \/ priority queue/)).toBeTruthy()
   })
 
@@ -504,21 +526,25 @@ describe('TechnicalWorkspace', () => {
         },
       ],
     }
-    renderWithQuery(<TechnicalWorkspace detail={detailAllCalibrated} />)
+    renderTech(detailAllCalibrated)
     expect(screen.queryByText('Other real-work DSA signals')).toBeNull()
   })
 
   it('no green sample text when dsaRealWork is empty array', () => {
-    renderWithQuery(<TechnicalWorkspace detail={{ ...dsaBaseDetail, dsaRealWork: [] }} />)
-    // No import-grounded caveat
+    renderTech({ ...dsaBaseDetail, dsaRealWork: [] })
+    // No import-grounded caveat (would appear only in a green detail)
     expect(screen.queryByText(/import\/type-grounded/)).toBeNull()
-    // All calibrated topics fall back to red treatment
+    // All calibrated topics fall back to red treatment — open both rows
+    openRow('Graph BFS/DFS')
+    openRow('Binary Search')
     expect(screen.getAllByText(/Not assessed from your code/).length).toBeGreaterThan(0)
   })
 
   it('green badge strictly requires evidence lookup hit — calibration alone never goes green', () => {
-    // No dsaRealWork at all
-    renderWithQuery(<TechnicalWorkspace detail={dsaBaseDetail} />)
+    // No dsaRealWork at all — open every calibrated row, none should go green
+    renderTech(dsaBaseDetail)
+    openRow('Graph BFS/DFS')
+    openRow('Binary Search')
     // No green sample text
     expect(screen.queryByText(/import\/type-grounded/)).toBeNull()
     // No GitHub link for samples
@@ -541,8 +567,8 @@ describe('TechnicalWorkspace', () => {
       primaryPillar: 'devops-sre-platform', secondaryPillars: ['ai-engineering' as const],
       confidence: 0.8, jdEvidenceTokens: ['on-call', 'Kubernetes'], classificationNote: 'inferred from JD',
     } } })
-    renderWithQuery(<TechnicalWorkspace detail={d} />)
-    expect(screen.getByText(/Role focus/i)).toBeTruthy()
+    renderTech(d)
+    expect(screen.getAllByText(/Role focus/i).length).toBeGreaterThan(0)
     expect(screen.getByText('DevOps / Platform')).toBeTruthy()
     expect(screen.getByText('AI Engineering')).toBeTruthy()
   })
@@ -552,12 +578,12 @@ describe('TechnicalWorkspace', () => {
       primaryPillar: 'swe-general', secondaryPillars: [] as const,
       confidence: 0.5, jdEvidenceTokens: [], classificationNote: 'general',
     } } })
-    renderWithQuery(<TechnicalWorkspace detail={d} />)
+    renderTech(d)
     expect(screen.queryByText(/Role focus/i)).toBeNull()
   })
 
   it('shows NO Role focus chip when pillarClassification absent', () => {
-    renderWithQuery(<TechnicalWorkspace detail={makeDetail({ research: {} })} />)
+    renderTech(makeDetail({ research: {} }))
     expect(screen.queryByText(/Role focus/i)).toBeNull()
   })
 
