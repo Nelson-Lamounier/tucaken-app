@@ -601,10 +601,28 @@ describe('TechnicalWorkspace', () => {
     expect(screen.getByText(/£100k base/)).toBeTruthy() // reflected in suggested response
   })
 
+  function renderSystemDesign(d: ApplicationDetail) {
+    return renderWithQuery(
+      <WorkspaceShell detail={d} activeStage="system-design">
+        <SystemDesignWorkspace detail={d} />
+      </WorkspaceShell>,
+    )
+  }
+
   it('System Design shows question patterns and expands a framework step', () => {
-    renderWithQuery(<SystemDesignWorkspace detail={detail} />)
-    expect(screen.getByText('Common question patterns')).toBeTruthy()
-    expect(screen.queryByText(/functional vs non-functional/)).toBeNull() // collapsed
+    renderSystemDesign(detail)
+    // Group title + row label both render the patterns label in the summary column
+    expect(screen.getAllByText('Common question patterns').length).toBeGreaterThan(0)
+    // Framework steps live behind the framework row's detail (rail) — collapsed until opened
+    expect(screen.queryByText(/functional vs non-functional/)).toBeNull()
+    // Open the framework row → its detail (the six-step CollapsibleSections) renders in the rail.
+    // The label appears twice (group title + row label); the row is the one inside a SummaryRow button.
+    const frameworkRow = screen
+      .getAllByText('Framework to have ready')
+      .map(el => el.closest('button'))
+      .find((btn): btn is HTMLButtonElement => btn?.getAttribute('aria-controls') === 'detail-rail-panel')
+    fireEvent.click(frameworkRow as HTMLElement)
+    // Then expand the first framework step
     fireEvent.click(screen.getByRole('button', { name: /Requirements & scope/i }))
     expect(screen.getByText(/functional vs non-functional/)).toBeTruthy()
   })
@@ -620,20 +638,23 @@ describe('TechnicalWorkspace', () => {
   }
 
   it('System Design renders a tour walkthrough (area/decision) when systemTours present + round is system-design', () => {
-    renderWithQuery(<SystemDesignWorkspace detail={{ ...detail, technicalRoundType: 'system-design', systemTours: [systemTour] }} />)
+    renderSystemDesign({ ...detail, technicalRoundType: 'system-design', systemTours: [systemTour] })
+    // Row label is the tour area
     expect(screen.getByText('Async ingestion pipeline')).toBeTruthy()
+    // Decision lives in the row's detail (rail) — appears after clicking the row
+    fireEvent.click(screen.getByText('Async ingestion pipeline').closest('button') as HTMLElement)
     expect(screen.getByText('Use SQS for buffering')).toBeTruthy()
     // empty-state fallback must NOT be shown when tours render
     expect(screen.queryByText('Open your projects')).toBeNull()
   })
 
   it('System Design also renders the tour for architecture-review rounds', () => {
-    renderWithQuery(<SystemDesignWorkspace detail={{ ...detail, technicalRoundType: 'architecture-review', systemTours: [systemTour] }} />)
+    renderSystemDesign({ ...detail, technicalRoundType: 'architecture-review', systemTours: [systemTour] })
     expect(screen.getByText('Async ingestion pipeline')).toBeTruthy()
   })
 
   it('System Design shows the empty-state fallback when systemTours is empty', () => {
-    renderWithQuery(<SystemDesignWorkspace detail={{ ...detail, technicalRoundType: 'system-design', systemTours: [] }} />)
+    renderSystemDesign({ ...detail, technicalRoundType: 'system-design', systemTours: [] })
     expect(screen.getByText('Open your projects')).toBeTruthy()
     expect(screen.queryByText('Async ingestion pipeline')).toBeNull()
   })

@@ -6,8 +6,8 @@ import type { ApplicationDetail, SystemTour } from '@/lib/types/applications.typ
 import { Card } from '@/components/ui/Card'
 import { ArchitectureDiagram } from '@/features/projects/components/ArchitectureDiagram'
 import { ScheduleCard } from '../components/ScheduleCard'
-import { SectionHeading } from '../components/SectionHeading'
 import { CollapsibleSection } from '../components/CollapsibleSection'
+import { SummaryGroup, SummaryRow } from '../components/workspace-shell'
 import { useStageDraft } from '../hooks/useStageDraft'
 
 interface SystemDesignWorkspaceProps {
@@ -128,12 +128,111 @@ function SystemTourCard({ tour }: { readonly tour: SystemTour }) {
   )
 }
 
+/** Common question patterns — single row whose detail is the full archetype list. */
+function QuestionPatternsGroup() {
+  return (
+    <SummaryGroup
+      id="question-patterns"
+      title="Common question patterns"
+      subtitle="Archetypes to rehearse — not company-specific."
+    >
+      <SummaryRow
+        id="question-patterns-list"
+        label="Common question patterns"
+        detail={
+          <Card className="p-4">
+            <ul className="space-y-2">
+              {QUESTION_PATTERNS.map(p => (
+                <li key={p} className="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+                  <ListChecks className="mt-0.5 size-4 shrink-0 text-zinc-400" aria-hidden />
+                  {p}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        }
+      />
+    </SummaryGroup>
+  )
+}
+
+/** Honest empty-state when the user has no grounded system tours yet. */
+function SystemToursEmptyState() {
+  return (
+    <Card className="flex flex-col items-center gap-3 px-4 py-8 text-center">
+      <FolderOpen className="size-6 text-zinc-400" aria-hidden />
+      <p className="max-w-md text-sm text-zinc-500 dark:text-zinc-400">
+        Your projects&apos; architectural tradeoffs will surface here as a grounded walkthrough once a
+        case-study (and its system tour) has been generated. For now, review the decisions in your
+        case-studies.
+      </p>
+      <Link to="/projects" className="text-sm font-medium text-accent hover:underline">
+        Open your projects
+      </Link>
+    </Card>
+  )
+}
+
+/** Your own system design work — one row per grounded tour; empty-state inline. */
+function SystemToursGroup({ tours }: { readonly tours: readonly SystemTour[] }) {
+  return (
+    <SummaryGroup
+      id="system-tours"
+      title="Your own system design work"
+      subtitle="The architecture you actually built, ready to cite."
+      count={tours.length}
+    >
+      {tours.length === 0 && <SystemToursEmptyState />}
+      {tours.map(tour => (
+        <SummaryRow
+          key={tour.area}
+          id={tour.area}
+          label={tour.area}
+          preview={tour.context}
+          detail={<SystemTourCard tour={tour} />}
+        />
+      ))}
+    </SummaryGroup>
+  )
+}
+
+/** Framework to have ready — single row whose detail is the six-step framework. */
+function FrameworkGroup() {
+  return (
+    <SummaryGroup
+      id="framework"
+      title="Framework to have ready"
+      subtitle="Drive the discussion with a repeatable structure."
+    >
+      <SummaryRow
+        id="framework-six-step"
+        label="Framework to have ready"
+        detail={
+          <Card className="px-4">
+            {FRAMEWORK.map(({ step, prompts }) => (
+              <CollapsibleSection key={step} title={step}>
+                <ul className="list-disc space-y-1 pl-5">
+                  {prompts.map(prompt => (
+                    <li key={prompt}>{prompt}</li>
+                  ))}
+                </ul>
+              </CollapsibleSection>
+            ))}
+          </Card>
+        }
+      />
+    </SummaryGroup>
+  )
+}
+
 /**
  * System Design workspace (Stage 4). Question patterns + the six-step
  * framework are generic, genuinely-useful content. "Your own system design
  * work" surfaces the tradeoffs the user actually made — that per-project
  * tradeoff data has no backend yet (honest empty state; the TradeoffBadge
  * pattern lands when the linkage ships). See ADR-0003.
+ *
+ * Renders a fragment of SummaryGroups into the WorkspaceShell's left column.
  */
 export function SystemDesignWorkspace({ detail }: SystemDesignWorkspaceProps) {
   const stageUserState = detail.stages?.['system-design']?.user_state as Partial<import('../hooks/useStageDraft').StageDraft> | undefined
@@ -145,71 +244,24 @@ export function SystemDesignWorkspace({ detail }: SystemDesignWorkspaceProps) {
   const roundType = detail.technicalRoundType
   const tourGateOpen = roundType === undefined || TOUR_ROUND_TYPES.has(roundType)
   const tours = tourGateOpen ? (detail.systemTours ?? []) : []
-  const hasTours = tours.length > 0
 
   return (
-    <div className="space-y-8">
-      <section className="space-y-3">
-        <SectionHeading title="Schedule &amp; format" />
+    <>
+      {/* Schedule + format — primary editable control, rendered inline */}
+      <SummaryGroup id="schedule" title="Schedule & format">
         <ScheduleCard
           scheduleAt={draft.scheduleAt}
           formatNote={draft.formatNote}
           onChange={setSchedule}
           formatPlaceholder="e.g. 45m design + 15m questions"
         />
-      </section>
+      </SummaryGroup>
 
-      <section className="space-y-3">
-        <SectionHeading title="Common question patterns" subtitle="Archetypes to rehearse — not company-specific." />
-        <Card className="p-4">
-          <ul className="space-y-2">
-            {QUESTION_PATTERNS.map(p => (
-              <li key={p} className="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">
-                <ListChecks className="mt-0.5 size-4 shrink-0 text-zinc-400" aria-hidden />
-                {p}
-              </li>
-            ))}
-          </ul>
-        </Card>
-      </section>
+      <QuestionPatternsGroup />
 
-      <section className="space-y-3">
-        <SectionHeading title="Your own system design work" subtitle="The architecture you actually built, ready to cite." />
-        {hasTours ? (
-          <div className="space-y-4">
-            {tours.map((tour) => (
-              <SystemTourCard key={tour.area} tour={tour} />
-            ))}
-          </div>
-        ) : (
-          <Card className="flex flex-col items-center gap-3 px-4 py-8 text-center">
-            <FolderOpen className="size-6 text-zinc-400" aria-hidden />
-            <p className="max-w-md text-sm text-zinc-500 dark:text-zinc-400">
-              Your projects&apos; architectural tradeoffs will surface here as a grounded walkthrough once a
-              case-study (and its system tour) has been generated. For now, review the decisions in your
-              case-studies.
-            </p>
-            <Link to="/projects" className="text-sm font-medium text-accent hover:underline">
-              Open your projects
-            </Link>
-          </Card>
-        )}
-      </section>
+      <SystemToursGroup tours={tours} />
 
-      <section className="space-y-3">
-        <SectionHeading title="Framework to have ready" subtitle="Drive the discussion with a repeatable structure." />
-        <Card className="px-4">
-          {FRAMEWORK.map(({ step, prompts }) => (
-            <CollapsibleSection key={step} title={step}>
-              <ul className="list-disc space-y-1 pl-5">
-                {prompts.map(prompt => (
-                  <li key={prompt}>{prompt}</li>
-                ))}
-              </ul>
-            </CollapsibleSection>
-          ))}
-        </Card>
-      </section>
-    </div>
+      <FrameworkGroup />
+    </>
   )
 }
