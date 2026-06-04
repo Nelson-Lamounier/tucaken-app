@@ -703,8 +703,19 @@ describe('BehaviouralWorkspace', () => {
 
   it('shows empty bank, gaps for typical questions, and opens the add-story form', () => {
     window.localStorage.clear()
-    renderWithQuery(<BehaviouralWorkspace detail={detail} />)
+    renderWithQuery(
+      <WorkspaceShell detail={detail} activeStage="behavioural">
+        <BehaviouralWorkspace detail={detail} />
+      </WorkspaceShell>,
+    )
+    // Empty-state body sits inline in the story-bank group
     expect(screen.getByText(/story bank is empty/i)).toBeTruthy()
+    // Gap guidance lives behind a typical-question row's detail (rail) — open one to reveal it
+    const gapRow = screen
+      .getAllByText('Gap')
+      .map(el => el.closest('button'))
+      .find((btn): btn is HTMLButtonElement => btn?.getAttribute('aria-controls') === 'detail-rail-panel')
+    fireEvent.click(gapRow as HTMLElement)
     expect(screen.getAllByText('Gap — consider drafting').length).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole('button', { name: /Add story/i }))
     expect(screen.getByText('Add a story')).toBeTruthy()
