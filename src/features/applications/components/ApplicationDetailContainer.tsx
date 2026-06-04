@@ -53,6 +53,100 @@ function stageWorkspaceNode(stage: InterviewStage, detail: ApplicationDetail) {
   return <StageWorkspacePlaceholder stage={stage} />
 }
 
+interface ApplicationErrorStateProps {
+  readonly message: string
+  readonly onBack: () => void
+}
+
+function ApplicationErrorState({ message, onBack }: ApplicationErrorStateProps) {
+  return (
+    <div className="px-4 py-8 sm:px-6 lg:px-8">
+      <button
+        type="button"
+        onClick={onBack}
+        className="mb-4 flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to Applications
+      </button>
+      <div className="flex items-center gap-3 rounded-xl border border-red-600/20 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400 px-4 py-3 text-sm">
+        <AlertCircle className="h-5 w-5 shrink-0" />
+        <span>{message}</span>
+      </div>
+    </div>
+  )
+}
+
+interface ApplicationHeaderProps {
+  readonly detail: ApplicationDetail
+  readonly statusPending: boolean
+  readonly onStatusChange: (status: ApplicationStatus) => void
+  readonly dateStr: string
+}
+
+function ApplicationHeader({ detail, statusPending, onStatusChange, dateStr }: ApplicationHeaderProps) {
+  return (
+    <div className="mb-8">
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="flex items-center gap-3">
+            <Building2 className="h-5 w-5 text-zinc-500 dark:text-zinc-400" />
+            <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+              {detail.targetCompany}
+            </h1>
+          </div>
+          <div className="mt-1 flex items-center gap-3">
+            <Briefcase className="h-4 w-4 text-zinc-500" />
+            <span className="text-base text-zinc-600 dark:text-zinc-400">{detail.targetRole}</span>
+          </div>
+        </div>
+
+        {/* Status and actions */}
+        <div className="flex items-center gap-3">
+
+          <DropDownOptions
+            label={STATUS_LABELS[detail.status]}
+            disabled={statusPending}
+            options={STATUS_OPTIONS}
+            selectedValue={detail.status}
+            onSelect={(val) => onStatusChange(val as ApplicationStatus)}
+          />
+        </div>
+      </div>
+
+      {/* Metadata row */}
+      <div className="mt-4 flex flex-wrap items-center gap-4">
+        <span
+          className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium ${STATUS_COLOURS[detail.status]}`}
+        >
+          {detail.status === 'analysing' && (
+            <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+          )}
+          {STATUS_LABELS[detail.status]}
+        </span>
+
+        {detail.research?.fitRating && (
+          <span
+            className={`inline-flex items-center rounded-lg border px-3 py-1 text-xs font-semibold ${FIT_RATING_COLOURS[detail.research.fitRating]}`}
+          >
+            {FIT_RATING_LABELS[detail.research.fitRating]}
+          </span>
+        )}
+
+        <span className="flex items-center gap-1.5 text-xs text-zinc-500">
+          <GraduationCap className="h-3.5 w-3.5" />
+          {STAGE_LABELS[detail.interviewStage]}
+        </span>
+
+        <span className="flex items-center gap-1.5 text-xs text-zinc-500">
+          <Clock className="h-3.5 w-3.5" />
+          {dateStr}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 interface ApplicationDetailContainerProps {
   readonly slug: string
   /** Active Stage from the `?stage` search param. Falls back to the
@@ -156,22 +250,7 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
 
   // Error state
   if (error) {
-    return (
-      <div className="px-4 py-8 sm:px-6 lg:px-8">
-        <button
-          type="button"
-          onClick={() => navigate({ to: '/applications/list' })}
-          className="mb-4 flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Applications
-        </button>
-        <div className="flex items-center gap-3 rounded-xl border border-red-600/20 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400 px-4 py-3 text-sm">
-          <AlertCircle className="h-5 w-5 shrink-0" />
-          <span>{error.message}</span>
-        </div>
-      </div>
-    )
+    return <ApplicationErrorState message={error.message} onBack={() => navigate({ to: '/applications/list' })} />
   }
 
   if (!detail) return null
@@ -198,64 +277,12 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
       </button>
 
       {/* Page header */}
-      <div className="mb-8">
-        <div className="flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <Building2 className="h-5 w-5 text-zinc-500 dark:text-zinc-400" />
-              <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
-                {detail.targetCompany}
-              </h1>
-            </div>
-            <div className="mt-1 flex items-center gap-3">
-              <Briefcase className="h-4 w-4 text-zinc-500" />
-              <span className="text-base text-zinc-600 dark:text-zinc-400">{detail.targetRole}</span>
-            </div>
-          </div>
-
-          {/* Status and actions */}
-          <div className="flex items-center gap-3">
-
-            <DropDownOptions
-              label={STATUS_LABELS[detail.status]}
-              disabled={statusMutation.isPending}
-              options={STATUS_OPTIONS}
-              selectedValue={detail.status}
-              onSelect={(val) => handleStatusChange(val as ApplicationStatus)}
-            />
-          </div>
-        </div>
-
-        {/* Metadata row */}
-        <div className="mt-4 flex flex-wrap items-center gap-4">
-          <span
-            className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium ${STATUS_COLOURS[detail.status]}`}
-          >
-            {detail.status === 'analysing' && (
-              <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
-            )}
-            {STATUS_LABELS[detail.status]}
-          </span>
-
-          {detail.research?.fitRating && (
-            <span
-              className={`inline-flex items-center rounded-lg border px-3 py-1 text-xs font-semibold ${FIT_RATING_COLOURS[detail.research.fitRating]}`}
-            >
-              {FIT_RATING_LABELS[detail.research.fitRating]}
-            </span>
-          )}
-
-          <span className="flex items-center gap-1.5 text-xs text-zinc-500">
-            <GraduationCap className="h-3.5 w-3.5" />
-            {STAGE_LABELS[detail.interviewStage]}
-          </span>
-
-          <span className="flex items-center gap-1.5 text-xs text-zinc-500">
-            <Clock className="h-3.5 w-3.5" />
-            {dateStr}
-          </span>
-        </div>
-      </div>
+      <ApplicationHeader
+        detail={detail}
+        statusPending={statusMutation.isPending}
+        onStatusChange={handleStatusChange}
+        dateStr={dateStr}
+      />
 
       {/* Stage navigation */}
       <div className="mt-2">
