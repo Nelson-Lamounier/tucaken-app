@@ -480,6 +480,32 @@ export interface InterviewPrepOutput {
   readonly barRaiserWalkthrough?: readonly BarRaiserPrinciple[]
   /** Bar-raiser only: leadership-principle coverage summary (code-authoritative). */
   readonly barRaiserCoverage?: BarRaiserCoverage
+  /** Final only: grounded pre-final-round prep (why-this-role, mutual fit, substantive questions, long-term framing). */
+  readonly finalPrep?: FinalPrep
+}
+
+/** One mutual-fit talking point for the final round, grounded in evidence. */
+export interface FinalTalkingPoint {
+  readonly point: string
+  readonly grounding: string
+}
+
+/** One substantive question for the candidate to ask in the final round. */
+export interface FinalQuestion {
+  readonly question: string
+  readonly rationale: string
+}
+
+/** Grounded pre-final-round prep emitted by the Coach Agent (final stage only). */
+export interface FinalPrep {
+  /** Narrative on why this role fits (whitespace-pre-line). */
+  readonly whyThisRole: string
+  /** Mutual-fit talking points, each grounded in evidence. */
+  readonly mutualFitTalkingPoints: readonly FinalTalkingPoint[]
+  /** Substantive questions to ask, each with its rationale. */
+  readonly substantiveQuestions: readonly FinalQuestion[]
+  /** Long-term framing for the role / trajectory. */
+  readonly longTermFraming: string
 }
 
 /** Evidence pointer cited by a System Design walkthrough card. */

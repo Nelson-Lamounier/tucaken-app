@@ -787,6 +787,47 @@ describe('FinalWorkspace', () => {
   })
 })
 
+describe('FinalPrep', () => {
+  const detail = {
+    slug: 'final-prep-acme', targetCompany: 'Acme', targetRole: 'Staff', status: 'offer-received',
+    interviewStage: 'final', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z',
+    context: { pipelineId: 'p', cumulativeInputTokens: 0, cumulativeOutputTokens: 0, cumulativeThinkingTokens: 0, cumulativeCostUsd: 0 },
+    research: null, analysis: null, interviewPrep: null,
+    coaching: {
+      final: {
+        topics: {
+          finalPrep: {
+            whyThisRole: 'The platform scope matches your migration work.',
+            mutualFitTalkingPoints: [
+              { point: 'You owned an idempotent migration runner.', grounding: 'PR #18 checksum ledger' },
+            ],
+            substantiveQuestions: [
+              { question: 'How is platform reliability measured here?', rationale: 'Surfaces ownership culture.' },
+            ],
+            longTermFraming: 'You want to grow into platform architecture leadership.',
+          },
+        },
+      },
+    },
+  } as unknown as ApplicationDetail
+
+  it('renders the why-this-role narrative, talking points, substantive questions and long-term framing', () => {
+    window.localStorage.clear()
+    renderWithQuery(
+      <WorkspaceShell detail={detail} activeStage="final">
+        <FinalWorkspace detail={detail} />
+      </WorkspaceShell>,
+    )
+    expect(screen.getByText('Pre-final-round prep')).toBeTruthy()
+    expect(screen.getByText(/platform scope matches your migration work/)).toBeTruthy()
+    expect(screen.getByText('You owned an idempotent migration runner.')).toBeTruthy()
+    expect(screen.getByText('PR #18 checksum ledger')).toBeTruthy()
+    expect(screen.getByText('How is platform reliability measured here?')).toBeTruthy()
+    expect(screen.getByText(/Surfaces ownership culture/)).toBeTruthy()
+    expect(screen.getByText(/grow into platform architecture leadership/)).toBeTruthy()
+  })
+})
+
 describe('SystemDesignWalkthrough', () => {
   const grounded: SystemDesignCard = {
     concernId: 'api',
