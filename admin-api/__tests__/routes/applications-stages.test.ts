@@ -61,6 +61,11 @@ jest.unstable_mockModule('../../src/lib/repositories/interview-stages.js', () =>
   getStagesForApp:       getStagesForAppMock,
   reconcilePrepStatus:   jest.fn(),
   advanceStageLifecycle: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  STAGE_OUTCOMES:        ['advanced', 'rejected', 'withdrew', 'not_completed', 'skipped'],
+  setStageOutcome:       jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  isStageOutcome:        (v: unknown) =>
+    typeof v === 'string' &&
+    ['advanced', 'rejected', 'withdrew', 'not_completed', 'skipped'].includes(v),
 }));
 
 // ---------------------------------------------------------------------------

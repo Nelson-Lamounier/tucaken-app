@@ -55,6 +55,11 @@ jest.unstable_mockModule('../../src/lib/repositories/interview-stages.js', () =>
   getStagesForApp:        jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
   reconcilePrepStatus:    jest.fn(),
   advanceStageLifecycle:  advanceStageLifecycleMock,
+  STAGE_OUTCOMES:         ['advanced', 'rejected', 'withdrew', 'not_completed', 'skipped'],
+  setStageOutcome:        jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  isStageOutcome:         (v: unknown) =>
+    typeof v === 'string' &&
+    ['advanced', 'rejected', 'withdrew', 'not_completed', 'skipped'].includes(v),
 }));
 
 // Mock the applications repo — getApplication, updateApplicationStatus, updateInterviewStage

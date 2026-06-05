@@ -42,11 +42,22 @@ jest.unstable_mockModule('../../src/lib/repositories/interview-stages.js', () =>
   getStagesForApp:       jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
   reconcilePrepStatus:   jest.fn(),
   advanceStageLifecycle: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  STAGE_OUTCOMES:        ['advanced', 'rejected', 'withdrew', 'not_completed', 'skipped'],
+  setStageOutcome:       jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  isStageOutcome:        (v: unknown) =>
+    typeof v === 'string' &&
+    ['advanced', 'rejected', 'withdrew', 'not_completed', 'skipped'].includes(v),
 }));
 
 jest.unstable_mockModule('../../src/lib/repositories/pipeline-runs.js', () => ({
   insertPipelineRun: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
   getPipelineRun:    jest.fn(),
+}));
+
+// Mock computeFunnel so the funnel route test is isolated from SQL.
+const computeFunnelMock = jest.fn<() => Promise<unknown>>();
+jest.unstable_mockModule('../../src/lib/repositories/funnel-analytics.js', () => ({
+  computeFunnel: computeFunnelMock,
 }));
 
 jest.unstable_mockModule('../../src/lib/k8s.js', () => ({
@@ -97,6 +108,15 @@ function buildApp() {
     await next();
   });
    
+  app.route('/', createApplicationsRouter(testConfig as any));
+  return app;
+}
+
+// Variant that does NOT set `userId` — exercises the route's own fail-closed
+// guard rather than auth middleware.
+function buildAppNoAuth() {
+  const app = new Hono();
+
   app.route('/', createApplicationsRouter(testConfig as any));
   return app;
 }
@@ -687,5 +707,80 @@ describe('POST /:slug/status — update kanban status (PG-only)', () => {
     expect(pgUpdateApplicationStatusMock).toHaveBeenCalledTimes(1);
     // updateApplicationStatus receives (pool, slug, status) — 3 args
     expect(pgUpdateApplicationStatusMock.mock.calls[0]?.length).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /analytics/funnel — funnel computation + 2026 framing
+// ---------------------------------------------------------------------------
+
+describe('GET /analytics/funnel — funnel + 2026 framing', () => {
+  // A small fixture: one transition deliberately below its typical band so we
+  // can assert classifyRate is applied (band + context).
+  const FUNNEL_FIXTURE = {
+    summary: {
+      totalApplied:          10,
+      daysSinceFirstApplied: 90,
+      active:                4,
+      advancedPastScreen:    2,
+      reachedFinal:          1,
+      offers:                0,
+    },
+    transitions: [
+      {
+        // 1/10 = 0.10, below typical 0.12–0.20 band → band 'below'
+        key:       'applied_to_phone_screen',
+        fromCount: 10,
+        toCount:   1,
+        rate:      0.1,
+      },
+    ],
+  };
+
+  beforeEach(() => {
+    computeFunnelMock.mockReset();
+    computeFunnelMock.mockResolvedValue(FUNNEL_FIXTURE);
+  });
+
+  it('returns 200 with summary, framed transitions, and ranges', async () => {
+    const res = await buildApp().request('/analytics/funnel');
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as {
+      summary: Record<string, number>;
+      transitions: Array<{
+        key: string;
+        fromCount: number;
+        toCount: number;
+        rate: number;
+        band: string;
+        context: string;
+      }>;
+      ranges: { medianDaysToOffer: number };
+    };
+
+    // summary passed through untouched
+    expect(body.summary).toEqual(FUNNEL_FIXTURE.summary);
+
+    // each transition carries classifyRate output (band + context)
+    expect(body.transitions).toHaveLength(1);
+    const t = body.transitions[0]!;
+    expect(t.key).toBe('applied_to_phone_screen');
+    expect(t.fromCount).toBe(10);
+    expect(t.toCount).toBe(1);
+    expect(t.rate).toBe(0.1);
+    // 0.10 is below the typical 0.12–0.20 band
+    expect(t.band).toBe('below');
+    expect(typeof t.context).toBe('string');
+    expect(t.context.length).toBeGreaterThan(0);
+
+    // 2026 ranges included; median days-to-offer asserted
+    expect(body.ranges.medianDaysToOffer).toBe(108);
+  });
+
+  it('returns 401 when userId is absent (fail-closed)', async () => {
+    const res = await buildAppNoAuth().request('/analytics/funnel');
+    expect(res.status).toBe(401);
+    expect(computeFunnelMock).not.toHaveBeenCalled();
   });
 });
