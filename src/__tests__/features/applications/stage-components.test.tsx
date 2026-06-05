@@ -7,7 +7,8 @@ import { render, screen, fireEvent, renderHook, act } from '@testing-library/rea
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { SystemDesignWalkthrough } from '@/features/applications/stages/workspaces/SystemDesignWalkthrough'
-import type { SystemDesignCard } from '@/lib/types/applications.types'
+import { BarRaiserWalkthrough } from '@/features/applications/stages/workspaces/BarRaiserWalkthrough'
+import type { BarRaiserPrinciple, SystemDesignCard } from '@/lib/types/applications.types'
 
 vi.mock('@tanstack/react-router', () => ({
   Link: ({ children, ...rest }: { children: React.ReactNode } & Record<string, unknown>) => (
@@ -817,5 +818,49 @@ describe('SystemDesignWalkthrough', () => {
     expect(screen.getByText('Zod')).toBeTruthy()
     expect(screen.getByText('Be honest about the gap.')).toBeTruthy()
     expect(screen.getByText(/1 of 2 role-relevant concerns/)).toBeTruthy()
+  })
+})
+
+describe('BarRaiserWalkthrough', () => {
+  const grounded: BarRaiserPrinciple = {
+    principleId: 'ownership',
+    principleName: 'Ownership',
+    interpretation: 'They look for end-to-end accountability.',
+    coverage: 'strong',
+    stories: [
+      {
+        title: 'Owned the migration',
+        situation: 'Migrations were halting bootstrap.',
+        task: 'Make them idempotent.',
+        action: 'Added a checksum ledger.',
+        result: 'Bootstrap recovered on dev.',
+        evidenceRefs: [{ source: 'pr', id: '18', label: 'PR #18', fileLine: 'runner.ts:42' }],
+        honestyCalibration: 'You led this — claim it directly, do not overstate the team size.',
+        seniorityNote: 'Cross-system root-cause lands at senior level.',
+      },
+    ],
+    probingQuestions: [{ question: 'What did you defer?', framing: 'Show scoping judgement.' }],
+    gapGuidance: null,
+  }
+  const gap: BarRaiserPrinciple = {
+    principleId: 'invent',
+    principleName: 'Invent and Simplify',
+    interpretation: 'Novel solutions to hard problems.',
+    coverage: 'none',
+    stories: [],
+    probingQuestions: [],
+    gapGuidance: 'No grounded story yet — be honest and draft one from memory.',
+  }
+
+  it('renders grounded + gap principle cards with coverage, evidence and calibration', () => {
+    render(<BarRaiserWalkthrough cards={[grounded, gap]} coverage={{ relevantTotal: 2, relevantAddressed: 1 }} />)
+    expect(screen.getByText('Ownership')).toBeTruthy()
+    expect(screen.getByText('Grounded')).toBeTruthy()
+    expect(screen.getByText('Gap')).toBeTruthy()
+    expect(screen.getByText(/You led this/)).toBeTruthy()
+    expect(screen.getByText('PR #18')).toBeTruthy()
+    expect(screen.getByText('What did you defer?')).toBeTruthy()
+    expect(screen.getByText(/No grounded story yet/)).toBeTruthy()
+    expect(screen.getByText(/1 of 2 leadership principles/)).toBeTruthy()
   })
 })

@@ -17,7 +17,9 @@ import {
   coverageStrength,
   type LeadershipPrinciple,
 } from '../types/principles'
+import { resolveStagePrep } from '../types/workspace'
 import type { EvidenceStrength, StarStory, StoryTheme } from '../types/workspace'
+import { BarRaiserWalkthrough } from './BarRaiserWalkthrough'
 
 interface BarRaiserWorkspaceProps {
   readonly detail: ApplicationDetail
@@ -120,6 +122,12 @@ export function BarRaiserWorkspace({ detail }: BarRaiserWorkspaceProps) {
 
   const [draftThemes, setDraftThemes] = useState<readonly StoryTheme[] | null>(null)
 
+  // The coach's project-anchored walkthrough (one card per leadership principle).
+  // Render it as the PRIMARY section when present; the story bank stays secondary.
+  const prep = resolveStagePrep(detail, 'bar-raiser')
+  const walkthrough = prep?.barRaiserWalkthrough ?? []
+  const coverage = prep?.barRaiserCoverage ?? null
+
   const rows = useMemo<readonly PrincipleRow[]>(
     () =>
       LEADERSHIP_PRINCIPLES.map(principle => {
@@ -138,6 +146,8 @@ export function BarRaiserWorkspace({ detail }: BarRaiserWorkspaceProps) {
       <SummaryGroup id="schedule" title="Schedule & format">
         <ScheduleCard scheduleAt={draft.scheduleAt} formatNote={draft.formatNote} onChange={setSchedule} formatPlaceholder="e.g. 60m leadership principles" />
       </SummaryGroup>
+
+      {walkthrough.length > 0 && <BarRaiserWalkthrough cards={walkthrough} coverage={coverage} />}
 
       <ValuesMatrixGroup rows={rows} onDraft={draftFrom} />
 
