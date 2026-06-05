@@ -14,6 +14,7 @@
  *   POST   /:slug/coach                   — schedule the coach K8s Job
  *   GET    /:slug/coaching/:stage         — read coaching_content row
  *   PATCH  /:slug/stages/:stage/outcome   — set per-stage analytics outcome
+ *   PUT    /:slug/stages/:stage/feedback  — upsert per-stage feedback capture
  */
 
 import { Hono } from 'hono';
@@ -44,6 +45,11 @@ import {
   isStageOutcome,
   STAGE_OUTCOMES,
 } from '../lib/repositories/interview-stages.js';
+import {
+  upsertStageFeedback,
+  InvalidStageFeedbackError,
+} from '../lib/repositories/stage-feedback.js';
+import type { StageFeedbackInput } from '../lib/repositories/stage-feedback.js';
 import { insertPipelineRun } from '../lib/repositories/pipeline-runs.js';
 import type { AdminApiBindings } from '../lib/types.js';
 
@@ -572,6 +578,34 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
       if (!application) return ctx.json({ error: `Application not found: ${slug}` }, 404);
 
       await setStageOutcome(db, application.id, stage, body.outcome as (typeof STAGE_OUTCOMES)[number]);
+      return ctx.json({ success: true });
+    });
+  });
+
+  // ── PUT /:slug/stages/:stage/feedback — upsert per-stage feedback capture ───
+  app.put('/:slug/stages/:stage/feedback', async (ctx) => {
+    const userId = ctx.get('userId');
+    if (!userId) return ctx.json({ error: 'Unauthorized' }, 401);
+
+    const slug  = ctx.req.param('slug');
+    const stage = ctx.req.param('stage');
+
+    let body: StageFeedbackInput;
+    try { body = await ctx.req.json(); }
+    catch { return ctx.json({ error: 'Body must be valid JSON' }, 400); }
+
+    return withUser(getPool(config), userId, async (db) => {
+      const application = await getApplication(db, slug);
+      if (!application) return ctx.json({ error: `Application not found: ${slug}` }, 404);
+
+      try {
+        await upsertStageFeedback(db, application.id, stage, userId, body);
+      } catch (err) {
+        if (err instanceof InvalidStageFeedbackError) {
+          return ctx.json({ error: err.message }, 400);
+        }
+        throw err;
+      }
       return ctx.json({ success: true });
     });
   });
