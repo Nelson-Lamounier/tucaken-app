@@ -726,3 +726,40 @@ export interface StatusUpdateResponse {
   readonly status: ApplicationStatus
   readonly message: string
 }
+
+// =============================================================================
+// STAGE OUTCOME + FEEDBACK
+// =============================================================================
+
+/**
+ * Per-stage outcome. The five stored values plus 'ghosted', which admin-api
+ * derives (a stage left `not_completed` past its expected window).
+ *
+ * @see PUT /applications/:slug/stages/:stage/feedback
+ */
+export type StageOutcome = 'advanced' | 'rejected' | 'withdrew' | 'not_completed' | 'skipped' | 'ghosted'
+
+/** Opt-in feedback category the user can attribute a terminal outcome to. */
+export type FeedbackCategory =
+  | 'compensation'
+  | 'skills_mismatch'
+  | 'culture_fit'
+  | 'communication'
+  | 'technical_perf'
+  | 'process_timing'
+  | 'unclear'
+  | 'other'
+
+/**
+ * Opt-in feedback the user captures at a terminal stage outcome. Every field
+ * is optional — the whole capture is voluntary.
+ *
+ * @see PUT /applications/:slug/stages/:stage/feedback
+ */
+export interface StageFeedback {
+  readonly userCategory?: FeedbackCategory
+  readonly userNote?: string
+  readonly companyFeedback?: string
+  readonly companyFeedbackVerbatim?: boolean
+  readonly prepSelfRating?: number
+}

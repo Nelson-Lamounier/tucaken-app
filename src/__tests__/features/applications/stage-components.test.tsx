@@ -2,12 +2,13 @@
  * @vitest-environment happy-dom
  */
 
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, fireEvent, renderHook, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { SystemDesignWalkthrough } from '@/features/applications/stages/workspaces/SystemDesignWalkthrough'
 import { BarRaiserWalkthrough } from '@/features/applications/stages/workspaces/BarRaiserWalkthrough'
+import { StageFeedbackCard } from '@/features/applications/stages/components/StageFeedbackCard'
 import type { BarRaiserPrinciple, SystemDesignCard } from '@/lib/types/applications.types'
 
 vi.mock('@tanstack/react-router', () => ({
@@ -22,9 +23,11 @@ vi.mock('@/hooks/use-admin-applications', () => ({
 }))
 
 // Stub patchStageFn so useStageDraft's debounced PATCH doesn't fail in tests
+const putStageFeedbackMock = vi.fn().mockResolvedValue({})
 vi.mock('@/server/pipelines', () => ({
   patchStageFn: vi.fn().mockResolvedValue({}),
   triggerCoachFn: vi.fn().mockResolvedValue({}),
+  putStageFeedbackFn: (...args: unknown[]) => putStageFeedbackMock(...args),
 }))
 
 function createWrapper() {
@@ -903,5 +906,42 @@ describe('BarRaiserWalkthrough', () => {
     expect(screen.getByText('What did you defer?')).toBeTruthy()
     expect(screen.getByText(/No grounded story yet/)).toBeTruthy()
     expect(screen.getByText(/1 of 2 leadership principles/)).toBeTruthy()
+  })
+})
+
+describe('StageFeedbackCard', () => {
+  beforeEach(() => {
+    putStageFeedbackMock.mockClear()
+  })
+
+  it('renders the opt-in capture at a terminal outcome', () => {
+    renderWithQuery(<StageFeedbackCard slug="acme-swe" stageType="phone-screen" outcome="rejected" />)
+    expect(screen.getByText(/Sorry this one didn't work out\./)).toBeTruthy()
+    expect(screen.getByText('Culture fit')).toBeTruthy()
+    expect(screen.getByLabelText(/Feedback from the company/)).toBeTruthy()
+    expect(screen.getByText('Skip / dismiss')).toBeTruthy()
+  })
+
+  it('renders nothing for a non-terminal outcome', () => {
+    const { container } = renderWithQuery(
+      <StageFeedbackCard slug="acme-swe" stageType="phone-screen" outcome="advanced" />,
+    )
+    expect(container.firstChild).toBeNull()
+  })
+
+  it('submits the selected category via the PUT mutation', async () => {
+    renderWithQuery(<StageFeedbackCard slug="acme-swe" stageType="phone-screen" outcome="rejected" />)
+    fireEvent.click(screen.getByText('Compensation'))
+    fireEvent.click(screen.getByText('Save feedback'))
+    await vi.waitFor(() => expect(putStageFeedbackMock).toHaveBeenCalledTimes(1))
+    expect(putStageFeedbackMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          slug: 'acme-swe',
+          stage: 'phone-screen',
+          userCategory: 'compensation',
+        }),
+      }),
+    )
   })
 })
