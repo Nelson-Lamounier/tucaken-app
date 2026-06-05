@@ -13,6 +13,9 @@
  *   POST   /:slug/status                  — update application status
  *   POST   /:slug/coach                   — schedule the coach K8s Job
  *   GET    /:slug/coaching/:stage         — read coaching_content row
+ *   PATCH  /:slug/stages/:stage/outcome   — set per-stage analytics outcome
+ *   PUT    /:slug/stages/:stage/feedback  — upsert per-stage feedback capture
+ *   GET    /analytics/funnel              — funnel computation + 2026 framing
  */
 
 import { Hono } from 'hono';
@@ -39,9 +42,30 @@ import {
   linkCoachRun,
   getStagesForApp,
   advanceStageLifecycle,
+  setStageOutcome,
+  isStageOutcome,
+  STAGE_OUTCOMES,
 } from '../lib/repositories/interview-stages.js';
+import {
+  upsertStageFeedback,
+  InvalidStageFeedbackError,
+} from '../lib/repositories/stage-feedback.js';
+import type { StageFeedbackInput } from '../lib/repositories/stage-feedback.js';
 import { insertPipelineRun } from '../lib/repositories/pipeline-runs.js';
+import { computeFunnel } from '../lib/repositories/funnel-analytics.js';
+import { classifyRate, FUNNEL_RANGES } from '../lib/market-funnel-ranges.js';
 import type { AdminApiBindings } from '../lib/types.js';
+
+/** Default days of inactivity after which an in-flight stage is treated as ghosted. */
+const DEFAULT_GHOST_DAYS = 21;
+
+/** Resolve GHOST_DAYS from env, falling back to the default on missing/invalid values. */
+function resolveGhostDays(): number {
+  const raw = process.env['GHOST_DAYS'];
+  if (!raw) return DEFAULT_GHOST_DAYS;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_GHOST_DAYS;
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -232,6 +256,23 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
         updatedAt:      a.updatedAt ?? null,
       }));
       return ctx.json({ applications: summaries, count: summaries.length });
+    });
+  });
+
+  // ── GET /analytics/funnel — funnel computation + 2026 framing ─────────────
+  app.get('/analytics/funnel', async (ctx) => {
+    const userId = ctx.get('userId');
+    if (!userId) return ctx.json({ error: 'Unauthorized' }, 401);
+
+    const ghostDays = resolveGhostDays();
+
+    return withUser(getPool(config), userId, async (db) => {
+      const { summary, transitions } = await computeFunnel(db, ghostDays);
+      const framed = transitions.map((t) => {
+        const { band, context } = classifyRate(t.key, t.rate);
+        return { ...t, band, context };
+      });
+      return ctx.json({ summary, transitions: framed, ranges: FUNNEL_RANGES });
     });
   });
 
@@ -543,6 +584,59 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
         }
       }
 
+      return ctx.json({ success: true });
+    });
+  });
+
+  // ── PATCH /:slug/stages/:stage/outcome — set per-stage analytics outcome ───
+  app.patch('/:slug/stages/:stage/outcome', async (ctx) => {
+    const userId = ctx.get('userId');
+    if (!userId) return ctx.json({ error: 'Unauthorized' }, 401);
+
+    const slug  = ctx.req.param('slug');
+    const stage = ctx.req.param('stage');
+
+    let body: { outcome?: unknown };
+    try { body = await ctx.req.json(); }
+    catch { return ctx.json({ error: 'Body must be valid JSON' }, 400); }
+
+    if (!isStageOutcome(body.outcome)) {
+      return ctx.json({ error: `Invalid outcome. Expected one of: ${STAGE_OUTCOMES.join(', ')}` }, 400);
+    }
+
+    return withUser(getPool(config), userId, async (db) => {
+      const application = await getApplication(db, slug);
+      if (!application) return ctx.json({ error: `Application not found: ${slug}` }, 404);
+
+      await setStageOutcome(db, application.id, stage, body.outcome as (typeof STAGE_OUTCOMES)[number]);
+      return ctx.json({ success: true });
+    });
+  });
+
+  // ── PUT /:slug/stages/:stage/feedback — upsert per-stage feedback capture ───
+  app.put('/:slug/stages/:stage/feedback', async (ctx) => {
+    const userId = ctx.get('userId');
+    if (!userId) return ctx.json({ error: 'Unauthorized' }, 401);
+
+    const slug  = ctx.req.param('slug');
+    const stage = ctx.req.param('stage');
+
+    let body: StageFeedbackInput;
+    try { body = await ctx.req.json(); }
+    catch { return ctx.json({ error: 'Body must be valid JSON' }, 400); }
+
+    return withUser(getPool(config), userId, async (db) => {
+      const application = await getApplication(db, slug);
+      if (!application) return ctx.json({ error: `Application not found: ${slug}` }, 404);
+
+      try {
+        await upsertStageFeedback(db, application.id, stage, userId, body);
+      } catch (err) {
+        if (err instanceof InvalidStageFeedbackError) {
+          return ctx.json({ error: err.message }, 400);
+        }
+        throw err;
+      }
       return ctx.json({ success: true });
     });
   });

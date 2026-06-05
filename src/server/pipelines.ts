@@ -19,7 +19,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { requireAuth } from './auth-guard'
 import { apiFetch } from './_api-client'
-import type { TriggerResponse } from '@/lib/types/applications.types'
+import type { FunnelAnalytics, TriggerResponse } from '@/lib/types/applications.types'
 
 // =============================================================================
 // Types
@@ -49,6 +49,27 @@ const coachSchema = z.object({
   compensationTarget: z.string().optional(),
   region: z.string().optional(),
   force: z.boolean().optional(),
+})
+
+const stageFeedbackSchema = z.object({
+  slug: z.string().min(1),
+  stage: z.string().min(1),
+  userCategory: z
+    .enum([
+      'compensation',
+      'skills_mismatch',
+      'culture_fit',
+      'communication',
+      'technical_perf',
+      'process_timing',
+      'unclear',
+      'other',
+    ])
+    .optional(),
+  userNote: z.string().optional(),
+  companyFeedback: z.string().optional(),
+  companyFeedbackVerbatim: z.boolean().optional(),
+  prepSelfRating: z.number().int().min(1).max(5).optional(),
 })
 
 const patchStageSchema = z.object({
@@ -251,6 +272,38 @@ export const patchStageFn = createServerFn({ method: 'POST' })
   })
 
 /**
+ * Captures opt-in per-stage feedback at a terminal outcome via admin-api.
+ *
+ * @see PUT /applications/:slug/stages/:stage/feedback — upstream implementation
+ * @param data.slug - Application slug
+ * @param data.stage - Stage type (e.g. 'phone-screen')
+ * @param data.userCategory - User's read on what happened (one of 8 categories)
+ * @param data.userNote - Optional freeform note
+ * @param data.companyFeedback - Feedback received from the company
+ * @param data.companyFeedbackVerbatim - Whether companyFeedback is verbatim from them
+ * @param data.prepSelfRating - Optional 1–5 prep self-rating
+ */
+export const putStageFeedbackFn = createServerFn({ method: 'POST' })
+  .inputValidator(stageFeedbackSchema)
+  .handler(async ({ data }) => {
+    await requireAuth()
+    return apiFetch<JsonRecord>(
+      `/applications/${encodeURIComponent(data.slug)}/stages/${encodeURIComponent(data.stage)}/feedback`,
+      {
+        method: 'PUT',
+        pathTemplate: '/applications/:slug/stages/:stage/feedback',
+        body: JSON.stringify({
+          userCategory: data.userCategory,
+          userNote: data.userNote,
+          companyFeedback: data.companyFeedback,
+          companyFeedbackVerbatim: data.companyFeedbackVerbatim,
+          prepSelfRating: data.prepSelfRating,
+        }),
+      },
+    )
+  })
+
+/**
  * Triggers a new applications analysis pipeline (Research → Applications) via admin-api.
  *
  * The Strategist trigger Lambda uses a Zod `.strict()` discriminated union on
@@ -306,6 +359,24 @@ export const triggerApplicationsAnalysisFn = createServerFn({ method: 'POST' })
     )
 
     return body
+  })
+
+/**
+ * Retrieves the 2026-framed application search funnel analytics via admin-api.
+ *
+ * Every transition rate is returned alongside an honest `context` qualifier;
+ * the UI never renders a rate without it. No success score, velocity, or
+ * cohort-ranking signal is produced.
+ *
+ * @see GET /applications/analytics/funnel — upstream implementation
+ * @returns The funnel summary, per-transition rates, and reference ranges
+ */
+export const getFunnelAnalyticsFn = createServerFn({ method: 'GET' })
+  .handler(async () => {
+    await requireAuth()
+    return apiFetch<FunnelAnalytics>('/applications/analytics/funnel', {
+      pathTemplate: '/applications/analytics/funnel',
+    })
   })
 
 export const getPipelineRunStatusFn = createServerFn({ method: 'GET' })

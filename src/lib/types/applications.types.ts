@@ -705,6 +705,79 @@ export interface StageState {
 }
 
 // =============================================================================
+// FUNNEL ANALYTICS — Search-analytics dashboard (2026-framed)
+// =============================================================================
+
+/**
+ * Top-line search summary, plain-language only — no score, no velocity.
+ *
+ * @see GET /applications/analytics/funnel — admin-api `summary`
+ */
+export interface FunnelSummary {
+  /** Total roles applied to. */
+  readonly totalApplied: number
+  /** Days since the first application. */
+  readonly daysSinceFirstApplied: number
+  /** Applications currently active (not terminal). */
+  readonly active: number
+  /** Applications that advanced past the phone screen. */
+  readonly advancedPastScreen: number
+  /** Applications that reached a final round. */
+  readonly reachedFinal: number
+  /** Offers received. */
+  readonly offers: number
+}
+
+/** Band classifying a transition rate against an honest reference range. */
+export type FunnelBand = 'above' | 'typical' | 'below'
+
+/**
+ * One stage-to-stage transition in the funnel. `context` is the honest range
+ * qualifier — a rate must NEVER render without it.
+ *
+ * @see GET /applications/analytics/funnel — admin-api `transitions[]`
+ */
+export interface FunnelTransition {
+  /** Stable transition key (e.g. 'applied->screen'). */
+  readonly key: string
+  /** Count entering this transition. */
+  readonly fromCount: number
+  /** Count that advanced through it. */
+  readonly toCount: number
+  /** Conversion rate (0–1). */
+  readonly rate: number
+  /** Band relative to the honest reference range. */
+  readonly band: FunnelBand
+  /** Honest range qualifier string — the load-bearing context for the rate. */
+  readonly context: string
+}
+
+/**
+ * 2026-search reference ranges that contextualise the funnel.
+ *
+ * @see GET /applications/analytics/funnel — admin-api `ranges`
+ */
+export interface FunnelRanges {
+  /** ISO 8601 timestamp the figures were computed. */
+  readonly asOf: string
+  /** Median days to an offer in the reference cohort (null when unknown). */
+  readonly medianDaysToOffer: number | null
+  /** Per-transition reference context strings, keyed by transition key. */
+  readonly transitions: Record<string, string>
+}
+
+/**
+ * Full funnel analytics payload.
+ *
+ * @see GET /applications/analytics/funnel
+ */
+export interface FunnelAnalytics {
+  readonly summary: FunnelSummary
+  readonly transitions: readonly FunnelTransition[]
+  readonly ranges: FunnelRanges
+}
+
+// =============================================================================
 // STATUS UPDATE
 // =============================================================================
 
@@ -725,4 +798,41 @@ export interface StatusUpdateResponse {
   readonly success: boolean
   readonly status: ApplicationStatus
   readonly message: string
+}
+
+// =============================================================================
+// STAGE OUTCOME + FEEDBACK
+// =============================================================================
+
+/**
+ * Per-stage outcome. The five stored values plus 'ghosted', which admin-api
+ * derives (a stage left `not_completed` past its expected window).
+ *
+ * @see PUT /applications/:slug/stages/:stage/feedback
+ */
+export type StageOutcome = 'advanced' | 'rejected' | 'withdrew' | 'not_completed' | 'skipped' | 'ghosted'
+
+/** Opt-in feedback category the user can attribute a terminal outcome to. */
+export type FeedbackCategory =
+  | 'compensation'
+  | 'skills_mismatch'
+  | 'culture_fit'
+  | 'communication'
+  | 'technical_perf'
+  | 'process_timing'
+  | 'unclear'
+  | 'other'
+
+/**
+ * Opt-in feedback the user captures at a terminal stage outcome. Every field
+ * is optional — the whole capture is voluntary.
+ *
+ * @see PUT /applications/:slug/stages/:stage/feedback
+ */
+export interface StageFeedback {
+  readonly userCategory?: FeedbackCategory
+  readonly userNote?: string
+  readonly companyFeedback?: string
+  readonly companyFeedbackVerbatim?: boolean
+  readonly prepSelfRating?: number
 }

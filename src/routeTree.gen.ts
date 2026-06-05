@@ -20,6 +20,7 @@ import { Route as GithubCallbackRouteImport } from './app/github.callback'
 import { Route as CheckoutReturnRouteImport } from './app/checkout.return'
 import { Route as CheckoutTierRouteImport } from './app/checkout.$tier'
 import { Route as DashboardTestRouteImport } from './app/_dashboard.test'
+import { Route as DashboardSearchAnalyticsRouteImport } from './app/_dashboard.search-analytics'
 import { Route as DashboardResumesRouteImport } from './app/_dashboard.resumes'
 import { Route as DashboardResumeThemeRouteImport } from './app/_dashboard.resume-theme'
 import { Route as DashboardReportsRouteImport } from './app/_dashboard.reports'
@@ -100,6 +101,12 @@ const DashboardTestRoute = DashboardTestRouteImport.update({
   path: '/test',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardSearchAnalyticsRoute =
+  DashboardSearchAnalyticsRouteImport.update({
+    id: '/search-analytics',
+    path: '/search-analytics',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardResumesRoute = DashboardResumesRouteImport.update({
   id: '/resumes',
   path: '/resumes',
@@ -247,6 +254,7 @@ export interface FileRoutesByFullPath {
   '/reports': typeof DashboardReportsRoute
   '/resume-theme': typeof DashboardResumeThemeRoute
   '/resumes': typeof DashboardResumesRouteWithChildren
+  '/search-analytics': typeof DashboardSearchAnalyticsRoute
   '/test': typeof DashboardTestRoute
   '/checkout/$tier': typeof CheckoutTierRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -284,6 +292,7 @@ export interface FileRoutesByTo {
   '/reports': typeof DashboardReportsRoute
   '/resume-theme': typeof DashboardResumeThemeRoute
   '/resumes': typeof DashboardResumesRouteWithChildren
+  '/search-analytics': typeof DashboardSearchAnalyticsRoute
   '/test': typeof DashboardTestRoute
   '/checkout/$tier': typeof CheckoutTierRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -323,6 +332,7 @@ export interface FileRoutesById {
   '/_dashboard/reports': typeof DashboardReportsRoute
   '/_dashboard/resume-theme': typeof DashboardResumeThemeRoute
   '/_dashboard/resumes': typeof DashboardResumesRouteWithChildren
+  '/_dashboard/search-analytics': typeof DashboardSearchAnalyticsRoute
   '/_dashboard/test': typeof DashboardTestRoute
   '/checkout/$tier': typeof CheckoutTierRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -362,6 +372,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/resume-theme'
     | '/resumes'
+    | '/search-analytics'
     | '/test'
     | '/checkout/$tier'
     | '/checkout/return'
@@ -399,6 +410,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/resume-theme'
     | '/resumes'
+    | '/search-analytics'
     | '/test'
     | '/checkout/$tier'
     | '/checkout/return'
@@ -437,6 +449,7 @@ export interface FileRouteTypes {
     | '/_dashboard/reports'
     | '/_dashboard/resume-theme'
     | '/_dashboard/resumes'
+    | '/_dashboard/search-analytics'
     | '/_dashboard/test'
     | '/checkout/$tier'
     | '/checkout/return'
@@ -550,6 +563,13 @@ declare module '@tanstack/react-router' {
       path: '/test'
       fullPath: '/test'
       preLoaderRoute: typeof DashboardTestRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/_dashboard/search-analytics': {
+      id: '/_dashboard/search-analytics'
+      path: '/search-analytics'
+      fullPath: '/search-analytics'
+      preLoaderRoute: typeof DashboardSearchAnalyticsRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/_dashboard/resumes': {
@@ -765,6 +785,7 @@ interface DashboardRouteChildren {
   DashboardReportsRoute: typeof DashboardReportsRoute
   DashboardResumeThemeRoute: typeof DashboardResumeThemeRoute
   DashboardResumesRoute: typeof DashboardResumesRouteWithChildren
+  DashboardSearchAnalyticsRoute: typeof DashboardSearchAnalyticsRoute
   DashboardTestRoute: typeof DashboardTestRoute
   DashboardApplicationsSlugRoute: typeof DashboardApplicationsSlugRoute
   DashboardApplicationsInterviewPrepRoute: typeof DashboardApplicationsInterviewPrepRoute
@@ -789,6 +810,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardReportsRoute: DashboardReportsRoute,
   DashboardResumeThemeRoute: DashboardResumeThemeRoute,
   DashboardResumesRoute: DashboardResumesRouteWithChildren,
+  DashboardSearchAnalyticsRoute: DashboardSearchAnalyticsRoute,
   DashboardTestRoute: DashboardTestRoute,
   DashboardApplicationsSlugRoute: DashboardApplicationsSlugRoute,
   DashboardApplicationsInterviewPrepRoute:
