@@ -9,6 +9,8 @@ import { ScheduleCard } from '../components/ScheduleCard'
 import { CollapsibleSection } from '../components/CollapsibleSection'
 import { SummaryGroup, SummaryRow } from '../components/workspace-shell'
 import { useStageDraft } from '../hooks/useStageDraft'
+import { resolveStagePrep } from '../types/workspace'
+import { SystemDesignWalkthrough } from './SystemDesignWalkthrough'
 
 interface SystemDesignWorkspaceProps {
   readonly detail: ApplicationDetail
@@ -245,6 +247,13 @@ export function SystemDesignWorkspace({ detail }: SystemDesignWorkspaceProps) {
   const tourGateOpen = roundType === undefined || TOUR_ROUND_TYPES.has(roundType)
   const tours = tourGateOpen ? (detail.systemTours ?? []) : []
 
+  // The coach's project-anchored walkthrough (one card per JD-relevant concern).
+  // Already on detail.coaching['system-design'].topics — render it as the primary
+  // section when present; otherwise fall back to the generic question patterns.
+  const prep = resolveStagePrep(detail, 'system-design')
+  const walkthrough = prep?.systemDesignWalkthrough ?? []
+  const coverage = prep?.systemDesignCoverage ?? null
+
   return (
     <>
       {/* Schedule + format — primary editable control, rendered inline */}
@@ -257,7 +266,11 @@ export function SystemDesignWorkspace({ detail }: SystemDesignWorkspaceProps) {
         />
       </SummaryGroup>
 
-      <QuestionPatternsGroup />
+      {walkthrough.length > 0 ? (
+        <SystemDesignWalkthrough cards={walkthrough} coverage={coverage} />
+      ) : (
+        <QuestionPatternsGroup />
+      )}
 
       <SystemToursGroup tours={tours} />
 
