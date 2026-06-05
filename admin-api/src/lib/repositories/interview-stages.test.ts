@@ -6,6 +6,8 @@ import {
   markNotApplicable,
   getStagesForApp,
   advanceStageLifecycle,
+  setStageOutcome,
+  STAGE_OUTCOMES,
 } from './interview-stages.js';
 
 function fakePool(rows: unknown[]) {
@@ -68,6 +70,38 @@ describe('advanceStageLifecycle', () => {
     expect(secondSql).toMatch(/stage_status = 'current'/);
     const secondParams = (query.mock.calls[1] as unknown[])[1] as unknown[];
     expect(secondParams).toEqual(['app-1', 'technical']);
+  });
+});
+
+describe('setStageOutcome', () => {
+  it('rejects an outcome outside STAGE_OUTCOMES (no query issued)', async () => {
+    const { pool, query } = fakePool([]);
+    await expect(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setStageOutcome(pool, 'app-1', 'phone-screen', 'bogus' as any),
+    ).rejects.toThrow();
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('exposes the canonical outcome set', () => {
+    expect([...STAGE_OUTCOMES]).toEqual(['advanced', 'rejected', 'withdrew', 'not_completed', 'skipped']);
+  });
+
+  it('issues the owner-scoped UPDATE on (app, stage) setting outcome/outcome_at/last_activity_at', async () => {
+    const { pool, query } = fakePool([]);
+    await setStageOutcome(pool, 'app-1', 'phone-screen', 'advanced');
+
+    expect(query).toHaveBeenCalledTimes(1);
+    const sql = (query.mock.calls[0] as unknown[])[0] as string;
+    expect(sql).toMatch(/UPDATE interview_stages/);
+    expect(sql).toMatch(/outcome\s*=\s*\$3/);
+    expect(sql).toMatch(/outcome_at\s*=\s*now\(\)/);
+    expect(sql).toMatch(/last_activity_at\s*=\s*now\(\)/);
+    expect(sql).toMatch(/job_application_id\s*=\s*\$1/);
+    expect(sql).toMatch(/stage_type\s*=\s*\$2/);
+
+    const params = (query.mock.calls[0] as unknown[])[1] as unknown[];
+    expect(params).toEqual(['app-1', 'phone-screen', 'advanced']);
   });
 });
 

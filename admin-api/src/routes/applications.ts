@@ -13,6 +13,7 @@
  *   POST   /:slug/status                  — update application status
  *   POST   /:slug/coach                   — schedule the coach K8s Job
  *   GET    /:slug/coaching/:stage         — read coaching_content row
+ *   PATCH  /:slug/stages/:stage/outcome   — set per-stage analytics outcome
  */
 
 import { Hono } from 'hono';
@@ -39,6 +40,9 @@ import {
   linkCoachRun,
   getStagesForApp,
   advanceStageLifecycle,
+  setStageOutcome,
+  isStageOutcome,
+  STAGE_OUTCOMES,
 } from '../lib/repositories/interview-stages.js';
 import { insertPipelineRun } from '../lib/repositories/pipeline-runs.js';
 import type { AdminApiBindings } from '../lib/types.js';
@@ -543,6 +547,31 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
         }
       }
 
+      return ctx.json({ success: true });
+    });
+  });
+
+  // ── PATCH /:slug/stages/:stage/outcome — set per-stage analytics outcome ───
+  app.patch('/:slug/stages/:stage/outcome', async (ctx) => {
+    const userId = ctx.get('userId');
+    if (!userId) return ctx.json({ error: 'Unauthorized' }, 401);
+
+    const slug  = ctx.req.param('slug');
+    const stage = ctx.req.param('stage');
+
+    let body: { outcome?: unknown };
+    try { body = await ctx.req.json(); }
+    catch { return ctx.json({ error: 'Body must be valid JSON' }, 400); }
+
+    if (!isStageOutcome(body.outcome)) {
+      return ctx.json({ error: `Invalid outcome. Expected one of: ${STAGE_OUTCOMES.join(', ')}` }, 400);
+    }
+
+    return withUser(getPool(config), userId, async (db) => {
+      const application = await getApplication(db, slug);
+      if (!application) return ctx.json({ error: `Application not found: ${slug}` }, 404);
+
+      await setStageOutcome(db, application.id, stage, body.outcome as (typeof STAGE_OUTCOMES)[number]);
       return ctx.json({ success: true });
     });
   });

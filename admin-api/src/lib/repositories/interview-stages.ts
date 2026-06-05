@@ -69,6 +69,48 @@ export async function advanceStageLifecycle(db: Queryable, appId: string, newSta
   );
 }
 
+/** Canonical per-stage outcome values (analytics funnel). */
+export const STAGE_OUTCOMES = ['advanced', 'rejected', 'withdrew', 'not_completed', 'skipped'] as const;
+export type StageOutcome = (typeof STAGE_OUTCOMES)[number];
+
+/** Thrown when an outcome value is not in {@link STAGE_OUTCOMES}. */
+export class InvalidStageOutcomeError extends Error {
+  constructor(public readonly outcome: string) {
+    super(`Invalid stage outcome: ${outcome}`);
+    this.name = 'InvalidStageOutcomeError';
+  }
+}
+
+/** Type guard for {@link StageOutcome}. */
+export function isStageOutcome(value: unknown): value is StageOutcome {
+  return typeof value === 'string' && (STAGE_OUTCOMES as readonly string[]).includes(value);
+}
+
+/**
+ * Set the per-stage outcome on the (appId, stageType) interview_stages row.
+ *
+ * Owner-scoping is enforced by RLS: the caller MUST run this inside withUser()
+ * (which SET LOCALs app.current_user_id). The interview_stages_isolation policy
+ * scopes rows via the job_application FK, so no explicit WHERE user_id is needed
+ * — this mirrors upsertStageUserState / markNotApplicable / advanceStageLifecycle.
+ *
+ * @throws InvalidStageOutcomeError when `outcome` is not in STAGE_OUTCOMES.
+ */
+export async function setStageOutcome(
+  db: Queryable,
+  appId: string,
+  stage: string,
+  outcome: StageOutcome,
+): Promise<void> {
+  if (!isStageOutcome(outcome)) throw new InvalidStageOutcomeError(String(outcome));
+  await db.query(
+    `UPDATE interview_stages
+        SET outcome = $3, outcome_at = now(), last_activity_at = now()
+      WHERE job_application_id = $1 AND stage_type = $2`,
+    [appId, stage, outcome],
+  );
+}
+
 export interface StageRow {
   stage_type: string;
   stage_status: string;
