@@ -6,6 +6,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { render, screen, fireEvent, renderHook, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
+import { SystemDesignWalkthrough } from '@/features/applications/stages/workspaces/SystemDesignWalkthrough'
+import type { SystemDesignCard } from '@/lib/types/applications.types'
 
 vi.mock('@tanstack/react-router', () => ({
   Link: ({ children, ...rest }: { children: React.ReactNode } & Record<string, unknown>) => (
@@ -781,5 +783,39 @@ describe('FinalWorkspace', () => {
     const confirm = screen.getAllByRole('button', { name: 'Decline' }).find(b => b.className.includes('bg-red-600'))
     fireEvent.click(confirm as HTMLElement)
     expect(statusMutate).toHaveBeenCalledWith({ slug: 'final-acme', status: 'rejected' })
+  })
+})
+
+describe('SystemDesignWalkthrough', () => {
+  const grounded: SystemDesignCard = {
+    concernId: 'api',
+    concernQuestion: 'Why this API style?',
+    whyItMatters: 'It matters.',
+    evidenceRefs: [{ source: 'tech', id: 'zod', label: 'Zod', fileLine: 'a.ts:1' }],
+    choiceMade: 'REST + Zod',
+    articulation: 'I chose REST because the access pattern is simple.',
+    followUps: [{ question: 'Idempotency?', status: 'addressed', framing: 'Conditional writes.' }],
+    gapGuidance: null,
+  }
+  const gap: SystemDesignCard = {
+    concernId: 'scale',
+    concernQuestion: 'How does it scale?',
+    whyItMatters: 'Load.',
+    evidenceRefs: [],
+    choiceMade: null,
+    articulation: 'No evidence yet; I would keep handlers stateless.',
+    followUps: [{ question: 'Stateless?', status: 'gap', framing: 'Not built yet.' }],
+    gapGuidance: 'Be honest about the gap.',
+  }
+
+  it('renders grounded + gap cards with coverage and evidence', () => {
+    render(<SystemDesignWalkthrough cards={[grounded, gap]} coverage={{ relevantTotal: 2, relevantAddressed: 1 }} />)
+    expect(screen.getByText('Why this API style?')).toBeTruthy()
+    expect(screen.getByText(/I chose REST/)).toBeTruthy()
+    expect(screen.getByText('Grounded')).toBeTruthy()
+    expect(screen.getByText('Gap')).toBeTruthy()
+    expect(screen.getByText('Zod')).toBeTruthy()
+    expect(screen.getByText('Be honest about the gap.')).toBeTruthy()
+    expect(screen.getByText(/1 of 2 role-relevant concerns/)).toBeTruthy()
   })
 })

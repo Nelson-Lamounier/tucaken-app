@@ -472,6 +472,45 @@ export interface InterviewPrepOutput {
   readonly jdTalkingPoints?: readonly PhoneScreenTalkingPoint[]
   /** Phone-screen only: compensation conversation script */
   readonly compScript?: CompScript
+  /** System-design only: project-anchored walkthrough, one card per JD-relevant concern. */
+  readonly systemDesignWalkthrough?: readonly SystemDesignCard[]
+  /** System-design only: concern-coverage summary (code-authoritative). */
+  readonly systemDesignCoverage?: SystemDesignCoverage
+}
+
+/** Evidence pointer cited by a System Design walkthrough card. */
+export interface EvidenceRef {
+  readonly source: string
+  readonly id: string
+  readonly label: string
+  readonly fileLine?: string
+}
+
+export type SystemDesignFollowUpStatus = 'addressed' | 'partial' | 'gap'
+
+/** A follow-up the interviewer might ask, with how the candidate handles it. */
+export interface SystemDesignFollowUp {
+  readonly question: string
+  readonly status: SystemDesignFollowUpStatus
+  readonly framing: string
+}
+
+/** One concern in the project-anchored System Design walkthrough. */
+export interface SystemDesignCard {
+  readonly concernId: string
+  readonly concernQuestion: string
+  readonly whyItMatters: string
+  readonly evidenceRefs: readonly EvidenceRef[]
+  readonly choiceMade: string | null
+  readonly articulation: string
+  readonly followUps: readonly SystemDesignFollowUp[]
+  readonly gapGuidance: string | null
+}
+
+/** Code-authoritative concern coverage for the System Design walkthrough. */
+export interface SystemDesignCoverage {
+  readonly relevantTotal: number
+  readonly relevantAddressed: number
 }
 
 /**
