@@ -2,13 +2,19 @@
 
 import { useMemo, useState, type ReactNode } from 'react'
 import { TrendingUp } from 'lucide-react'
-import type { ApplicationDetail, ApplicationStatus } from '@/lib/types/applications.types'
+import type {
+  ApplicationDetail,
+  ApplicationStatus,
+  FinalPrep,
+  FinalQuestion,
+  FinalTalkingPoint,
+} from '@/lib/types/applications.types'
 import { useApplicationStatus } from '@/hooks/use-admin-applications'
 import { Card } from '@/components/ui/Card'
 import { ConfirmModal } from '../components/ConfirmModal'
 import { SummaryGroup, SummaryRow } from '../components/workspace-shell'
 import { useOfferDraft, personalFitScore, type OfferComponents, type DecisionFactor } from '../hooks/useOfferDraft'
-import { negotiationLeverage } from '../types/workspace'
+import { negotiationLeverage, resolveStagePrep } from '../types/workspace'
 
 interface FinalWorkspaceProps {
   readonly detail: ApplicationDetail
@@ -219,6 +225,78 @@ function DecisionGroup({ onPick }: { readonly onPick: (action: DecisionAction) =
   )
 }
 
+/** Mutual-fit talking points — each a grounded point with a muted grounding line. */
+function TalkingPoints({ points }: { readonly points: readonly FinalTalkingPoint[] }) {
+  if (points.length === 0) return null
+  return (
+    <div className="space-y-2.5">
+      {points.map((tp, i) => (
+        <div key={i} className="space-y-1 rounded-lg border border-zinc-200 p-3 dark:border-white/10">
+          <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">{tp.point}</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">{tp.grounding}</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Substantive questions to ask — each a question with a muted rationale. */
+function Questions({ questions }: { readonly questions: readonly FinalQuestion[] }) {
+  if (questions.length === 0) return null
+  return (
+    <ul className="space-y-1.5">
+      {questions.map((q, i) => (
+        <li key={i} className="text-sm">
+          <span className="font-medium text-zinc-700 dark:text-zinc-300">{q.question}</span>
+          <span className="text-zinc-500 dark:text-zinc-400"> — {q.rationale}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** The coach's grounded pre-final-round prep, rendered as the primary section. */
+function FinalPrepGroup({ prep }: { readonly prep: FinalPrep }) {
+  return (
+    <SummaryGroup id="final-prep" title="Pre-final-round prep" subtitle="Grounded in your work — why this role, mutual fit, and what to ask.">
+      <Card className="space-y-4 p-4">
+        <p className="text-sm leading-relaxed whitespace-pre-line text-zinc-700 dark:text-zinc-300">{prep.whyThisRole}</p>
+
+        {prep.mutualFitTalkingPoints.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Mutual-fit talking points</h4>
+            <TalkingPoints points={prep.mutualFitTalkingPoints} />
+          </div>
+        )}
+
+        {prep.substantiveQuestions.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Substantive questions to ask</h4>
+            <Questions questions={prep.substantiveQuestions} />
+          </div>
+        )}
+
+        {prep.longTermFraming && (
+          <div className="space-y-2">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Long-term framing</h4>
+            <p className="text-sm leading-relaxed whitespace-pre-line text-zinc-700 dark:text-zinc-300">{prep.longTermFraming}</p>
+          </div>
+        )}
+      </Card>
+    </SummaryGroup>
+  )
+}
+
+/**
+ * Resolve + render the coach's grounded final-round prep group, or null when no
+ * prep exists. Keeps the conditional out of the main workspace function (complexity).
+ */
+function FinalPrepSection({ detail }: { readonly detail: ApplicationDetail }) {
+  const finalPrep: FinalPrep | null = resolveStagePrep(detail, 'final')?.finalPrep ?? null
+  if (!finalPrep) return null
+  return <FinalPrepGroup prep={finalPrep} />
+}
+
 /**
  * Final / Offer workspace (Stage 7). Offer figures + decision factors are
  * editable and persisted (useOfferDraft). Negotiation leverage is derived from
@@ -250,6 +328,9 @@ export function FinalWorkspace({ detail }: FinalWorkspaceProps) {
 
   return (
     <>
+      {/* The coach's grounded pre-final-round prep — primary section, when present. */}
+      <FinalPrepSection detail={detail} />
+
       {/* The offer — primary editable control, rendered inline */}
       <SummaryGroup id="offer" title="The offer" subtitle="Editable — auto-saves.">
         <OfferForm offer={draft.offer} onChange={setOffer} />
