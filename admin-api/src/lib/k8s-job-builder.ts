@@ -130,7 +130,15 @@ export function buildPipelineJob(input: BuildJobInput): V1Job {
             backoffLimit:            2,
             activeDeadlineSeconds:   input.activeDeadlineSeconds ?? 1800,
             template: {
-                metadata: { labels: sanitisedLabels },
+                metadata: {
+                    labels: sanitisedLabels,
+                    // Long-running Bedrock pipeline Jobs (coach ~3min, strategist, ingestion)
+                    // must not be evicted by Karpenter consolidation mid-run — that kills the
+                    // pod before it persists its result, leaving the Job "Complete" with no data.
+                    // Safe to pin: restartPolicy=Never + ttlSecondsAfterFinished means the pod
+                    // (and the node hold) is released seconds after the pipeline finishes.
+                    annotations: { 'karpenter.sh/do-not-disrupt': 'true' },
+                },
                 spec: {
                     restartPolicy:      'Never',
                     serviceAccountName: input.serviceAccountName,
