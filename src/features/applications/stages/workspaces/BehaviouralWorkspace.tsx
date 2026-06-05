@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { Plus, BookOpen } from 'lucide-react'
-import type { ApplicationDetail } from '@/lib/types/applications.types'
+import type { ApplicationDetail, InterviewQuestion } from '@/lib/types/applications.types'
 import { Card } from '@/components/ui/Card'
 import { ScheduleCard } from '../components/ScheduleCard'
 import { StoryCard } from '../components/StoryCard'
@@ -11,7 +11,7 @@ import { PracticeModal } from '../components/PracticeModal'
 import { SummaryGroup, SummaryRow } from '../components/workspace-shell'
 import { useStageDraft } from '../hooks/useStageDraft'
 import { useStoryBank } from '../hooks/useStoryBank'
-import { STORY_THEMES } from '../types/workspace'
+import { STORY_THEMES, resolveStagePrep } from '../types/workspace'
 import type { StarStory, StoryTheme } from '../types/workspace'
 
 interface BehaviouralWorkspaceProps {
@@ -185,10 +185,57 @@ function TypicalQuestionsGroup({ stories }: TypicalQuestionsGroupProps) {
  * Renders a fragment of SummaryGroups into the WorkspaceShell's left column;
  * the StoryForm / PracticeModal overlays sit at the fragment root.
  */
+/** Coach-generated behavioural questions — role-tailored; rehearse a STAR story for each. */
+function CoachBehaviouralQuestionsGroup({ questions }: { readonly questions: readonly InterviewQuestion[] }) {
+  if (questions.length === 0) return null
+  return (
+    <SummaryGroup
+      id="coach-behavioural-questions"
+      title="Likely behavioural questions"
+      subtitle="Role-tailored by your interview coach — rehearse a STAR story for each."
+    >
+      <div className="space-y-2">
+        {questions.map((q, i) => (
+          <Card key={i} className="space-y-2 p-4">
+            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{q.question}</p>
+            {q.answerFramework && (
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">Answer framework: {q.answerFramework}</p>
+            )}
+            {q.keyPoints.length > 0 && (
+              <ul className="list-disc space-y-0.5 pl-5 text-sm text-zinc-700 dark:text-zinc-300">
+                {q.keyPoints.map((p, j) => (
+                  <li key={j}>{p}</li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        ))}
+      </div>
+    </SummaryGroup>
+  )
+}
+
+/** Coaching notes — free-text stage guidance from the Coach Agent. */
+function CoachingNotesGroup({ notes }: { readonly notes: string | undefined }) {
+  if (!notes) return null
+  return (
+    <SummaryGroup id="coaching-notes" title="Coaching notes" subtitle="Stage-specific guidance from your interview coach.">
+      <Card className="p-4">
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">{notes}</p>
+      </Card>
+    </SummaryGroup>
+  )
+}
+
 export function BehaviouralWorkspace({ detail }: BehaviouralWorkspaceProps) {
   const stageUserState = detail.stages?.['behavioural']?.user_state as Partial<import('../hooks/useStageDraft').StageDraft> | undefined
   const { draft, setSchedule } = useStageDraft(detail.slug, 'behavioural', stageUserState)
   const { stories, addStory, updateStory, removeStory } = useStoryBank(detail.slug)
+
+  // Coach-generated behavioural prep (role-tailored questions + free-text notes).
+  const prep = resolveStagePrep(detail, 'behavioural')
+  const coachQuestions = prep?.behaviouralQuestions ?? []
+  const coachingNotes = prep?.coachingNotes
 
   const [filter, setFilter] = useState<Filter>('All')
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -215,6 +262,10 @@ export function BehaviouralWorkspace({ detail }: BehaviouralWorkspaceProps) {
       <SummaryGroup id="schedule" title="Schedule & format">
         <ScheduleCard scheduleAt={draft.scheduleAt} formatNote={draft.formatNote} onChange={setSchedule} formatPlaceholder="e.g. 45m behavioural" />
       </SummaryGroup>
+
+      <CoachBehaviouralQuestionsGroup questions={coachQuestions} />
+
+      <CoachingNotesGroup notes={coachingNotes} />
 
       <StoryBankGroup
         stories={stories}

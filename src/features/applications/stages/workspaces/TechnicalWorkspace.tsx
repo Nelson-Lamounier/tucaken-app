@@ -16,6 +16,8 @@ import type {
   DsaTopicCalibration,
   PillarClassification,
   DevopsTopicEvidence,
+  InterviewQuestion,
+  QuestionToAsk,
 } from '@/lib/types/applications.types'
 
 type DsaCalibratedTopic = DsaTopicCalibration['likelyTopics'][number]
@@ -598,6 +600,20 @@ function useTechnicalWorkspaceData(detail: ApplicationDetail) {
     showRoleFocus: roleFocusVisible(pc),
     showDevops: devopsEvidence.length > 0,
     showDifficult: difficultQuestions.length > 0,
+    ...coachPrepFields(prep),
+  }
+}
+
+/** Coach prep fields (questions/notes) — extracted to keep useTechnicalWorkspaceData under the complexity cap. */
+function coachPrepFields(prep: ReturnType<typeof resolveStagePrep>) {
+  const technicalQuestions = prep?.technicalQuestions ?? []
+  const questionsToAsk = prep?.questionsToAsk ?? []
+  return {
+    technicalQuestions,
+    questionsToAsk,
+    coachingNotes: prep?.coachingNotes,
+    showTechnicalQuestions: technicalQuestions.length > 0,
+    showQuestionsToAsk: questionsToAsk.length > 0,
   }
 }
 
@@ -611,6 +627,67 @@ function showDsaSectionFor(roundType: ApplicationDetail['technicalRoundType']): 
 function roleFocusVisible(pc: PillarClassification | undefined): boolean {
   if (!pc) return false
   return pc.primaryPillar !== 'swe-general'
+}
+
+/** Coach-generated technical questions — role-tailored, with approach + key points. */
+function TechnicalQuestionsGroup({ questions }: { readonly questions: readonly InterviewQuestion[] }) {
+  return (
+    <SummaryGroup id="technical-questions" title="Likely technical questions" subtitle="Role-tailored by your interview coach.">
+      <div className="space-y-2">
+        {questions.map((q, i) => (
+          <Card key={i} className="space-y-2 p-4">
+            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{q.question}</p>
+            {q.answerFramework && <p className="text-xs text-zinc-500 dark:text-zinc-400">Approach: {q.answerFramework}</p>}
+            {q.keyPoints.length > 0 && (
+              <ul className="list-disc space-y-0.5 pl-5 text-sm text-zinc-700 dark:text-zinc-300">
+                {q.keyPoints.map((p, j) => (
+                  <li key={j}>{p}</li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        ))}
+      </div>
+    </SummaryGroup>
+  )
+}
+
+/** Questions to ask the interviewer — from the coach. */
+function QuestionsToAskGroup({ questions }: { readonly questions: readonly QuestionToAsk[] }) {
+  return (
+    <SummaryGroup id="questions-to-ask" title="Questions to ask" subtitle="Thoughtful questions for the interviewer.">
+      <div className="space-y-2">
+        {questions.map((q, i) => (
+          <Card key={i} className="space-y-1 p-3">
+            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{q.question}</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">{q.rationale}</p>
+          </Card>
+        ))}
+      </div>
+    </SummaryGroup>
+  )
+}
+
+/** Coaching notes — free-text stage guidance from the Coach Agent. */
+function TechnicalCoachingNotesGroup({ notes }: { readonly notes: string }) {
+  return (
+    <SummaryGroup id="coaching-notes" title="Coaching notes" subtitle="Stage-specific guidance from your interview coach.">
+      <Card className="p-4">
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">{notes}</p>
+      </Card>
+    </SummaryGroup>
+  )
+}
+
+/** Coach prep supplements (technical questions, notes, questions-to-ask) — grouped to keep the workspace simple. */
+function TechnicalCoachSupplements({ data }: { readonly data: ReturnType<typeof useTechnicalWorkspaceData> }) {
+  return (
+    <>
+      {data.showTechnicalQuestions && <TechnicalQuestionsGroup questions={data.technicalQuestions} />}
+      {data.coachingNotes && <TechnicalCoachingNotesGroup notes={data.coachingNotes} />}
+      {data.showQuestionsToAsk && <QuestionsToAskGroup questions={data.questionsToAsk} />}
+    </>
+  )
 }
 
 /**
@@ -665,6 +742,8 @@ export function TechnicalWorkspace({ detail }: TechnicalWorkspaceProps) {
       <PrepChecklistGroup items={data.checklist} />
 
       {data.showDifficult && <DifficultQuestionsGroup questions={data.difficultQuestions} />}
+
+      <TechnicalCoachSupplements data={data} />
 
       {data.showDevops && (
         <DevopsGroup topics={data.devopsEvidence} matchesRole={data.focusPillars.has('devops-sre-platform')} />
