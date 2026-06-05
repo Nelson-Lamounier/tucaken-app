@@ -1,13 +1,13 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { TrendingUp } from 'lucide-react'
 import type { ApplicationDetail, ApplicationStatus } from '@/lib/types/applications.types'
 import { useApplicationStatus } from '@/hooks/use-admin-applications'
 import { Card } from '@/components/ui/Card'
-import { SectionHeading } from '../components/SectionHeading'
 import { ConfirmModal } from '../components/ConfirmModal'
-import { useOfferDraft, personalFitScore, type OfferComponents } from '../hooks/useOfferDraft'
+import { SummaryGroup, SummaryRow } from '../components/workspace-shell'
+import { useOfferDraft, personalFitScore, type OfferComponents, type DecisionFactor } from '../hooks/useOfferDraft'
 import { negotiationLeverage } from '../types/workspace'
 
 interface FinalWorkspaceProps {
@@ -49,22 +49,196 @@ function parseMoney(value: string): number | null {
   return Number.isFinite(n) ? n : null
 }
 
+/** Offer figures form — the primary editable control, rendered inline. */
+function OfferForm({
+  offer,
+  onChange,
+}: {
+  readonly offer: OfferComponents
+  readonly onChange: (patch: Partial<OfferComponents>) => void
+}) {
+  return (
+    <Card className="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3">
+      {OFFER_FIELDS.map(({ key, label }) => (
+        <div key={key}>
+          <label htmlFor={`offer-${key}`} className="mb-1.5 block text-xs font-medium text-zinc-500">{label}</label>
+          <input
+            id={`offer-${key}`}
+            type="text"
+            value={offer[key]}
+            onChange={e => onChange({ [key]: e.target.value })}
+            className={FIELD_CLASS}
+            placeholder="—"
+          />
+        </div>
+      ))}
+    </Card>
+  )
+}
+
+/** Detail body for the market-context row (honest placeholder, ADR-0003). */
+function MarketContextDetail() {
+  return (
+    <Card className="flex items-center gap-3 px-4 py-6 text-sm text-zinc-500 dark:text-zinc-400">
+      <TrendingUp className="size-5 shrink-0 text-zinc-400" aria-hidden />
+      Percentile benchmarks (25th / median / 75th) for this role and location land once market data
+      is wired up.
+    </Card>
+  )
+}
+
+/** Detail body for a single negotiation-leverage point. */
+function LeverageDetail({ point }: { readonly point: string }) {
+  return (
+    <Card className="p-4 text-sm text-zinc-700 dark:text-zinc-300">{point}</Card>
+  )
+}
+
+/** Detail body for the suggested-counter row: counter + suggested message. */
+function SuggestedCounterDetail({
+  base,
+  counter,
+}: {
+  readonly base: string
+  readonly counter: number | null
+}) {
+  const [showMessage, setShowMessage] = useState(false)
+  return (
+    <Card className="space-y-3 p-4">
+      {counter !== null ? (
+        <p className="text-sm text-zinc-700 dark:text-zinc-300">
+          Based on your base of {base.trim()}, a reasonable counter is around{' '}
+          <span className="font-semibold text-accent">{counter.toLocaleString()}</span>.
+        </p>
+      ) : (
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">Enter a base figure in the offer above to see a suggested counter.</p>
+      )}
+      <button type="button" onClick={() => setShowMessage(s => !s)} className="text-sm font-medium text-accent hover:underline">
+        {showMessage ? 'Hide suggested message' : 'See suggested message'}
+      </button>
+      {showMessage && (
+        <p className="rounded-lg bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:bg-white/5 dark:text-zinc-400">
+          &ldquo;Thank you for the offer — I&apos;m excited about the role. Based on the scope and my
+          experience{counter !== null ? `, I was hoping we could get closer to ${counter.toLocaleString()}` : ''}.
+          Is there flexibility on the package?&rdquo;
+        </p>
+      )}
+    </Card>
+  )
+}
+
+/** Detail body for one decision factor: importance + this-offer sliders. */
+function DecisionFactorDetail({
+  factor,
+  onChange,
+}: {
+  readonly factor: DecisionFactor
+  readonly onChange: (key: string, patch: Partial<Pick<DecisionFactor, 'weight' | 'score'>>) => void
+}) {
+  return (
+    <Card className="space-y-3 p-4">
+      <label className="flex items-center gap-2 text-xs text-zinc-500">
+        Importance
+        <input type="range" min={0} max={10} value={factor.weight} onChange={e => onChange(factor.key, { weight: Number.parseInt(e.target.value, 10) })} className="accent-(--accent)" />
+        <span className="w-4 tabular-nums">{factor.weight}</span>
+      </label>
+      <label className="flex items-center gap-2 text-xs text-zinc-500">
+        This offer
+        <input type="range" min={0} max={10} value={factor.score} onChange={e => onChange(factor.key, { score: Number.parseInt(e.target.value, 10) })} className="accent-(--accent)" />
+        <span className="w-4 tabular-nums">{factor.score}</span>
+      </label>
+    </Card>
+  )
+}
+
+/** "Negotiation leverage" group — one row per factual leverage point. */
+function LeverageGroup({ leverage }: { readonly leverage: readonly string[] }) {
+  return (
+    <SummaryGroup id="negotiation-leverage" title="Negotiation leverage" subtitle="Factual points the analysis identified." count={leverage.length}>
+      {leverage.length === 0 && (
+        <Card className="px-4 py-6 text-sm text-zinc-500 dark:text-zinc-400">
+          Leverage points appear once the Research Agent has analysed this application.
+        </Card>
+      )}
+      {leverage.map(point => (
+        <SummaryRow key={point} id={point} label={point} preview={point} detail={<LeverageDetail point={point} />} />
+      ))}
+    </SummaryGroup>
+  )
+}
+
+interface FactorsGroupProps {
+  readonly factors: readonly DecisionFactor[]
+  readonly fit: number
+  readonly onChange: (key: string, patch: Partial<Pick<DecisionFactor, 'weight' | 'score'>>) => void
+}
+
+/** "Decision factors" group — one row per weighted factor; weight is the indicator. */
+function DecisionFactorsGroup({ factors, fit, onChange }: FactorsGroupProps) {
+  return (
+    <SummaryGroup id="decision-factors" title="Your decision factors" subtitle="Weight what matters, rate how this offer does." count={factors.length}>
+      <div className="flex justify-end">
+        <span className="rounded-lg bg-[color-mix(in_oklab,var(--accent)_12%,transparent)] px-3 py-1.5 text-sm font-semibold text-accent">
+          Fit {fit}%
+        </span>
+      </div>
+      {factors.map(factor => (
+        <SummaryRow
+          key={factor.key}
+          id={factor.key}
+          label={factor.key}
+          indicator={<span className="text-xs font-medium tabular-nums text-zinc-500">Weight {factor.weight}</span>}
+          detail={<DecisionFactorDetail factor={factor} onChange={onChange} />}
+        />
+      ))}
+    </SummaryGroup>
+  )
+}
+
+/** "Decision" group — accept/counter/decline/request-time actions, inline. */
+function DecisionGroup({ onPick }: { readonly onPick: (action: DecisionAction) => void }) {
+  return (
+    <SummaryGroup id="decision" title="Decision">
+      <div className="flex flex-wrap gap-3">
+        {ACTIONS.map(action => (
+          <button
+            key={action.id}
+            type="button"
+            onClick={() => onPick(action)}
+            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+              action.id === 'accept'
+                ? 'bg-(--accent) text-white hover:opacity-90'
+                : 'border border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/5'
+            }`}
+          >
+            {action.label}
+          </button>
+        ))}
+      </div>
+    </SummaryGroup>
+  )
+}
+
 /**
  * Final / Offer workspace (Stage 7). Offer figures + decision factors are
  * editable and persisted (useOfferDraft). Negotiation leverage is derived from
  * real research evidence; market percentile data has no backend yet (honest
  * placeholder, ADR-0003). Accept/Decline call the real status mutation.
+ *
+ * Renders a fragment of SummaryGroups into the WorkspaceShell's left column.
  */
 export function FinalWorkspace({ detail }: FinalWorkspaceProps) {
   const { draft, setOffer, setFactor } = useOfferDraft(detail.slug)
   const statusMutation = useApplicationStatus()
-  const [showMessage, setShowMessage] = useState(false)
   const [pending, setPending] = useState<DecisionAction | null>(null)
 
   const fit = useMemo(() => personalFitScore(draft.factors), [draft.factors])
   const leverage = useMemo(() => negotiationLeverage(detail.research), [detail.research])
   const base = parseMoney(draft.offer.base)
   const counter = base !== null ? Math.round(base * 1.1) : null
+
+  const counterDetail: ReactNode = <SuggestedCounterDetail base={draft.offer.base} counter={counter} />
+  const counterPreview = counter !== null ? `~${counter.toLocaleString()}` : undefined
 
   function confirmAction() {
     if (!pending) return
@@ -75,120 +249,27 @@ export function FinalWorkspace({ detail }: FinalWorkspaceProps) {
   }
 
   return (
-    <div className="space-y-8">
-      {/* The offer */}
-      <section className="space-y-3">
-        <SectionHeading title="The offer" subtitle="Editable — auto-saves." />
-        <Card className="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3">
-          {OFFER_FIELDS.map(({ key, label }) => (
-            <div key={key}>
-              <label htmlFor={`offer-${key}`} className="mb-1.5 block text-xs font-medium text-zinc-500">{label}</label>
-              <input id={`offer-${key}`} type="text" value={draft.offer[key]} onChange={e => setOffer({ [key]: e.target.value })} className={FIELD_CLASS} placeholder="—" />
-            </div>
-          ))}
-        </Card>
-      </section>
+    <>
+      {/* The offer — primary editable control, rendered inline */}
+      <SummaryGroup id="offer" title="The offer" subtitle="Editable — auto-saves.">
+        <OfferForm offer={draft.offer} onChange={setOffer} />
+      </SummaryGroup>
 
       {/* Market context */}
-      <section className="space-y-3">
-        <SectionHeading title="Market context" />
-        <Card className="flex items-center gap-3 px-4 py-6 text-sm text-zinc-500 dark:text-zinc-400">
-          <TrendingUp className="size-5 shrink-0 text-zinc-400" aria-hidden />
-          Percentile benchmarks (25th / median / 75th) for this role and location land once market data
-          is wired up.
-        </Card>
-      </section>
+      <SummaryGroup id="market-context" title="Market context">
+        <SummaryRow id="market-context" label="Market context" detail={<MarketContextDetail />} />
+      </SummaryGroup>
 
-      {/* Negotiation leverage */}
-      <section className="space-y-3">
-        <SectionHeading title="Negotiation leverage" subtitle="Factual points the analysis identified." />
-        {leverage.length > 0 ? (
-          <Card className="p-4">
-            <ul className="space-y-2">
-              {leverage.map(point => (
-                <li key={point} className="text-sm text-zinc-700 dark:text-zinc-300">• {point}</li>
-              ))}
-            </ul>
-          </Card>
-        ) : (
-          <Card className="px-4 py-6 text-sm text-zinc-500 dark:text-zinc-400">
-            Leverage points appear once the Research Agent has analysed this application.
-          </Card>
-        )}
-      </section>
+      <LeverageGroup leverage={leverage} />
 
       {/* Suggested counter */}
-      <section className="space-y-3">
-        <SectionHeading title="Suggested counter" />
-        <Card className="space-y-3 p-4">
-          {counter !== null ? (
-            <p className="text-sm text-zinc-700 dark:text-zinc-300">
-              Based on your base of {draft.offer.base.trim()}, a reasonable counter is around{' '}
-              <span className="font-semibold text-accent">{counter.toLocaleString()}</span>.
-            </p>
-          ) : (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Enter a base figure above to see a suggested counter.</p>
-          )}
-          <button type="button" onClick={() => setShowMessage(s => !s)} className="text-sm font-medium text-accent hover:underline">
-            {showMessage ? 'Hide suggested message' : 'See suggested message'}
-          </button>
-          {showMessage && (
-            <p className="rounded-lg bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:bg-white/5 dark:text-zinc-400">
-              &ldquo;Thank you for the offer — I&apos;m excited about the role. Based on the scope and my
-              experience{counter !== null ? `, I was hoping we could get closer to ${counter.toLocaleString()}` : ''}.
-              Is there flexibility on the package?&rdquo;
-            </p>
-          )}
-        </Card>
-      </section>
+      <SummaryGroup id="suggested-counter" title="Suggested counter">
+        <SummaryRow id="suggested-counter" label="Suggested counter" preview={counterPreview} detail={counterDetail} />
+      </SummaryGroup>
 
-      {/* Decision factors */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <SectionHeading title="Your decision factors" subtitle="Weight what matters, rate how this offer does." />
-          <span className="rounded-lg bg-[color-mix(in_oklab,var(--accent)_12%,transparent)] px-3 py-1.5 text-sm font-semibold text-accent">
-            Fit {fit}%
-          </span>
-        </div>
-        <Card className="divide-y divide-zinc-200 p-4 dark:divide-white/10">
-          {draft.factors.map(factor => (
-            <div key={factor.key} className="grid gap-2 py-3 first:pt-0 last:pb-0 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:gap-4">
-              <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">{factor.key}</span>
-              <label className="flex items-center gap-2 text-xs text-zinc-500">
-                Importance
-                <input type="range" min={0} max={10} value={factor.weight} onChange={e => setFactor(factor.key, { weight: Number.parseInt(e.target.value, 10) })} className="accent-(--accent)" />
-                <span className="w-4 tabular-nums">{factor.weight}</span>
-              </label>
-              <label className="flex items-center gap-2 text-xs text-zinc-500">
-                This offer
-                <input type="range" min={0} max={10} value={factor.score} onChange={e => setFactor(factor.key, { score: Number.parseInt(e.target.value, 10) })} className="accent-(--accent)" />
-                <span className="w-4 tabular-nums">{factor.score}</span>
-              </label>
-            </div>
-          ))}
-        </Card>
-      </section>
+      <DecisionFactorsGroup factors={draft.factors} fit={fit} onChange={setFactor} />
 
-      {/* Decision actions */}
-      <section className="space-y-3">
-        <SectionHeading title="Decision" />
-        <div className="flex flex-wrap gap-3">
-          {ACTIONS.map(action => (
-            <button
-              key={action.id}
-              type="button"
-              onClick={() => setPending(action)}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                action.id === 'accept'
-                  ? 'bg-(--accent) text-white hover:opacity-90'
-                  : 'border border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/5'
-              }`}
-            >
-              {action.label}
-            </button>
-          ))}
-        </div>
-      </section>
+      <DecisionGroup onPick={setPending} />
 
       <ConfirmModal
         open={pending !== null}
@@ -200,6 +281,6 @@ export function FinalWorkspace({ detail }: FinalWorkspaceProps) {
         destructive={pending?.destructive}
         busy={statusMutation.isPending}
       />
-    </div>
+    </>
   )
 }
