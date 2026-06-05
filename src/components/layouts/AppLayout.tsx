@@ -50,6 +50,7 @@ const navigation = [
   { name: "Projects",        href: "/projects",      icon: FolderIcon,            adminOnly: false },
   { name: "Database",        href: "/settings/github", icon: Database,            adminOnly: false },
   { name: "Calendar",        href: "/calendar",      icon: CalendarIcon,          adminOnly: false },
+  { name: "Search Analytics", href: "/search-analytics", icon: ChartPieIcon,       adminOnly: true  },
   { name: "Reports",         href: "/reports",       icon: ChartPieIcon,          adminOnly: true  },
   { name: "Test Components", href: "/test",          icon: BeakerIcon,            adminOnly: true  },
 ];

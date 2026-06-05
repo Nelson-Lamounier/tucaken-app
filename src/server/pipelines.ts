@@ -19,7 +19,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { requireAuth } from './auth-guard'
 import { apiFetch } from './_api-client'
-import type { TriggerResponse } from '@/lib/types/applications.types'
+import type { FunnelAnalytics, TriggerResponse } from '@/lib/types/applications.types'
 
 // =============================================================================
 // Types
@@ -359,6 +359,24 @@ export const triggerApplicationsAnalysisFn = createServerFn({ method: 'POST' })
     )
 
     return body
+  })
+
+/**
+ * Retrieves the 2026-framed application search funnel analytics via admin-api.
+ *
+ * Every transition rate is returned alongside an honest `context` qualifier;
+ * the UI never renders a rate without it. No success score, velocity, or
+ * cohort-ranking signal is produced.
+ *
+ * @see GET /applications/analytics/funnel — upstream implementation
+ * @returns The funnel summary, per-transition rates, and reference ranges
+ */
+export const getFunnelAnalyticsFn = createServerFn({ method: 'GET' })
+  .handler(async () => {
+    await requireAuth()
+    return apiFetch<FunnelAnalytics>('/applications/analytics/funnel', {
+      pathTemplate: '/applications/analytics/funnel',
+    })
   })
 
 export const getPipelineRunStatusFn = createServerFn({ method: 'GET' })
