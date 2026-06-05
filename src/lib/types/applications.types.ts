@@ -476,6 +476,10 @@ export interface InterviewPrepOutput {
   readonly systemDesignWalkthrough?: readonly SystemDesignCard[]
   /** System-design only: concern-coverage summary (code-authoritative). */
   readonly systemDesignCoverage?: SystemDesignCoverage
+  /** Bar-raiser only: grounded leadership-principle walkthrough, one card per principle. */
+  readonly barRaiserWalkthrough?: readonly BarRaiserPrinciple[]
+  /** Bar-raiser only: leadership-principle coverage summary (code-authoritative). */
+  readonly barRaiserCoverage?: BarRaiserCoverage
 }
 
 /** Evidence pointer cited by a System Design walkthrough card. */
@@ -509,6 +513,40 @@ export interface SystemDesignCard {
 
 /** Code-authoritative concern coverage for the System Design walkthrough. */
 export interface SystemDesignCoverage {
+  readonly relevantTotal: number
+  readonly relevantAddressed: number
+}
+
+/** One grounded STAR story backing a Bar Raiser leadership principle. */
+export interface BarRaiserStory {
+  readonly title: string
+  readonly situation: string
+  readonly task: string
+  readonly action: string
+  readonly result: string
+  readonly evidenceRefs: readonly EvidenceRef[]
+  /** Load-bearing: how to keep the story honest (claimed vs demonstrated). */
+  readonly honestyCalibration: string
+  /** What lands this story at the target seniority. */
+  readonly seniorityNote: string
+}
+
+/** Coverage strength for one leadership principle. */
+export type BarRaiserPrincipleCoverage = 'strong' | 'partial' | 'none'
+
+/** One principle in the project-anchored Bar Raiser walkthrough. */
+export interface BarRaiserPrinciple {
+  readonly principleId: string
+  readonly principleName: string
+  readonly interpretation: string
+  readonly coverage: BarRaiserPrincipleCoverage
+  readonly stories: readonly BarRaiserStory[]
+  readonly probingQuestions: readonly { question: string; framing: string }[]
+  readonly gapGuidance: string | null
+}
+
+/** Code-authoritative principle coverage for the Bar Raiser walkthrough. */
+export interface BarRaiserCoverage {
   readonly relevantTotal: number
   readonly relevantAddressed: number
 }
