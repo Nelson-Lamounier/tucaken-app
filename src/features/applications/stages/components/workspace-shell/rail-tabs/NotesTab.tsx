@@ -15,7 +15,7 @@ interface SectionGroup {
 function groupBySection(store: AnnotationStore): SectionGroup[] {
   const bySection = new Map<string, ItemAnnotations[]>()
   for (const item of Object.values(store)) {
-    if (item.notes.length === 0) continue
+    if (!item || !Array.isArray(item.notes) || item.notes.length === 0) continue
     const key = item.section ?? NO_SECTION
     const list = bySection.get(key) ?? []
     list.push(item)
