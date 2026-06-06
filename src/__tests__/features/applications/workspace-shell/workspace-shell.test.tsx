@@ -14,7 +14,7 @@ const detail = {
 beforeEach(() => globalThis.localStorage.clear())
 
 describe('WorkspaceShell', () => {
-  it('renders summary children beside the rail and wires selection end-to-end', async () => {
+  it('renders summary children and opens the detail drawer on selection', async () => {
     const user = userEvent.setup()
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
@@ -27,7 +27,8 @@ describe('WorkspaceShell', () => {
       </QueryClientProvider>,
     )
     expect(screen.getByText('Topics')).toBeTruthy()
-    expect(screen.getByText(/Select an item/i)).toBeTruthy()
+    // Drawer is closed until a row is selected — no detail content yet.
+    expect(screen.queryByText('Caching body')).toBeNull()
     await user.click(screen.getByRole('button', { name: /Caching/ }))
     expect(await screen.findByText('Caching body')).toBeTruthy()
   })

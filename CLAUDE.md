@@ -127,6 +127,18 @@ rg -n "<probable-component-name>" src/components src/features
 - Use Tailwind utility classes that resolve to those tokens. Avoid arbitrary hex (`bg-[#abc]`) outside the theme block.
 - Dark mode via `next-themes`. Any new component must render correctly in both modes.
 
+### Corner radius — default `rounded-md`
+
+- **Default corner radius for new components is `rounded-md`** — cards, panels, tiles,
+  buttons, inputs, dropdowns, badges/chips. Keep the whole surface on one radius;
+  don't mix `rounded-lg`/`-xl`/`-2xl` across sibling elements of the same component.
+- **Exceptions** (intentional, not flattened to `rounded-md`): `rounded-full` for
+  pills, avatars, status dots, and icon-only circular buttons; `rounded-none` where a
+  flush edge is the design.
+- This is the convention for **new/edited** code — existing components are not
+  retrofitted en masse. When you substantially touch a component, bring its radius
+  in line with `rounded-md` in the same change.
+
 ## Animation — Motion for React
 
 Project rule file: `.claude/rules/motion-react.md` (authoritative; this section summarises).

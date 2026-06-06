@@ -7,6 +7,7 @@ import {
   PencilSquareIcon,
   EnvelopeIcon,
   CheckIcon,
+  ArrowDownTrayIcon,
 } from '@heroicons/react/20/solid'
 
 interface DropDownOptionsProps {
@@ -23,6 +24,8 @@ interface DropDownOptionsProps {
   readonly onDelete?: () => void
   readonly onPublish?: () => void
   readonly onUnpublish?: () => void
+  readonly onDownloadResume?: () => void
+  readonly onDownloadCoverLetter?: () => void
   readonly showPreviewResume?: boolean
   readonly showPreviewCoverLetter?: boolean
   /** Single consolidated "Edit" action — opens the resume builder */
@@ -42,6 +45,8 @@ export default function DropDownOptions({
   onDelete,
   onPublish,
   onUnpublish,
+  onDownloadResume,
+  onDownloadCoverLetter,
   onPreviewArticle,
   onEditArticle,
   onEdit,
@@ -104,6 +109,42 @@ export default function DropDownOptions({
                 Edit
               </button>
             </MenuItem>
+          </div>
+        )}
+
+        {/* Downloads (attachments) */}
+        {(onDownloadResume || onDownloadCoverLetter) && (
+          <div className="py-1">
+            {onDownloadResume && (
+              <MenuItem>
+                <button
+                  type="button"
+                  onClick={onDownloadResume}
+                  className="group flex w-full items-center px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 data-focus:bg-zinc-50 dark:data-focus:bg-white/5 data-focus:text-zinc-900 dark:data-focus:text-white data-focus:outline-hidden"
+                >
+                  <ArrowDownTrayIcon
+                    aria-hidden="true"
+                    className="mr-3 size-5 text-zinc-400 dark:text-zinc-500 group-data-focus:text-zinc-600 dark:group-data-focus:text-white"
+                  />
+                  Download Resume
+                </button>
+              </MenuItem>
+            )}
+            {onDownloadCoverLetter && (
+              <MenuItem>
+                <button
+                  type="button"
+                  onClick={onDownloadCoverLetter}
+                  className="group flex w-full items-center px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 data-focus:bg-zinc-50 dark:data-focus:bg-white/5 data-focus:text-zinc-900 dark:data-focus:text-white data-focus:outline-hidden"
+                >
+                  <ArrowDownTrayIcon
+                    aria-hidden="true"
+                    className="mr-3 size-5 text-zinc-400 dark:text-zinc-500 group-data-focus:text-zinc-600 dark:group-data-focus:text-white"
+                  />
+                  Download Cover Letter
+                </button>
+              </MenuItem>
+            )}
           </div>
         )}
 

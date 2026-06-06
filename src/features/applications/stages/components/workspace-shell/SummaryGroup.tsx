@@ -1,8 +1,16 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { createContext, useContext, useState, type ReactNode } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
+import { useSummaryOrder } from './summary-order'
+
+/** The enclosing group's title, so rows/cards can tag their selection with it. */
+const SummaryGroupTitleContext = createContext<string | undefined>(undefined)
+
+export function useSummaryGroupTitle(): string | undefined {
+  return useContext(SummaryGroupTitleContext)
+}
 
 interface SummaryGroupProps {
   readonly id: string
@@ -10,23 +18,31 @@ interface SummaryGroupProps {
   readonly count?: number
   readonly subtitle?: string
   readonly children: ReactNode
+  /** Force the initial open state. When omitted, the group opens by default
+   *  unless it sits inside a SummaryOrderProvider, where only the first group
+   *  opens. */
   readonly defaultOpen?: boolean
 }
 
-/** Collapsible labelled group of SummaryRows. */
+/** Collapsible labelled group of SummaryRows, rendered as a bordered panel. */
 export function SummaryGroup({
   id,
   title,
   count,
   subtitle,
   children,
-  defaultOpen = true,
+  defaultOpen,
 }: SummaryGroupProps) {
-  const [open, setOpen] = useState(defaultOpen)
+  const order = useSummaryOrder()
+  const [open, setOpen] = useState(() => {
+    if (defaultOpen !== undefined) return defaultOpen
+    if (order) return order.registerFirst(id)
+    return true
+  })
   const regionId = `summary-group-${id}`
 
   return (
-    <section className="space-y-2">
+    <section className="space-y-2 rounded-md border border-zinc-200 bg-zinc-50/50 p-4 dark:border-white/10 dark:bg-white/2">
       <button
         type="button"
         onClick={() => setOpen(prev => !prev)}
@@ -57,7 +73,7 @@ export function SummaryGroup({
             style={{ overflow: 'hidden', willChange: 'opacity' }}
             className="space-y-2 pl-6"
           >
-            {children}
+            <SummaryGroupTitleContext.Provider value={title}>{children}</SummaryGroupTitleContext.Provider>
           </motion.div>
         )}
       </AnimatePresence>

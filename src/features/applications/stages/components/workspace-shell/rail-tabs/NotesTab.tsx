@@ -1,65 +1,76 @@
 'use client'
 
 import { useMemo } from 'react'
-import type { ApplicationDetail, InterviewStage } from '@/lib/types/applications.types'
-import { STAGE_LABELS } from '@/features/applications/components/ApplicationTypes'
-import { STAGE_ORDER } from '@/features/applications/stages/types/stage'
-import { useStageDraft } from '@/features/applications/stages/hooks/useStageDraft'
+import type { ItemAnnotations } from '@/lib/types/applications.types'
+import type { AnnotationStore } from '@/features/applications/stages/hooks/useAnnotations'
 
-/** Read every stage's saved notes straight from localStorage for the aggregate. */
-function readAllNotes(slug: string): readonly { stage: InterviewStage; notes: string }[] {
-  if (typeof window === 'undefined') return []
-  const out: { stage: InterviewStage; notes: string }[] = []
-  for (const stage of STAGE_ORDER) {
-    const raw = window.localStorage.getItem(`appstage:${slug}:${stage}`)
-    if (!raw) continue
-    try {
-      const parsed: unknown = JSON.parse(raw)
-      if (typeof parsed === 'object' && parsed !== null) {
-        const notes = (parsed as { notes?: unknown }).notes
-        if (typeof notes === 'string' && notes.trim()) out.push({ stage, notes })
-      }
-    } catch {
-      // skip malformed entry
-    }
+const NO_SECTION = 'Other'
+
+interface SectionGroup {
+  readonly section: string
+  readonly items: readonly ItemAnnotations[]
+}
+
+/** Group the item-annotations by section for the breakdown view. */
+function groupBySection(store: AnnotationStore): SectionGroup[] {
+  const bySection = new Map<string, ItemAnnotations[]>()
+  for (const item of Object.values(store)) {
+    if (item.notes.length === 0) continue
+    const key = item.section ?? NO_SECTION
+    const list = bySection.get(key) ?? []
+    list.push(item)
+    bySection.set(key, list)
   }
-  return out
+  return Array.from(bySection, ([section, items]) => ({ section, items }))
 }
 
-interface NotesTabProps {
-  readonly detail: ApplicationDetail
-  readonly activeStage: InterviewStage
+function formatWhen(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
-export function NotesTab({ detail, activeStage }: NotesTabProps) {
-  const { draft, setNotes } = useStageDraft(detail.slug, activeStage)
-  const allNotes = useMemo(() => readAllNotes(detail.slug), [detail.slug, draft.notes])
+/**
+ * Read-only breakdown of every annotation on this application, grouped by the
+ * section it was written in (e.g. "Skills gaps") and then by item. Notes are
+ * authored from each item's Detail tab; this aggregates them.
+ */
+export function NotesTab({ store }: { readonly store: AnnotationStore }) {
+  const groups = useMemo(() => groupBySection(store), [store])
+
+  if (groups.length === 0) {
+    return (
+      <p className="py-10 text-center text-sm text-zinc-500 dark:text-zinc-400">
+        No annotations yet. Add notes from an item&apos;s Detail tab and they&apos;ll appear here, grouped by section.
+      </p>
+    )
+  }
 
   return (
-    <div className="space-y-4">
-      {allNotes.length > 0 && (
-        <div className="space-y-2">
-          {allNotes.map(n => (
-            <div key={n.stage}>
-              <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">{STAGE_LABELS[n.stage]}</p>
-              <p className="whitespace-pre-wrap text-xs text-zinc-600 dark:text-zinc-400">{n.notes}</p>
-            </div>
-          ))}
-        </div>
-      )}
-      <div className="border-t border-zinc-200 pt-4 dark:border-white/10">
-        <label htmlFor="quick-note" className="mb-1.5 block text-[11px] font-medium text-zinc-500">
-          Note for {STAGE_LABELS[activeStage]}
-        </label>
-        <textarea
-          id="quick-note"
-          value={draft.notes}
-          onChange={e => setNotes(e.target.value)}
-          rows={5}
-          placeholder="Auto-saves as you type…"
-          className="block w-full rounded-md border-0 bg-zinc-50 p-2 text-sm text-zinc-900 shadow-sm ring-1 ring-inset ring-zinc-300 focus:ring-2 focus:ring-inset focus:ring-teal-500 dark:bg-white/5 dark:text-white dark:ring-white/10"
-        />
-      </div>
+    <div className="space-y-6">
+      {groups.map(group => (
+        <section key={group.section} className="space-y-3">
+          <h3 className="text-[11px] font-semibold uppercase text-accent">{group.section}</h3>
+          <div className="space-y-3">
+            {group.items.map(item => (
+              <div key={item.label}>
+                <p className="mb-1.5 text-sm font-medium text-zinc-900 dark:text-zinc-100">{item.label}</p>
+                <ul className="space-y-2">
+                  {item.notes.map(n => (
+                    <li
+                      key={n.id}
+                      className="rounded-md border border-zinc-200 bg-zinc-50 p-3 dark:border-white/10 dark:bg-white/5"
+                    >
+                      <p className="whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-200">{n.text}</p>
+                      <time className="mt-2 block text-[11px] text-zinc-400">{formatWhen(n.createdAt)}</time>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
     </div>
   )
 }

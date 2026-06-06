@@ -46,6 +46,7 @@ jest.unstable_mockModule('../../src/lib/repositories/applications.js', () => ({
   updateApplicationStatus: updateApplicationStatusMock,
   updateInterviewStage:    updateInterviewStageMock,
   deleteApplication:       jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  updateApplicationAnnotations: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 }));
 
 // Mock the interview-stages repo — the main subject of PATCH tests.

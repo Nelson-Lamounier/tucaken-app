@@ -99,6 +99,30 @@ export const deleteApplicationFn = createServerFn({ method: 'POST' })
   })
 
 /**
+ * Replaces the application-level user annotations blob (keyed by insight item id).
+ * Persisted on `job_applications.user_annotations`.
+ *
+ * @param data.slug - The application slug
+ * @param data.annotations - The full annotations map to persist
+ * @returns Success indicator
+ */
+export const patchApplicationAnnotationsFn = createServerFn({ method: 'POST' })
+  .inputValidator(z.object({ slug: z.string().min(1), annotations: z.record(z.any()) }))
+  .handler(async ({ data }) => {
+    await requireAuth()
+
+    await apiFetch<{ success: boolean }>(
+      `/applications/${encodeURIComponent(data.slug)}/annotations`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ annotations: data.annotations }),
+        pathTemplate: '/applications/:slug/annotations',
+      },
+    )
+    return { success: true }
+  })
+
+/**
  * Updates the status (and optionally interview stage) of an application.
  *
  * @param data.slug - The application slug

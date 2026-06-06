@@ -35,6 +35,7 @@ import {
   updateApplicationStatus as pgUpdateStatus,
   updateInterviewStage,
   deleteApplication as pgDeleteApplication,
+  updateApplicationAnnotations,
 } from '../lib/repositories/applications.js';
 import {
   upsertStageUserState,
@@ -521,6 +522,7 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
           ...(devopsEvidence !== undefined ? { devopsEvidence } : {}),
           ...(systemTours !== undefined ? { systemTours } : {}),
           stages:              Object.fromEntries(stages.map(s => [s.stage_type, s])),
+          userAnnotations:     application.userAnnotations ?? {},
         },
       });
     });
@@ -584,6 +586,26 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
         }
       }
 
+      return ctx.json({ success: true });
+    });
+  });
+
+  // ── PATCH /:slug/annotations — replace the application-level user annotations ──
+  app.patch('/:slug/annotations', async (ctx) => {
+    const userId = ctx.get('userId');
+    if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
+
+    const slug = ctx.req.param('slug');
+
+    let body: { annotations?: Record<string, unknown> };
+    try { body = await ctx.req.json(); }
+    catch { return ctx.json({ error: 'Body must be valid JSON' }, 400); }
+
+    return withUser(getPool(config), userId, async (db) => {
+      const application = await getApplication(db, slug);
+      if (!application) return ctx.json({ error: `Application not found: ${slug}` }, 404);
+
+      await updateApplicationAnnotations(db, application.id, body.annotations ?? {});
       return ctx.json({ success: true });
     });
   });

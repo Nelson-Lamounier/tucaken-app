@@ -4,7 +4,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { DetailRailProvider, useDetailRail } from '@/features/applications/stages/components/workspace-shell/selection'
-import { DetailRail } from '@/features/applications/stages/components/workspace-shell/DetailRail'
+import { DetailRailDrawer } from '@/features/applications/stages/components/workspace-shell/DetailRail'
 import type { ApplicationDetail } from '@/lib/types/applications.types'
 
 const detail = {
@@ -23,7 +23,7 @@ function renderRail(extra?: React.ReactNode) {
     <QueryClientProvider client={client}>
       <DetailRailProvider initialFocus={undefined}>
         {extra}
-        <DetailRail detail={detail} activeStage="technical" />
+        <DetailRailDrawer detail={detail} />
       </DetailRailProvider>
     </QueryClientProvider>,
   )
@@ -31,13 +31,14 @@ function renderRail(extra?: React.ReactNode) {
 
 beforeEach(() => globalThis.localStorage.clear())
 
-describe('DetailRail', () => {
-  it('shows the empty placeholder when nothing is selected', () => {
+describe('DetailRailDrawer', () => {
+  it('stays closed when nothing is selected', () => {
     renderRail()
-    expect(screen.getByText(/Select an item/i)).toBeTruthy()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByText(/Select an item/i)).toBeNull()
   })
 
-  it('renders selected detail and switches tabs', async () => {
+  it('opens with the selected detail and switches tabs', async () => {
     const user = userEvent.setup()
     renderRail(<Selector />)
     await user.click(screen.getByText('pick'))

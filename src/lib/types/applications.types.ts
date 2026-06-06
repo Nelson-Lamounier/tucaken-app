@@ -683,6 +683,32 @@ export interface ApplicationDetail {
    * user annotations). May be absent on older records.
    */
   readonly stages?: Record<string, StageState>
+  /**
+   * User annotations, keyed by the insight item id (e.g. `gap-Ruby`). Each item
+   * carries its section + label and a list of timestamped notes. Persisted on
+   * `job_applications.user_annotations` (JSONB). Absent on older records.
+   */
+  readonly userAnnotations?: Record<string, ItemAnnotations>
+}
+
+// =============================================================================
+// ANNOTATIONS
+// =============================================================================
+
+/** A single timestamped annotation on an insight item. */
+export interface Annotation {
+  readonly id: string
+  readonly text: string
+  readonly createdAt: string
+}
+
+/** All annotations for one insight item, with the section/label for the breakdown view. */
+export interface ItemAnnotations {
+  /** Group/section the item belongs to (e.g. "Skills gaps"). */
+  readonly section?: string
+  /** Item label (e.g. "Ruby"). */
+  readonly label: string
+  readonly notes: readonly Annotation[]
 }
 
 // =============================================================================

@@ -3,6 +3,7 @@
 import { ChevronRight } from 'lucide-react'
 import { useEffect, useRef, type ReactNode } from 'react'
 import { useDetailRail } from './selection'
+import { useSummaryGroupTitle } from './SummaryGroup'
 
 interface SummaryRowProps {
   readonly id: string
@@ -18,20 +19,21 @@ interface SummaryRowProps {
 /** One scannable line in a SummaryGroup. Click → publishes `detail` to the rail. */
 export function SummaryRow({ id, label, detail, indicator, preview }: SummaryRowProps) {
   const { selected, select, pendingFocus } = useDetailRail()
+  const section = useSummaryGroupTitle()
   const isActive = selected?.id === id
   const autoSelected = useRef(false)
 
   useEffect(() => {
     if (!autoSelected.current && pendingFocus === id && !selected) {
       autoSelected.current = true
-      select({ id, label, node: detail })
+      select({ id, label, node: detail, section })
     }
-  }, [pendingFocus, id, selected, select, label, detail])
+  }, [pendingFocus, id, selected, select, label, detail, section])
 
   return (
     <button
       type="button"
-      onClick={() => select({ id, label, node: detail })}
+      onClick={() => select({ id, label, node: detail, section })}
       aria-current={isActive ? 'true' : undefined}
       aria-controls="detail-rail-panel"
       className={[

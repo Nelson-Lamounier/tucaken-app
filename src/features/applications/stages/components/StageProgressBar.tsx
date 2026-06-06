@@ -1,7 +1,7 @@
 'use client'
 
+import { Fragment } from 'react'
 import { Check } from 'lucide-react'
-import { motion, MotionConfig } from 'motion/react'
 import type { InterviewStage, StageState } from '@/lib/types/applications.types'
 import { STAGE_LABELS } from '../../components/ApplicationTypes'
 import { STAGE_ORDER, stageProgress } from '../types/stage'
@@ -47,60 +47,78 @@ function resolveSegment(
 }
 
 /**
- * Horizontal seven-segment stage navigator. Each segment is a Current-Stage
- * derived state (completed / current / upcoming) and an Active-Stage selection
- * highlight (the sliding `layoutId` pill). Scrolls horizontally on mobile.
- *
- * When `stages` is provided, per-stage lifecycle state from the backend drives
- * the segment display (completed / current / not_applicable); a queued
- * prep_status adds a pulsing "Generating…" affordance.
+ * Pipeline connector fill: solid accent for segments before the active node, a
+ * left→right gradient flowing into the active node, muted track after it.
+ */
+function connectorClass(idx: number, activeIndex: number): string {
+  if (idx < activeIndex) return 'bg-[color-mix(in_oklab,var(--accent)_45%,transparent)]'
+  if (idx === activeIndex) {
+    return 'bg-gradient-to-r from-[color-mix(in_oklab,var(--accent)_10%,transparent)] to-[var(--accent)]'
+  }
+  return 'bg-zinc-200 dark:bg-white/10'
+}
+
+/** Node text colour — extracted to avoid a nested ternary in JSX. */
+function nodeTextClass(notApplicable: boolean, isActive: boolean): string {
+  if (notApplicable) {
+    return isActive
+      ? 'text-zinc-400 dark:text-zinc-500'
+      : 'text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-400'
+  }
+  return isActive
+    ? 'text-accent'
+    : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+}
+
+function nodeAriaLabel(stage: InterviewStage, notApplicable: boolean, queued: boolean): string {
+  if (notApplicable) return `${STAGE_LABELS[stage]} (not applicable)`
+  if (queued) return `${STAGE_LABELS[stage]} — generating prep`
+  return STAGE_LABELS[stage]
+}
+
+/**
+ * Horizontal seven-stage pipeline navigator. Each stage is a node (dot + label)
+ * connected by a track; the track fills with an accent gradient up to the
+ * Active stage, so the row reads like a progress pipeline. Node dots still
+ * reflect Current-Stage lifecycle (completed / current / not-applicable), and
+ * the active node carries an accent halo. Scrolls horizontally on mobile.
  */
 export function StageProgressBar({ current, active, onSelect, stages }: StageProgressBarProps) {
-  return (
-    <MotionConfig transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}>
-      <div
-        role="tablist"
-        aria-label="Interview stages"
-        className="flex gap-1 overflow-x-auto rounded-xl border border-zinc-200 bg-white p-1 dark:border-white/10 dark:bg-white/2"
-      >
-        {STAGE_ORDER.map(stage => {
-          const { completed, isCurrent, notApplicable, queued } = resolveSegment(stage, current, stages)
-          const isActive = stage === active
+  const activeIndex = STAGE_ORDER.indexOf(active)
 
-          return (
+  return (
+    <div role="tablist" aria-label="Interview stages" className="flex items-start overflow-x-auto">
+      {STAGE_ORDER.map((stage, idx) => {
+        const { completed, isCurrent, notApplicable, queued } = resolveSegment(stage, current, stages)
+        const isActive = stage === active
+
+        return (
+          <Fragment key={stage}>
+            {idx > 0 && (
+              <span
+                aria-hidden
+                className={`mt-2 h-0.5 min-w-8 flex-1 rounded-full transition-colors ${connectorClass(idx, activeIndex)}`}
+              />
+            )}
             <button
-              key={stage}
               type="button"
               role="tab"
               aria-selected={isActive}
               aria-current={isCurrent ? 'step' : undefined}
-              aria-label={
-                notApplicable
-                  ? `${STAGE_LABELS[stage]} (not applicable)`
-                  : queued
-                    ? `${STAGE_LABELS[stage]} — generating prep`
-                    : STAGE_LABELS[stage]
-              }
+              aria-label={nodeAriaLabel(stage, notApplicable, queued)}
               onClick={() => onSelect(stage)}
-              className={`relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-500 ${
-                notApplicable
-                  ? isActive
-                    ? 'text-zinc-400 dark:text-zinc-500'
-                    : 'text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-400'
-                  : isActive
-                    ? 'text-accent'
-                    : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
-              }`}
+              className={`group relative flex shrink-0 flex-col items-center gap-2 whitespace-nowrap rounded-md px-2 pb-1 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-500 ${nodeTextClass(notApplicable, isActive)}`}
             >
-              {isActive && (
-                <motion.span
-                  layoutId="stage-active-pill"
-                  className="absolute inset-0 rounded-lg bg-[color-mix(in_oklab,var(--accent)_12%,transparent)] inset-ring inset-ring-[color-mix(in_oklab,var(--accent)_28%,transparent)]"
-                  style={{ willChange: 'transform' }}
-                />
-              )}
-              <span className="relative flex items-center gap-2">
+              <span
+                className={
+                  isActive && !notApplicable
+                    ? 'rounded-full ring-2 ring-offset-0 ring-[color-mix(in_oklab,var(--accent)_45%,transparent)]'
+                    : undefined
+                }
+              >
                 <StageDot completed={completed} current={isCurrent} notApplicable={notApplicable} />
+              </span>
+              <span className="flex items-center gap-1.5">
                 {STAGE_LABELS[stage]}
                 {queued && (
                   <span
@@ -110,10 +128,10 @@ export function StageProgressBar({ current, active, onSelect, stages }: StagePro
                 )}
               </span>
             </button>
-          )
-        })}
-      </div>
-    </MotionConfig>
+          </Fragment>
+        )
+      })}
+    </div>
   )
 }
 
