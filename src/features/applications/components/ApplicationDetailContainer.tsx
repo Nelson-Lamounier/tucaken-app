@@ -18,6 +18,8 @@ import { BarRaiserWorkspace } from '../stages/workspaces/BarRaiserWorkspace'
 import { FinalWorkspace } from '../stages/workspaces/FinalWorkspace'
 import { AppliedWorkspace } from '../stages/workspaces/AppliedWorkspace'
 import { StageGlancePanel } from './StageGlancePanel'
+import { StageDraftProvider } from '../stages/hooks/stage-draft-context'
+import type { StageDraft } from '../stages/hooks/useStageDraft'
 import { STAGE_ORDER, stageIndex } from '../stages/types/stage'
 import { Button } from '@/components/ui/Button'
 import { ApplicationActionsMenu } from './ApplicationActionsMenu'
@@ -228,36 +230,11 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
     year: 'numeric',
   })
 
-  return (
-    <div className="px-4 py-6 sm:px-6 lg:px-8">
-      {/* Back nav */}
-      <button
-        type="button"
-        onClick={() => navigate({ to: '/applications/list' })}
-        className="mb-6 flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 transition-colors hover:text-zinc-900 dark:hover:text-zinc-200"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to Applications
-      </button>
-
-      {/* Stage navigation — top of the section */}
-      <div className="mb-6">
-        <StageProgressBar
-          current={detail.interviewStage}
-          active={resolvedStage}
-          onSelect={handleStageSelect}
-          stages={detail.stages}
-        />
-      </div>
-
-      {/* Page header */}
-      <ApplicationHeader
-        detail={detail}
-        statusPending={statusMutation.isPending}
-        onStatusChange={handleStatusChange}
-        dateStr={dateStr}
-      />
-
+  // Dashboard panel + active-stage workspace. For phone-screen this region is
+  // wrapped in a StageDraftProvider so the dashboard Schedule panel and the
+  // workspace share one persisted draft (see below).
+  const stageRegion = (
+    <>
       {/* At-a-glance dashboard panel — dynamic per active stage */}
       <StageGlancePanel detail={detail} stage={resolvedStage} />
 
@@ -299,6 +276,51 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
           )}
         </WorkspaceShell>
       </div>
+    </>
+  )
+
+  return (
+    <div className="px-4 py-6 sm:px-6 lg:px-8">
+      {/* Back nav */}
+      <button
+        type="button"
+        onClick={() => navigate({ to: '/applications/list' })}
+        className="mb-6 flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 transition-colors hover:text-zinc-900 dark:hover:text-zinc-200"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to Applications
+      </button>
+
+      {/* Stage navigation — top of the section */}
+      <div className="mb-6">
+        <StageProgressBar
+          current={detail.interviewStage}
+          active={resolvedStage}
+          onSelect={handleStageSelect}
+          stages={detail.stages}
+        />
+      </div>
+
+      {/* Page header */}
+      <ApplicationHeader
+        detail={detail}
+        statusPending={statusMutation.isPending}
+        onStatusChange={handleStatusChange}
+        dateStr={dateStr}
+      />
+
+      {resolvedStage === 'phone-screen' ? (
+        <StageDraftProvider
+          slug={detail.slug}
+          stage={resolvedStage}
+          serverState={detail.stages?.[resolvedStage]?.user_state as Partial<StageDraft> | undefined}
+        >
+          {stageRegion}
+        </StageDraftProvider>
+      ) : (
+        stageRegion
+      )}
+
       {/* Confirm modal for AI coach dispatch */}
       <ConfirmModal
         open={confirmGenStage !== null}

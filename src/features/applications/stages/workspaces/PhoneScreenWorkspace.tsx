@@ -1,28 +1,19 @@
 'use client'
 
-import { useMemo } from 'react'
-import { CheckCircle2, Lightbulb } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Lightbulb, RotateCw } from 'lucide-react'
+import { motion, useReducedMotion } from 'motion/react'
 import type { ApplicationDetail, PhoneScreenTalkingPoint } from '@/lib/types/applications.types'
 import { Card } from '@/components/ui/Card'
-import { ScheduleCard } from '../components/ScheduleCard'
 import { ChecklistItem } from '../components/ChecklistItem'
-import { SummaryGroup, SummaryRow } from '../components/workspace-shell'
-import { useStageDraft } from '../hooks/useStageDraft'
+import { SummaryGroup } from '../components/workspace-shell'
+import { useStageDraftContext } from '../hooks/stage-draft-context'
 import { interviewPrepToWorkspace, resolveStagePrep } from '../types/workspace'
 import type { ChecklistEntry } from '../types/workspace'
 
 interface PhoneScreenWorkspaceProps {
   readonly detail: ApplicationDetail
 }
-
-/** Generic phone-screen expectations — not company-specific (no backend for
- *  that yet); honest, broadly-true content rather than fabricated specifics. */
-const WHAT_TO_EXPECT: readonly string[] = [
-  'A recruiter or hiring manager confirming your background and motivation.',
-  'High-level walk-through of your most relevant experience.',
-  'Logistics: timeline, compensation range, remote/onsite, visa.',
-  'A short window at the end for your questions.',
-]
 
 /** Generic questions worth asking on a first call. */
 const DEFAULT_QUESTIONS: readonly ChecklistEntry[] = [
@@ -44,104 +35,101 @@ function dedupeQuestions(entries: readonly ChecklistEntry[]): ChecklistEntry[] {
   return out
 }
 
-/** Career arc — phone-screen narrative from the Coach Agent. One row, full text in the rail. */
-function CareerArcGroup({ summary }: { readonly summary: string }) {
+const FLIP_SPRING = { type: 'spring', visualDuration: 0.45, bounce: 0.18 } as const
+const FACE = 'absolute inset-0 flex flex-col rounded-md border p-4 [backface-visibility:hidden] [-webkit-backface-visibility:hidden]'
+
+interface TalkingPointCardProps {
+  readonly index: number
+  readonly point: string
+  readonly evidence?: string
+}
+
+/** A flip card: the strength on the front, its evidence on the back — tap to test recall. */
+function TalkingPointCard({ index, point, evidence }: TalkingPointCardProps) {
+  const reduce = useReducedMotion()
+  const [flipped, setFlipped] = useState(false)
+  const back = evidence ?? 'A verified strength from your own work — lead with it confidently.'
+
   return (
-    <SummaryGroup id="career-arc" title="Your career arc" subtitle="A tight narrative to open the call with.">
-      <SummaryRow
-        id="career-arc-summary"
-        label="Career arc"
-        detail={
-          <Card className="p-4">
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
-              {summary}
-            </p>
-          </Card>
-        }
-      />
-    </SummaryGroup>
+    <button
+      type="button"
+      onClick={() => setFlipped(prev => !prev)}
+      aria-pressed={flipped}
+      className="h-36 w-full rounded-md text-left perspective-distant focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-500"
+    >
+      <motion.div
+        className="relative h-full w-full"
+        style={{ transformStyle: 'preserve-3d', willChange: 'transform' }}
+        initial={false}
+        animate={{ rotateY: flipped ? 180 : 0 }}
+        transition={reduce ? { duration: 0 } : FLIP_SPRING}
+      >
+        {/* Front — the strength to recall */}
+        <div className={`${FACE} border-zinc-200 bg-white dark:border-white/10 dark:bg-white/2`}>
+          <div className="flex items-center justify-between">
+            <span className="flex size-8 items-center justify-center rounded-full bg-accent/15 text-lg font-bold text-accent">
+              {index}
+            </span>
+            <Lightbulb className="size-4 text-accent" aria-hidden />
+          </div>
+          <p className="mt-2 flex-1 text-sm font-semibold leading-snug text-zinc-900 dark:text-zinc-100">{point}</p>
+          <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-zinc-400">
+            <RotateCw className="size-3" aria-hidden /> Tap to reveal evidence
+          </span>
+        </div>
+
+        {/* Back — the evidence */}
+        <div className={`${FACE} border-accent/40 bg-zinc-50 transform-[rotateY(180deg)] dark:border-accent/30 dark:bg-white/5`}>
+          <span className="text-[10px] font-semibold uppercase text-accent">Evidence</span>
+          <p className="mt-1.5 flex-1 overflow-y-auto text-sm leading-relaxed text-zinc-700 dark:text-zinc-200">{back}</p>
+          <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-zinc-400">
+            <RotateCw className="size-3" aria-hidden /> Tap to flip back
+          </span>
+        </div>
+      </motion.div>
+    </button>
   )
 }
 
-/** What to expect — single row whose detail is the full bulleted list. */
-function WhatToExpectGroup() {
-  return (
-    <SummaryGroup id="what-to-expect" title="What to expect">
-      <SummaryRow
-        id="what-to-expect-list"
-        label="What to expect"
-        detail={
-          <Card className="p-4">
-            <ul className="space-y-2">
-              {WHAT_TO_EXPECT.map(item => (
-                <li key={item} className="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">
-                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-zinc-400" aria-hidden />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </Card>
-        }
-      />
-    </SummaryGroup>
-  )
+interface PointCard {
+  readonly key: string
+  readonly point: string
+  readonly evidence?: string
 }
 
-/** Detail body for a JD-cross-referenced talking point. */
-function TalkingPointDetail({ tp }: { readonly tp: PhoneScreenTalkingPoint }) {
-  return (
-    <Card className="space-y-1.5 p-4">
-      <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{tp.point}</p>
-      {tp.evidence ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">{tp.evidence}</p>
-      ) : null}
-    </Card>
-  )
-}
-
-/** Talking points — one SummaryRow per point (Coach JD points preferred over raw verified matches). */
-function TalkingPointsGroup({
+/** Talking points — a flip-card deck (active recall) instead of a list of rows. */
+function TalkingPointsPanel({
   jdPoints,
   fallbackPoints,
 }: {
   readonly jdPoints: readonly PhoneScreenTalkingPoint[]
   readonly fallbackPoints: readonly string[]
 }) {
+  const cards: PointCard[] =
+    jdPoints.length > 0
+      ? jdPoints.map(tp => ({ key: tp.point, point: tp.point, evidence: tp.evidence }))
+      : fallbackPoints.map(point => ({ key: point, point }))
+
   return (
-    <SummaryGroup
-      id="talking-points"
-      title="Your talking points"
-      subtitle="Strengths to lead with, from your verified evidence."
-    >
-      {jdPoints.map(tp => (
-        <SummaryRow
-          key={tp.point}
-          id={tp.point}
-          label={tp.point}
-          indicator={<Lightbulb className="size-4 shrink-0 text-accent" aria-hidden />}
-          detail={<TalkingPointDetail tp={tp} />}
-        />
-      ))}
-      {jdPoints.length === 0 &&
-        fallbackPoints.map(point => (
-          <SummaryRow
-            key={point}
-            id={point}
-            label={point}
-            indicator={<Lightbulb className="size-4 shrink-0 text-accent" aria-hidden />}
-            detail={
-              <Card className="p-4">
-                <p className="text-sm text-zinc-700 dark:text-zinc-300">{point}</p>
-              </Card>
-            }
-          />
-        ))}
-      {jdPoints.length === 0 && fallbackPoints.length === 0 && (
+    <section className="space-y-3 rounded-md border border-zinc-200 bg-zinc-50/50 p-4 dark:border-white/10 dark:bg-white/2">
+      <div>
+        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Your talking points</h3>
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          Strengths to lead with, from your verified evidence. Tap a card to test your recall.
+        </p>
+      </div>
+      {cards.length > 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {cards.map((card, i) => (
+            <TalkingPointCard key={card.key} index={i + 1} point={card.point} evidence={card.evidence} />
+          ))}
+        </div>
+      ) : (
         <Card className="px-4 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
           Talking points appear once the Research Agent has analysed this application.
         </Card>
       )}
-    </SummaryGroup>
+    </section>
   )
 }
 
@@ -251,8 +239,9 @@ function QuestionsToAskGroup({ questions, checkedItems, onToggle }: QuestionsToA
  * Renders a fragment of SummaryGroups into the WorkspaceShell's left column.
  */
 export function PhoneScreenWorkspace({ detail }: PhoneScreenWorkspaceProps) {
-  const stageUserState = detail.stages?.['phone-screen']?.user_state as Partial<import('../hooks/useStageDraft').StageDraft> | undefined
-  const { draft, setSchedule, toggleChecked, patch } = useStageDraft(detail.slug, 'phone-screen', stageUserState)
+  // Schedule & format is edited from the dashboard SchedulePanel; both share this
+  // single stage-draft instance via the provider (see StageDraftProvider).
+  const { draft, toggleChecked, patch } = useStageDraftContext()
 
   const talkingPoints = useMemo(
     () => (detail.research?.verifiedMatches ?? []).map(m => m.skill),
@@ -270,20 +259,7 @@ export function PhoneScreenWorkspace({ detail }: PhoneScreenWorkspaceProps) {
 
   return (
     <>
-      <SummaryGroup id="schedule" title="Schedule & format">
-        <ScheduleCard
-          scheduleAt={draft.scheduleAt}
-          formatNote={draft.formatNote}
-          onChange={setSchedule}
-          formatPlaceholder="e.g. 30 min · recruiter Jane Doe"
-        />
-      </SummaryGroup>
-
-      {prep?.careerArcSummary ? <CareerArcGroup summary={prep.careerArcSummary} /> : null}
-
-      <WhatToExpectGroup />
-
-      <TalkingPointsGroup jdPoints={jdPoints} fallbackPoints={talkingPoints} />
+      <TalkingPointsPanel jdPoints={jdPoints} fallbackPoints={talkingPoints} />
 
       <CompConversationGroup
         compScript={prep?.compScript}

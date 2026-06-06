@@ -4,6 +4,7 @@ import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { WorkspaceShell } from '@/features/applications/stages/components/workspace-shell'
 import { PhoneScreenWorkspace } from '@/features/applications/stages/workspaces/PhoneScreenWorkspace'
+import { StageDraftProvider } from '@/features/applications/stages/hooks/stage-draft-context'
 import type { ApplicationDetail } from '@/lib/types/applications.types'
 
 const detail = {
@@ -20,11 +21,15 @@ describe('PhoneScreenWorkspace', () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     render(
       <QueryClientProvider client={client}>
-        <WorkspaceShell detail={detail} activeStage="phone-screen">
-          <PhoneScreenWorkspace detail={detail} />
-        </WorkspaceShell>
+        <StageDraftProvider slug={detail.slug} stage="phone-screen">
+          <WorkspaceShell detail={detail} activeStage="phone-screen">
+            <PhoneScreenWorkspace detail={detail} />
+          </WorkspaceShell>
+        </StageDraftProvider>
       </QueryClientProvider>,
     )
-    expect(screen.getByText('Schedule & format')).toBeTruthy()
+    // Schedule & format now lives in the dashboard SchedulePanel; the workspace
+    // still renders its talking-points group.
+    expect(screen.getByText('Your talking points')).toBeTruthy()
   })
 })
