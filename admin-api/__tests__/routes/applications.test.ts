@@ -33,6 +33,7 @@ jest.unstable_mockModule('../../src/lib/repositories/applications.js', () => ({
   deleteApplication:       pgDeleteApplicationMock,
   updateApplicationStatus: pgUpdateApplicationStatusMock,
   updateInterviewStage:    jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  updateApplicationAnnotations: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 }));
 
 jest.unstable_mockModule('../../src/lib/repositories/interview-stages.js', () => ({
