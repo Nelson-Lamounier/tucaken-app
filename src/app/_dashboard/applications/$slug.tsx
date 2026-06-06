@@ -12,6 +12,8 @@ const stageSearchSchema = z.object({
 
 export const Route = createFileRoute('/_dashboard/applications/$slug')({
   validateSearch: stageSearchSchema,
+  // Opt out of the AppLayout <main> padding shell so this page is full-bleed.
+  staticData: { disableMainWrapper: true },
   component: ApplicationDetailRoute,
 })
 
@@ -19,9 +21,5 @@ function ApplicationDetailRoute() {
   const { slug } = Route.useParams()
   const { stage, focus } = Route.useSearch()
 
-  return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      <ApplicationDetailContainer slug={slug} activeStage={stage} focus={focus} />
-    </div>
-  )
+  return <ApplicationDetailContainer slug={slug} activeStage={stage} focus={focus} />
 }

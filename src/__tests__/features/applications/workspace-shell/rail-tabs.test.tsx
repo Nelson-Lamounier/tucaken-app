@@ -5,6 +5,7 @@ import { render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { TimelineTab } from '@/features/applications/stages/components/workspace-shell/rail-tabs/TimelineTab'
 import { NotesTab } from '@/features/applications/stages/components/workspace-shell/rail-tabs/NotesTab'
+import type { AnnotationStore } from '@/features/applications/stages/hooks/useAnnotations'
 import type { ApplicationDetail } from '@/lib/types/applications.types'
 
 const detail = {
@@ -36,8 +37,18 @@ describe('rail tabs', () => {
     expect(screen.getByText('Application created')).toBeTruthy()
   })
 
-  it('NotesTab renders the active-stage quick-add label', () => {
-    renderWithQuery(<NotesTab detail={detail} activeStage="technical" />)
-    expect(screen.getByText(/Note for/)).toBeTruthy()
+  it('NotesTab shows the empty state with no annotations', () => {
+    renderWithQuery(<NotesTab store={{}} />)
+    expect(screen.getByText(/No annotations yet/)).toBeTruthy()
+  })
+
+  it('NotesTab groups annotations by section', () => {
+    const store: AnnotationStore = {
+      'gap-ruby': { section: 'Skills gaps', label: 'Ruby', notes: [{ id: 'n1', text: 'Brush up Rails', createdAt: '2026-06-02T10:00:00.000Z' }] },
+    }
+    renderWithQuery(<NotesTab store={store} />)
+    expect(screen.getByText('Skills gaps')).toBeTruthy()
+    expect(screen.getByText('Ruby')).toBeTruthy()
+    expect(screen.getByText('Brush up Rails')).toBeTruthy()
   })
 })

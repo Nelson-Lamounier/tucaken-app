@@ -18,6 +18,8 @@ export interface RailSelection {
   readonly label: string
   /** Full-text detail node rendered in the rail. */
   readonly node: ReactNode
+  /** Group/section this item belongs to (e.g. "Skills gaps") — shown as the drawer eyebrow. */
+  readonly section?: string
 }
 
 export interface DetailRailValue {
