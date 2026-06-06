@@ -20,7 +20,7 @@ import { AppliedWorkspace } from '../stages/workspaces/AppliedWorkspace'
 import { StageGlancePanel } from './StageGlancePanel'
 import { STAGE_ORDER, stageIndex } from '../stages/types/stage'
 import { Button } from '@/components/ui/Button'
-import DropDownOptions from '@/components/ui/DropDownOptions'
+import { ApplicationActionsMenu } from './ApplicationActionsMenu'
 import { triggerCoachFn } from '@/server/pipelines'
 import { ConfirmModal } from '../stages/components/ConfirmModal'
 import { useToastStore } from '@/lib/stores/toast-store'
@@ -99,12 +99,13 @@ function ApplicationHeader({ detail, statusPending, onStatusChange, dateStr }: A
         </div>
       </div>
 
-      <DropDownOptions
-        label={STATUS_LABELS[detail.status]}
-        disabled={statusPending}
-        options={STATUS_OPTIONS}
-        selectedValue={detail.status}
-        onSelect={(val) => onStatusChange(val as ApplicationStatus)}
+      <ApplicationActionsMenu
+        detail={detail}
+        statusLabel={STATUS_LABELS[detail.status]}
+        statusOptions={STATUS_OPTIONS}
+        statusValue={detail.status}
+        statusPending={statusPending}
+        onStatusChange={onStatusChange}
       />
     </div>
   )

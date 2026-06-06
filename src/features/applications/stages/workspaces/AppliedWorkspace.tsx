@@ -1,10 +1,5 @@
 'use client'
 
-import { PaperClipIcon } from '@heroicons/react/20/solid'
-import { useState, useCallback, useRef, useEffect, type ReactNode } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from '@tanstack/react-router'
-import { PenLine, Send, Trash2 } from 'lucide-react'
 import type {
   ApplicationDetail,
   VerifiedMatch,
@@ -15,23 +10,6 @@ import type {
 import { Card } from '@/components/ui/Card'
 import { EvidenceIndicator } from '../components/EvidenceIndicator'
 import { SummaryGroup, SummaryRow, useDetailRail, useSummaryGroupTitle } from '../components/workspace-shell'
-import { adminKeys } from '@/lib/api/query-keys'
-import { useToastStore } from '@/lib/stores/toast-store'
-import { DashboardDrawer } from '@/components/ui/DashboardDrawer'
-import { createResumeFn, setActiveResumeFn } from '@/server/resumes'
-import { deleteApplicationFn } from '@/server/applications'
-import { buildResumeDomForPdf, buildCoverLetterDomForPdf } from '@/lib/resumes/resume-dom-builder'
-import { usePdfDownload } from '@/hooks/use-pdf-download'
-import type { ResumeData } from '@/lib/resumes/resume-data'
-import { ResumeBuilderApp } from '@/features/resume-theme/app/main'
-import {
-  getState,
-  setState,
-  enterEphemeralMode,
-  exitEphemeralMode,
-  type AppState,
-} from '@/features/resume-theme/app/state'
-import { mapApplicationToBuilderState } from '../../utils/resume-adapters'
 
 interface AppliedWorkspaceProps {
   readonly detail: ApplicationDetail
@@ -219,50 +197,102 @@ function PartialMatchesGroup({ matches }: { readonly matches: readonly PartialMa
 }
 
 /** Detail body for one skills gap. */
-function SkillGapDetail({ gap }: { readonly gap: SkillGap }) {
-  return (
-    <Card className="space-y-2 p-4">
-      <div className="flex items-center gap-2">
-        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{gap.skill}</p>
-        {gap.isDisqualifying && (
-          <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:bg-red-500/20 dark:text-red-400">
-            Disqualifying
-          </span>
-        )}
-      </div>
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">{gap.severity}</p>
-      <span className="inline-flex rounded bg-zinc-100 px-1.5 py-0.5 text-xs capitalize text-zinc-600 dark:bg-white/5 dark:text-zinc-400">
-        {gap.gapType} skill
-      </span>
-    </Card>
-  )
+/** Severity copy ("minor"/"significant"/…) → ordinal 1–4 for the meter. */
+const SEVERITY_LEVEL: Record<string, number> = {
+  minor: 1, low: 1, slight: 1, small: 1,
+  moderate: 2, medium: 2, partial: 2,
+  significant: 3, major: 3, high: 3, substantial: 3, serious: 3,
+  critical: 4, severe: 4, disqualifying: 4, blocking: 4,
 }
 
-/** Skills gaps — one row per gap; gap (none) indicator. */
-function SkillsGapsGroup({ gaps }: { readonly gaps: readonly SkillGap[] }) {
+function severityLevel(severity: string): number {
+  return SEVERITY_LEVEL[severity.trim().toLowerCase()] ?? 2
+}
+
+type SeverityTone = 'amber' | 'orange' | 'red'
+
+function severityTone(level: number, disqualifying: boolean): SeverityTone {
+  if (disqualifying || level >= 4) return 'red'
+  if (level >= 3) return 'orange'
+  return 'amber'
+}
+
+const SEVERITY_BAR: Record<SeverityTone, string> = {
+  amber: 'bg-amber-500 dark:bg-amber-400',
+  orange: 'bg-orange-500 dark:bg-orange-400',
+  red: 'bg-red-500 dark:bg-red-400',
+}
+
+const SEVERITY_TEXT: Record<SeverityTone, string> = {
+  amber: 'text-amber-600 dark:text-amber-400',
+  orange: 'text-orange-600 dark:text-orange-400',
+  red: 'text-red-600 dark:text-red-400',
+}
+
+const SEVERITY_SEGMENTS = [1, 2, 3, 4] as const
+
+/** Four-segment severity meter filled to `level`, in the severity tone. */
+function SeverityMeter({ level, tone }: { readonly level: number; readonly tone: SeverityTone }) {
   return (
-    <SummaryGroup
-      id="skills-gaps"
-      title="Skills gaps"
-      subtitle="Where the role asks for more than the evidence shows."
-      count={gaps.length}
-    >
-      {gaps.map(gap => (
-        <SummaryRow
-          key={gap.skill}
-          id={`gap-${gap.skill}`}
-          label={gap.skill}
-          preview={gap.severity}
-          indicator={<EvidenceIndicator strength="none" />}
-          detail={<SkillGapDetail gap={gap} />}
+    <div className="flex gap-0.5" aria-hidden>
+      {SEVERITY_SEGMENTS.map(seg => (
+        <span
+          key={seg}
+          className={`h-1.5 w-4 rounded-sm ${seg <= level ? SEVERITY_BAR[tone] : 'bg-zinc-200 dark:bg-white/10'}`}
         />
       ))}
-    </SummaryGroup>
+    </div>
   )
 }
 
-/** Technology inventory — inline grid of tag categories. */
-function TechnologyInventoryGroup({ detail }: { readonly detail: ApplicationDetail }) {
+function GapRow({ gap }: { readonly gap: SkillGap }) {
+  const level = severityLevel(gap.severity)
+  const tone = severityTone(level, gap.isDisqualifying)
+  return (
+    <li className="rounded-md border border-zinc-200 bg-white p-3 dark:border-white/10 dark:bg-white/2">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{gap.skill}</span>
+            {gap.isDisqualifying && (
+              <span className="shrink-0 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700 dark:bg-red-500/20 dark:text-red-400">
+                Disqualifying
+              </span>
+            )}
+          </div>
+          <span className="text-xs capitalize text-zinc-500 dark:text-zinc-400">{gap.gapType} skill</span>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <SeverityMeter level={level} tone={tone} />
+          <span className={`text-[11px] font-medium capitalize ${SEVERITY_TEXT[tone]}`}>{gap.severity}</span>
+        </div>
+      </div>
+    </li>
+  )
+}
+
+/** Skills gaps — a fixed panel (no collapse, no drawer) with a per-gap severity meter. */
+function SkillsGapsPanel({ gaps }: { readonly gaps: readonly SkillGap[] }) {
+  return (
+    <section className="space-y-3 rounded-md border border-zinc-200 bg-zinc-50/50 p-4 dark:border-white/10 dark:bg-white/2">
+      <div className="flex items-center gap-2">
+        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Skills gaps</h3>
+        <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-white/5 dark:text-zinc-400">
+          {gaps.length}
+        </span>
+      </div>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">Where the role asks for more than the evidence shows.</p>
+      <ul className="space-y-2">
+        {gaps.map(gap => (
+          <GapRow key={gap.skill} gap={gap} />
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+/** Technology inventory — a fixed panel (no collapse) of tag categories. */
+function TechnologyInventoryPanel({ detail }: { readonly detail: ApplicationDetail }) {
   const inv = detail.research?.technologyInventory
   if (!inv) return null
   const categories: ReadonlyArray<readonly [string, readonly string[]]> = [
@@ -273,206 +303,38 @@ function TechnologyInventoryGroup({ detail }: { readonly detail: ApplicationDeta
     ['Methodologies', inv.methodologies],
   ]
   return (
-    <SummaryGroup id="technology-inventory" title="Technology inventory">
-      <Card className="p-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          {categories.map(([category, items]) =>
-            items.length > 0 ? (
-              <div key={category}>
-                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                  {category}
-                </h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {items.map(item => (
-                    <span
-                      key={item}
-                      className="rounded-md border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-xs text-zinc-700 dark:border-white/10 dark:bg-white/5 dark:text-zinc-300"
-                    >
-                      {item}
-                    </span>
-                  ))}
-                </div>
+    <section className="space-y-3 rounded-md border border-zinc-200 bg-zinc-50/50 p-4 dark:border-white/10 dark:bg-white/2">
+      <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Technology inventory</h3>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {categories.map(([category, items]) =>
+          items.length > 0 ? (
+            <div key={category}>
+              <h4 className="mb-2 text-xs font-semibold uppercase text-zinc-500">{category}</h4>
+              <div className="flex flex-wrap gap-1.5">
+                {items.map(item => (
+                  <span
+                    key={item}
+                    className="rounded-md border border-zinc-200 bg-white px-2 py-0.5 text-xs text-zinc-700 dark:border-white/10 dark:bg-white/5 dark:text-zinc-300"
+                  >
+                    {item}
+                  </span>
+                ))}
               </div>
-            ) : null,
-          )}
-        </div>
-      </Card>
-    </SummaryGroup>
-  )
-}
-
-interface AttachmentRowProps {
-  readonly name: string
-  readonly size: string
-  readonly downloading: boolean
-  readonly onDownload: () => void
-}
-
-function AttachmentRow({ name, size, downloading, onDownload }: AttachmentRowProps) {
-  return (
-    <li className="flex items-center justify-between py-3 pr-4 pl-3 text-sm/6">
-      <div className="flex w-0 flex-1 items-center">
-        <PaperClipIcon aria-hidden="true" className="size-5 shrink-0 text-zinc-500" />
-        <div className="ml-3 flex min-w-0 flex-1 gap-2">
-          <span className="truncate font-medium text-zinc-900 dark:text-white">{name}</span>
-          <span className="shrink-0 text-zinc-500">{size}</span>
-        </div>
+            </div>
+          ) : null,
+        )}
       </div>
-      <button
-        type="button"
-        onClick={onDownload}
-        disabled={downloading}
-        className="ml-4 shrink-0 font-medium text-blue-500 transition-colors hover:text-blue-400 disabled:opacity-50"
-      >
-        {downloading ? 'Generating…' : 'Download'}
-      </button>
-    </li>
-  )
-}
-
-/** Action button shared by the Actions group — matches the workspace draft-CTA style. */
-function ActionButton({
-  icon,
-  label,
-  onClick,
-  tone = 'default',
-}: {
-  readonly icon: ReactNode
-  readonly label: string
-  readonly onClick: () => void
-  readonly tone?: 'default' | 'danger'
-}) {
-  const toneClasses =
-    tone === 'danger'
-      ? 'border-red-600/20 text-red-700 hover:bg-red-50 dark:border-red-500/20 dark:text-red-400 dark:hover:bg-red-500/10'
-      : 'border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/5'
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${toneClasses}`}
-    >
-      {icon}
-      {label}
-    </button>
+    </section>
   )
 }
 
 /**
- * Applied workspace (Stage 1). The post-analysis review surface: fit summary,
- * evidence matches/gaps, technology inventory, generated attachments, and the
- * resume-builder / publish / delete actions. Renders a fragment of
- * SummaryGroups into the WorkspaceShell's left column so the Applied stage
- * shares the master–detail layout of every other interview stage; the resume
- * builder drawer sits at the fragment root.
+ * Applied workspace (Stage 1). The post-analysis review surface: fit & experience,
+ * evidence matches/gaps and technology inventory. Renders a fragment into the
+ * WorkspaceShell's left column. The resume attachments / edit / publish / delete
+ * actions live in the header menu (see ApplicationActionsMenu).
  */
 export function AppliedWorkspace({ detail }: AppliedWorkspaceProps) {
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
-  const { addToast } = useToastStore()
-
-  const [isBuilderOpen, setIsBuilderOpen] = useState(false)
-  const [builderKey, setBuilderKey] = useState(0)
-  const prevStateRef = useRef<AppState | null>(null)
-
-  const handleOpenBuilder = useCallback(() => {
-    if (!detail.analysis?.tailoredResume) return
-    prevStateRef.current = getState()
-    enterEphemeralMode()
-    try {
-      setState(() =>
-        mapApplicationToBuilderState(
-          detail.analysis!.tailoredResume as unknown as ResumeData,
-          detail.analysis?.coverLetter ?? null,
-          detail.targetCompany,
-          detail.targetRole,
-        ),
-      )
-    } catch {
-      // Adapter failed — restore prior builder state and bail out of edit mode.
-      exitEphemeralMode()
-      prevStateRef.current = null
-      return
-    }
-    setBuilderKey(k => k + 1)
-    setIsBuilderOpen(true)
-  }, [detail])
-
-  const handleCloseBuilder = useCallback(() => {
-    setIsBuilderOpen(false)
-    if (prevStateRef.current) {
-      setState(() => prevStateRef.current!)
-      prevStateRef.current = null
-    }
-    exitEphemeralMode()
-  }, [])
-
-  useEffect(() => {
-    return () => {
-      if (prevStateRef.current) {
-        setState(() => prevStateRef.current!)
-        prevStateRef.current = null
-        exitEphemeralMode()
-      }
-    }
-  }, [])
-
-  const { downloading: isDownloading, generatePdf } = usePdfDownload()
-
-  const handleDownloadResume = useCallback(() => {
-    if (!detail.analysis?.tailoredResume) return
-    const resume = detail.analysis.tailoredResume as unknown as ResumeData
-    const company = detail.targetCompany.replace(/\s+/g, '_')
-    const role = detail.targetRole.replace(/\s+/g, '_')
-    void generatePdf(
-      () => buildResumeDomForPdf(resume),
-      `Nelson_Lamounier_Resume_${company}_${role}.pdf`,
-    )
-  }, [detail, generatePdf])
-
-  const handleDownloadCoverLetter = useCallback(() => {
-    if (!detail.analysis?.coverLetter) return
-    const company = detail.targetCompany.replace(/\s+/g, '_')
-    void generatePdf(
-      () =>
-        buildCoverLetterDomForPdf(
-          detail.analysis!.coverLetter!,
-          detail.analysis?.tailoredResume?.profile,
-          detail.targetCompany,
-          detail.targetRole,
-        ),
-      `Nelson_Lamounier_Cover_Letter_${company}.pdf`,
-    )
-  }, [detail, generatePdf])
-
-  const publishMutation = useMutation({
-    mutationFn: async () => {
-      const created = await createResumeFn({
-        data: {
-          label: `${detail.targetCompany} — ${detail.targetRole}`,
-          data: detail.analysis!.tailoredResume as unknown as Record<string, unknown>,
-        },
-      })
-      await setActiveResumeFn({ data: created.resumeId })
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: adminKeys.resumes.all })
-      addToast('success', 'Resume published to the public site.')
-    },
-    onError: (err: Error) => addToast('error', err.message),
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: () => deleteApplicationFn({ data: detail.slug }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: adminKeys.applications.all })
-      addToast('success', 'Application deleted.')
-      void navigate({ to: '/applications/list' })
-    },
-    onError: (err: Error) => addToast('error', err.message),
-  })
-
-  const hasTailoredResume = Boolean(detail.analysis?.tailoredResume)
   const verifiedMatches = detail.research?.verifiedMatches ?? []
   const partialMatches = detail.research?.partialMatches ?? []
   const gaps = detail.research?.gaps ?? []
@@ -486,72 +348,14 @@ export function AppliedWorkspace({ detail }: AppliedWorkspaceProps) {
 
       {verifiedMatches.length > 0 && <VerifiedMatchesGroup matches={verifiedMatches} />}
 
-      {partialMatches.length > 0 && <PartialMatchesGroup matches={partialMatches} />}
-
-      {gaps.length > 0 && <SkillsGapsGroup gaps={gaps} />}
-
-      <TechnologyInventoryGroup detail={detail} />
-
-      {hasTailoredResume && (
-        <SummaryGroup id="attachments" title="Attachments">
-          <Card className="p-2">
-            <ul role="list" className="divide-y divide-zinc-200 dark:divide-white/5">
-              <AttachmentRow
-                name="tailored_resume.pdf"
-                size="2.4mb"
-                downloading={isDownloading}
-                onDownload={handleDownloadResume}
-              />
-              {detail.analysis?.coverLetter && (
-                <AttachmentRow
-                  name="cover_letter.pdf"
-                  size="1.2mb"
-                  downloading={isDownloading}
-                  onDownload={handleDownloadCoverLetter}
-                />
-              )}
-            </ul>
-          </Card>
-        </SummaryGroup>
+      {(partialMatches.length > 0 || gaps.length > 0) && (
+        <div className="grid items-start gap-6 lg:grid-cols-2">
+          {partialMatches.length > 0 && <PartialMatchesGroup matches={partialMatches} />}
+          {gaps.length > 0 && <SkillsGapsPanel gaps={gaps} />}
+        </div>
       )}
 
-      <SummaryGroup id="actions" title="Actions">
-        <Card className="flex flex-wrap gap-2 p-4">
-          {hasTailoredResume && (
-            <>
-              <ActionButton
-                icon={<PenLine className="size-3.5" aria-hidden />}
-                label="Edit tailored resume"
-                onClick={handleOpenBuilder}
-              />
-              <ActionButton
-                icon={<Send className="size-3.5" aria-hidden />}
-                label="Publish to public site"
-                onClick={() => publishMutation.mutate()}
-              />
-            </>
-          )}
-          <ActionButton
-            icon={<Trash2 className="size-3.5" aria-hidden />}
-            label="Delete application"
-            onClick={() => deleteMutation.mutate()}
-            tone="danger"
-          />
-        </Card>
-      </SummaryGroup>
-
-      {detail.analysis?.tailoredResume && (
-        <DashboardDrawer
-          isOpen={isBuilderOpen}
-          onClose={handleCloseBuilder}
-          title="Edit Tailored Resume"
-          description={`${detail.targetCompany} — ${detail.targetRole}`}
-          unstyledContent
-          fullBleed
-        >
-          {isBuilderOpen && <ResumeBuilderApp key={builderKey} onClose={handleCloseBuilder} />}
-        </DashboardDrawer>
-      )}
+      <TechnologyInventoryPanel detail={detail} />
     </>
   )
 }
