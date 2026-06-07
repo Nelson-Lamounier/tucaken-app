@@ -339,6 +339,33 @@ kb-export repo="":
     printf '%s\n' "$rows" | BASE="{{justfile_directory()}}/kb-exports" \
         python3 {{justfile_directory()}}/scripts/export-coaching.py
 
+# Run the RAG retrieval eval against dev RDS — baseline/regression for KB quality.
+# Opens an SSM tunnel, runs the REAL retrieval + LLM judge over the golden set in
+# ../ai-applications, prints a report, writes /tmp/rag-eval{.jsonl,-report.json}.
+# Needs: ../ai-applications checked out, AWS dev-account SSO, node/tsx.
+rag-eval userid="1d4c645a-447e-4b5b-924d-19a3c75a84db":
+    #!/usr/bin/env bash
+    set -uo pipefail
+    export AWS_PROFILE={{aws_profile}} AWS_REGION={{aws_region}}
+    host=$(aws rds describe-db-instances --db-instance-identifier {{rds_instance}} \
+        --query 'DBInstances[0].Endpoint.Address' --output text) || { echo "rds describe failed" >&2; exit 1; }
+    target=$(aws ssm describe-instance-information \
+        --query 'InstanceInformationList[?PingStatus==`Online`]|[0].InstanceId' --output text) || { echo "ssm describe failed" >&2; exit 1; }
+    [ -n "$target" ] && [ "$target" != "None" ] || { echo "No Online SSM node found" >&2; exit 1; }
+    params=$(printf '{"host":["%s"],"portNumber":["5432"],"localPortNumber":["%s"]}' "$host" "{{rds_port}}")
+    aws ssm start-session --target "$target" \
+        --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters "$params" >/dev/null 2>&1 &
+    tunnel=$!
+    trap 'kill "$tunnel" 2>/dev/null; pkill -P "$tunnel" 2>/dev/null; pkill -f "localPortNumber.*{{rds_port}}" 2>/dev/null' EXIT
+    for _ in $(seq 1 40); do nc -z 127.0.0.1 {{rds_port}} 2>/dev/null && break; sleep 0.5; done
+    export RDS_PASSWORD=$(aws secretsmanager get-secret-value --secret-id {{rds_secret}} \
+        --query SecretString --output text | python3 -c "import sys,json;print(json.load(sys.stdin)['password'])")
+    cd {{justfile_directory()}}/../ai-applications
+    RUN_RAG_EVAL=1 USER_ID={{userid}} \
+        RDS_HOST=127.0.0.1 RDS_PORT={{rds_port}} RDS_DB_NAME={{rds_db}} RDS_USER=postgres \
+        RAG_EVAL_OUT_DIR=/tmp \
+        npx tsx applications/job-strategist/src/evals/rag/run-rag-eval.ts
+
 # Open a tunnel, run one SQL statement (-X -t -A), then close the tunnel. Internal.
 [private]
 _rds-query SQL:
