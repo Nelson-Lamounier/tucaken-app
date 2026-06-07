@@ -37,6 +37,7 @@ import {
 import { Link } from "@tanstack/react-router";
 import { HeaderNav } from "../ui/HeaderNav";
 import { PipelineNotificationWatcher } from "../ui/PipelineNotificationWatcher";
+import { IngestionSyncWatcher } from "../ui/IngestionSyncWatcher";
 import type { MeResponse } from "@/server/me";
 import logo from "@/images/logo.png";
 
@@ -172,6 +173,8 @@ export default function AppLayout({
     <>
       {/* Background pipeline notification watchers — renders null */}
       <PipelineNotificationWatcher />
+      {/* Refreshes KB-derived views when a repo resync completes — renders null */}
+      <IngestionSyncWatcher />
 
       {/* =========================================================
           Mobile Off-Canvas Sidebar
