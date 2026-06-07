@@ -5,6 +5,7 @@ import { Link } from '@tanstack/react-router'
 import { ExternalLink, FolderOpen } from 'lucide-react'
 import type { ApplicationDetail } from '@/lib/types/applications.types'
 import { Card } from '@/components/ui/Card'
+import { Markdown } from '@/components/ui/Markdown'
 import { ScheduleCard } from '../components/ScheduleCard'
 import { TopicCard } from '../components/TopicCard'
 import { EvidenceIndicator } from '../components/EvidenceIndicator'
@@ -673,7 +674,7 @@ function TechnicalCoachingNotesGroup({ notes }: { readonly notes: string }) {
   return (
     <SummaryGroup id="coaching-notes" title="Coaching notes" subtitle="Stage-specific guidance from your interview coach.">
       <Card className="p-4">
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">{notes}</p>
+        <Markdown className="text-sm text-zinc-700 dark:text-zinc-300">{notes}</Markdown>
       </Card>
     </SummaryGroup>
   )
