@@ -79,6 +79,16 @@ function buildJobSpec(
                             { name: 'USER_ID',        value: userId },
                             { name: 'REPO_FULL_NAME', value: repoFullName },
                             { name: 'FORCE_REINDEX',  value: String(forceReindex) },
+                            // Fast scan is the PRODUCTION DEFAULT: defer per-chunk skill
+                            // enrichment to the in-job background re-enrich pass (run after
+                            // the repo is marked searchable), so a (re)sync is searchable in
+                            // minutes instead of blocking on inline Bedrock enrichment — no
+                            // quality loss (skills are backfilled in the same Job). Set
+                            // admin-api INGESTION_DEFER_ENRICHMENT=0 to fall back to inline.
+                            {
+                                name:  'DEFER_ENRICHMENT',
+                                value: process.env['INGESTION_DEFER_ENRICHMENT'] ?? '1',
+                            },
                             // BedrockChunkEnricher reads ENRICHMENT_MODEL_ID to select the
                             // model for per-chunk skill/technology extraction. Direct
                             // on-demand Claude invocation isn't supported in eu-west-1 —
