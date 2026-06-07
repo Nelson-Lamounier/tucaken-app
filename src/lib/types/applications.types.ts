@@ -317,6 +317,27 @@ export interface DsaTopicCalibration {
   readonly honestyNote: string
 }
 
+/** One retrieved KB source and its absolute cosine relevance. */
+export interface KbRetrievalSource {
+  readonly source: string
+  readonly cosine: number
+}
+
+/**
+ * Retrieval-health snapshot for a research run (RAG quality). Powers the
+ * "Knowledge Base — data health" panel. Present only on runs produced after the
+ * retrieval-hygiene change; absent on older runs.
+ */
+export interface KbRetrievalStats {
+  readonly passageCount: number
+  readonly maxCosine: number
+  readonly medianCosine: number
+  readonly minCosine: number
+  readonly floor: number
+  readonly topSources: readonly KbRetrievalSource[]
+  readonly repoBreakdown: readonly { readonly repo: string; readonly count: number }[]
+}
+
 /** Research Agent output — part of ApplicationDetail */
 export interface ResearchOutput {
   readonly fitSummary: string
@@ -330,6 +351,8 @@ export interface ResearchOutput {
   readonly dsaTopicCalibration?: DsaTopicCalibration
   /** JD interview-prep pillar classification — present only when the research agent classified the role */
   readonly pillarClassification?: PillarClassification
+  /** RAG retrieval health for this run — present only on post-hygiene runs. */
+  readonly kbRetrievalStats?: KbRetrievalStats
 }
 
 /** Analysis metadata from the Applications Agent */

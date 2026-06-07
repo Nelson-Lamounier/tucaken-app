@@ -37,6 +37,7 @@ import { createGitHubRouter, createGitHubWebhookRouter } from './routes/github.j
 import { createHealthRouter } from './routes/health.js';
 import { createAdminUsersRouter } from './routes/admin-users.js';
 import { createIngestionRouter } from './routes/ingestion.js';
+import { createKbRouter } from './routes/kb.js';
 import { createInternalBillingRouter } from './routes/internal-billing.js';
 import { createMeRouter } from './routes/me.js';
 import { createObservabilityRouter } from './routes/observability.js';
@@ -181,6 +182,7 @@ app.route('/api/admin/applications', createApplicationsRouter(config));
 app.route('/api/admin/assets', createAssetsRouter(config));
 app.route('/api/admin/finops', createFinopsRouter(config));
 app.route('/api/admin/ingestion', createIngestionRouter(config));
+app.route('/api/admin/kb', createKbRouter(config));
 app.route('/api/admin/pipelines', createPipelinesRouter(config));
 app.route('/api/admin/resumes', createResumesRouter(config));
 app.route('/api/admin/resume-imports', createResumeImportsRouter(config));
