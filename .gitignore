@@ -6,6 +6,10 @@ node_modules/
 .env.*
 !.env.example
 
+# Local RDS exports (per-user dumps via `just coaching`/`just research`) — never commit user data
+coaching-exports/
+research-exports/
+
 # TanStack Start / Vinxi
 .tanstack/
 .vinxi/
@@ -44,3 +48,6 @@ build_output*.log
 !.yarn/versions
 .pnp.*
 .superpowers/
+
+# Python bytecode cache
+__pycache__/
