@@ -31,13 +31,19 @@ export function createKbRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
     if (!userId) return ctx.json({ error: 'Unauthorized' }, 401);
 
     return withUser(getPool(config), userId, async (db) => {
+      // Explicit user_id scoping (defense-in-depth): RLS is enabled but NOT
+      // forced on these tables, so an owner/superuser DB role would bypass the
+      // withUser RLS context. The explicit predicate guarantees tenant
+      // isolation regardless of the connecting role.
       const { rows } = await db.query<RepoCompositionRow>(
         `SELECT repo_full_name AS repo,
                 COUNT(*)::int            AS chunks,
                 COUNT(DISTINCT file_path)::int AS files
            FROM document_embeddings
+          WHERE user_id = $1::uuid
           GROUP BY repo_full_name
           ORDER BY chunks DESC`,
+        [userId],
       );
 
       const totalChunks = rows.reduce((acc, r) => acc + r.chunks, 0);
@@ -49,9 +55,11 @@ export function createKbRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
       const { rows: techRows } = await db.query<TechnologyRow>(
         `SELECT raw_name AS name, ecosystem, COUNT(*)::int AS occurrences
            FROM technology_evidence
+          WHERE user_id = $1::uuid
           GROUP BY raw_name, ecosystem
           ORDER BY occurrences DESC
           LIMIT 24`,
+        [userId],
       );
 
       return ctx.json({
