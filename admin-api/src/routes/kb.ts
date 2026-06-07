@@ -11,6 +11,12 @@ interface RepoCompositionRow {
   files: number;
 }
 
+interface TechnologyRow {
+  name: string;
+  ecosystem: string | null;
+  occurrences: number;
+}
+
 /**
  * Knowledge-base health router. Surfaces the composition of the authenticated
  * user's pgvector store (`document_embeddings`) so the UI can show "data health
@@ -37,12 +43,25 @@ export function createKbRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
       const totalChunks = rows.reduce((acc, r) => acc + r.chunks, 0);
       const totalFiles = rows.reduce((acc, r) => acc + r.files, 0);
 
+      // Real technology signal lives in technology_evidence (deterministic
+      // tech-extractor pipeline), NOT document_embeddings.technologies (dead
+      // back-compat column). Surface the top technologies by evidence count.
+      const { rows: techRows } = await db.query<TechnologyRow>(
+        `SELECT raw_name AS name, ecosystem, COUNT(*)::int AS occurrences
+           FROM technology_evidence
+          GROUP BY raw_name, ecosystem
+          ORDER BY occurrences DESC
+          LIMIT 24`,
+      );
+
       return ctx.json({
         kb: {
           totalChunks,
           totalFiles,
           repoCount: rows.length,
           repos: rows,
+          technologies: techRows,
+          technologyCount: techRows.length,
         },
       });
     });

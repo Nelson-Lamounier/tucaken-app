@@ -2,7 +2,7 @@
 
 import { motion } from 'motion/react'
 import { Database, FileText, GitBranch, Gauge, AlertTriangle } from 'lucide-react'
-import type { KbHealth } from '@/lib/types/kb.types'
+import type { KbHealth, KbTechnology } from '@/lib/types/kb.types'
 import type { KbRetrievalStats } from '@/lib/types/applications.types'
 
 // ── Verdict ───────────────────────────────────────────────────────────────────
@@ -64,6 +64,23 @@ function CosineBar({ cosine, floor, label }: { readonly cosine: number; readonly
           aria-hidden
         />
       </div>
+    </div>
+  )
+}
+
+/** Top technologies as occurrence-weighted chips (from technology_evidence). */
+function TechChips({ technologies }: { readonly technologies: readonly KbTechnology[] }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {technologies.map(t => (
+        <span
+          key={`${t.name}-${t.ecosystem ?? ''}`}
+          className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2 py-0.5 text-xs text-zinc-700 dark:border-white/10 dark:bg-white/5 dark:text-zinc-300"
+        >
+          {t.name}
+          <span className="text-[10px] tabular-nums text-zinc-400">{t.occurrences}</span>
+        </span>
+      ))}
     </div>
   )
 }
@@ -210,6 +227,14 @@ export function KnowledgeBaseHealthPanel({ kb, retrieval, loading, compact, clas
             <div>
               <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Indexed repositories</div>
               <RepoBars repos={kb.repos} total={kb.totalChunks} />
+            </div>
+          )}
+          {kb.technologies && kb.technologies.length > 0 && (
+            <div>
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                Top technologies{kb.technologyCount ? <span className="ml-1 text-zinc-300 dark:text-zinc-600">· {kb.technologyCount} shown</span> : null}
+              </div>
+              <TechChips technologies={kb.technologies} />
             </div>
           )}
         </div>
