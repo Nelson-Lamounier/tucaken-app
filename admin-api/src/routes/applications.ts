@@ -163,6 +163,11 @@ function normaliseResearch(raw: Record<string, unknown>): Record<string, unknown
     result['pillarClassification'] = raw['pillarClassification'];
   }
 
+  // Pass kbRetrievalStats through verbatim — RAG health for the data panel.
+  if (raw['kbRetrievalStats'] !== undefined) {
+    result['kbRetrievalStats'] = raw['kbRetrievalStats'];
+  }
+
   return result;
 }
 

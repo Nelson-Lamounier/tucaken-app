@@ -8,6 +8,7 @@ import type {
   ExperienceSignal,
 } from '@/lib/types/applications.types'
 import { Card } from '@/components/ui/Card'
+import { KnowledgeBaseHealthPanel } from '@/components/kb/KnowledgeBaseHealthPanel'
 import { EvidenceIndicator } from '../components/EvidenceIndicator'
 import { SummaryGroup, SummaryRow, useDetailRail, useSummaryGroupTitle } from '../components/workspace-shell'
 
@@ -343,6 +344,8 @@ export function AppliedWorkspace({ detail }: AppliedWorkspaceProps) {
   return (
     <>
       <FitExperienceSection detail={detail} />
+
+      <KnowledgeBaseHealthPanel compact retrieval={detail.research?.kbRetrievalStats} />
 
       {resumeSummary ? <ResumeSuggestionsGroup summary={resumeSummary} /> : null}
 

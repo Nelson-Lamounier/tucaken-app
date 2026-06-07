@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { Plus, BookOpen } from 'lucide-react'
 import type { ApplicationDetail, InterviewQuestion } from '@/lib/types/applications.types'
 import { Card } from '@/components/ui/Card'
+import { Markdown } from '@/components/ui/Markdown'
 import { ScheduleCard } from '../components/ScheduleCard'
 import { StoryCard } from '../components/StoryCard'
 import { StoryForm } from '../components/StoryForm'
@@ -221,7 +222,7 @@ function CoachingNotesGroup({ notes }: { readonly notes: string | undefined }) {
   return (
     <SummaryGroup id="coaching-notes" title="Coaching notes" subtitle="Stage-specific guidance from your interview coach.">
       <Card className="p-4">
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">{notes}</p>
+        <Markdown className="text-sm text-zinc-700 dark:text-zinc-300">{notes}</Markdown>
       </Card>
     </SummaryGroup>
   )
