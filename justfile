@@ -307,6 +307,38 @@ kb-chunks-export repo="":
     just _rds-query "select jsonb_pretty(jsonb_agg(jsonb_build_object('repo',repo_full_name,'file',file_path,'heading',heading,'chunkIndex',chunk_index,'totalChunks',total_chunks,'fileType',file_type,'tags',to_jsonb(tags),'skills',to_jsonb(skills),'technologies',to_jsonb(technologies),'metadata',metadata,'contentHash',content_hash,'embeddingDims',vector_dims(embedding),'content',content) order by repo_full_name, file_path, chunk_index)) from document_embeddings where ('{{repo}}' = '' or repo_full_name ilike '%{{repo}}%');" > "$out"
     echo "==> Wrote $(wc -c < "$out" | tr -d ' ') bytes to $out"
 
+# Export ingested chunks into the repo, versioned per (user, repo):
+#   kb-exports/<userId>/<repo>/vNNN.json (+ latest.json)
+# One snapshot doc per repo (all chunks + metadata). A new version is written
+# only when a chunk's content changed since the last export — diff ingestion
+# snapshots over time. Gitignored (user data stays local).
+kb-export repo="":
+    #!/usr/bin/env bash
+    set -uo pipefail
+    read -r -d '' SQL <<'EOF' || true
+    select jsonb_build_object(
+        'userId', user_id,
+        'applicationId', repo_full_name,
+        'repo', repo_full_name,
+        'chunkCount', count(*),
+        'fileCount', count(distinct file_path),
+        'chunks', jsonb_agg(jsonb_build_object(
+            'file', file_path, 'heading', heading,
+            'chunkIndex', chunk_index, 'totalChunks', total_chunks,
+            'fileType', file_type, 'tags', to_jsonb(tags),
+            'skills', to_jsonb(skills), 'technologies', to_jsonb(technologies),
+            'metadata', metadata, 'enrichment', metadata->>'enrichment_status',
+            'contentHash', content_hash, 'embeddingDims', vector_dims(embedding),
+            'content', content) order by file_path, chunk_index))
+    from document_embeddings
+    where ('{{repo}}' = '' or repo_full_name ilike '%{{repo}}%')
+    group by user_id, repo_full_name;
+    EOF
+    rows="$(just _rds-query "$SQL")" || { echo "query failed" >&2; exit 1; }
+    [ -n "$rows" ] || { echo "No chunks found${repo:+ for '{{repo}}'}"; exit 0; }
+    printf '%s\n' "$rows" | BASE="{{justfile_directory()}}/kb-exports" \
+        python3 {{justfile_directory()}}/scripts/export-coaching.py
+
 # Open a tunnel, run one SQL statement (-X -t -A), then close the tunnel. Internal.
 [private]
 _rds-query SQL:
