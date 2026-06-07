@@ -6,9 +6,10 @@ node_modules/
 .env.*
 !.env.example
 
-# Local RDS exports (per-user dumps via `just coaching`/`just research`) — never commit user data
+# Local RDS exports (per-user dumps via `just coaching`/`just research`/`just kb-export`) — never commit user data
 coaching-exports/
 research-exports/
+kb-exports/
 
 # TanStack Start / Vinxi
 .tanstack/
