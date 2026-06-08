@@ -148,6 +148,9 @@ describe('POST /trigger — create ingestion Job', () => {
     expect(envMap['USER_ID']).toBe('test-user');
     expect(envMap['REPO_FULL_NAME']).toBe('octocat/hello-world');
     expect(envMap['FORCE_REINDEX']).toBe('true');
+    // Fast scan is the production default — the Job defers enrichment to the
+    // in-job background pass so the repo is searchable in minutes.
+    expect(envMap['DEFER_ENRICHMENT']).toBe('1');
   });
 
   it('defaults forceReindex to false when omitted', async () => {

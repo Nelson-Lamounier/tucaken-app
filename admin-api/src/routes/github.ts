@@ -48,7 +48,8 @@ import {
 } from '../lib/github-app.js';
 import type { V1Job } from '@kubernetes/client-node';
 import { getBatchApi } from '../lib/k8s.js';
-import { traceParentEnv, observabilityEnv, ingestionModelEnv } from '../lib/k8s-job-builder.js';
+import { traceParentEnv, observabilityEnv } from '../lib/k8s-job-builder.js';
+import { buildIngestionJobSpec } from '../lib/ingestion-job.js';
 import { getPool } from '../lib/pg.js';
 import { ensureDefaultProject } from '../lib/repositories/projects.js';
 import { secondsUntilNextMonthUTC } from '../lib/retry-after.js';
@@ -407,81 +408,18 @@ async function dispatchIngestionJob(
     githubToken: string,
     forceReindex = false,
 ): Promise<{ jobName: string }> {
-    const { createHash } = await import('node:crypto');
     const image = getJobImage('ingestion');
     if (!isImageConfigured(image)) {
         throw Object.assign(new Error('Ingestion image not yet configured'), { status: 502 });
     }
 
-    const timestamp = Date.now();
-    const safeUser  = sanitizeLabel(userId);
-    const repoSlug  = sanitizeLabel(repoFullName.replace('/', '-'));
-    const suffix    = createHash('sha1').update(`${userId}:${repoFullName}:${timestamp}`).digest('hex').slice(0, 8);
-    const slugPart  = sanitizeLabel(`${safeUser}-${repoSlug}`).slice(0, 43);
-    const jobName   = `ingestion-${slugPart}-${suffix}`.slice(0, MAX_NAME_LEN);
-
-    const job = {
-        apiVersion: 'batch/v1',
-        kind:       'Job',
-        metadata: {
-            name:      jobName,
-            namespace: config.ingestionNamespace,
-            labels:      { app: 'ingestion-worker', userId: safeUser, repoSlug },
-            // Labels are charset-restricted + lossily sanitized, so they can't
-            // round-trip back to the exact identifiers. Annotations carry the
-            // unsanitized user_id + repo_full_name so reconciliation (read-time
-            // in this service, and the platform-job-watcher sweep) can map a
-            // terminally-failed Job back to its repo_sync_state row.
-            annotations: {
-                'argocd.argoproj.io/compare-options': 'IgnoreExtraneous',
-                'ingestion.tucaken.io/user-id':        userId,
-                'ingestion.tucaken.io/repo-full-name': repoFullName,
-            },
-        },
-        spec: {
-            ttlSecondsAfterFinished: 3600,
-            backoffLimit:            2,
-            activeDeadlineSeconds:   900,
-            template: {
-                metadata: { labels: { app: 'ingestion-worker', userId: safeUser, repoSlug } },
-                spec: {
-                    restartPolicy:      'Never',
-                    serviceAccountName: config.ingestionServiceAccount,
-                    containers: [{
-                        name:    'worker',
-                        image,
-                        command: ['node', 'dist/run-ingestion.js'],
-                        // Explicit env vars take precedence over envFrom in K8s.
-                        // GITHUB_TOKEN here overrides any static token in ingestion-secrets,
-                        // ensuring each Job uses the per-user installation token.
-                        env: [
-                            ...observabilityEnv('ingestion-worker', `${userId}:${repoFullName}:${timestamp}`),
-                            { name: 'USER_ID',            value: userId },
-                            { name: 'REPO_FULL_NAME',     value: repoFullName },
-                            { name: 'FORCE_REINDEX',      value: String(forceReindex) },
-                            { name: 'GITHUB_TOKEN',       value: githubToken },
-                            // Cross-region inference profile for BedrockChunkEnricher.
-                            // Direct on-demand Claude invocation unsupported in eu-west-1.
-                            {
-                                name:  'ENRICHMENT_MODEL_ID',
-                                value: process.env['ENRICHMENT_MODEL_ID'] ?? 'eu.anthropic.claude-haiku-4-5-20251001-v1:0',
-                            },
-                            // Profile synthesis model ids — without these the
-                            // Mirror/Direction/Reconciliation synthesizers silently
-                            // disable and rollup synthesis columns stay NULL.
-                            ...ingestionModelEnv(config),
-                            ...(() => { const tp = traceParentEnv(); return tp ? [tp] : []; })(),
-                        ],
-                        envFrom: [{ secretRef: { name: 'platform-rds-credentials' } }],
-                        resources: {
-                            requests: { memory: '512Mi', cpu: '250m' },
-                            limits:   { memory: '1Gi',   cpu: '500m' },
-                        },
-                    }],
-                },
-            },
-        },
-    };
+    // Shared builder = single source of truth (same spec as the admin trigger).
+    // Resync path adds the per-user GITHUB_TOKEN + argocd compare-options.
+    const job = buildIngestionJobSpec(config, image, userId, repoFullName, forceReindex, Date.now(), {
+        githubToken,
+        extraAnnotations: { 'argocd.argoproj.io/compare-options': 'IgnoreExtraneous' },
+    });
+    const jobName = job.metadata?.name ?? '';
 
     await getBatchApi().createNamespacedJob({ namespace: config.ingestionNamespace, body: job });
     return { jobName };

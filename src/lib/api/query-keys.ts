@@ -98,6 +98,11 @@ export const adminKeys = {
     summary: () => ['admin', 'profile', 'summary'] as const,
   },
 
+  /** Knowledge-base health (document_embeddings composition + tech evidence) */
+  kb: {
+    health: () => ['admin', 'kb', 'health'] as const,
+  },
+
   /** Resume import pipeline query keys */
   resumeImports: {
     /** All resume import queries */

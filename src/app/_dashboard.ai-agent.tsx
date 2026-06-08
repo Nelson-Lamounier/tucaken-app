@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { AIAgentContainer } from '@/features/ai-agent/components/AIAgentContainer'
+import { KbHealthPanel } from '@/features/ai-agent/components/KbHealthPanel'
 import { DashboardPage } from '@/components/layouts/DashboardPage'
 import { FullWidthBar, type FullWidthBarStep } from '../components/ui/FullWidthBar'
 
@@ -42,6 +43,7 @@ function AIAgentRoute() {
       fullWidth={true}
       headerBottom={<FullWidthBar steps={steps} />}
     >
+      <KbHealthPanel className="mb-6" />
       <AIAgentContainer
         key={slug ?? mode}
         initialMode={mode === 'pipeline' ? 'pipeline' : 'test'}
