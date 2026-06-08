@@ -471,6 +471,34 @@ export interface CompScript {
   readonly deflectTemplate: string
 }
 
+/** One "what to expect" item — a short bold label and its description. */
+export interface InterviewFocusItem {
+  readonly label: string
+  readonly detail: string
+}
+
+/** Pre-interview checklist — actionable items + an optional closing note. */
+export interface FinalCheckpoint {
+  readonly items: readonly string[]
+  readonly note?: string
+}
+
+/**
+ * Structured stage coaching emitted by the Coach Agent. Each section is its own
+ * field so the UI can place them across the page without parsing prose. String
+ * fields are Markdown; only `positioning` is required.
+ */
+export interface CoachingNotes {
+  readonly positioning: string
+  readonly interviewFocus?: readonly InterviewFocusItem[]
+  readonly tacticalPrep?: string
+  readonly communication?: string
+  readonly mindset?: string
+  readonly debrief?: string
+  /** Structured checklist (new) or legacy Markdown string (old rows). */
+  readonly finalCheckpoint?: string | FinalCheckpoint
+}
+
 /** Coach Agent output — part of ApplicationDetail */
 export interface InterviewPrepOutput {
   /** Current interview stage */
@@ -487,8 +515,11 @@ export interface InterviewPrepOutput {
   readonly technicalPrepChecklist: TechnicalPrepItem[]
   /** Questions to ask the interviewer */
   readonly questionsToAsk: QuestionToAsk[]
-  /** Free-text coaching notes (Markdown) */
-  readonly coachingNotes: string
+  /**
+   * Stage coaching. New rows are a structured `CoachingNotes` object; legacy
+   * rows are a Markdown string. `parseCoachingSections` handles both.
+   */
+  readonly coachingNotes: string | CoachingNotes
   /** Phone-screen only: 2-3 sentence career-arc narrative */
   readonly careerArcSummary?: string
   /** Phone-screen only: JD-cross-referenced verified talking points */

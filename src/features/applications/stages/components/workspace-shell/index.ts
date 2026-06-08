@@ -1,4 +1,5 @@
 export { WorkspaceShell } from './WorkspaceShell'
 export { SummaryGroup, useSummaryGroupTitle } from './SummaryGroup'
 export { SummaryRow } from './SummaryRow'
+export { RailField, RailCallout, RailBullets, RailRichText } from './RailDetail'
 export { useDetailRail } from './selection'

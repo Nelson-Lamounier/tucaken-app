@@ -1,4 +1,3 @@
-import { Card } from '@/components/ui/Card'
 import type {
   BarRaiserCoverage,
   BarRaiserPrinciple,
@@ -6,7 +5,7 @@ import type {
   BarRaiserStory,
   EvidenceRef,
 } from '@/lib/types/applications.types'
-import { SummaryGroup } from '../components/workspace-shell'
+import { SummaryGroup, SummaryRow, RailField, RailCallout } from '../components/workspace-shell'
 
 /** Coverage → badge label + colour. strong = grounded green, partial = amber, none = honest red. */
 const COVERAGE_BADGE: Record<BarRaiserPrincipleCoverage, { label: string; className: string }> = {
@@ -39,9 +38,9 @@ function EvidenceChips({ refs }: { readonly refs: readonly EvidenceRef[] }) {
   if (refs.length === 0) return null
   return (
     <div className="flex flex-wrap gap-1.5 pt-1">
-      {refs.map((e, i) => (
+      {refs.map((e) => (
         <span
-          key={i}
+          key={e.id}
           title={e.fileLine}
           className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
         >
@@ -55,7 +54,7 @@ function EvidenceChips({ refs }: { readonly refs: readonly EvidenceRef[] }) {
 /** One grounded story: title, STAR, the honesty-calibration callout, seniority note, evidence. */
 function StoryBlock({ story }: { readonly story: BarRaiserStory }) {
   return (
-    <div className="space-y-2 rounded-lg border border-zinc-200 p-3 dark:border-white/10">
+    <div className="space-y-2 rounded-md border border-zinc-200 p-3 dark:border-white/10">
       <h5 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{story.title}</h5>
 
       <div className="space-y-1.5">
@@ -81,47 +80,48 @@ function StoryBlock({ story }: { readonly story: BarRaiserStory }) {
   )
 }
 
-/** One principle card: header + interpretation + stories + probing questions + gap guidance. */
-function PrincipleCard({ principle }: { readonly principle: BarRaiserPrinciple }) {
-  const badge = COVERAGE_BADGE[principle.coverage]
+/** Rail detail for one principle: interpretation + grounded stories + probing
+ *  questions + gap guidance. */
+function PrincipleDetail({ principle }: { readonly principle: BarRaiserPrinciple }) {
   return (
-    <Card className="space-y-3 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{principle.principleName}</h4>
-        <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${badge.className}`}>{badge.label}</span>
-      </div>
-
-      <p className="text-xs text-zinc-500 dark:text-zinc-400">{principle.interpretation}</p>
+    <>
+      <RailField label="What they look for">{principle.interpretation}</RailField>
 
       {principle.stories.length > 0 && (
-        <div className="space-y-2.5">
-          {principle.stories.map((story, i) => (
-            <StoryBlock key={i} story={story} />
-          ))}
-        </div>
+        <RailField label="Your stories">
+          <div className="space-y-2.5">
+            {principle.stories.map(story => (
+              <StoryBlock key={story.title} story={story} />
+            ))}
+          </div>
+        </RailField>
       )}
 
       {principle.probingQuestions.length > 0 && (
-        <ul className="space-y-1.5">
-          {principle.probingQuestions.map((q, i) => (
-            <li key={i} className="text-xs">
-              <span className="font-medium text-zinc-700 dark:text-zinc-300">{q.question}</span>
-              <span className="text-zinc-500 dark:text-zinc-400"> — {q.framing}</span>
-            </li>
-          ))}
-        </ul>
+        <RailField label="Probing questions">
+          <ul className="space-y-2">
+            {principle.probingQuestions.map(q => (
+              <li key={q.question} className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
+                <span className="font-medium text-zinc-900 dark:text-zinc-100">{q.question}</span>
+                <span className="text-zinc-500 dark:text-zinc-400"> — {q.framing}</span>
+              </li>
+            ))}
+          </ul>
+        </RailField>
       )}
 
       {principle.gapGuidance && (
-        <p className="rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
-          {principle.gapGuidance}
-        </p>
+        <RailCallout label="Addressing the gap" tone="warn">{principle.gapGuidance}</RailCallout>
       )}
-    </Card>
+    </>
   )
 }
 
-/** The project-anchored Bar Raiser walkthrough — one card per leadership principle. */
+/**
+ * The project-anchored Bar Raiser walkthrough — one clickable row per leadership
+ * principle; the stories + probing detail open in the rail (mirrors the
+ * Difficult-questions / System-design patterns).
+ */
 export function BarRaiserWalkthrough({
   cards,
   coverage,
@@ -133,12 +133,22 @@ export function BarRaiserWalkthrough({
     ? `${coverage.relevantAddressed} of ${coverage.relevantTotal} leadership principles, grounded in your work.`
     : 'Principle by principle, grounded in your work.'
   return (
-    <SummaryGroup id="bar-raiser-walkthrough" title="Bar Raiser walkthrough" subtitle={subtitle}>
-      <div className="space-y-3">
-        {cards.map(card => (
-          <PrincipleCard key={card.principleId} principle={card} />
-        ))}
-      </div>
+    <SummaryGroup id="bar-raiser-walkthrough" title="Bar Raiser walkthrough" subtitle={subtitle} count={cards.length}>
+      {cards.map(card => {
+        const badge = COVERAGE_BADGE[card.coverage]
+        return (
+          <SummaryRow
+            key={card.principleId}
+            id={card.principleId}
+            label={card.principleName}
+            preview={card.interpretation}
+            indicator={
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${badge.className}`}>{badge.label}</span>
+            }
+            detail={<PrincipleDetail principle={card} />}
+          />
+        )
+      })}
     </SummaryGroup>
   )
 }

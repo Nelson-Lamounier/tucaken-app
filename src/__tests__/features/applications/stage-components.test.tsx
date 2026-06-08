@@ -229,7 +229,8 @@ describe('TechnicalWorkspace', () => {
   it('renders evidence topics from research and shows external practice links', () => {
     renderTech(detail)
     expect(screen.getByText('Kubernetes')).toBeTruthy()
-    expect(screen.getByText('Strong evidence')).toBeTruthy()
+    // Strength is now an icon on the flip card; its label is the accessible name.
+    expect(screen.getByLabelText('Strong evidence')).toBeTruthy()
     // Practice section now has external links, no in-product modal
     expect(screen.getByRole('link', { name: /Practice on LeetCode/i })).toBeTruthy()
     expect(screen.getByRole('link', { name: /Practice on NeetCode/i })).toBeTruthy()
@@ -283,7 +284,8 @@ describe('TechnicalWorkspace', () => {
   it('renders Section B with DSA banner for dsa round type', () => {
     renderTech({ ...detail, technicalRoundType: 'dsa' })
     expect(screen.getByText('DSA / Coding')).toBeTruthy()
-    expect(screen.getByText(/calibrate which DSA topics matter/)).toBeTruthy()
+    // Honesty banners merged into one narrow-coverage callout.
+    expect(screen.getByText(/Real-work detection covers a limited pattern set/)).toBeTruthy()
   })
 
   it('renders Section B for mixed round type', () => {
@@ -400,7 +402,7 @@ describe('TechnicalWorkspace', () => {
     renderTech(devopsDetail)
     expect(screen.getByText(/DevOps \/ Infrastructure/i)).toBeTruthy()
     expect(screen.getByText(/Infrastructure as Code/)).toBeTruthy()
-    openRow(/Infrastructure as Code/)
+    // DevOps renders inline now (no detail-rail toggle) — file:line is visible directly.
     expect(screen.getByText(/o\/r\/main\.tf:3/)).toBeTruthy()
     // Tier-1: must NOT claim competence
     expect(screen.queryByText(/expert|mastered|you know/i)).toBeNull()
@@ -477,8 +479,6 @@ describe('TechnicalWorkspace', () => {
     expect(screen.getByText(/imports networkx \(graph algorithms\)/)).toBeTruthy()
     // matchCount copy
     expect(screen.getByText(/in 2 place/)).toBeTruthy()
-    // Import-grounded caveat
-    expect(screen.getByText(/import\/type-grounded/)).toBeTruthy()
   })
 
   it('calibrated topic WITHOUT evidence still renders red "practice externally" treatment', () => {
@@ -817,19 +817,33 @@ describe('FinalPrep', () => {
     },
   } as unknown as ApplicationDetail
 
-  it('renders the why-this-role narrative, talking points, substantive questions and long-term framing', () => {
+  it('renders prep section rows; each section opens its detail in the rail', () => {
     window.localStorage.clear()
     renderWithQuery(
       <WorkspaceShell detail={detail} activeStage="final">
         <FinalWorkspace detail={detail} />
       </WorkspaceShell>,
     )
+    // Section rows are visible without opening the rail.
     expect(screen.getByText('Pre-final-round prep')).toBeTruthy()
+    expect(screen.getByText('Why this role')).toBeTruthy()
+    expect(screen.getByText('Mutual-fit talking points')).toBeTruthy()
+    expect(screen.getByText('Substantive questions to ask')).toBeTruthy()
+    expect(screen.getByText('Long-term framing')).toBeTruthy()
+
+    // Each section's detail opens in the rail on click.
+    fireEvent.click(screen.getByText('Why this role').closest('button') as HTMLElement)
     expect(screen.getByText(/platform scope matches your migration work/)).toBeTruthy()
+
+    fireEvent.click(screen.getByText('Mutual-fit talking points').closest('button') as HTMLElement)
     expect(screen.getByText('You owned an idempotent migration runner.')).toBeTruthy()
     expect(screen.getByText('PR #18 checksum ledger')).toBeTruthy()
+
+    fireEvent.click(screen.getByText('Substantive questions to ask').closest('button') as HTMLElement)
     expect(screen.getByText('How is platform reliability measured here?')).toBeTruthy()
     expect(screen.getByText(/Surfaces ownership culture/)).toBeTruthy()
+
+    fireEvent.click(screen.getByText('Long-term framing').closest('button') as HTMLElement)
     expect(screen.getByText(/grow into platform architecture leadership/)).toBeTruthy()
   })
 })
@@ -856,15 +870,27 @@ describe('SystemDesignWalkthrough', () => {
     gapGuidance: 'Be honest about the gap.',
   }
 
-  it('renders grounded + gap cards with coverage and evidence', () => {
-    render(<SystemDesignWalkthrough cards={[grounded, gap]} coverage={{ relevantTotal: 2, relevantAddressed: 1 }} />)
+  it('renders concern rows; the rehearsal detail (script, evidence, gap guidance) opens in the rail', () => {
+    const shellDetail = { slug: 'sd', userAnnotations: undefined } as unknown as ApplicationDetail
+    renderWithQuery(
+      <WorkspaceShell detail={shellDetail} activeStage="system-design">
+        <SystemDesignWalkthrough cards={[grounded, gap]} coverage={{ relevantTotal: 2, relevantAddressed: 1 }} />
+      </WorkspaceShell>,
+    )
+    // Row-level content is visible without opening the rail.
     expect(screen.getByText('Why this API style?')).toBeTruthy()
-    expect(screen.getByText(/I chose REST/)).toBeTruthy()
     expect(screen.getByText('Grounded')).toBeTruthy()
     expect(screen.getByText('Gap')).toBeTruthy()
-    expect(screen.getByText('Zod')).toBeTruthy()
-    expect(screen.getByText('Be honest about the gap.')).toBeTruthy()
     expect(screen.getByText(/1 of 2 role-relevant concerns/)).toBeTruthy()
+
+    // Detail (rehearsal script + evidence) opens in the rail on click.
+    fireEvent.click(screen.getByText('Why this API style?').closest('button') as HTMLElement)
+    expect(screen.getByText(/I chose REST/)).toBeTruthy()
+    expect(screen.getByText('Zod')).toBeTruthy()
+
+    // The gap concern surfaces its honest gap guidance.
+    fireEvent.click(screen.getByText('How does it scale?').closest('button') as HTMLElement)
+    expect(screen.getByText('Be honest about the gap.')).toBeTruthy()
   })
 })
 
@@ -899,16 +925,28 @@ describe('BarRaiserWalkthrough', () => {
     gapGuidance: 'No grounded story yet — be honest and draft one from memory.',
   }
 
-  it('renders grounded + gap principle cards with coverage, evidence and calibration', () => {
-    render(<BarRaiserWalkthrough cards={[grounded, gap]} coverage={{ relevantTotal: 2, relevantAddressed: 1 }} />)
+  it('renders principle rows; stories/evidence/calibration and gap guidance open in the rail', () => {
+    const shellDetail = { slug: 'br', userAnnotations: undefined } as unknown as ApplicationDetail
+    renderWithQuery(
+      <WorkspaceShell detail={shellDetail} activeStage="bar-raiser">
+        <BarRaiserWalkthrough cards={[grounded, gap]} coverage={{ relevantTotal: 2, relevantAddressed: 1 }} />
+      </WorkspaceShell>,
+    )
+    // Row-level content without opening the rail.
     expect(screen.getByText('Ownership')).toBeTruthy()
     expect(screen.getByText('Grounded')).toBeTruthy()
     expect(screen.getByText('Gap')).toBeTruthy()
+    expect(screen.getByText(/1 of 2 leadership principles/)).toBeTruthy()
+
+    // Grounded principle: stories + calibration + evidence + probing open in the rail.
+    fireEvent.click(screen.getByText('Ownership').closest('button') as HTMLElement)
     expect(screen.getByText(/You led this/)).toBeTruthy()
     expect(screen.getByText('PR #18')).toBeTruthy()
     expect(screen.getByText('What did you defer?')).toBeTruthy()
+
+    // Gap principle: honest gap guidance.
+    fireEvent.click(screen.getByText('Invent and Simplify').closest('button') as HTMLElement)
     expect(screen.getByText(/No grounded story yet/)).toBeTruthy()
-    expect(screen.getByText(/1 of 2 leadership principles/)).toBeTruthy()
   })
 })
 

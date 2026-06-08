@@ -37,7 +37,7 @@ export function SummaryRow({ id, label, detail, indicator, preview }: SummaryRow
       aria-current={isActive ? 'true' : undefined}
       aria-controls="detail-rail-panel"
       className={[
-        'group flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors',
+        'group flex w-full items-start gap-3 rounded-md border px-3 py-2.5 text-left transition-colors',
         isActive
           ? 'border-accent/40 bg-accent/8'
           : 'border-zinc-200 bg-white hover:bg-zinc-50 dark:border-white/10 dark:bg-white/2 dark:hover:bg-white/5',
@@ -46,20 +46,20 @@ export function SummaryRow({ id, label, detail, indicator, preview }: SummaryRow
       <span
         aria-hidden
         className={[
-          'h-8 w-0.5 shrink-0 rounded-full transition-colors',
+          'mt-0.5 h-5 w-0.5 shrink-0 rounded-full transition-colors',
           isActive ? 'bg-accent' : 'bg-transparent',
         ].join(' ')}
       />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
+        <span className="block text-sm font-medium leading-snug text-pretty wrap-break-word text-zinc-900 dark:text-zinc-100">
           {label}
         </span>
         {preview && (
-          <span className="block truncate text-xs text-zinc-500 dark:text-zinc-400">{preview}</span>
+          <span className="mt-0.5 block truncate text-xs text-zinc-500 dark:text-zinc-400">{preview}</span>
         )}
       </span>
       {indicator}
-      <ChevronRight className="size-4 shrink-0 text-zinc-400 transition-transform group-hover:translate-x-0.5" aria-hidden />
+      <ChevronRight className="mt-0.5 size-4 shrink-0 text-zinc-400 transition-transform group-hover:translate-x-0.5" aria-hidden />
     </button>
   )
 }

@@ -31,7 +31,10 @@ describe('TechnicalWorkspace', () => {
         </WorkspaceShell>
       </QueryClientProvider>,
     )
-    expect(screen.getByText('Schedule & format')).toBeTruthy()
+    // Schedule & format now lives in the dashboard StageGlancePanel (shared draft
+    // via StageDraftProvider), not the workspace.
+    expect(screen.queryByText('Schedule & format')).toBeNull()
+    expect(screen.getByText('Topics likely to come up')).toBeTruthy()
     expect(screen.getByText('Your project reference sheet')).toBeTruthy()
   })
 })

@@ -95,7 +95,8 @@ function DetailPane({ detail, ann }: { readonly detail: ApplicationDetail; reado
   }
   return (
     <div>
-      <div className="text-sm text-zinc-600 dark:text-zinc-300">{selected.node}</div>
+      {/* Served node is dynamic per row — give it one consistent, readable layout. */}
+      <div className="space-y-5 text-[15px] leading-relaxed text-zinc-700 dark:text-zinc-200">{selected.node}</div>
       <Annotations item={selected} ann={ann} />
     </div>
   )
@@ -158,9 +159,9 @@ export function DetailRailDrawer({ detail }: DetailRailProps) {
               <header className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   {selected?.section && (
-                    <p className="mb-1 text-[11px] font-semibold uppercase text-accent">{selected.section}</p>
+                    <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-accent">{selected.section}</p>
                   )}
-                  <h2 className="truncate text-xl font-semibold text-zinc-900 dark:text-zinc-100">
+                  <h2 className="text-lg font-semibold leading-snug text-pretty wrap-break-word text-zinc-900 dark:text-zinc-100">
                     {selected?.label ?? 'Detail'}
                   </h2>
                 </div>

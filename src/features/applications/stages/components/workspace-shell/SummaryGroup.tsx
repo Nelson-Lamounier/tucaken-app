@@ -56,9 +56,7 @@ export function SummaryGroup({
         />
         <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{title}</span>
         {typeof count === 'number' && (
-          <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600 dark:bg-white/5 dark:text-zinc-400">
-            {count}
-          </span>
+          <span className="ml-auto pl-2 text-base font-bold tabular-nums text-accent">{count}</span>
         )}
       </button>
       {subtitle && <p className="pl-6 text-xs text-zinc-500 dark:text-zinc-400">{subtitle}</p>}

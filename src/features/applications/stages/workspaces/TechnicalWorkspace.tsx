@@ -1,17 +1,17 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { ExternalLink, FolderOpen } from 'lucide-react'
+import { motion, useReducedMotion } from 'motion/react'
+import { ExternalLink, FolderOpen, RotateCw, CheckCircle2, CircleDashed, CircleSlash } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import type { ApplicationDetail } from '@/lib/types/applications.types'
+import { TONE, type Tone } from '@/components/ui/tone'
 import { Card } from '@/components/ui/Card'
-import { Markdown } from '@/components/ui/Markdown'
-import { ScheduleCard } from '../components/ScheduleCard'
-import { TopicCard } from '../components/TopicCard'
-import { EvidenceIndicator } from '../components/EvidenceIndicator'
-import { SummaryGroup, SummaryRow } from '../components/workspace-shell'
-import { useStageDraft } from '../hooks/useStageDraft'
-import { researchToTopics, resolveStagePrep } from '../types/workspace'
+import { CoachingGuidance } from '../components/CoachingSections'
+import { parseCoachingSections } from '../lib/coaching-sections'
+import { SummaryGroup, SummaryRow, RailField, RailBullets, RailRichText } from '../components/workspace-shell'
+import { researchToTopics, resolveStagePrep, type EvidenceStrength } from '../types/workspace'
 import type {
   DsaRealWorkTopic,
   DsaTopicCalibration,
@@ -34,17 +34,6 @@ const CONFIDENCE_LABEL = (confidence: number): string => {
   if (confidence >= 0.66) return 'High relevance'
   if (confidence >= 0.33) return 'Medium relevance'
   return 'Low relevance'
-}
-
-const CONFIDENCE_BADGE: Record<string, string> = {
-  high:   'bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-500/10 dark:text-rose-300',
-  medium: 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-300',
-  low:    'bg-zinc-100 text-zinc-600 ring-zinc-500/20 dark:bg-white/5 dark:text-zinc-400',
-}
-const confidenceBadge = (confidence: number): string => {
-  if (confidence >= 0.66) return CONFIDENCE_BADGE.high
-  if (confidence >= 0.33) return CONFIDENCE_BADGE.medium
-  return CONFIDENCE_BADGE.low
 }
 
 /** Round types that should show the DSA / Coding section */
@@ -90,181 +79,149 @@ function RoleFocusCard({ pc }: { readonly pc: PillarClassification }) {
   )
 }
 
-/** Per-topic DSA detail body: green (evidence) or red (no evidence). */
-function DsaTopicDetail({
-  topic,
-  evidence,
-}: {
-  readonly topic: DsaCalibratedTopic
-  readonly evidence: DsaRealWorkTopic | undefined
-}) {
-  if (evidence) {
-    const sample = evidence.samples[0]
-    const signalKey = evidence.signals[0] ?? ''
-    const signalPhrase = SIGNAL_PHRASE[signalKey] ?? 'shows real-work DSA'
-    const ghUrl = sample
-      ? `https://github.com/${sample.repo}/blob/HEAD/${sample.file}#L${sample.line}`
-      : undefined
-    return (
-      <Card className="space-y-2 border-emerald-200 p-4 dark:border-emerald-500/20">
-        <div className="flex items-center gap-2">
-          <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20">
-            Real-work signal
-          </span>
-          <span
-            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${confidenceBadge(topic.confidence)}`}
-          >
-            {CONFIDENCE_LABEL(topic.confidence)}
-          </span>
-          <h4 className="text-sm font-semibold text-zinc-900 dark:text-white">
-            {topic.displayName}
-          </h4>
-        </div>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">{topic.rationale}</p>
-        {/* Green evidence line: repo/file:line (when sampled) + signal phrase */}
-        <p className="text-xs text-emerald-700 dark:text-emerald-400">
-          Your{' '}
-          <DsaEvidenceSample sample={sample} ghUrl={ghUrl} />
-          {signalPhrase}{' '}
-          <span className="text-zinc-400 dark:text-zinc-500">
-            (in {evidence.matchCount} place{evidence.matchCount > 1 ? 's' : ''})
-          </span>
-        </p>
-        {/* Import-grounded caveat — honesty constraint */}
-        <p className="text-xs text-zinc-400 dark:text-zinc-500">
-          import/type-grounded — concrete work to talk to, not a mastery score.
-        </p>
-      </Card>
-    )
-  }
-
-  // 🔴 — calibrated, no evidence — v1 treatment unchanged
+/** Back face of a DSA card when your code shows the pattern — the real-work signal line. */
+function DsaEvidenceLine({ evidence }: { readonly evidence: DsaRealWorkTopic }) {
+  const sample = evidence.samples[0]
+  const signalPhrase = SIGNAL_PHRASE[evidence.signals[0] ?? ''] ?? 'shows real-work DSA'
   return (
-    <Card className="space-y-2 p-4">
-      <div className="flex items-center gap-2">
-        <span
-          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${confidenceBadge(topic.confidence)}`}
-        >
-          {CONFIDENCE_LABEL(topic.confidence)}
-        </span>
-        <h4 className="text-sm font-semibold text-zinc-900 dark:text-white">
-          {topic.displayName}
-        </h4>
-      </div>
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">{topic.rationale}</p>
-      {/* DSA v1: external pointers, not in-product practice */}
-      <p className="text-xs text-zinc-400 dark:text-zinc-500">
-        Not assessed from your code — practice on{' '}
-        <a
-          href="https://leetcode.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-0.5 font-medium underline underline-offset-2 hover:text-zinc-600 dark:hover:text-zinc-300"
-        >
-          LeetCode <ExternalLink className="size-3" aria-hidden />
-        </a>
-        {' '}or{' '}
-        <a
-          href="https://neetcode.io"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-0.5 font-medium underline underline-offset-2 hover:text-zinc-600 dark:hover:text-zinc-300"
-        >
-          NeetCode <ExternalLink className="size-3" aria-hidden />
-        </a>
-        {' '}before this round.
-      </p>
-    </Card>
+    <p className="text-xs text-emerald-700 dark:text-emerald-400">
+      Your {sample ? <span className="font-mono">{sample.repo}/{sample.file}:{sample.line}</span> : 'code'} {signalPhrase}{' '}
+      <span className="text-zinc-400 dark:text-zinc-500">
+        (in {evidence.matchCount} place{evidence.matchCount > 1 ? 's' : ''})
+      </span>
+    </p>
   )
 }
 
-type DsaSample = DsaRealWorkTopic['samples'][number]
+/**
+ * A DSA topic flip card: topic + evidence/confidence on the front, the real-work
+ * evidence (or practice guidance) on the back. Coloured by whether your code
+ * shows the pattern — green = real-work signal, red = no code evidence. Tap to flip.
+ */
+function DsaFlipCard({ topic, evidence }: { readonly topic: DsaCalibratedTopic; readonly evidence: DsaRealWorkTopic | undefined }) {
+  const reduce = useReducedMotion()
+  const [flipped, setFlipped] = useState(false)
+  const hasEvidence = Boolean(evidence)
+  const tone: Tone = hasEvidence ? 'good' : 'bad'
+  const border = hasEvidence ? STRENGTH_BORDER.strong : STRENGTH_BORDER.none
+  const EvidenceIcon = hasEvidence ? CheckCircle2 : CircleSlash
+  const evidenceLabel = hasEvidence ? 'Real-work signal' : 'No code evidence'
+  const backLabel = hasEvidence ? 'Evidence in your work' : 'How to prepare'
+  const frontHint = hasEvidence ? 'Flip to see your evidence' : 'Flip to see how to prepare'
 
-/** The repo/file:line fragment of the green evidence line. */
-function DsaEvidenceSample({
-  sample,
-  ghUrl,
-}: {
-  readonly sample: DsaSample | undefined
-  readonly ghUrl: string | undefined
-}) {
-  if (sample && ghUrl) {
-    return (
-      <>
-        <a
-          href={ghUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-0.5 font-mono font-medium underline underline-offset-2 hover:text-emerald-600"
-        >
-          {sample.repo}/{sample.file}:{sample.line}{' '}
-          <ExternalLink className="size-3" aria-hidden />
-        </a>{' '}
-      </>
-    )
-  }
-  if (sample) {
-    return <span className="font-mono">{sample.repo}/{sample.file}:{sample.line} </span>
-  }
-  return <>code </>
+  return (
+    <button
+      type="button"
+      onClick={() => setFlipped(prev => !prev)}
+      aria-pressed={flipped}
+      className="h-44 w-full rounded-md text-left perspective-distant focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-500"
+    >
+      <motion.div
+        className="relative h-full w-full"
+        style={{ transformStyle: 'preserve-3d', willChange: 'transform' }}
+        initial={false}
+        animate={{ rotateY: flipped ? 180 : 0 }}
+        transition={reduce ? { duration: 0 } : TOPIC_FLIP_SPRING}
+      >
+        {/* Front — an at-a-glance evidence icon, the topic, and its role relevance */}
+        <div className={`${TOPIC_FACE} bg-white dark:bg-white/2 ${border}`}>
+          <div className="flex items-center justify-between">
+            <EvidenceIcon className={`size-5 ${TONE[tone].dot}`} role="img" aria-label={evidenceLabel} />
+            <RotateCw className="size-3.5 text-zinc-300 dark:text-zinc-600" aria-hidden />
+          </div>
+          <p className="mt-3 flex-1 text-base font-semibold leading-snug tracking-tight text-zinc-900 dark:text-zinc-100">{topic.displayName}</p>
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <span className="text-[11px] font-medium text-zinc-400">{CONFIDENCE_LABEL(topic.confidence)}</span>
+            <span className="text-xs text-zinc-400 dark:text-zinc-500">{frontHint}</span>
+          </div>
+        </div>
+
+        {/* Back — rationale + the evidence in your code (or how to prepare) */}
+        <div className={`${TOPIC_FACE} transform-[rotateY(180deg)] bg-zinc-50 dark:bg-white/5 ${border}`}>
+          <span className={`inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase ${TONE[tone].text}`}>
+            <EvidenceIcon className="size-3.5" aria-hidden />
+            {backLabel}
+          </span>
+          <div className="mt-1.5 flex-1 space-y-1.5 overflow-y-auto">
+            <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-200">{topic.rationale}</p>
+            {evidence ? (
+              <DsaEvidenceLine evidence={evidence} />
+            ) : (
+              <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                Not assessed from your code — practice on LeetCode / NeetCode before this round.
+              </p>
+            )}
+          </div>
+          <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-zinc-400">
+            <RotateCw className="size-3" aria-hidden /> Flip back
+          </span>
+        </div>
+      </motion.div>
+    </button>
+  )
 }
 
 /** 🟡 Secondary block — evidence topics NOT in the calibrated list. */
 function ExtraEvidenceList({ topics }: { readonly topics: readonly DsaRealWorkTopic[] }) {
   return (
-    <div className="space-y-2">
-      <h4 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">
-        Other real-work DSA signals
-      </h4>
-      <p className="text-xs text-zinc-400 dark:text-zinc-500">
-        Your code shows these patterns; this role didn&apos;t emphasise them.
-      </p>
-      {topics.map(ev => {
-        const sample = ev.samples[0]
-        const signalKey = ev.signals[0] ?? ''
-        const signalPhrase = SIGNAL_PHRASE[signalKey] ?? 'shows real-work DSA'
-        return (
-          <Card key={ev.canonicalName} className="space-y-1.5 border-amber-200 p-3 dark:border-amber-500/20">
-            <p className="text-xs text-amber-700 dark:text-amber-400">
-              {signalPhrase}
-              {sample && (
-                <span className="ml-1 font-mono text-zinc-400 dark:text-zinc-500">
-                  ({sample.repo}/{sample.file}:{sample.line})
-                </span>
-              )}
-              {' '}
-              <span className="text-zinc-400 dark:text-zinc-500">
-                — {ev.matchCount} place{ev.matchCount > 1 ? 's' : ''}
+    <div className="space-y-3">
+      <div className="space-y-1">
+        <h4 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">Other real-work DSA signals</h4>
+        <p className="text-xs text-zinc-400 dark:text-zinc-500">
+          Your code shows these patterns; this role didn&apos;t emphasise them.
+        </p>
+      </div>
+      <ol className="space-y-3">
+        {topics.map((ev, i) => {
+          const sample = ev.samples[0]
+          const signalPhrase = SIGNAL_PHRASE[ev.signals[0] ?? ''] ?? 'shows real-work DSA'
+          return (
+            <li
+              key={ev.canonicalName}
+              className="flex gap-3 rounded-md bg-amber-50/60 p-4 ring-1 ring-inset ring-amber-200/70 dark:bg-amber-500/5 dark:ring-amber-500/20"
+            >
+              <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-amber-400/15 text-[11px] font-semibold tabular-nums text-amber-700 dark:text-amber-300">
+                {i + 1}
               </span>
-            </p>
-          </Card>
-        )
-      })}
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <p className="text-sm leading-snug text-amber-800 dark:text-amber-300">{signalPhrase}</p>
+                {sample && (
+                  <p className="text-xs text-zinc-500 dark:text-zinc-500">
+                    <span className="font-mono">{sample.repo}/{sample.file}:{sample.line}</span>
+                    <span className="text-zinc-400 dark:text-zinc-600"> · {ev.matchCount} place{ev.matchCount > 1 ? 's' : ''}</span>
+                  </p>
+                )}
+              </div>
+            </li>
+          )
+        })}
+      </ol>
     </div>
   )
 }
 
-/** Per-topic DevOps detail body: the "You declared …" receipts line. */
-function DevopsTopicDetail({ topic }: { readonly topic: DevopsTopicEvidence }) {
+/** Inline DevOps card: topic-group badge + name + the "You declared …" receipt.
+ *  Rendered inline (no rail toggle) — these are read-only evidence receipts. */
+function DevopsTopicCard({ topic }: { readonly topic: DevopsTopicEvidence }) {
   const s = topic.samples[0]
   const ghUrl = s ? `https://github.com/${s.repo}/blob/HEAD/${s.file}#L${s.line}` : undefined
   return (
-    <Card className="space-y-2 p-4">
-      <div className="flex items-center gap-2">
+    <li className="rounded-md bg-white p-4 ring-1 ring-zinc-200 shadow-sm dark:bg-white/2 dark:ring-0 dark:inset-ring dark:inset-ring-white/10 dark:shadow-none">
+      <div className="flex flex-wrap items-center gap-2">
         <span className="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-500/20">
           {topic.topicGroup}
         </span>
-        <h4 className="text-sm font-semibold text-zinc-900 dark:text-white">{topic.displayName}</h4>
+        <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{topic.displayName}</h4>
       </div>
       {s && (
-        <p className="text-xs text-zinc-600 dark:text-zinc-400">
+        <p className="mt-2 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
           You declared{' '}
           {ghUrl ? (
             <a
               href={ghUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-0.5 font-mono font-medium underline underline-offset-2 hover:text-blue-600"
+              className="inline-flex items-center gap-0.5 font-mono font-medium text-accent underline underline-offset-2 hover:opacity-80"
             >
               {s.repo}/{s.file}:{s.line} <ExternalLink className="size-3" aria-hidden />
             </a>
@@ -277,36 +234,102 @@ function DevopsTopicDetail({ topic }: { readonly topic: DevopsTopicEvidence }) {
           )}
         </p>
       )}
-    </Card>
+    </li>
   )
 }
 
 type EvidenceTopicRow = ReturnType<typeof researchToTopics>[number]
 
-/** Topics likely to come up — one SummaryRow per evidence topic. */
-function TopicsGroup({ topics }: { readonly topics: readonly EvidenceTopicRow[] }) {
+const TOPIC_FLIP_SPRING = { type: 'spring', visualDuration: 0.45, bounce: 0.18 } as const
+const TOPIC_FACE = 'absolute inset-0 flex flex-col rounded-md border p-4 [backface-visibility:hidden] [-webkit-backface-visibility:hidden]'
+
+/** Strength → traffic-light tone + card border. Mirrors EvidenceIndicator's mapping. */
+const STRENGTH_TONE: Record<EvidenceStrength, Tone> = { strong: 'good', moderate: 'warn', none: 'bad' }
+const STRENGTH_BORDER: Record<EvidenceStrength, string> = {
+  strong:   'border-emerald-200 dark:border-emerald-500/30',
+  moderate: 'border-amber-200 dark:border-amber-500/30',
+  none:     'border-red-200 dark:border-red-500/30',
+}
+/** Strength → a shape-distinct icon (not colour-only) + its accessible label. */
+const STRENGTH_ICON: Record<EvidenceStrength, LucideIcon> = { strong: CheckCircle2, moderate: CircleDashed, none: CircleSlash }
+const STRENGTH_LABEL: Record<EvidenceStrength, string> = { strong: 'Strong evidence', moderate: 'Some evidence', none: 'Gap to address' }
+
+/** A topic flip card: title + evidence badge on the front, the evidence (or
+ *  gap guidance) on the back — coloured by evidence strength. Tap to reveal. */
+function TopicFlipCard({ topic }: { readonly topic: EvidenceTopicRow }) {
+  const reduce = useReducedMotion()
+  const [flipped, setFlipped] = useState(false)
+  const isGap = topic.strength === 'none'
+  const backLabel = isGap ? 'Addressing the gap' : 'Evidence in your work'
+  const backText = isGap ? (topic.beHonest ?? topic.summary) : topic.summary
+  const frontHint = isGap ? 'Flip to see how to address it' : 'Flip to see your evidence'
+  const tone = STRENGTH_TONE[topic.strength]
+  const border = STRENGTH_BORDER[topic.strength]
+  const StrengthIcon = STRENGTH_ICON[topic.strength]
+
   return (
-    <SummaryGroup
-      id="topics"
-      title="Topics likely to come up"
-      subtitle="Grounded in the evidence found across your work for this role."
-      count={topics.length}
+    <button
+      type="button"
+      onClick={() => setFlipped(prev => !prev)}
+      aria-pressed={flipped}
+      className="h-44 w-full rounded-md text-left perspective-distant focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-500"
     >
-      {topics.length === 0 && (
+      <motion.div
+        className="relative h-full w-full"
+        style={{ transformStyle: 'preserve-3d', willChange: 'transform' }}
+        initial={false}
+        animate={{ rotateY: flipped ? 180 : 0 }}
+        transition={reduce ? { duration: 0 } : TOPIC_FLIP_SPRING}
+      >
+        {/* Front — the topic + an at-a-glance evidence icon (shape-distinct, not colour-only) */}
+        <div className={`${TOPIC_FACE} bg-white dark:bg-white/2 ${border}`}>
+          <div className="flex items-center justify-between">
+            <StrengthIcon className={`size-5 ${TONE[tone].dot}`} role="img" aria-label={STRENGTH_LABEL[topic.strength]} />
+            <RotateCw className="size-3.5 text-zinc-300 dark:text-zinc-600" aria-hidden />
+          </div>
+          <p className="mt-3 flex-1 text-base font-semibold leading-snug tracking-tight text-zinc-900 dark:text-zinc-100">{topic.title}</p>
+          <span className="text-xs text-zinc-400 dark:text-zinc-500">{frontHint}</span>
+        </div>
+
+        {/* Back — the evidence in your work (or gap guidance) */}
+        <div className={`${TOPIC_FACE} transform-[rotateY(180deg)] bg-zinc-50 dark:bg-white/5 ${border}`}>
+          <span className={`inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase ${TONE[tone].text}`}>
+            <StrengthIcon className="size-3.5" aria-hidden />
+            {backLabel}
+          </span>
+          <p className="mt-1.5 flex-1 overflow-y-auto text-sm leading-relaxed text-zinc-700 dark:text-zinc-200">{backText}</p>
+          <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-zinc-400">
+            <RotateCw className="size-3" aria-hidden /> Flip back
+          </span>
+        </div>
+      </motion.div>
+    </button>
+  )
+}
+
+/** Topics likely to come up — a flip-card deck (active recall) coloured by
+ *  evidence strength, inline like the phone-screen talking points. */
+function TopicsPanel({ topics }: { readonly topics: readonly EvidenceTopicRow[] }) {
+  return (
+    <section className="space-y-3 rounded-md border border-zinc-200 bg-zinc-50/50 p-4 dark:border-white/10 dark:bg-white/2">
+      <div>
+        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Topics likely to come up</h3>
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          Grounded in the evidence found across your work for this role. Tap a card to reveal the evidence.
+        </p>
+      </div>
+      {topics.length > 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {topics.map(topic => (
+            <TopicFlipCard key={topic.id} topic={topic} />
+          ))}
+        </div>
+      ) : (
         <Card className="px-4 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
           No analysis yet — topics appear once the Research Agent has run for this application.
         </Card>
       )}
-      {topics.map(topic => (
-        <SummaryRow
-          key={topic.id}
-          id={topic.id}
-          label={topic.title}
-          indicator={<EvidenceIndicator strength={topic.strength} />}
-          detail={<TopicCard topic={topic} />}
-        />
-      ))}
-    </SummaryGroup>
+    </section>
   )
 }
 
@@ -318,8 +341,8 @@ interface DsaGroupProps {
   readonly matchesRole: boolean
 }
 
-/** Section B — DSA / Coding (calibration + real-work evidence badges). */
-function DsaGroup({
+/** Section B — DSA / Coding. Inline flip-card deck coloured by real-work evidence. */
+function DsaPanel({
   detail,
   dsaCalibration,
   evidenceByTopic,
@@ -328,25 +351,27 @@ function DsaGroup({
 }: DsaGroupProps) {
   const likelyTopics = dsaCalibration?.likelyTopics ?? []
   return (
-    <SummaryGroup id="dsa" title="DSA / Coding" subtitle="Topic calibration for this role.">
-      {matchesRole && (
-        <span className="inline-flex rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent ring-1 ring-inset ring-accent/20">
-          Matches this role
-        </span>
-      )}
+    <section className="space-y-3 rounded-md border border-zinc-200 bg-zinc-50/50 p-4 dark:border-white/10 dark:bg-white/2">
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">DSA / Coding</h3>
+          {matchesRole && (
+            <span className="inline-flex rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent ring-1 ring-inset ring-accent/20">
+              Matches this role
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          Topics calibrated for this role, coloured by whether your code shows the pattern. Tap a card to reveal the detail.
+        </p>
+      </div>
 
       {/* Narrow-coverage honesty banner — ALWAYS shown when Section B renders */}
-      <Card className="border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">
+      <div className="rounded-md bg-blue-50 px-4 py-3 text-sm text-blue-800 ring-1 ring-zinc-200 shadow-sm dark:bg-blue-500/10 dark:text-blue-300 dark:ring-0 dark:inset-ring dark:inset-ring-white/10 dark:shadow-none">
         Real-work detection covers a limited pattern set (graphs, heaps, trees/tries,
         memoization, custom sort). No green badge ≠ you can&apos;t do it — most DSA practice
-        happens off-GitHub.
-      </Card>
-
-      {/* Calibration honesty banner */}
-      <Card className="border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300">
-        We calibrate which DSA topics matter for this role and flag gaps. DSA practice happens
-        off-GitHub — we point you to LeetCode/NeetCode; we don&apos;t drill.
-      </Card>
+        happens off-GitHub. We point you to LeetCode/NeetCode; we don&apos;t drill.
+      </div>
 
       {/* Practical-coding note */}
       {detail.technicalRoundType === 'practical' && (
@@ -356,27 +381,18 @@ function DsaGroup({
         </p>
       )}
 
-      {/* Primary topic rows — calibrated topics with 🟢/🔴 treatment */}
-      {likelyTopics.length === 0 && (
+      {/* Primary topic deck — calibrated topics as 🟢/🔴 flip cards */}
+      {likelyTopics.length > 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {likelyTopics.map(topic => (
+            <DsaFlipCard key={topic.canonicalName} topic={topic} evidence={evidenceByTopic.get(topic.canonicalName)} />
+          ))}
+        </div>
+      ) : (
         <Card className="px-4 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
           This role likely has no DSA round — focus on system design / practical work.
         </Card>
       )}
-      {likelyTopics.map(topic => (
-        <SummaryRow
-          key={topic.canonicalName}
-          id={topic.canonicalName}
-          label={topic.displayName}
-          indicator={
-            <span
-              className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${confidenceBadge(topic.confidence)}`}
-            >
-              {CONFIDENCE_LABEL(topic.confidence)}
-            </span>
-          }
-          detail={<DsaTopicDetail topic={topic} evidence={evidenceByTopic.get(topic.canonicalName)} />}
-        />
-      ))}
 
       {/* 🟡 Secondary block — evidence topics NOT in calibrated list */}
       {extraEvidenceTopics.length > 0 && <ExtraEvidenceList topics={extraEvidenceTopics} />}
@@ -385,7 +401,7 @@ function DsaGroup({
       {dsaCalibration?.honestyNote && (
         <p className="text-xs text-zinc-400 dark:text-zinc-500">{dsaCalibration.honestyNote}</p>
       )}
-    </SummaryGroup>
+    </section>
   )
 }
 
@@ -416,14 +432,14 @@ function PrepChecklistGroup({ items }: { readonly items: readonly PrepChecklistI
             </span>
           }
           detail={
-            <Card className="space-y-1.5 p-4">
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">{item.rationale}</p>
+            <>
+              <RailField label="Why it matters">{item.rationale}</RailField>
               {item.suggestedResources && item.suggestedResources.length > 0 && (
-                <p className="text-xs text-zinc-500 dark:text-zinc-500">
-                  Resources: {item.suggestedResources.join(', ')}
-                </p>
+                <RailField label="Resources">
+                  <RailBullets items={item.suggestedResources} />
+                </RailField>
               )}
-            </Card>
+            </>
           }
         />
       ))}
@@ -440,6 +456,7 @@ function DifficultQuestionsGroup({ questions }: { readonly questions: readonly D
       id="difficult-questions"
       title="Difficult questions"
       subtitle="How to bridge honestly from a gap to an adjacent strength."
+      count={questions.length}
     >
       {questions.map(q => (
         <SummaryRow
@@ -447,12 +464,16 @@ function DifficultQuestionsGroup({ questions }: { readonly questions: readonly D
           id={q.question}
           label={q.question}
           detail={
-            <Card className="space-y-1.5 p-4">
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">{q.answerFramework}</p>
-              <p className="rounded-lg bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:bg-white/5 dark:text-zinc-400">
-                Bridge: {q.bridgeStrategy}
-              </p>
-            </Card>
+            <>
+              <RailField label="Answer framework">
+                <RailRichText text={q.answerFramework} />
+              </RailField>
+              <RailField label="Bridge strategy">
+                <div className="rounded-md bg-accent/5 px-4 py-3 ring-1 ring-inset ring-accent/15">
+                  <RailRichText text={q.bridgeStrategy} />
+                </div>
+              </RailField>
+            </>
           }
         />
       ))}
@@ -473,29 +494,22 @@ function DevopsGroup({
       id="devops"
       title="DevOps / Infrastructure"
       subtitle="The infrastructure artifacts your repos declare, with receipts."
+      count={topics.length}
     >
       {matchesRole && (
         <span className="inline-flex rounded-full bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent ring-1 ring-inset ring-accent/20">
           Matches this role
         </span>
       )}
-      <Card className="border-blue-200 p-4 text-sm text-zinc-600 dark:border-blue-500/20 dark:text-zinc-400">
+      <div className="rounded-md bg-blue-50/60 px-4 py-3 text-sm leading-relaxed text-zinc-600 ring-1 ring-inset ring-blue-200/70 dark:bg-blue-500/5 dark:text-zinc-400 dark:ring-blue-500/20">
         The infrastructure artifacts your repos declare, with receipts — what you can speak to,
         not a competence score. Depth assessment is coming.
-      </Card>
-      {topics.map(topic => (
-        <SummaryRow
-          key={topic.canonicalTopicName}
-          id={topic.canonicalTopicName}
-          label={topic.displayName}
-          indicator={
-            <span className="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-500/20">
-              {topic.topicGroup}
-            </span>
-          }
-          detail={<DevopsTopicDetail topic={topic} />}
-        />
-      ))}
+      </div>
+      <ol className="space-y-3">
+        {topics.map(topic => (
+          <DevopsTopicCard key={topic.canonicalTopicName} topic={topic} />
+        ))}
+      </ol>
     </SummaryGroup>
   )
 }
@@ -612,7 +626,7 @@ function coachPrepFields(prep: ReturnType<typeof resolveStagePrep>) {
   return {
     technicalQuestions,
     questionsToAsk,
-    coachingNotes: prep?.coachingNotes,
+    coachingSections: parseCoachingSections(prep?.coachingNotes),
     showTechnicalQuestions: technicalQuestions.length > 0,
     showQuestionsToAsk: questionsToAsk.length > 0,
   }
@@ -630,62 +644,71 @@ function roleFocusVisible(pc: PillarClassification | undefined): boolean {
   return pc.primaryPillar !== 'swe-general'
 }
 
-/** Coach-generated technical questions — role-tailored, with approach + key points. */
+/** Coach-generated technical questions — one clickable row per question; the
+ *  approach + key points open in the detail rail (mirrors Difficult questions). */
 function TechnicalQuestionsGroup({ questions }: { readonly questions: readonly InterviewQuestion[] }) {
   return (
-    <SummaryGroup id="technical-questions" title="Likely technical questions" subtitle="Role-tailored by your interview coach.">
-      <div className="space-y-2">
-        {questions.map((q, i) => (
-          <Card key={i} className="space-y-2 p-4">
-            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{q.question}</p>
-            {q.answerFramework && <p className="text-xs text-zinc-500 dark:text-zinc-400">Approach: {q.answerFramework}</p>}
-            {q.keyPoints.length > 0 && (
-              <ul className="list-disc space-y-0.5 pl-5 text-sm text-zinc-700 dark:text-zinc-300">
-                {q.keyPoints.map((p, j) => (
-                  <li key={j}>{p}</li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        ))}
-      </div>
+    <SummaryGroup id="technical-questions" title="Likely technical questions" subtitle="Role-tailored by your interview coach." count={questions.length}>
+      {questions.map(q => (
+        <SummaryRow
+          key={q.question}
+          id={q.question}
+          label={q.question}
+          detail={
+            <>
+              {q.answerFramework && (
+                <RailField label="Approach">
+                  <RailRichText text={q.answerFramework} />
+                </RailField>
+              )}
+              {q.keyPoints.length > 0 && (
+                <RailField label="Key points">
+                  <RailBullets items={q.keyPoints} />
+                </RailField>
+              )}
+            </>
+          }
+        />
+      ))}
     </SummaryGroup>
   )
 }
 
-/** Questions to ask the interviewer — from the coach. */
+/** Questions to ask the interviewer — from the coach. A numbered card per
+ *  question: the question to ask, then why it lands. rounded-md, roomy. */
 function QuestionsToAskGroup({ questions }: { readonly questions: readonly QuestionToAsk[] }) {
   return (
-    <SummaryGroup id="questions-to-ask" title="Questions to ask" subtitle="Thoughtful questions for the interviewer.">
-      <div className="space-y-2">
+    <SummaryGroup id="questions-to-ask" title="Questions to ask" subtitle="Thoughtful questions for the interviewer." count={questions.length}>
+      <ol className="space-y-3">
         {questions.map((q, i) => (
-          <Card key={i} className="space-y-1 p-3">
-            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{q.question}</p>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">{q.rationale}</p>
-          </Card>
+          <li
+            key={q.question}
+            className="rounded-md bg-white p-4 ring-1 ring-zinc-200 shadow-sm dark:bg-white/2 dark:ring-0 dark:inset-ring dark:inset-ring-white/10 dark:shadow-none"
+          >
+            <div className="flex items-start gap-3">
+              <span className="mt-1 flex size-5 shrink-0 items-center justify-center rounded-full bg-accent/12 text-[11px] font-semibold tabular-nums text-accent">
+                {i + 1}
+              </span>
+              <p className="min-w-0 flex-1 text-[15px] font-semibold leading-relaxed text-pretty text-zinc-900 dark:text-zinc-100">
+                {q.question}
+              </p>
+            </div>
+            <div className="mt-3 space-y-1 border-t border-zinc-100 pt-3 dark:border-white/5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Why ask it</p>
+              <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">{q.rationale}</p>
+            </div>
+          </li>
         ))}
-      </div>
+      </ol>
     </SummaryGroup>
   )
 }
 
-/** Coaching notes — free-text stage guidance from the Coach Agent. */
-function TechnicalCoachingNotesGroup({ notes }: { readonly notes: string }) {
-  return (
-    <SummaryGroup id="coaching-notes" title="Coaching notes" subtitle="Stage-specific guidance from your interview coach.">
-      <Card className="p-4">
-        <Markdown className="text-sm text-zinc-700 dark:text-zinc-300">{notes}</Markdown>
-      </Card>
-    </SummaryGroup>
-  )
-}
-
-/** Coach prep supplements (technical questions, notes, questions-to-ask) — grouped to keep the workspace simple. */
+/** Coach prep supplements (technical questions, questions-to-ask) — grouped to keep the workspace simple. */
 function TechnicalCoachSupplements({ data }: { readonly data: ReturnType<typeof useTechnicalWorkspaceData> }) {
   return (
     <>
       {data.showTechnicalQuestions && <TechnicalQuestionsGroup questions={data.technicalQuestions} />}
-      {data.coachingNotes && <TechnicalCoachingNotesGroup notes={data.coachingNotes} />}
       {data.showQuestionsToAsk && <QuestionsToAskGroup questions={data.questionsToAsk} />}
     </>
   )
@@ -702,9 +725,6 @@ function TechnicalCoachSupplements({ data }: { readonly data: ReturnType<typeof 
  * Renders a fragment of SummaryGroups into the WorkspaceShell's left column.
  */
 export function TechnicalWorkspace({ detail }: TechnicalWorkspaceProps) {
-  const stageUserState = detail.stages?.['technical']?.user_state as Partial<import('../hooks/useStageDraft').StageDraft> | undefined
-  const { draft, setSchedule } = useStageDraft(detail.slug, 'technical', stageUserState)
-
   const data = useTechnicalWorkspaceData(detail)
 
   return (
@@ -716,20 +736,12 @@ export function TechnicalWorkspace({ detail }: TechnicalWorkspaceProps) {
         </SummaryGroup>
       )}
 
-      {/* Schedule + format — primary editable control, rendered inline */}
-      <SummaryGroup id="schedule" title="Schedule & format">
-        <ScheduleCard
-          scheduleAt={draft.scheduleAt}
-          formatNote={draft.formatNote}
-          onChange={setSchedule}
-          formatPlaceholder="e.g. 30m coding + 30m systems discussion"
-        />
-      </SummaryGroup>
-
-      <TopicsGroup topics={data.topics} />
+      {/* Schedule & format is edited from the dashboard SchedulePanel (shared draft
+          via StageDraftProvider); coaching notes are surfaced there too. */}
+      <TopicsPanel topics={data.topics} />
 
       {data.showDsaSection && (
-        <DsaGroup
+        <DsaPanel
           detail={detail}
           dsaCalibration={data.dsaCalibration}
           evidenceByTopic={data.evidenceByTopic}
@@ -745,6 +757,10 @@ export function TechnicalWorkspace({ detail }: TechnicalWorkspaceProps) {
       {data.showDifficult && <DifficultQuestionsGroup questions={data.difficultQuestions} />}
 
       <TechnicalCoachSupplements data={data} />
+
+      {/* Coaching guidance — positioning lives above the dashboards; these are the
+          remaining coach sections, split into focused collapsible groups. */}
+      <CoachingGuidance sections={data.coachingSections} appKey={{ slug: detail.slug, stage: 'technical' }} />
 
       {data.showDevops && (
         <DevopsGroup topics={data.devopsEvidence} matchesRole={data.focusPillars.has('devops-sre-platform')} />

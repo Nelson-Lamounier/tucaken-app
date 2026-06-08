@@ -18,6 +18,7 @@ import { BarRaiserWorkspace } from '../stages/workspaces/BarRaiserWorkspace'
 import { FinalWorkspace } from '../stages/workspaces/FinalWorkspace'
 import { AppliedWorkspace } from '../stages/workspaces/AppliedWorkspace'
 import { StageGlancePanel } from './StageGlancePanel'
+import { StagePositioning } from '../stages/components/CoachingSections'
 import { StageDraftProvider } from '../stages/hooks/stage-draft-context'
 import type { StageDraft } from '../stages/hooks/useStageDraft'
 import { STAGE_ORDER, stageIndex } from '../stages/types/stage'
@@ -32,6 +33,13 @@ import {
   STATUS_LABELS,
   STAGE_LABELS,
 } from './ApplicationTypes'
+
+/**
+ * Stages whose Schedule panel lives in the dashboard StageGlancePanel — wrapped
+ * in a StageDraftProvider so the panel and the workspace share one persisted
+ * draft. Phone-screen and technical mirror this layout.
+ */
+const STAGE_USES_DRAFT_PROVIDER = new Set<InterviewStage>(['phone-screen', 'technical'])
 
 /** Returns the bare workspace node for a stage — no gate, no callbacks. */
 function stageWorkspaceNode(stage: InterviewStage, detail: ApplicationDetail) {
@@ -154,6 +162,8 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
         to: '/applications/$slug',
         params: { slug },
         search: { stage: activeStage, focus: id ?? undefined },
+        // Opening/closing the detail rail must not jump the page back to the top.
+        resetScroll: false,
       })
     },
     [slug, activeStage, navigate],
@@ -235,6 +245,9 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
   // workspace share one persisted draft (see below).
   const stageRegion = (
     <>
+      {/* Coach's stage positioning — frames the round, sits above the dashboards */}
+      {STAGE_USES_DRAFT_PROVIDER.has(resolvedStage) && <StagePositioning detail={detail} stage={resolvedStage} />}
+
       {/* At-a-glance dashboard panel — dynamic per active stage */}
       <StageGlancePanel detail={detail} stage={resolvedStage} />
 
@@ -309,7 +322,7 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
         dateStr={dateStr}
       />
 
-      {resolvedStage === 'phone-screen' ? (
+      {STAGE_USES_DRAFT_PROVIDER.has(resolvedStage) ? (
         <StageDraftProvider
           slug={detail.slug}
           stage={resolvedStage}
