@@ -462,6 +462,8 @@ export interface QuestionToAsk {
 export interface PhoneScreenTalkingPoint {
   readonly point: string
   readonly evidence: string
+  /** Verified-match skills this point draws on (one-to-many). Empty/absent on legacy rows. */
+  readonly matchedSkills?: readonly string[]
 }
 
 /** Phone-screen compensation conversation script */
