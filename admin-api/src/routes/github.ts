@@ -460,6 +460,14 @@ async function dispatchIngestionJob(
                             { name: 'REPO_FULL_NAME',     value: repoFullName },
                             { name: 'FORCE_REINDEX',      value: String(forceReindex) },
                             { name: 'GITHUB_TOKEN',       value: githubToken },
+                            // Fast scan is the production default: defer per-chunk skill
+                            // enrichment to the in-job background pass so the repo is
+                            // searchable in minutes (skills backfilled in the same Job, no
+                            // quality loss). Set INGESTION_DEFER_ENRICHMENT=0 for inline.
+                            {
+                                name:  'DEFER_ENRICHMENT',
+                                value: process.env['INGESTION_DEFER_ENRICHMENT'] ?? '1',
+                            },
                             // Cross-region inference profile for BedrockChunkEnricher.
                             // Direct on-demand Claude invocation unsupported in eu-west-1.
                             {
