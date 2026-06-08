@@ -12,7 +12,7 @@ import type {
 import { useApplicationStatus } from '@/hooks/use-admin-applications'
 import { Card } from '@/components/ui/Card'
 import { ConfirmModal } from '../components/ConfirmModal'
-import { SummaryGroup, SummaryRow } from '../components/workspace-shell'
+import { SummaryGroup, SummaryRow, RailRichText } from '../components/workspace-shell'
 import { useOfferDraft, personalFitScore, type OfferComponents, type DecisionFactor } from '../hooks/useOfferDraft'
 import { negotiationLeverage, resolveStagePrep } from '../types/workspace'
 
@@ -225,14 +225,13 @@ function DecisionGroup({ onPick }: { readonly onPick: (action: DecisionAction) =
   )
 }
 
-/** Mutual-fit talking points — each a grounded point with a muted grounding line. */
-function TalkingPoints({ points }: { readonly points: readonly FinalTalkingPoint[] }) {
-  if (points.length === 0) return null
+/** Rail detail: mutual-fit talking points — each a grounded point + grounding line. */
+function MutualFitDetail({ points }: { readonly points: readonly FinalTalkingPoint[] }) {
   return (
     <div className="space-y-2.5">
-      {points.map((tp, i) => (
-        <div key={i} className="space-y-1 rounded-lg border border-zinc-200 p-3 dark:border-white/10">
-          <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">{tp.point}</p>
+      {points.map(tp => (
+        <div key={tp.point} className="space-y-1 rounded-md border border-zinc-200 p-3 dark:border-white/10">
+          <p className="text-sm leading-relaxed text-zinc-900 dark:text-zinc-100">{tp.point}</p>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">{tp.grounding}</p>
         </div>
       ))}
@@ -240,14 +239,13 @@ function TalkingPoints({ points }: { readonly points: readonly FinalTalkingPoint
   )
 }
 
-/** Substantive questions to ask — each a question with a muted rationale. */
-function Questions({ questions }: { readonly questions: readonly FinalQuestion[] }) {
-  if (questions.length === 0) return null
+/** Rail detail: substantive questions to ask — each a question with a muted rationale. */
+function QuestionsDetail({ questions }: { readonly questions: readonly FinalQuestion[] }) {
   return (
-    <ul className="space-y-1.5">
-      {questions.map((q, i) => (
-        <li key={i} className="text-sm">
-          <span className="font-medium text-zinc-700 dark:text-zinc-300">{q.question}</span>
+    <ul className="space-y-2">
+      {questions.map(q => (
+        <li key={q.question} className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
+          <span className="font-medium text-zinc-900 dark:text-zinc-100">{q.question}</span>
           <span className="text-zinc-500 dark:text-zinc-400"> — {q.rationale}</span>
         </li>
       ))}
@@ -255,34 +253,53 @@ function Questions({ questions }: { readonly questions: readonly FinalQuestion[]
   )
 }
 
-/** The coach's grounded pre-final-round prep, rendered as the primary section. */
+/**
+ * The coach's grounded pre-final-round prep — one clickable row per section; the
+ * detail opens in the rail (mirrors the Difficult-questions / walkthrough patterns).
+ */
 function FinalPrepGroup({ prep }: { readonly prep: FinalPrep }) {
+  const rowCount =
+    (prep.whyThisRole ? 1 : 0) +
+    (prep.mutualFitTalkingPoints.length > 0 ? 1 : 0) +
+    (prep.substantiveQuestions.length > 0 ? 1 : 0) +
+    (prep.longTermFraming ? 1 : 0)
   return (
-    <SummaryGroup id="final-prep" title="Pre-final-round prep" subtitle="Grounded in your work — why this role, mutual fit, and what to ask.">
-      <Card className="space-y-4 p-4">
-        <p className="text-sm leading-relaxed whitespace-pre-line text-zinc-700 dark:text-zinc-300">{prep.whyThisRole}</p>
-
-        {prep.mutualFitTalkingPoints.length > 0 && (
-          <div className="space-y-2">
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Mutual-fit talking points</h4>
-            <TalkingPoints points={prep.mutualFitTalkingPoints} />
-          </div>
-        )}
-
-        {prep.substantiveQuestions.length > 0 && (
-          <div className="space-y-2">
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Substantive questions to ask</h4>
-            <Questions questions={prep.substantiveQuestions} />
-          </div>
-        )}
-
-        {prep.longTermFraming && (
-          <div className="space-y-2">
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Long-term framing</h4>
-            <p className="text-sm leading-relaxed whitespace-pre-line text-zinc-700 dark:text-zinc-300">{prep.longTermFraming}</p>
-          </div>
-        )}
-      </Card>
+    <SummaryGroup
+      id="final-prep"
+      title="Pre-final-round prep"
+      subtitle="Grounded in your work — why this role, mutual fit, and what to ask."
+      count={rowCount}
+    >
+      {prep.whyThisRole && (
+        <SummaryRow
+          id="final-why-this-role"
+          label="Why this role"
+          detail={<RailRichText text={prep.whyThisRole} />}
+        />
+      )}
+      {prep.mutualFitTalkingPoints.length > 0 && (
+        <SummaryRow
+          id="final-mutual-fit"
+          label="Mutual-fit talking points"
+          indicator={<span className="text-xs font-medium tabular-nums text-zinc-500">{prep.mutualFitTalkingPoints.length}</span>}
+          detail={<MutualFitDetail points={prep.mutualFitTalkingPoints} />}
+        />
+      )}
+      {prep.substantiveQuestions.length > 0 && (
+        <SummaryRow
+          id="final-questions"
+          label="Substantive questions to ask"
+          indicator={<span className="text-xs font-medium tabular-nums text-zinc-500">{prep.substantiveQuestions.length}</span>}
+          detail={<QuestionsDetail questions={prep.substantiveQuestions} />}
+        />
+      )}
+      {prep.longTermFraming && (
+        <SummaryRow
+          id="final-long-term"
+          label="Long-term framing"
+          detail={<RailRichText text={prep.longTermFraming} />}
+        />
+      )}
     </SummaryGroup>
   )
 }

@@ -3,6 +3,7 @@ import type {
   InterviewStage,
   InterviewPrepOutput,
   ResearchOutput,
+  CoachingNotes,
 } from '@/lib/types/applications.types'
 
 // =============================================================================
@@ -89,8 +90,8 @@ export interface StageWorkspaceData {
   readonly projectRefs: readonly ProjectReference[]
   /** Questions to ask the interviewer — real, from the Coach Agent. */
   readonly questionsToAsk: readonly ChecklistEntry[]
-  /** Free-text coaching notes (Markdown) — real, from the Coach Agent. */
-  readonly coachingNotes: string | null
+  /** Stage coaching — structured object (new) or legacy Markdown string. */
+  readonly coachingNotes: string | CoachingNotes | null
 }
 
 /**

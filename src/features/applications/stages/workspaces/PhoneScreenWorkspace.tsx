@@ -1,11 +1,12 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Lightbulb, RotateCw } from 'lucide-react'
+import { Lightbulb, RotateCw, Check, Copy } from 'lucide-react'
 import { motion, useReducedMotion } from 'motion/react'
 import type { ApplicationDetail, PhoneScreenTalkingPoint } from '@/lib/types/applications.types'
 import { Card } from '@/components/ui/Card'
-import { ChecklistItem } from '../components/ChecklistItem'
+import { CoachingGuidance } from '../components/CoachingSections'
+import { parseCoachingSections } from '../lib/coaching-sections'
 import { SummaryGroup } from '../components/workspace-shell'
 import { useStageDraftContext } from '../hooks/stage-draft-context'
 import { interviewPrepToWorkspace, resolveStagePrep } from '../types/workspace'
@@ -187,21 +188,15 @@ function CompConversationGroup({ compScript, compTarget, onTargetChange }: CompC
   )
 }
 
-/** Coaching notes — real, from the Coach Agent (when generated for this stage). */
-function CoachingNotesGroup({ notes }: { readonly notes: string | undefined }) {
+/** Empty-state shown when the coach hasn't generated phone-screen guidance yet. */
+function CoachingEmptyState() {
   return (
     <SummaryGroup id="coaching-notes" title="Coaching notes" subtitle="Stage-specific guidance from your interview coach.">
-      <Card className="p-4">
-        {notes ? (
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
-            {notes}
-          </p>
-        ) : (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            No coaching generated for this stage yet. Generate interview prep to see tailored guidance here.
-          </p>
-        )}
-      </Card>
+      <div className="rounded-md bg-white p-4 ring-1 ring-zinc-200 shadow-sm dark:bg-white/2 dark:ring-0 dark:inset-ring dark:inset-ring-white/10 dark:shadow-none">
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          No coaching generated for this stage yet. Generate interview prep to see tailored guidance here.
+        </p>
+      </div>
     </SummaryGroup>
   )
 }
@@ -212,20 +207,97 @@ interface QuestionsToAskGroupProps {
   readonly onToggle: (id: string) => void
 }
 
-/** Questions to ask — an action/checklist surface; rendered inline (not rows). */
-function QuestionsToAskGroup({ questions, checkedItems, onToggle }: QuestionsToAskGroupProps) {
+/** One selectable question — whole-card toggle, accent check when chosen. */
+function SelectableQuestionCard({
+  entry,
+  checked,
+  onToggle,
+}: {
+  readonly entry: ChecklistEntry
+  readonly checked: boolean
+  readonly onToggle: (id: string) => void
+}) {
   return (
-    <SummaryGroup id="questions-to-ask" title="Questions to ask" subtitle="Tick the two or three you plan to ask.">
-      <Card className="p-2">
-        {questions.map(entry => (
-          <ChecklistItem
-            key={entry.id}
-            entry={entry}
-            checked={checkedItems.includes(entry.id)}
-            onToggle={onToggle}
-          />
-        ))}
-      </Card>
+    <button
+      type="button"
+      onClick={() => onToggle(entry.id)}
+      aria-pressed={checked}
+      className={[
+        'flex w-full items-start gap-3 rounded-md border p-3.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-500',
+        checked
+          ? 'border-accent/40 bg-accent/5 ring-1 ring-inset ring-accent/30'
+          : 'border-zinc-200 bg-white hover:bg-zinc-50 dark:border-white/10 dark:bg-white/2 dark:hover:bg-white/5',
+      ].join(' ')}
+    >
+      <span
+        aria-hidden
+        className={[
+          'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border transition-colors',
+          checked ? 'border-accent bg-accent text-white' : 'border-zinc-300 text-transparent dark:border-zinc-600',
+        ].join(' ')}
+      >
+        <Check className="size-3.5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-medium leading-snug text-zinc-900 dark:text-zinc-100">{entry.label}</span>
+        {entry.rationale && (
+          <span className="mt-1 block text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">{entry.rationale}</span>
+        )}
+      </span>
+    </button>
+  )
+}
+
+/**
+ * Questions to ask — a selectable card grid. Pick the few you'll actually ask;
+ * a one-tap "Copy selected" puts them on the clipboard, ready for the call.
+ */
+function QuestionsToAskGroup({ questions, checkedItems, onToggle }: QuestionsToAskGroupProps) {
+  const [copied, setCopied] = useState(false)
+  const selected = questions.filter(q => checkedItems.includes(q.id))
+
+  function copySelected() {
+    const clip = typeof navigator !== 'undefined' ? navigator.clipboard : undefined
+    if (!clip || selected.length === 0) return
+    void clip.writeText(selected.map(q => `• ${q.label}`).join('\n')).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
+
+  return (
+    <SummaryGroup
+      id="questions-to-ask"
+      title="Questions to ask"
+      subtitle="Pick the two or three you'll actually ask — then copy them for the call."
+      count={questions.length}
+    >
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+            {selected.length > 0 ? `${selected.length} selected` : 'None selected yet'}
+          </p>
+          <button
+            type="button"
+            onClick={copySelected}
+            disabled={selected.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-accent transition-colors hover:bg-accent/10 disabled:cursor-not-allowed disabled:text-zinc-400 disabled:hover:bg-transparent"
+          >
+            {copied ? <Check className="size-3.5" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
+            {copied ? 'Copied' : 'Copy selected'}
+          </button>
+        </div>
+        <div className="grid gap-2.5 sm:grid-cols-2">
+          {questions.map(entry => (
+            <SelectableQuestionCard
+              key={entry.id}
+              entry={entry}
+              checked={checkedItems.includes(entry.id)}
+              onToggle={onToggle}
+            />
+          ))}
+        </div>
+      </div>
     </SummaryGroup>
   )
 }
@@ -267,7 +339,9 @@ export function PhoneScreenWorkspace({ detail }: PhoneScreenWorkspaceProps) {
         onTargetChange={value => patch({ compTarget: value })}
       />
 
-      <CoachingNotesGroup notes={prep?.coachingNotes} />
+      {/* Coaching guidance — split into focused sections; positioning sits above the
+          dashboards and interview-focus feeds What-to-expect. Empty state when absent. */}
+      {prep?.coachingNotes ? <CoachingGuidance sections={parseCoachingSections(prep.coachingNotes)} /> : <CoachingEmptyState />}
 
       <QuestionsToAskGroup questions={questions} checkedItems={draft.checkedItems} onToggle={toggleChecked} />
     </>

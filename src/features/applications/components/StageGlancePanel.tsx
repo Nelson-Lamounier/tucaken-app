@@ -1,11 +1,13 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { motion, useReducedMotion, useMotionValue, useTransform, animate } from 'motion/react'
 import { PieChart, Gauge, CheckCircle2, Circle, ListChecks, CalendarClock, Route } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { TONE, type Tone } from '@/components/ui/tone'
 import type { ApplicationDetail, InterviewStage } from '@/lib/types/applications.types'
 import { stageGlanceTiles, type GlanceTileData } from '../lib/stage-glance'
+import { parseCoachingSections, type InterviewFocusItem } from '../stages/lib/coaching-sections'
 import { resolveStagePrep } from '../stages/types/workspace'
 import { ScheduleCard } from '../stages/components/ScheduleCard'
 import { useStageDraftContext } from '../stages/hooks/stage-draft-context'
@@ -344,8 +346,6 @@ function ResearchCompareGraphic({ detail }: { readonly detail: ApplicationDetail
   )
 }
 
-const READINESS_TOTAL = 4
-
 interface ReadinessItem {
   readonly key: string
   readonly label: string
@@ -354,44 +354,25 @@ interface ReadinessItem {
 }
 
 /**
- * Auto coverage of the four "what to expect" areas of a phone screen, derived
- * from real prep signals: career-arc summary, experience talking points, a saved
- * comp/logistics target, and ticked questions-to-ask.
+ * Generic readiness ring + checklist — a donut showing `ready / total` plus a
+ * ticked list of the underlying areas. Shared by every interview stage that
+ * tracks discrete prep signals (phone-screen, technical).
  */
-function phoneScreenReadiness(detail: ApplicationDetail): ReadinessItem[] {
-  const prep = resolveStagePrep(detail, 'phone-screen')
-  const userState = detail.stages?.['phone-screen']?.user_state
-  const rawComp = userState?.compTarget
-  const compTarget = typeof rawComp === 'string' ? rawComp.trim() : ''
-  const rawChecked = userState?.checkedItems
-  const checkedCount = Array.isArray(rawChecked) ? rawChecked.length : 0
-  const talkingPoints = prep?.jdTalkingPoints?.length ?? 0
-  const verified = detail.research?.verifiedMatches?.length ?? 0
-
-  return [
-    { key: 'background', label: 'Background & motivation', hint: 'career arc', ready: Boolean(prep?.careerArcSummary) },
-    { key: 'experience', label: 'Experience walk-through', hint: 'talking points', ready: talkingPoints > 0 || verified > 0 },
-    { key: 'logistics', label: 'Logistics & comp', hint: 'target set', ready: compTarget.length > 0 },
-    { key: 'questions', label: 'Your questions', hint: 'ticked', ready: checkedCount > 0 },
-  ]
-}
-
-/** Phone-screen readiness ring + checklist — measures the four "what to expect" areas. */
-function PhoneScreenReadiness({ detail }: { readonly detail: ApplicationDetail }) {
+function ReadinessRing({ label, items }: { readonly label: string; readonly items: readonly ReadinessItem[] }) {
   const reduce = useReducedMotion()
-  const items = phoneScreenReadiness(detail)
+  const total = items.length
   const readyCount = items.filter(item => item.ready).length
-  const fraction = readyCount / READINESS_TOTAL
+  const fraction = total > 0 ? readyCount / total : 0
 
   return (
     <div className={`flex h-full flex-col ${SURFACE}`}>
       <div className="flex items-center gap-2">
         <Gauge className="size-5 text-accent" />
-        <span className="text-[10px] font-medium uppercase text-zinc-400 dark:text-zinc-500">Phone screen readiness</span>
+        <span className="text-[10px] font-medium uppercase text-zinc-400 dark:text-zinc-500">{label}</span>
       </div>
 
       <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-6">
-        <svg viewBox={`0 0 ${DONUT_SIZE} ${DONUT_SIZE}`} className="size-44 shrink-0" role="img" aria-label="Phone screen readiness">
+        <svg viewBox={`0 0 ${DONUT_SIZE} ${DONUT_SIZE}`} className="size-44 shrink-0" role="img" aria-label={label}>
           <circle
             cx={DONUT_MID}
             cy={DONUT_MID}
@@ -417,7 +398,7 @@ function PhoneScreenReadiness({ detail }: { readonly detail: ApplicationDetail }
             className="fill-zinc-900 font-bold dark:fill-zinc-100"
             style={{ fontSize: 22 }}
           >
-            {readyCount}/{READINESS_TOTAL}
+            {readyCount}/{total}
           </text>
           <text
             x={DONUT_MID}
@@ -449,16 +430,89 @@ function PhoneScreenReadiness({ detail }: { readonly detail: ApplicationDetail }
   )
 }
 
-/** Generic phone-screen expectations — honest, broadly-true content (no backend yet). */
-const WHAT_TO_EXPECT: readonly string[] = [
+/**
+ * Auto coverage of the four "what to expect" areas of a phone screen, derived
+ * from real prep signals: career-arc summary, experience talking points, a saved
+ * comp/logistics target, and ticked questions-to-ask.
+ */
+function phoneScreenReadiness(detail: ApplicationDetail): ReadinessItem[] {
+  const prep = resolveStagePrep(detail, 'phone-screen')
+  const userState = detail.stages?.['phone-screen']?.user_state
+  const rawComp = userState?.compTarget
+  const compTarget = typeof rawComp === 'string' ? rawComp.trim() : ''
+  const rawChecked = userState?.checkedItems
+  const checkedCount = Array.isArray(rawChecked) ? rawChecked.length : 0
+  const talkingPoints = prep?.jdTalkingPoints?.length ?? 0
+  const verified = detail.research?.verifiedMatches?.length ?? 0
+
+  return [
+    { key: 'background', label: 'Background & motivation', hint: 'career arc', ready: Boolean(prep?.careerArcSummary) },
+    { key: 'experience', label: 'Experience walk-through', hint: 'talking points', ready: talkingPoints > 0 || verified > 0 },
+    { key: 'logistics', label: 'Logistics & comp', hint: 'target set', ready: compTarget.length > 0 },
+    { key: 'questions', label: 'Your questions', hint: 'ticked', ready: checkedCount > 0 },
+  ]
+}
+
+/** Phone-screen readiness ring — measures the four "what to expect" areas. */
+function PhoneScreenReadiness({ detail }: { readonly detail: ApplicationDetail }) {
+  return <ReadinessRing label="Phone screen readiness" items={phoneScreenReadiness(detail)} />
+}
+
+/**
+ * Auto coverage of the four technical-round prep areas, derived from real
+ * signals: DSA topic calibration / real-work evidence, project evidence to
+ * reference, a generated prep checklist, and a saved schedule.
+ */
+function technicalReadiness(detail: ApplicationDetail): ReadinessItem[] {
+  const prep = resolveStagePrep(detail, 'technical')
+  const rawSchedule = detail.stages?.['technical']?.user_state?.scheduleAt
+  const scheduleAt = typeof rawSchedule === 'string' ? rawSchedule.trim() : ''
+  const dsaCalibrated = (detail.research?.dsaTopicCalibration?.likelyTopics?.length ?? 0) > 0
+  const dsaRealWork = detail.dsaRealWork?.length ?? 0
+  const verified = detail.research?.verifiedMatches?.length ?? 0
+  const checklist = prep?.technicalPrepChecklist?.length ?? 0
+
+  return [
+    { key: 'dsa', label: 'DSA & coding', hint: 'topics calibrated', ready: dsaCalibrated || dsaRealWork > 0 },
+    { key: 'projects', label: 'Projects to reference', hint: 'evidence found', ready: verified > 0 },
+    { key: 'checklist', label: 'Prep checklist', hint: 'generated', ready: checklist > 0 },
+    { key: 'schedule', label: 'Schedule & format', hint: 'time set', ready: scheduleAt.length > 0 },
+  ]
+}
+
+/** Technical-round readiness ring — measures the four technical prep areas. */
+function TechnicalReadiness({ detail }: { readonly detail: ApplicationDetail }) {
+  return <ReadinessRing label="Technical readiness" items={technicalReadiness(detail)} />
+}
+
+/** Phone-screen expectations — honest, broadly-true content (no backend yet). */
+const PHONE_WHAT_TO_EXPECT: readonly string[] = [
   'A recruiter or hiring manager confirming your background and motivation.',
   'High-level walk-through of your most relevant experience.',
   'Logistics: timeline, compensation range, remote/onsite, visa.',
   'A short window at the end for your questions.',
 ]
 
-/** The "what to expect" descriptions — the right panel paired with the readiness ring. */
-function WhatToExpectPanel() {
+/** Technical-round expectations — honest, broadly-true content (no backend yet). */
+const TECHNICAL_WHAT_TO_EXPECT: readonly string[] = [
+  'A coding exercise — algorithmic puzzle or practical task, usually in a language you choose.',
+  'A walk-through of your most relevant projects and the decisions behind them.',
+  'Probing on tradeoffs, complexity, testing, and how you would extend your solution.',
+  'Logistics: round format, time split, and the editor or tools you will use.',
+]
+
+/**
+ * The "what to expect" descriptions — the right panel paired with the readiness
+ * ring. Prefers the coach's parsed "interview will focus on" items (bold label +
+ * detail) when present; otherwise falls back to the honest static list.
+ */
+function WhatToExpectPanel({
+  items,
+  focus,
+}: {
+  readonly items: readonly string[]
+  readonly focus?: readonly InterviewFocusItem[] | null
+}) {
   return (
     <div className={`flex h-full flex-col ${SURFACE}`}>
       <div className="flex items-center gap-2">
@@ -466,19 +520,28 @@ function WhatToExpectPanel() {
         <span className="text-[10px] font-medium uppercase text-zinc-400 dark:text-zinc-500">What to expect</span>
       </div>
       <ul className="mt-4 flex flex-1 flex-col justify-center gap-4">
-        {WHAT_TO_EXPECT.map(item => (
-          <li key={item} className="flex items-start gap-3 text-sm text-zinc-700 dark:text-zinc-300">
-            <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
-            <span className="leading-relaxed">{item}</span>
-          </li>
-        ))}
+        {focus && focus.length > 0
+          ? focus.map(item => (
+              <li key={item.label} className="flex items-start gap-3 text-sm text-zinc-700 dark:text-zinc-300">
+                <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
+                <span className="leading-relaxed">
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">{item.label}.</span> {item.detail}
+                </span>
+              </li>
+            ))
+          : items.map(item => (
+              <li key={item} className="flex items-start gap-3 text-sm text-zinc-700 dark:text-zinc-300">
+                <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
+                <span className="leading-relaxed">{item}</span>
+              </li>
+            ))}
       </ul>
     </div>
   )
 }
 
 /** Editable Schedule & format — shares the stage draft via the provider. */
-function SchedulePanel() {
+function SchedulePanel({ placeholder }: { readonly placeholder: string }) {
   const { draft, setSchedule } = useStageDraftContext()
   return (
     <div className={`flex h-full flex-col ${SURFACE}`}>
@@ -491,20 +554,20 @@ function SchedulePanel() {
           scheduleAt={draft.scheduleAt}
           formatNote={draft.formatNote}
           onChange={setSchedule}
-          formatPlaceholder="e.g. 30 min · recruiter Jane Doe"
+          formatPlaceholder={placeholder}
         />
       </div>
     </div>
   )
 }
 
-/** Your career arc — the coach's phone-screen narrative, as a fixed panel. */
-function CareerArcPanel({ summary }: { readonly summary: string }) {
+/** A coach narrative blurb (career arc, coaching notes) shown as a fixed panel. */
+function NarrativePanel({ icon: Icon, label, summary }: { readonly icon: LucideIcon; readonly label: string; readonly summary: string }) {
   return (
     <div className={`flex h-full flex-col ${SURFACE}`}>
       <div className="flex items-center gap-2">
-        <Route className="size-5 text-accent" />
-        <span className="text-[10px] font-medium uppercase text-zinc-400 dark:text-zinc-500">Your career arc</span>
+        <Icon className="size-5 text-accent" />
+        <span className="text-[10px] font-medium uppercase text-zinc-400 dark:text-zinc-500">{label}</span>
       </div>
       <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">{summary}</p>
     </div>
@@ -516,40 +579,90 @@ interface StageGlancePanelProps {
   readonly stage: InterviewStage
 }
 
-/**
- * KB-style "at a glance" dashboard panel for the active stage. A taller
- * skill-coverage graphic on the left correlates Verified / Partial / Gaps; the
- * four stat tiles fill a 2×2 block on the right at matching height. Tiles are
- * dynamic per stage (see stageGlanceTiles) and re-stagger on stage change.
- */
-export function StageGlancePanel({ detail, stage }: StageGlancePanelProps) {
-  const tiles = stageGlanceTiles(stage, detail)
-  const careerArc = stage === 'phone-screen' ? resolveStagePrep(detail, 'phone-screen')?.careerArcSummary : undefined
+/** Outer at-a-glance grid: a tall left panel + the stage's right column. */
+function GlanceGrid({ stageKey, left, right }: { readonly stageKey: string; readonly left: ReactNode; readonly right: ReactNode }) {
   return (
-    <motion.div
-      key={stage}
-      className="grid gap-4 lg:grid-cols-3"
-      variants={GRID}
-      initial="hidden"
-      animate="show"
-    >
+    <motion.div key={stageKey} className="grid gap-4 lg:grid-cols-3" variants={GRID} initial="hidden" animate="show">
       <motion.div variants={TILE} style={{ willChange: 'transform' }} className="lg:col-span-1">
-        {stage === 'phone-screen' ? (
-          <PhoneScreenReadiness detail={detail} />
-        ) : (
-          <ResearchCompareGraphic detail={detail} />
-        )}
+        {left}
       </motion.div>
+      {right}
+    </motion.div>
+  )
+}
 
-      {stage === 'phone-screen' ? (
-        <motion.div variants={TILE} style={{ willChange: 'transform' }} className="flex flex-col gap-4 lg:col-span-2">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <WhatToExpectPanel />
-            <SchedulePanel />
-          </div>
-          {careerArc ? <CareerArcPanel summary={careerArc} /> : null}
-        </motion.div>
-      ) : (
+/** Right column shared by readiness-led stages: [What to expect | Schedule] + optional narrative. */
+function ExpectScheduleColumn({
+  expectations,
+  focus,
+  schedulePlaceholder,
+  narrative,
+}: {
+  readonly expectations: readonly string[]
+  readonly focus?: readonly InterviewFocusItem[] | null
+  readonly schedulePlaceholder: string
+  readonly narrative: ReactNode
+}) {
+  return (
+    <motion.div variants={TILE} style={{ willChange: 'transform' }} className="flex flex-col gap-4 lg:col-span-2">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <WhatToExpectPanel items={expectations} focus={focus} />
+        <SchedulePanel placeholder={schedulePlaceholder} />
+      </div>
+      {narrative}
+    </motion.div>
+  )
+}
+
+/** Phone-screen glance — readiness ring + expectations/schedule + career-arc narrative. */
+function PhoneScreenGlance({ detail }: { readonly detail: ApplicationDetail }) {
+  const prep = resolveStagePrep(detail, 'phone-screen')
+  const careerArc = prep?.careerArcSummary
+  const focus = parseCoachingSections(prep?.coachingNotes).interviewFocus
+  return (
+    <GlanceGrid
+      stageKey="phone-screen"
+      left={<PhoneScreenReadiness detail={detail} />}
+      right={
+        <ExpectScheduleColumn
+          expectations={PHONE_WHAT_TO_EXPECT}
+          focus={focus}
+          schedulePlaceholder="e.g. 30 min · recruiter Jane Doe"
+          narrative={careerArc ? <NarrativePanel icon={Route} label="Your career arc" summary={careerArc} /> : null}
+        />
+      }
+    />
+  )
+}
+
+/** Technical glance — mirrors phone-screen: readiness ring + expectations/schedule.
+ *  "What to expect" prefers the coach's parsed interview-focus when available. */
+function TechnicalGlance({ detail }: { readonly detail: ApplicationDetail }) {
+  const focus = parseCoachingSections(resolveStagePrep(detail, 'technical')?.coachingNotes).interviewFocus
+  return (
+    <GlanceGrid
+      stageKey="technical"
+      left={<TechnicalReadiness detail={detail} />}
+      right={
+        <ExpectScheduleColumn
+          expectations={TECHNICAL_WHAT_TO_EXPECT}
+          focus={focus}
+          schedulePlaceholder="e.g. 30m coding + 30m systems discussion"
+          narrative={null}
+        />
+      }
+    />
+  )
+}
+
+/** Research glance — the default stages: skill-coverage donut + 2×2 stat tiles. */
+function ResearchGlance({ detail, stage }: StageGlancePanelProps) {
+  const tiles = stageGlanceTiles(stage, detail)
+  return (
+    <GlanceGrid
+      stageKey={stage}
+      left={<ResearchCompareGraphic detail={detail} />}
+      right={
         <motion.div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:grid-rows-2 lg:col-span-2">
           {tiles.map(tile => (
             <motion.div key={tile.key} variants={TILE} style={{ willChange: 'transform' }}>
@@ -557,7 +670,18 @@ export function StageGlancePanel({ detail, stage }: StageGlancePanelProps) {
             </motion.div>
           ))}
         </motion.div>
-      )}
-    </motion.div>
+      }
+    />
   )
+}
+
+/**
+ * KB-style "at a glance" dashboard panel for the active stage. Phone-screen and
+ * technical lead with a readiness ring + [What to expect | Schedule] + a coach
+ * narrative; the remaining stages show the skill-coverage donut + 2×2 stat tiles.
+ */
+export function StageGlancePanel({ detail, stage }: StageGlancePanelProps) {
+  if (stage === 'phone-screen') return <PhoneScreenGlance detail={detail} />
+  if (stage === 'technical') return <TechnicalGlance detail={detail} />
+  return <ResearchGlance detail={detail} stage={stage} />
 }

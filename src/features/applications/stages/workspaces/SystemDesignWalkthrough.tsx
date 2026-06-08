@@ -1,10 +1,9 @@
-import { Card } from '@/components/ui/Card'
 import type {
   SystemDesignCard,
   SystemDesignCoverage,
   SystemDesignFollowUpStatus,
 } from '@/lib/types/applications.types'
-import { SummaryGroup } from '../components/workspace-shell'
+import { SummaryGroup, SummaryRow, RailField, RailCallout } from '../components/workspace-shell'
 
 /** Status → badge/chip colour. addressed = solid, partial = caution, gap = honest red. */
 const STATUS_STYLE: Record<SystemDesignFollowUpStatus, string> = {
@@ -13,71 +12,62 @@ const STATUS_STYLE: Record<SystemDesignFollowUpStatus, string> = {
   gap: 'bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300',
 }
 
-/** One concern card: question, why, the candidate's choice, the rehearsal script,
- *  follow-ups, and the evidence it is grounded in. */
-function ConcernCard({ card }: { readonly card: SystemDesignCard }) {
-  const grounded = card.evidenceRefs.length > 0 && card.choiceMade !== null
+/** Rail detail for one concern: why it matters, the choice, the rehearsal script,
+ *  gap guidance, follow-ups, and the evidence it is grounded in. */
+function ConcernDetail({ card }: { readonly card: SystemDesignCard }) {
   return (
-    <Card className="space-y-3 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{card.concernQuestion}</h4>
-        <span
-          className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${grounded ? STATUS_STYLE.addressed : STATUS_STYLE.partial}`}
-        >
-          {grounded ? 'Grounded' : 'Gap'}
-        </span>
-      </div>
+    <>
+      <RailField label="Why it matters">{card.whyItMatters}</RailField>
 
-      <p className="text-xs text-zinc-500 dark:text-zinc-400">{card.whyItMatters}</p>
+      {card.choiceMade && <RailField label="Your choice">{card.choiceMade}</RailField>}
 
-      {card.choiceMade && (
-        <p className="text-sm">
-          <span className="font-medium text-zinc-700 dark:text-zinc-300">Your choice: </span>
-          {card.choiceMade}
-        </p>
-      )}
-
-      {/* Rehearsal script — first-person, multi-paragraph; preserve the line breaks. */}
-      <p className="whitespace-pre-line text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
-        {card.articulation}
-      </p>
+      <RailField label="How to articulate it">
+        {/* First-person rehearsal script — multi-paragraph; preserve the line breaks. */}
+        <p className="whitespace-pre-line">{card.articulation}</p>
+      </RailField>
 
       {card.gapGuidance && (
-        <p className="rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
-          {card.gapGuidance}
-        </p>
+        <RailCallout label="Addressing the gap" tone="warn">{card.gapGuidance}</RailCallout>
       )}
 
       {card.followUps.length > 0 && (
-        <ul className="space-y-1.5">
-          {card.followUps.map((f, i) => (
-            <li key={i} className="text-xs">
-              <span className={`mr-2 rounded px-1.5 py-0.5 font-medium ${STATUS_STYLE[f.status]}`}>{f.status}</span>
-              <span className="font-medium text-zinc-700 dark:text-zinc-300">{f.question}</span>
-              <span className="text-zinc-500 dark:text-zinc-400"> — {f.framing}</span>
-            </li>
-          ))}
-        </ul>
+        <RailField label="Likely follow-ups">
+          <ul className="space-y-2">
+            {card.followUps.map(f => (
+              <li key={f.question} className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
+                <span className={`mr-2 inline-flex rounded px-1.5 py-0.5 text-xs font-medium ${STATUS_STYLE[f.status]}`}>{f.status}</span>
+                <span className="font-medium text-zinc-900 dark:text-zinc-100">{f.question}</span>
+                <span className="text-zinc-500 dark:text-zinc-400"> — {f.framing}</span>
+              </li>
+            ))}
+          </ul>
+        </RailField>
       )}
 
       {card.evidenceRefs.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 pt-1">
-          {card.evidenceRefs.map((e, i) => (
-            <span
-              key={i}
-              title={e.fileLine}
-              className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
-            >
-              {e.label}
-            </span>
-          ))}
-        </div>
+        <RailField label="Grounded in">
+          <div className="flex flex-wrap gap-1.5">
+            {card.evidenceRefs.map(e => (
+              <span
+                key={e.id}
+                title={e.fileLine}
+                className="rounded bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+              >
+                {e.label}
+              </span>
+            ))}
+          </div>
+        </RailField>
       )}
-    </Card>
+    </>
   )
 }
 
-/** The project-anchored System Design walkthrough — one card per JD-relevant concern. */
+/**
+ * The project-anchored System Design walkthrough — one clickable row per
+ * JD-relevant concern; the rehearsal detail opens in the rail (mirrors the
+ * Difficult-questions pattern on the technical stage).
+ */
 export function SystemDesignWalkthrough({
   cards,
   coverage,
@@ -89,12 +79,24 @@ export function SystemDesignWalkthrough({
     ? `${coverage.relevantAddressed} of ${coverage.relevantTotal} role-relevant concerns grounded in your project work.`
     : 'Concern by concern, grounded in your project work.'
   return (
-    <SummaryGroup id="system-design-walkthrough" title="System Design walkthrough" subtitle={subtitle}>
-      <div className="space-y-3">
-        {cards.map(card => (
-          <ConcernCard key={card.concernId} card={card} />
-        ))}
-      </div>
+    <SummaryGroup id="system-design-walkthrough" title="System Design walkthrough" subtitle={subtitle} count={cards.length}>
+      {cards.map(card => {
+        const grounded = card.evidenceRefs.length > 0 && card.choiceMade !== null
+        return (
+          <SummaryRow
+            key={card.concernId}
+            id={card.concernId}
+            label={card.concernQuestion}
+            preview={card.whyItMatters}
+            indicator={
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${grounded ? STATUS_STYLE.addressed : STATUS_STYLE.partial}`}>
+                {grounded ? 'Grounded' : 'Gap'}
+              </span>
+            }
+            detail={<ConcernDetail card={card} />}
+          />
+        )
+      })}
     </SummaryGroup>
   )
 }
