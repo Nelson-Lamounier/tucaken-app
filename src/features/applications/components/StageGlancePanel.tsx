@@ -2,10 +2,13 @@
 
 import { useEffect } from 'react'
 import { motion, useReducedMotion, useMotionValue, useTransform, animate } from 'motion/react'
-import { PieChart } from 'lucide-react'
+import { PieChart, Gauge, CheckCircle2, Circle, ListChecks, CalendarClock, Route } from 'lucide-react'
 import { TONE, type Tone } from '@/components/ui/tone'
 import type { ApplicationDetail, InterviewStage } from '@/lib/types/applications.types'
 import { stageGlanceTiles, type GlanceTileData } from '../lib/stage-glance'
+import { resolveStagePrep } from '../stages/types/workspace'
+import { ScheduleCard } from '../stages/components/ScheduleCard'
+import { useStageDraftContext } from '../stages/hooks/stage-draft-context'
 
 /** Shared card surface — rounded-md per the project radius convention. */
 const SURFACE =
@@ -341,6 +344,173 @@ function ResearchCompareGraphic({ detail }: { readonly detail: ApplicationDetail
   )
 }
 
+const READINESS_TOTAL = 4
+
+interface ReadinessItem {
+  readonly key: string
+  readonly label: string
+  readonly hint: string
+  readonly ready: boolean
+}
+
+/**
+ * Auto coverage of the four "what to expect" areas of a phone screen, derived
+ * from real prep signals: career-arc summary, experience talking points, a saved
+ * comp/logistics target, and ticked questions-to-ask.
+ */
+function phoneScreenReadiness(detail: ApplicationDetail): ReadinessItem[] {
+  const prep = resolveStagePrep(detail, 'phone-screen')
+  const userState = detail.stages?.['phone-screen']?.user_state
+  const rawComp = userState?.compTarget
+  const compTarget = typeof rawComp === 'string' ? rawComp.trim() : ''
+  const rawChecked = userState?.checkedItems
+  const checkedCount = Array.isArray(rawChecked) ? rawChecked.length : 0
+  const talkingPoints = prep?.jdTalkingPoints?.length ?? 0
+  const verified = detail.research?.verifiedMatches?.length ?? 0
+
+  return [
+    { key: 'background', label: 'Background & motivation', hint: 'career arc', ready: Boolean(prep?.careerArcSummary) },
+    { key: 'experience', label: 'Experience walk-through', hint: 'talking points', ready: talkingPoints > 0 || verified > 0 },
+    { key: 'logistics', label: 'Logistics & comp', hint: 'target set', ready: compTarget.length > 0 },
+    { key: 'questions', label: 'Your questions', hint: 'ticked', ready: checkedCount > 0 },
+  ]
+}
+
+/** Phone-screen readiness ring + checklist — measures the four "what to expect" areas. */
+function PhoneScreenReadiness({ detail }: { readonly detail: ApplicationDetail }) {
+  const reduce = useReducedMotion()
+  const items = phoneScreenReadiness(detail)
+  const readyCount = items.filter(item => item.ready).length
+  const fraction = readyCount / READINESS_TOTAL
+
+  return (
+    <div className={`flex h-full flex-col ${SURFACE}`}>
+      <div className="flex items-center gap-2">
+        <Gauge className="size-5 text-accent" />
+        <span className="text-[10px] font-medium uppercase text-zinc-400 dark:text-zinc-500">Phone screen readiness</span>
+      </div>
+
+      <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-6">
+        <svg viewBox={`0 0 ${DONUT_SIZE} ${DONUT_SIZE}`} className="size-44 shrink-0" role="img" aria-label="Phone screen readiness">
+          <circle
+            cx={DONUT_MID}
+            cy={DONUT_MID}
+            r={DONUT_R}
+            fill="none"
+            strokeWidth={DONUT_STROKE}
+            className="stroke-zinc-100 dark:stroke-white/10"
+          />
+          {fraction > 0 && (
+            <ArcSegment
+              len={fraction * DONUT_C}
+              offset={0}
+              stroke="stroke-emerald-500 dark:stroke-emerald-400"
+              delay={0}
+              reduce={Boolean(reduce)}
+            />
+          )}
+          <text
+            x={DONUT_MID}
+            y={DONUT_MID - 4}
+            textAnchor="middle"
+            dominantBaseline="central"
+            className="fill-zinc-900 font-bold dark:fill-zinc-100"
+            style={{ fontSize: 22 }}
+          >
+            {readyCount}/{READINESS_TOTAL}
+          </text>
+          <text
+            x={DONUT_MID}
+            y={DONUT_MID + 15}
+            textAnchor="middle"
+            dominantBaseline="central"
+            className="fill-zinc-400 uppercase"
+            style={{ fontSize: 9, letterSpacing: 0.5 }}
+          >
+            ready
+          </text>
+        </svg>
+
+        <ul className="w-full space-y-3">
+          {items.map(item => (
+            <li key={item.key} className="flex items-center gap-2.5 text-sm">
+              {item.ready ? (
+                <CheckCircle2 className="size-4 shrink-0 text-emerald-500 dark:text-emerald-400" aria-hidden />
+              ) : (
+                <Circle className="size-4 shrink-0 text-zinc-300 dark:text-zinc-600" aria-hidden />
+              )}
+              <span className="flex-1 truncate text-zinc-600 dark:text-zinc-300">{item.label}</span>
+              <span className="text-xs text-zinc-400">{item.hint}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  )
+}
+
+/** Generic phone-screen expectations — honest, broadly-true content (no backend yet). */
+const WHAT_TO_EXPECT: readonly string[] = [
+  'A recruiter or hiring manager confirming your background and motivation.',
+  'High-level walk-through of your most relevant experience.',
+  'Logistics: timeline, compensation range, remote/onsite, visa.',
+  'A short window at the end for your questions.',
+]
+
+/** The "what to expect" descriptions — the right panel paired with the readiness ring. */
+function WhatToExpectPanel() {
+  return (
+    <div className={`flex h-full flex-col ${SURFACE}`}>
+      <div className="flex items-center gap-2">
+        <ListChecks className="size-5 text-accent" />
+        <span className="text-[10px] font-medium uppercase text-zinc-400 dark:text-zinc-500">What to expect</span>
+      </div>
+      <ul className="mt-4 flex flex-1 flex-col justify-center gap-4">
+        {WHAT_TO_EXPECT.map(item => (
+          <li key={item} className="flex items-start gap-3 text-sm text-zinc-700 dark:text-zinc-300">
+            <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
+            <span className="leading-relaxed">{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/** Editable Schedule & format — shares the stage draft via the provider. */
+function SchedulePanel() {
+  const { draft, setSchedule } = useStageDraftContext()
+  return (
+    <div className={`flex h-full flex-col ${SURFACE}`}>
+      <div className="flex items-center gap-2">
+        <CalendarClock className="size-5 text-accent" />
+        <span className="text-[10px] font-medium uppercase text-zinc-400 dark:text-zinc-500">Schedule &amp; format</span>
+      </div>
+      <div className="mt-4 flex-1">
+        <ScheduleCard
+          scheduleAt={draft.scheduleAt}
+          formatNote={draft.formatNote}
+          onChange={setSchedule}
+          formatPlaceholder="e.g. 30 min · recruiter Jane Doe"
+        />
+      </div>
+    </div>
+  )
+}
+
+/** Your career arc — the coach's phone-screen narrative, as a fixed panel. */
+function CareerArcPanel({ summary }: { readonly summary: string }) {
+  return (
+    <div className={`flex h-full flex-col ${SURFACE}`}>
+      <div className="flex items-center gap-2">
+        <Route className="size-5 text-accent" />
+        <span className="text-[10px] font-medium uppercase text-zinc-400 dark:text-zinc-500">Your career arc</span>
+      </div>
+      <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">{summary}</p>
+    </div>
+  )
+}
+
 interface StageGlancePanelProps {
   readonly detail: ApplicationDetail
   readonly stage: InterviewStage
@@ -354,6 +524,7 @@ interface StageGlancePanelProps {
  */
 export function StageGlancePanel({ detail, stage }: StageGlancePanelProps) {
   const tiles = stageGlanceTiles(stage, detail)
+  const careerArc = stage === 'phone-screen' ? resolveStagePrep(detail, 'phone-screen')?.careerArcSummary : undefined
   return (
     <motion.div
       key={stage}
@@ -363,16 +534,30 @@ export function StageGlancePanel({ detail, stage }: StageGlancePanelProps) {
       animate="show"
     >
       <motion.div variants={TILE} style={{ willChange: 'transform' }} className="lg:col-span-1">
-        <ResearchCompareGraphic detail={detail} />
+        {stage === 'phone-screen' ? (
+          <PhoneScreenReadiness detail={detail} />
+        ) : (
+          <ResearchCompareGraphic detail={detail} />
+        )}
       </motion.div>
 
-      <motion.div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:grid-rows-2 lg:col-span-2">
-        {tiles.map(tile => (
-          <motion.div key={tile.key} variants={TILE} style={{ willChange: 'transform' }}>
-            <GlanceTile tile={tile} />
-          </motion.div>
-        ))}
-      </motion.div>
+      {stage === 'phone-screen' ? (
+        <motion.div variants={TILE} style={{ willChange: 'transform' }} className="flex flex-col gap-4 lg:col-span-2">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <WhatToExpectPanel />
+            <SchedulePanel />
+          </div>
+          {careerArc ? <CareerArcPanel summary={careerArc} /> : null}
+        </motion.div>
+      ) : (
+        <motion.div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:grid-rows-2 lg:col-span-2">
+          {tiles.map(tile => (
+            <motion.div key={tile.key} variants={TILE} style={{ willChange: 'transform' }}>
+              <GlanceTile tile={tile} />
+            </motion.div>
+          ))}
+        </motion.div>
+      )}
     </motion.div>
   )
 }

@@ -27,14 +27,30 @@ function storageKey(slug: string): string {
   return `appannotations:${slug}`
 }
 
+/** Keep only entries in the current {section,label,notes} shape — drops data
+ *  written by an earlier annotation format so consumers never see a bad item. */
+function sanitizeStore(value: unknown): AnnotationStore {
+  if (typeof value !== 'object' || value === null) return {}
+  const out: AnnotationStore = {}
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    if (
+      typeof entry === 'object' &&
+      entry !== null &&
+      Array.isArray((entry as ItemAnnotations).notes) &&
+      typeof (entry as ItemAnnotations).label === 'string'
+    ) {
+      out[key] = entry as ItemAnnotations
+    }
+  }
+  return out
+}
+
 function readLocal(slug: string): AnnotationStore | null {
   if (globalThis.localStorage === undefined) return null
   const raw = globalThis.localStorage.getItem(storageKey(slug))
   if (!raw) return null
   try {
-    const parsed: unknown = JSON.parse(raw)
-    if (typeof parsed === 'object' && parsed !== null) return parsed as AnnotationStore
-    return null
+    return sanitizeStore(JSON.parse(raw))
   } catch {
     return null
   }
@@ -42,7 +58,7 @@ function readLocal(slug: string): AnnotationStore | null {
 
 /** localStorage wins in-session; the server blob seeds first load on a new device. */
 function hydrate(slug: string, server: AnnotationStore | undefined): AnnotationStore {
-  return readLocal(slug) ?? server ?? {}
+  return readLocal(slug) ?? sanitizeStore(server)
 }
 
 /**

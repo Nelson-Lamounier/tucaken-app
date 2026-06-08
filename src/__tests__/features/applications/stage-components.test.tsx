@@ -48,6 +48,7 @@ import { EvidenceCard } from '@/features/applications/stages/components/Evidence
 import { TechnicalWorkspace } from '@/features/applications/stages/workspaces/TechnicalWorkspace'
 import { WorkspaceShell } from '@/features/applications/stages/components/workspace-shell'
 import { PhoneScreenWorkspace } from '@/features/applications/stages/workspaces/PhoneScreenWorkspace'
+import { StageDraftProvider } from '@/features/applications/stages/hooks/stage-draft-context'
 import { SystemDesignWorkspace } from '@/features/applications/stages/workspaces/SystemDesignWorkspace'
 import { TradeoffBadge } from '@/features/applications/stages/components/TradeoffBadge'
 import { StageWorkspaceSkeleton } from '@/features/applications/stages/components/StageWorkspaceSkeleton'
@@ -595,9 +596,11 @@ describe('TechnicalWorkspace', () => {
 
   it('Phone Screen surfaces talking points, questions, and an editable comp target', () => {
     renderWithQuery(
-      <WorkspaceShell detail={detail} activeStage="phone-screen">
-        <PhoneScreenWorkspace detail={detail} />
-      </WorkspaceShell>,
+      <StageDraftProvider slug={detail.slug} stage="phone-screen">
+        <WorkspaceShell detail={detail} activeStage="phone-screen">
+          <PhoneScreenWorkspace detail={detail} />
+        </WorkspaceShell>
+      </StageDraftProvider>,
     )
     expect(screen.getByText('Your talking points')).toBeTruthy()
     expect(screen.getByText('Kubernetes')).toBeTruthy() // verified match → talking point
