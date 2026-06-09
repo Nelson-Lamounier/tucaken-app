@@ -25,7 +25,7 @@ export function ReviewProposalCard({
   const busy = accepting || rejecting
 
   return (
-    <li className="rounded-2xl bg-white/2 p-4 inset-ring inset-ring-white/10">
+    <li className="rounded-md bg-white/2 p-4 inset-ring inset-ring-white/10">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <InlineText

@@ -32,7 +32,7 @@ export function MergePanel({ targetId, targetName, isPending, error, onMerge }: 
   const canMerge = selected.size > 0
 
   return (
-    <div className="rounded-2xl bg-white/2 p-4 inset-ring inset-ring-white/10">
+    <div className="rounded-md bg-white/2 p-4 inset-ring inset-ring-white/10">
       <div className="mb-3 flex items-center gap-2">
         <span className="flex size-6 items-center justify-center rounded-md bg-white/5 text-zinc-400 inset-ring inset-ring-white/10">
           <Combine className="size-3.5" />
@@ -53,7 +53,7 @@ export function MergePanel({ targetId, targetName, isPending, error, onMerge }: 
             const checked = selected.has(p.id)
             return (
               <li key={p.id}>
-                <label className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5">
+                <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-white/5">
                   <input
                     type="checkbox"
                     checked={checked}

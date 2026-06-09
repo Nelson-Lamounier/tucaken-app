@@ -37,10 +37,10 @@ export function Hero({ project }: HeroProps) {
   const canRegenerate = project.is_user_confirmed && project.status !== 'archived'
 
   return (
-    <section className="overflow-hidden rounded-2xl bg-white/2 inset-ring inset-ring-white/10">
+    <section className="overflow-hidden rounded-md bg-white/2 inset-ring inset-ring-white/10">
       <div className="flex flex-wrap items-start justify-between gap-6 px-6 py-6">
         <div className="flex min-w-0 flex-1 items-start gap-4">
-          <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-teal-500/10 text-teal-300 inset-ring inset-ring-teal-400/30">
+          <span className="flex size-12 shrink-0 items-center justify-center rounded-md bg-teal-500/10 text-teal-300 inset-ring inset-ring-teal-400/30">
             <ShapeIcon className="size-5" />
           </span>
           <div className="min-w-0 flex-1">

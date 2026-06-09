@@ -10,6 +10,7 @@ vi.mock('@tanstack/react-router', () => ({
   Link: ({ children, ...rest }: { children: React.ReactNode } & Record<string, unknown>) => (
     <a {...(rest as Record<string, string>)}>{children}</a>
   ),
+  useNavigate: () => vi.fn(),
 }))
 
 const listProjectsMock = vi.fn()
