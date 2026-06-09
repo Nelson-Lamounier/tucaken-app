@@ -7,7 +7,6 @@ import type { LucideIcon } from 'lucide-react'
 import { TONE, type Tone } from '@/components/ui/tone'
 import type { ApplicationDetail, InterviewStage } from '@/lib/types/applications.types'
 import { stageGlanceTiles, type GlanceTileData } from '../lib/stage-glance'
-import { parseCoachingSections, type InterviewFocusItem } from '../stages/lib/coaching-sections'
 import { resolveStagePrep } from '../stages/types/workspace'
 import { ScheduleCard } from '../stages/components/ScheduleCard'
 import { useStageDraftContext } from '../stages/hooks/stage-draft-context'
@@ -493,6 +492,14 @@ const PHONE_WHAT_TO_EXPECT: readonly string[] = [
   'A short window at the end for your questions.',
 ]
 
+/** Behavioural-round expectations — honest, broadly-true content (no backend yet). */
+const BEHAVIOURAL_WHAT_TO_EXPECT: readonly string[] = [
+  'Competency questions — ownership, conflict, learning from failure, influence, customer focus.',
+  'STAR answers expected: Situation, Task, Action, Result — with a quantified result.',
+  'Probing follow-ups on your real role, the tradeoffs, and what you would do differently.',
+  'A short window at the end for your questions.',
+]
+
 /** Technical-round expectations — honest, broadly-true content (no backend yet). */
 const TECHNICAL_WHAT_TO_EXPECT: readonly string[] = [
   'A coding exercise — algorithmic puzzle or practical task, usually in a language you choose.',
@@ -506,13 +513,7 @@ const TECHNICAL_WHAT_TO_EXPECT: readonly string[] = [
  * ring. Prefers the coach's parsed "interview will focus on" items (bold label +
  * detail) when present; otherwise falls back to the honest static list.
  */
-function WhatToExpectPanel({
-  items,
-  focus,
-}: {
-  readonly items: readonly string[]
-  readonly focus?: readonly InterviewFocusItem[] | null
-}) {
+function WhatToExpectPanel({ items }: { readonly items: readonly string[] }) {
   return (
     <div className={`flex h-full flex-col ${SURFACE}`}>
       <div className="flex items-center gap-2">
@@ -520,21 +521,12 @@ function WhatToExpectPanel({
         <span className="text-[10px] font-medium uppercase text-zinc-400 dark:text-zinc-500">What to expect</span>
       </div>
       <ul className="mt-4 flex flex-1 flex-col justify-center gap-4">
-        {focus && focus.length > 0
-          ? focus.map(item => (
-              <li key={item.label} className="flex items-start gap-3 text-sm text-zinc-700 dark:text-zinc-300">
-                <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
-                <span className="leading-relaxed">
-                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">{item.label}.</span> {item.detail}
-                </span>
-              </li>
-            ))
-          : items.map(item => (
-              <li key={item} className="flex items-start gap-3 text-sm text-zinc-700 dark:text-zinc-300">
-                <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
-                <span className="leading-relaxed">{item}</span>
-              </li>
-            ))}
+        {items.map(item => (
+          <li key={item} className="flex items-start gap-3 text-sm text-zinc-700 dark:text-zinc-300">
+            <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
+            <span className="leading-relaxed">{item}</span>
+          </li>
+        ))}
       </ul>
     </div>
   )
@@ -594,19 +586,17 @@ function GlanceGrid({ stageKey, left, right }: { readonly stageKey: string; read
 /** Right column shared by readiness-led stages: [What to expect | Schedule] + optional narrative. */
 function ExpectScheduleColumn({
   expectations,
-  focus,
   schedulePlaceholder,
   narrative,
 }: {
   readonly expectations: readonly string[]
-  readonly focus?: readonly InterviewFocusItem[] | null
   readonly schedulePlaceholder: string
   readonly narrative: ReactNode
 }) {
   return (
     <motion.div variants={TILE} style={{ willChange: 'transform' }} className="flex flex-col gap-4 lg:col-span-2">
       <div className="grid gap-4 sm:grid-cols-2">
-        <WhatToExpectPanel items={expectations} focus={focus} />
+        <WhatToExpectPanel items={expectations} />
         <SchedulePanel placeholder={schedulePlaceholder} />
       </div>
       {narrative}
@@ -616,9 +606,7 @@ function ExpectScheduleColumn({
 
 /** Phone-screen glance — readiness ring + expectations/schedule + career-arc narrative. */
 function PhoneScreenGlance({ detail }: { readonly detail: ApplicationDetail }) {
-  const prep = resolveStagePrep(detail, 'phone-screen')
-  const careerArc = prep?.careerArcSummary
-  const focus = parseCoachingSections(prep?.coachingNotes).interviewFocus
+  const careerArc = resolveStagePrep(detail, 'phone-screen')?.careerArcSummary
   return (
     <GlanceGrid
       stageKey="phone-screen"
@@ -626,7 +614,6 @@ function PhoneScreenGlance({ detail }: { readonly detail: ApplicationDetail }) {
       right={
         <ExpectScheduleColumn
           expectations={PHONE_WHAT_TO_EXPECT}
-          focus={focus}
           schedulePlaceholder="e.g. 30 min · recruiter Jane Doe"
           narrative={careerArc ? <NarrativePanel icon={Route} label="Your career arc" summary={careerArc} /> : null}
         />
@@ -635,10 +622,8 @@ function PhoneScreenGlance({ detail }: { readonly detail: ApplicationDetail }) {
   )
 }
 
-/** Technical glance — mirrors phone-screen: readiness ring + expectations/schedule.
- *  "What to expect" prefers the coach's parsed interview-focus when available. */
+/** Technical glance — readiness ring + [What to expect | Schedule]. */
 function TechnicalGlance({ detail }: { readonly detail: ApplicationDetail }) {
-  const focus = parseCoachingSections(resolveStagePrep(detail, 'technical')?.coachingNotes).interviewFocus
   return (
     <GlanceGrid
       stageKey="technical"
@@ -646,12 +631,25 @@ function TechnicalGlance({ detail }: { readonly detail: ApplicationDetail }) {
       right={
         <ExpectScheduleColumn
           expectations={TECHNICAL_WHAT_TO_EXPECT}
-          focus={focus}
           schedulePlaceholder="e.g. 30m coding + 30m systems discussion"
           narrative={null}
         />
       }
     />
+  )
+}
+
+/** Behavioural glance — [What to expect | Schedule] side by side. */
+function BehaviouralGlance() {
+  return (
+    <motion.div key="behavioural" className="grid gap-4 sm:grid-cols-2" variants={GRID} initial="hidden" animate="show">
+      <motion.div variants={TILE} style={{ willChange: 'transform' }}>
+        <WhatToExpectPanel items={BEHAVIOURAL_WHAT_TO_EXPECT} />
+      </motion.div>
+      <motion.div variants={TILE} style={{ willChange: 'transform' }}>
+        <SchedulePanel placeholder="e.g. 45m behavioural" />
+      </motion.div>
+    </motion.div>
   )
 }
 
@@ -676,12 +674,37 @@ function ResearchGlance({ detail, stage }: StageGlancePanelProps) {
 }
 
 /**
+ * System-design glance — the research evidence (skill-coverage donut + the three
+ * Research tiles) is intentionally omitted here; it lives in the dedicated
+ * workspace panels for this stage. Schedule & format (left) sits side by side
+ * with the prep-status tile (right).
+ */
+function SystemDesignGlance({ detail }: { readonly detail: ApplicationDetail }) {
+  const prepTile = stageGlanceTiles('system-design', detail).find(tile => tile.key === 'prep')
+  return (
+    <motion.div key="system-design" className="grid gap-4 sm:grid-cols-2" variants={GRID} initial="hidden" animate="show">
+      <motion.div variants={TILE} style={{ willChange: 'transform' }}>
+        <SchedulePanel placeholder="e.g. 45m design + 15m questions" />
+      </motion.div>
+      {prepTile && (
+        <motion.div variants={TILE} style={{ willChange: 'transform' }}>
+          <GlanceTile tile={prepTile} />
+        </motion.div>
+      )}
+    </motion.div>
+  )
+}
+
+/**
  * KB-style "at a glance" dashboard panel for the active stage. Phone-screen and
  * technical lead with a readiness ring + [What to expect | Schedule] + a coach
- * narrative; the remaining stages show the skill-coverage donut + 2×2 stat tiles.
+ * narrative; system-design shows only its prep-status tile; the remaining stages
+ * show the skill-coverage donut + 2×2 stat tiles.
  */
 export function StageGlancePanel({ detail, stage }: StageGlancePanelProps) {
   if (stage === 'phone-screen') return <PhoneScreenGlance detail={detail} />
   if (stage === 'technical') return <TechnicalGlance detail={detail} />
+  if (stage === 'system-design') return <SystemDesignGlance detail={detail} />
+  if (stage === 'behavioural') return <BehaviouralGlance />
   return <ResearchGlance detail={detail} stage={stage} />
 }

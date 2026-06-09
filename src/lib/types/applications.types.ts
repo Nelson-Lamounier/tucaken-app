@@ -490,6 +490,7 @@ export interface FinalCheckpoint {
  * field so the UI can place them across the page without parsing prose. String
  * fields are Markdown; only `positioning` is required.
  */
+/** Legacy 7-field coaching shape — kept only so the adapter can map old rows. */
 export interface CoachingNotes {
   readonly positioning: string
   readonly interviewFocus?: readonly InterviewFocusItem[]
@@ -499,6 +500,21 @@ export interface CoachingNotes {
   readonly debrief?: string
   /** Structured checklist (new) or legacy Markdown string (old rows). */
   readonly finalCheckpoint?: string | FinalCheckpoint
+}
+
+/**
+ * One composable coaching block. The coach emits an ordered list of these; the
+ * UI distributes them to build a per-stage narrative. `checklist` present → the
+ * section renders as an interactive, persisted checklist.
+ */
+export interface CoachingSection {
+  /** Stable kebab-case id, e.g. "esl-coaching" — lets the UI place a section. */
+  readonly key: string
+  readonly title: string
+  /** Narrative content (markdown). */
+  readonly body: string
+  /** When present, the section renders as a tickable checklist. */
+  readonly checklist?: readonly string[]
 }
 
 /** Coach Agent output — part of ApplicationDetail */
@@ -521,7 +537,7 @@ export interface InterviewPrepOutput {
    * Stage coaching. New rows are a structured `CoachingNotes` object; legacy
    * rows are a Markdown string. `parseCoachingSections` handles both.
    */
-  readonly coachingNotes: string | CoachingNotes
+  readonly coachingNotes: string | CoachingNotes | readonly CoachingSection[]
   /** Phone-screen only: 2-3 sentence career-arc narrative */
   readonly careerArcSummary?: string
   /** Phone-screen only: JD-cross-referenced verified talking points */

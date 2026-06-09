@@ -5,8 +5,6 @@ import { Check, Copy } from 'lucide-react'
 import type { ApplicationDetail, PhoneScreenTalkingPoint } from '@/lib/types/applications.types'
 import { Card } from '@/components/ui/Card'
 import { EvidenceDeck, type EvidenceCard } from '../components/EvidenceDeck'
-import { CoachingGuidance } from '../components/CoachingSections'
-import { parseCoachingSections } from '../lib/coaching-sections'
 import { SummaryGroup } from '../components/workspace-shell'
 import { useStageDraftContext } from '../hooks/stage-draft-context'
 import { interviewPrepToWorkspace, resolveStagePrep } from '../types/workspace'
@@ -144,19 +142,6 @@ function CompConversationGroup({ compScript, compTarget, onTargetChange }: CompC
           Suggested response: &ldquo;{deflect}&rdquo;
         </p>
       </Card>
-    </SummaryGroup>
-  )
-}
-
-/** Empty-state shown when the coach hasn't generated phone-screen guidance yet. */
-function CoachingEmptyState() {
-  return (
-    <SummaryGroup id="coaching-notes" title="Coaching notes" subtitle="Stage-specific guidance from your interview coach.">
-      <div className="rounded-md bg-white p-4 ring-1 ring-zinc-200 shadow-sm dark:bg-white/2 dark:ring-0 dark:inset-ring dark:inset-ring-white/10 dark:shadow-none">
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          No coaching generated for this stage yet. Generate interview prep to see tailored guidance here.
-        </p>
-      </div>
     </SummaryGroup>
   )
 }
@@ -299,9 +284,7 @@ export function PhoneScreenWorkspace({ detail }: PhoneScreenWorkspaceProps) {
         onTargetChange={value => patch({ compTarget: value })}
       />
 
-      {/* Coaching guidance — split into focused sections; positioning sits above the
-          dashboards and interview-focus feeds What-to-expect. Empty state when absent. */}
-      {prep?.coachingNotes ? <CoachingGuidance sections={parseCoachingSections(prep.coachingNotes)} /> : <CoachingEmptyState />}
+      {/* Coaching notes render as the page intro (StageCoachingNarrative), not here. */}
 
       <QuestionsToAskGroup questions={questions} checkedItems={draft.checkedItems} onToggle={toggleChecked} />
     </>

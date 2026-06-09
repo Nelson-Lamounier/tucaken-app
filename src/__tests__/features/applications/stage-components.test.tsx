@@ -618,20 +618,13 @@ describe('TechnicalWorkspace', () => {
     )
   }
 
-  it('System Design shows question patterns and expands a framework step', () => {
+  it('System Design shows question patterns and the inline collapsible framework', () => {
     renderSystemDesign(detail)
-    // Group title + row label both render the patterns label in the summary column
     expect(screen.getAllByText('Common question patterns').length).toBeGreaterThan(0)
-    // Framework steps live behind the framework row's detail (rail) — collapsed until opened
+    // Framework is a static inline section (no group dropdown, no rail). Each step keeps
+    // its own inline collapsible: the step title shows, its prompts are collapsed until opened.
+    expect(screen.getByText('Framework to have ready')).toBeTruthy()
     expect(screen.queryByText(/functional vs non-functional/)).toBeNull()
-    // Open the framework row → its detail (the six-step CollapsibleSections) renders in the rail.
-    // The label appears twice (group title + row label); the row is the one inside a SummaryRow button.
-    const frameworkRow = screen
-      .getAllByText('Framework to have ready')
-      .map(el => el.closest('button'))
-      .find((btn): btn is HTMLButtonElement => btn?.getAttribute('aria-controls') === 'detail-rail-panel')
-    fireEvent.click(frameworkRow as HTMLElement)
-    // Then expand the first framework step
     fireEvent.click(screen.getByRole('button', { name: /Requirements & scope/i }))
     expect(screen.getByText(/functional vs non-functional/)).toBeTruthy()
   })

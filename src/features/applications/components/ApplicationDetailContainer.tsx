@@ -18,7 +18,7 @@ import { BarRaiserWorkspace } from '../stages/workspaces/BarRaiserWorkspace'
 import { FinalWorkspace } from '../stages/workspaces/FinalWorkspace'
 import { AppliedWorkspace } from '../stages/workspaces/AppliedWorkspace'
 import { StageGlancePanel } from './StageGlancePanel'
-import { StagePositioning } from '../stages/components/CoachingSections'
+import { StageCoachingNarrative } from '../stages/components/CoachingSections'
 import { StageDraftProvider } from '../stages/hooks/stage-draft-context'
 import type { StageDraft } from '../stages/hooks/useStageDraft'
 import { STAGE_ORDER, stageIndex } from '../stages/types/stage'
@@ -39,7 +39,7 @@ import {
  * in a StageDraftProvider so the panel and the workspace share one persisted
  * draft. Phone-screen and technical mirror this layout.
  */
-const STAGE_USES_DRAFT_PROVIDER = new Set<InterviewStage>(['phone-screen', 'technical'])
+const STAGE_USES_DRAFT_PROVIDER = new Set<InterviewStage>(['phone-screen', 'technical', 'system-design', 'behavioural'])
 
 /** Returns the bare workspace node for a stage — no gate, no callbacks. */
 function stageWorkspaceNode(stage: InterviewStage, detail: ApplicationDetail) {
@@ -245,8 +245,9 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
   // workspace share one persisted draft (see below).
   const stageRegion = (
     <>
-      {/* Coach's stage positioning — frames the round, sits above the dashboards */}
-      {STAGE_USES_DRAFT_PROVIDER.has(resolvedStage) && <StagePositioning detail={detail} stage={resolvedStage} />}
+      {/* Coach's notes as the page intro — an ordered narrative of sections, above
+          the dashboards. Null-safe: renders only when the stage has coaching. */}
+      <StageCoachingNarrative detail={detail} stage={resolvedStage} />
 
       {/* At-a-glance dashboard panel — dynamic per active stage */}
       <StageGlancePanel detail={detail} stage={resolvedStage} />
