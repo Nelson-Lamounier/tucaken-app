@@ -28,6 +28,7 @@ import { buildPipelineJob, sanitizeLabel } from '../lib/k8s-job-builder.js';
 import { getBatchApi } from '../lib/k8s.js';
 import { getPool, withUser } from '../lib/pg.js';
 import type { Queryable } from '../lib/pg.js';
+import { loadProjectRefIndex, rankProjectsForSkills } from '../lib/repositories/project-references.js';
 import { logger } from '../lib/observability/logger.js';
 import {
   listApplications,
@@ -171,6 +172,23 @@ function normaliseResearch(raw: Record<string, unknown>): Record<string, unknown
   }
 
   return result;
+}
+
+/**
+ * Collect the topic skills (verified + partial + gap) from a normalised research
+ * object, for ranking project references. Tolerant of shape — reads `.skill`.
+ */
+function collectResearchSkills(research: Record<string, unknown>): string[] {
+  const skills: string[] = [];
+  for (const key of ['verifiedMatches', 'partialMatches', 'gaps']) {
+    const arr = research[key];
+    if (!Array.isArray(arr)) continue;
+    for (const item of arr) {
+      const skill = (item as Record<string, unknown>)?.['skill'];
+      if (typeof skill === 'string' && skill.trim().length > 0) skills.push(skill);
+    }
+  }
+  return skills;
 }
 
 // ── Shared coach dispatch helpers ─────────────────────────────────────────────
@@ -455,6 +473,22 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
       // Field names differ between the pipeline contract (@bedrock/shared) and
       // the UI types (applications.types.ts), so we normalise here.
       const research = rawResearch ? normaliseResearch(rawResearch) : null;
+
+      // Rank the user's documented projects against the stage topics (verified /
+      // partial / gap skills) so the UI can deep-link project references per topic.
+      // Deterministic + RLS-scoped + fail-open — empty map on any issue.
+      if (research) {
+        try {
+          const skills = collectResearchSkills(research);
+          if (skills.length > 0) {
+            const refIndex = await loadProjectRefIndex(db);
+            const refs = rankProjectsForSkills(refIndex, skills);
+            if (Object.keys(refs).length > 0) research['topicProjectRefs'] = refs;
+          }
+        } catch (err) {
+          console.error('[applications/detail] project-reference ranking failed (non-fatal)', err);
+        }
+      }
 
       // DevOps real-work evidence: technology_evidence ⋈ technology_ontology ⋈ devops_topic_mappings.
       // Reuses the outer withUser-scoped db client (RLS). Prose-suppressed. Fail-open.

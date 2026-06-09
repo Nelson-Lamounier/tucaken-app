@@ -368,6 +368,22 @@ export interface ResearchOutput {
   readonly pillarClassification?: PillarClassification
   /** RAG retrieval health for this run — present only on post-hygiene runs. */
   readonly kbRetrievalStats?: KbRetrievalStats
+  /**
+   * Ranked project references keyed by lowercased topic skill — the user's
+   * documented projects most relevant to each topic. Computed live by admin-api
+   * (deterministic stack/tag/name match). Absent when no projects match.
+   */
+  readonly topicProjectRefs?: Record<string, readonly ProjectReferenceData[]>
+}
+
+/** A deep-link to one of the user's project case-studies (routes to /projects/$id). */
+export interface ProjectReferenceData {
+  readonly id: string
+  readonly title: string
+  /** One-line pitch. */
+  readonly pitch: string
+  /** Top matched stack/skill tags. */
+  readonly highlights?: readonly string[]
 }
 
 /** Analysis metadata from the Applications Agent */
