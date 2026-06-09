@@ -5,6 +5,7 @@ import {
   upsertStageUserState,
   markNotApplicable,
   getStagesForApp,
+  listScheduledInterviews,
   advanceStageLifecycle,
   setStageOutcome,
   STAGE_OUTCOMES,
@@ -34,6 +35,23 @@ describe('upsertStageUserState', () => {
     const sql = (query.mock.calls[0] as unknown[])[0] as string;
     expect(sql).toMatch(/INSERT INTO interview_stages/);
     expect(sql).toMatch(/ON CONFLICT \(job_application_id, stage_type\)/);
+  });
+});
+
+describe('listScheduledInterviews', () => {
+  it('selects scheduled stages joined to the application, ordered by time', async () => {
+    const row = {
+      slug: 'app-1', company: 'Acme', role: 'SWE', kanban_status: 'interviewing',
+      stage_type: 'technical', stage_status: 'current', scheduled_at: '2026-06-10T14:00:00Z',
+    };
+    const { pool, query } = fakePool([row]);
+    const out = await listScheduledInterviews(pool);
+    const sql = (query.mock.calls[0] as unknown[])[0] as string;
+    expect(sql).toMatch(/FROM interview_stages/);
+    expect(sql).toMatch(/JOIN job_applications/);
+    expect(sql).toMatch(/scheduled_at IS NOT NULL/);
+    expect(sql).toMatch(/ORDER BY s\.scheduled_at ASC/);
+    expect(out).toEqual([row]);
   });
 });
 

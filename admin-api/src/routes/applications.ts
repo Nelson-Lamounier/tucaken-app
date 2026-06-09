@@ -42,6 +42,7 @@ import {
   markNotApplicable as pgMarkNotApplicable,
   linkCoachRun,
   getStagesForApp,
+  listScheduledInterviews,
   advanceStageLifecycle,
   setStageOutcome,
   isStageOutcome,
@@ -279,6 +280,31 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
         return { ...t, band, context };
       });
       return ctx.json({ summary, transitions: framed, ranges: FUNNEL_RANGES });
+    });
+  });
+
+  // ── GET /scheduled-interviews — all scheduled stages, for the calendar ───
+  /**
+   * Lists every interview stage with a `scheduled_at` for the caller's own
+   * applications (RLS-scoped), joined to company/role/status. Registered before
+   * `/:slug` so the literal path is not captured as a slug.
+   */
+  app.get('/scheduled-interviews', async (ctx) => {
+    const userId = ctx.get('userId');
+    if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
+
+    return withUser(getPool(config), userId, async (db) => {
+      const rows = await listScheduledInterviews(db);
+      const interviews = rows.map(r => ({
+        slug:        r.slug,
+        company:     r.company,
+        role:        r.role,
+        status:      r.kanban_status,
+        stage:       r.stage_type,
+        stageStatus: r.stage_status,
+        scheduledAt: r.scheduled_at,
+      }));
+      return ctx.json({ interviews, count: interviews.length });
     });
   });
 

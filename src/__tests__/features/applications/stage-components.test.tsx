@@ -760,31 +760,23 @@ describe('FinalWorkspace', () => {
     research: null, analysis: null, interviewPrep: null,
   } satisfies ApplicationDetail
 
-  it('computes a counter from base and confirms a decision action', () => {
+  it('renders the decision-factors fit badge and collects no offer/PII figures', () => {
     window.localStorage.clear()
     renderWithQuery(
       <WorkspaceShell detail={detail} activeStage="final">
         <FinalWorkspace detail={detail} />
       </WorkspaceShell>,
     )
-    // Fit badge lives in the decision-factors group header (always visible)
+    // Fit badge lives in the decision-factors section header (always visible)
     expect(screen.getByText('Fit 50%')).toBeTruthy() // default factors 5/5
-    // Base input is the inline offer control
-    fireEvent.change(screen.getByLabelText('Base'), { target: { value: '100,000' } })
-    // The suggested counter now lives behind the suggested-counter row's detail (rail)
-    const counterRow = screen
-      .getAllByText('Suggested counter')
-      .map(el => el.closest('button'))
-      .find((btn): btn is HTMLButtonElement => btn?.getAttribute('aria-controls') === 'detail-rail-panel')
-    fireEvent.click(counterRow as HTMLElement)
-    expect(screen.getByText('110,000')).toBeTruthy() // suggested counter
-    fireEvent.click(screen.getByRole('button', { name: 'Decline' }))
-    expect(screen.getByText('Decline this offer?')).toBeTruthy()
-    const confirm = screen.getAllByRole('button', { name: 'Decline' }).find(b => b.className.includes('bg-red-600'))
-    fireEvent.click(confirm as HTMLElement)
-    expect(statusMutate).toHaveBeenCalledWith({ slug: 'final-acme', status: 'rejected' })
+    // Compensation figures are no longer collected (PII / contract compliance)
+    expect(screen.queryByText('The offer')).toBeNull()
+    expect(screen.queryByLabelText('Base')).toBeNull()
+    // The Suggested counter component has been removed
+    expect(screen.queryByText('Suggested counter')).toBeNull()
   })
 })
+
 
 describe('FinalPrep', () => {
   const detail = {

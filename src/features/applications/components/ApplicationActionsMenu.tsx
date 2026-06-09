@@ -54,6 +54,9 @@ export function ApplicationActionsMenu({
   const [builderKey, setBuilderKey] = useState(0)
   const prevStateRef = useRef<AppState | null>(null)
 
+  // Resume attachments / edit / publish are only relevant in the Applied phase.
+  const isApplied = detail.interviewStage === 'applied'
+
   const handleOpenBuilder = useCallback(() => {
     if (!detail.analysis?.tailoredResume) return
     prevStateRef.current = getState()
@@ -158,14 +161,14 @@ export function ApplicationActionsMenu({
         options={statusOptions}
         selectedValue={statusValue}
         onSelect={val => onStatusChange(val as ApplicationStatus)}
-        onDownloadResume={hasTailoredResume ? handleDownloadResume : undefined}
-        onDownloadCoverLetter={detail.analysis?.coverLetter ? handleDownloadCoverLetter : undefined}
-        onEdit={hasTailoredResume ? handleOpenBuilder : undefined}
-        onPublish={hasTailoredResume ? () => publishMutation.mutate() : undefined}
+        onDownloadResume={isApplied && hasTailoredResume ? handleDownloadResume : undefined}
+        onDownloadCoverLetter={isApplied && detail.analysis?.coverLetter ? handleDownloadCoverLetter : undefined}
+        onEdit={isApplied && hasTailoredResume ? handleOpenBuilder : undefined}
+        onPublish={isApplied && hasTailoredResume ? () => publishMutation.mutate() : undefined}
         onDelete={() => deleteMutation.mutate()}
       />
 
-      {detail.analysis?.tailoredResume && (
+      {isApplied && detail.analysis?.tailoredResume && (
         <DashboardDrawer
           isOpen={isBuilderOpen}
           onClose={handleCloseBuilder}

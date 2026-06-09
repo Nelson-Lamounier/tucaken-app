@@ -153,3 +153,31 @@ export async function getStagesForApp(db: Queryable, appId: string): Promise<Sta
     coach_run_id: row.coach_run_id,
   }));
 }
+
+/** One scheduled interview joined to its application — for the calendar. */
+export interface ScheduledInterviewRow {
+  slug: string; // job_applications.id (the `:slug` path param)
+  company: string;
+  role: string;
+  kanban_status: string;
+  stage_type: string;
+  stage_status: string;
+  scheduled_at: string;
+}
+
+/**
+ * Every interview stage with a `scheduled_at`, joined to its application
+ * (company, role, status). RLS (via `withUser`) scopes rows to the caller's own
+ * applications. Ordered chronologically for calendar rendering.
+ */
+export async function listScheduledInterviews(db: Queryable): Promise<ScheduledInterviewRow[]> {
+  const r = await db.query<ScheduledInterviewRow>(
+    `SELECT ja.id AS slug, ja.company, ja.role, ja.kanban_status,
+            s.stage_type, s.stage_status, s.scheduled_at
+       FROM interview_stages s
+       JOIN job_applications ja ON ja.id = s.job_application_id
+      WHERE s.scheduled_at IS NOT NULL
+      ORDER BY s.scheduled_at ASC`,
+  );
+  return r.rows;
+}
