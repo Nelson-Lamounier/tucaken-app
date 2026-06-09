@@ -363,7 +363,7 @@ rag-eval userid="1d4c645a-447e-4b5b-924d-19a3c75a84db":
     cd {{justfile_directory()}}/../ai-applications
     RUN_RAG_EVAL=1 USER_ID={{userid}} \
         RDS_HOST=127.0.0.1 RDS_PORT={{rds_port}} RDS_DB_NAME={{rds_db}} RDS_USER=postgres \
-        RAG_EVAL_OUT_DIR=/tmp RAG_EVAL_PERSIST=1 \
+        RDS_SSL=require RAG_EVAL_OUT_DIR=/tmp RAG_EVAL_PERSIST=1 \
         npx tsx applications/job-strategist/src/evals/rag/run-rag-eval.ts
 
 # Open a tunnel, run one SQL statement (-X -t -A), then close the tunnel. Internal.
