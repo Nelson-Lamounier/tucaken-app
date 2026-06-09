@@ -1,10 +1,10 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Lightbulb, RotateCw, Check, Copy } from 'lucide-react'
-import { motion, useReducedMotion } from 'motion/react'
+import { Check, Copy } from 'lucide-react'
 import type { ApplicationDetail, PhoneScreenTalkingPoint } from '@/lib/types/applications.types'
 import { Card } from '@/components/ui/Card'
+import { EvidenceDeck, type EvidenceCard } from '../components/EvidenceDeck'
 import { CoachingGuidance } from '../components/CoachingSections'
 import { parseCoachingSections } from '../lib/coaching-sections'
 import { SummaryGroup } from '../components/workspace-shell'
@@ -36,101 +36,61 @@ function dedupeQuestions(entries: readonly ChecklistEntry[]): ChecklistEntry[] {
   return out
 }
 
-const FLIP_SPRING = { type: 'spring', visualDuration: 0.45, bounce: 0.18 } as const
-const FACE = 'absolute inset-0 flex flex-col rounded-md border p-4 [backface-visibility:hidden] [-webkit-backface-visibility:hidden]'
-
-interface TalkingPointCardProps {
-  readonly index: number
-  readonly point: string
-  readonly evidence?: string
-}
-
-/** A flip card: the strength on the front, its evidence on the back — tap to test recall. */
-function TalkingPointCard({ index, point, evidence }: TalkingPointCardProps) {
-  const reduce = useReducedMotion()
-  const [flipped, setFlipped] = useState(false)
-  const back = evidence ?? 'A verified strength from your own work — lead with it confidently.'
-
+function Chips({ skills }: { readonly skills: readonly string[] }) {
+  if (skills.length === 0) return null
   return (
-    <button
-      type="button"
-      onClick={() => setFlipped(prev => !prev)}
-      aria-pressed={flipped}
-      className="h-36 w-full rounded-md text-left perspective-distant focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-500"
-    >
-      <motion.div
-        className="relative h-full w-full"
-        style={{ transformStyle: 'preserve-3d', willChange: 'transform' }}
-        initial={false}
-        animate={{ rotateY: flipped ? 180 : 0 }}
-        transition={reduce ? { duration: 0 } : FLIP_SPRING}
-      >
-        {/* Front — the strength to recall */}
-        <div className={`${FACE} border-zinc-200 bg-white dark:border-white/10 dark:bg-white/2`}>
-          <div className="flex items-center justify-between">
-            <span className="flex size-8 items-center justify-center rounded-full bg-accent/15 text-lg font-bold text-accent">
-              {index}
-            </span>
-            <Lightbulb className="size-4 text-accent" aria-hidden />
-          </div>
-          <p className="mt-2 flex-1 text-sm font-semibold leading-snug text-zinc-900 dark:text-zinc-100">{point}</p>
-          <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-zinc-400">
-            <RotateCw className="size-3" aria-hidden /> Tap to reveal evidence
-          </span>
-        </div>
-
-        {/* Back — the evidence */}
-        <div className={`${FACE} border-accent/40 bg-zinc-50 transform-[rotateY(180deg)] dark:border-accent/30 dark:bg-white/5`}>
-          <span className="text-[10px] font-semibold uppercase text-accent">Evidence</span>
-          <p className="mt-1.5 flex-1 overflow-y-auto text-sm leading-relaxed text-zinc-700 dark:text-zinc-200">{back}</p>
-          <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-zinc-400">
-            <RotateCw className="size-3" aria-hidden /> Tap to flip back
-          </span>
-        </div>
-      </motion.div>
-    </button>
+    <div className="flex flex-wrap gap-1.5 pt-1">
+      {skills.map(s => (
+        <span key={s} className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/20">
+          {s}
+        </span>
+      ))}
+    </div>
   )
 }
 
-interface PointCard {
-  readonly key: string
-  readonly point: string
-  readonly evidence?: string
-}
-
-/** Talking points — a flip-card deck (active recall) instead of a list of rows. */
-function TalkingPointsPanel({
+export function TalkingPointsPanel({
   jdPoints,
   fallbackPoints,
 }: {
   readonly jdPoints: readonly PhoneScreenTalkingPoint[]
   readonly fallbackPoints: readonly string[]
 }) {
-  const cards: PointCard[] =
+  const cards: EvidenceCard[] =
     jdPoints.length > 0
-      ? jdPoints.map(tp => ({ key: tp.point, point: tp.point, evidence: tp.evidence }))
-      : fallbackPoints.map(point => ({ key: point, point }))
+      ? jdPoints.map(tp => ({
+          id: tp.point,
+          title: tp.point,
+          strength: 'strong' as const,
+          backLabel: 'How to say it',
+          hint: 'Flip to see your evidence',
+          back: (
+            <>
+              <p>{tp.evidence}</p>
+              <Chips skills={tp.matchedSkills ?? []} />
+            </>
+          ),
+        }))
+      : fallbackPoints.map(point => ({
+          id: point,
+          title: point,
+          strength: 'strong' as const,
+          backLabel: 'Verified strength',
+          hint: 'Lead with this confidently',
+          back: <p>A verified strength from your own work — lead with it confidently.</p>,
+        }))
 
   return (
-    <section className="space-y-3 rounded-md border border-zinc-200 bg-zinc-50/50 p-4 dark:border-white/10 dark:bg-white/2">
-      <div>
-        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Your talking points</h3>
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          Strengths to lead with, from your verified evidence. Tap a card to test your recall.
-        </p>
-      </div>
-      {cards.length > 0 ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {cards.map((card, i) => (
-            <TalkingPointCard key={card.key} index={i + 1} point={card.point} evidence={card.evidence} />
-          ))}
-        </div>
-      ) : (
+    <EvidenceDeck
+      title="Your talking points"
+      subtitle="Strengths to lead with, from your verified evidence. Tap a card to test your recall."
+      cards={cards}
+      emptyState={
         <Card className="px-4 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
           Talking points appear once the Research Agent has analysed this application.
         </Card>
-      )}
-    </section>
+      }
+    />
   )
 }
 

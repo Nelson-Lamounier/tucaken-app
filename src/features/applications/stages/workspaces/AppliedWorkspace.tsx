@@ -10,7 +10,8 @@ import type {
 import { Card } from '@/components/ui/Card'
 import { KnowledgeBaseHealthPanel } from '@/components/kb/KnowledgeBaseHealthPanel'
 import { EvidenceIndicator } from '../components/EvidenceIndicator'
-import { SummaryGroup, SummaryRow, useDetailRail, useSummaryGroupTitle } from '../components/workspace-shell'
+import { EvidenceDeck, type EvidenceCard } from '../components/EvidenceDeck'
+import { SummaryGroup, SummaryRow } from '../components/workspace-shell'
 
 interface AppliedWorkspaceProps {
   readonly detail: ApplicationDetail
@@ -87,72 +88,31 @@ function ResumeSuggestionsGroup({ summary }: { readonly summary: string }) {
   )
 }
 
-/** Detail body for one verified match. */
-function VerifiedMatchDetail({ match }: { readonly match: VerifiedMatch }) {
-  return (
-    <Card className="space-y-2 p-4">
-      <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{match.skill}</p>
-      <p className="text-sm text-zinc-500 dark:text-zinc-400">{match.sourceCitation}</p>
-      <div className="flex flex-wrap gap-2">
-        <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-600 dark:bg-white/5 dark:text-zinc-400">
-          {match.depthBadge}
-        </span>
-        <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-600 dark:bg-white/5 dark:text-zinc-400">
-          {match.recency}
-        </span>
-      </div>
-    </Card>
-  )
+/** Map a verified match to a shared evidence card (always strong evidence). */
+function matchCard(match: VerifiedMatch): EvidenceCard {
+  return {
+    id: match.skill,
+    title: match.skill,
+    strength: 'strong',
+    backLabel: 'Verified in your work',
+    hint: 'Flip to see the source',
+    back: (
+      <>
+        <p>{match.sourceCitation}</p>
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">{match.depthBadge} · {match.recency}</p>
+      </>
+    ),
+  }
 }
 
-/** One verified-match card — a clickable CTA that opens its detail in the drawer. */
-function VerifiedMatchCard({ match }: { readonly match: VerifiedMatch }) {
-  const { selected, select } = useDetailRail()
-  const section = useSummaryGroupTitle()
-  const id = `verified-${match.skill}`
-  const isActive = selected?.id === id
-
+/** Verified matches — rendered via the shared EvidenceDeck (verified-only lens). */
+export function VerifiedMatchesDeck({ matches }: { readonly matches: readonly VerifiedMatch[] }) {
   return (
-    <button
-      type="button"
-      onClick={() => select({ id, label: match.skill, node: <VerifiedMatchDetail match={match} />, section })}
-      aria-current={isActive ? 'true' : undefined}
-      className={[
-        'flex h-full flex-col gap-2 rounded-md border p-3 text-left transition-colors',
-        isActive
-          ? 'border-accent/40 bg-accent/8'
-          : 'border-zinc-200 bg-white hover:bg-zinc-50 dark:border-white/10 dark:bg-white/2 dark:hover:bg-white/5',
-      ].join(' ')}
-    >
-      <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{match.skill}</span>
-      <p className="line-clamp-2 text-xs text-zinc-500 dark:text-zinc-400">{match.sourceCitation}</p>
-      <div className="mt-auto flex flex-wrap gap-1.5 pt-1">
-        <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[11px] text-zinc-600 dark:bg-white/5 dark:text-zinc-400">
-          {match.depthBadge}
-        </span>
-        <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[11px] text-zinc-600 dark:bg-white/5 dark:text-zinc-400">
-          {match.recency}
-        </span>
-      </div>
-    </button>
-  )
-}
-
-/** Verified matches — a grid of clickable cards; each opens its detail in the drawer. */
-function VerifiedMatchesGroup({ matches }: { readonly matches: readonly VerifiedMatch[] }) {
-  return (
-    <SummaryGroup
-      id="verified-matches"
+    <EvidenceDeck
       title="Verified matches"
-      subtitle="Skills backed by evidence in your work."
-      count={matches.length}
-    >
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {matches.map(match => (
-          <VerifiedMatchCard key={match.skill} match={match} />
-        ))}
-      </div>
-    </SummaryGroup>
+      subtitle="Skills proven by your own work, ready to lead with. Tap a card to see the source."
+      cards={matches.map(matchCard)}
+    />
   )
 }
 
@@ -349,7 +309,7 @@ export function AppliedWorkspace({ detail }: AppliedWorkspaceProps) {
 
       {resumeSummary ? <ResumeSuggestionsGroup summary={resumeSummary} /> : null}
 
-      {verifiedMatches.length > 0 && <VerifiedMatchesGroup matches={verifiedMatches} />}
+      {verifiedMatches.length > 0 && <VerifiedMatchesDeck matches={verifiedMatches} />}
 
       {(partialMatches.length > 0 || gaps.length > 0) && (
         <div className="grid items-start gap-6 lg:grid-cols-2">

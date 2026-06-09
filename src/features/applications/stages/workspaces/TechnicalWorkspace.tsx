@@ -3,11 +3,11 @@
 import { useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { motion, useReducedMotion } from 'motion/react'
-import { ExternalLink, FolderOpen, RotateCw, CheckCircle2, CircleDashed, CircleSlash } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+import { ExternalLink, FolderOpen, RotateCw, CheckCircle2, CircleSlash } from 'lucide-react'
 import type { ApplicationDetail } from '@/lib/types/applications.types'
 import { TONE, type Tone } from '@/components/ui/tone'
 import { Card } from '@/components/ui/Card'
+import { EvidenceDeck, type EvidenceCard } from '../components/EvidenceDeck'
 import { CoachingGuidance } from '../components/CoachingSections'
 import { parseCoachingSections } from '../lib/coaching-sections'
 import { SummaryGroup, SummaryRow, RailField, RailBullets, RailRichText } from '../components/workspace-shell'
@@ -243,93 +243,37 @@ type EvidenceTopicRow = ReturnType<typeof researchToTopics>[number]
 const TOPIC_FLIP_SPRING = { type: 'spring', visualDuration: 0.45, bounce: 0.18 } as const
 const TOPIC_FACE = 'absolute inset-0 flex flex-col rounded-md border p-4 [backface-visibility:hidden] [-webkit-backface-visibility:hidden]'
 
-/** Strength → traffic-light tone + card border. Mirrors EvidenceIndicator's mapping. */
-const STRENGTH_TONE: Record<EvidenceStrength, Tone> = { strong: 'good', moderate: 'warn', none: 'bad' }
+/** Strength → card border. Mirrors EvidenceIndicator's mapping. */
 const STRENGTH_BORDER: Record<EvidenceStrength, string> = {
   strong:   'border-emerald-200 dark:border-emerald-500/30',
   moderate: 'border-amber-200 dark:border-amber-500/30',
   none:     'border-red-200 dark:border-red-500/30',
 }
-/** Strength → a shape-distinct icon (not colour-only) + its accessible label. */
-const STRENGTH_ICON: Record<EvidenceStrength, LucideIcon> = { strong: CheckCircle2, moderate: CircleDashed, none: CircleSlash }
-const STRENGTH_LABEL: Record<EvidenceStrength, string> = { strong: 'Strong evidence', moderate: 'Some evidence', none: 'Gap to address' }
 
-/** A topic flip card: title + evidence badge on the front, the evidence (or
- *  gap guidance) on the back — coloured by evidence strength. Tap to reveal. */
-function TopicFlipCard({ topic }: { readonly topic: EvidenceTopicRow }) {
-  const reduce = useReducedMotion()
-  const [flipped, setFlipped] = useState(false)
+function topicCard(topic: EvidenceTopicRow): EvidenceCard {
   const isGap = topic.strength === 'none'
-  const backLabel = isGap ? 'Addressing the gap' : 'Evidence in your work'
-  const backText = isGap ? (topic.beHonest ?? topic.summary) : topic.summary
-  const frontHint = isGap ? 'Flip to see how to address it' : 'Flip to see your evidence'
-  const tone = STRENGTH_TONE[topic.strength]
-  const border = STRENGTH_BORDER[topic.strength]
-  const StrengthIcon = STRENGTH_ICON[topic.strength]
-
-  return (
-    <button
-      type="button"
-      onClick={() => setFlipped(prev => !prev)}
-      aria-pressed={flipped}
-      className="h-44 w-full rounded-md text-left perspective-distant focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-500"
-    >
-      <motion.div
-        className="relative h-full w-full"
-        style={{ transformStyle: 'preserve-3d', willChange: 'transform' }}
-        initial={false}
-        animate={{ rotateY: flipped ? 180 : 0 }}
-        transition={reduce ? { duration: 0 } : TOPIC_FLIP_SPRING}
-      >
-        {/* Front — the topic + an at-a-glance evidence icon (shape-distinct, not colour-only) */}
-        <div className={`${TOPIC_FACE} bg-white dark:bg-white/2 ${border}`}>
-          <div className="flex items-center justify-between">
-            <StrengthIcon className={`size-5 ${TONE[tone].dot}`} role="img" aria-label={STRENGTH_LABEL[topic.strength]} />
-            <RotateCw className="size-3.5 text-zinc-300 dark:text-zinc-600" aria-hidden />
-          </div>
-          <p className="mt-3 flex-1 text-base font-semibold leading-snug tracking-tight text-zinc-900 dark:text-zinc-100">{topic.title}</p>
-          <span className="text-xs text-zinc-400 dark:text-zinc-500">{frontHint}</span>
-        </div>
-
-        {/* Back — the evidence in your work (or gap guidance) */}
-        <div className={`${TOPIC_FACE} transform-[rotateY(180deg)] bg-zinc-50 dark:bg-white/5 ${border}`}>
-          <span className={`inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase ${TONE[tone].text}`}>
-            <StrengthIcon className="size-3.5" aria-hidden />
-            {backLabel}
-          </span>
-          <p className="mt-1.5 flex-1 overflow-y-auto text-sm leading-relaxed text-zinc-700 dark:text-zinc-200">{backText}</p>
-          <span className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-zinc-400">
-            <RotateCw className="size-3" aria-hidden /> Flip back
-          </span>
-        </div>
-      </motion.div>
-    </button>
-  )
+  return {
+    id: topic.id,
+    title: topic.title,
+    strength: topic.strength,
+    backLabel: isGap ? 'Addressing the gap' : 'Evidence in your work',
+    hint: isGap ? 'Flip to see how to address it' : 'Flip to see your evidence',
+    back: <p>{isGap ? (topic.beHonest ?? topic.summary) : topic.summary}</p>,
+  }
 }
 
-/** Topics likely to come up — a flip-card deck (active recall) coloured by
- *  evidence strength, inline like the phone-screen talking points. */
 function TopicsPanel({ topics }: { readonly topics: readonly EvidenceTopicRow[] }) {
   return (
-    <section className="space-y-3 rounded-md border border-zinc-200 bg-zinc-50/50 p-4 dark:border-white/10 dark:bg-white/2">
-      <div>
-        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Topics likely to come up</h3>
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          Grounded in the evidence found across your work for this role. Tap a card to reveal the evidence.
-        </p>
-      </div>
-      {topics.length > 0 ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {topics.map(topic => (
-            <TopicFlipCard key={topic.id} topic={topic} />
-          ))}
-        </div>
-      ) : (
+    <EvidenceDeck
+      title="Topics likely to come up"
+      subtitle="Grounded in the evidence found across your work for this role. Tap a card to reveal the evidence."
+      cards={topics.map(topicCard)}
+      emptyState={
         <Card className="px-4 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
           No analysis yet — topics appear once the Research Agent has run for this application.
         </Card>
-      )}
-    </section>
+      }
+    />
   )
 }
 
