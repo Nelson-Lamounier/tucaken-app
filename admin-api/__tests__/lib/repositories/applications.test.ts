@@ -18,6 +18,7 @@ const {
     getApplication,
     listApplications,
     updateApplicationStatus,
+    advanceStatusOffAnalysis,
     deleteApplication,
 } = await import('../../../src/lib/repositories/applications.js');
 
@@ -84,15 +85,18 @@ describe('ApplicationRepository', () => {
             await listApplications(fakePool);
             const [sql] = mockQuery.mock.calls[0] as unknown as [string];
             expect(sql).toMatch(/SELECT/i);
-            expect(sql).toMatch(/ORDER BY created_at DESC/i);
-            expect(sql).not.toMatch(/WHERE kanban_status/i);
+            expect(sql).toMatch(/ORDER BY ja\.created_at DESC/i);
+            expect(sql).not.toMatch(/WHERE ja\.kanban_status/i);
+            // derives furthest-reached stage from interview_stages
+            expect(sql).toMatch(/reached_stage/i);
+            expect(sql).toMatch(/array_position/i);
         });
 
         it('should filter by kanban_status when provided', async () => {
             mockQuery.mockResolvedValue({ rows: [] });
             await listApplications(fakePool, 'saved');
             const [sql, params] = mockQuery.mock.calls[0] as unknown as [string, unknown[]];
-            expect(sql).toMatch(/WHERE kanban_status = \$1/i);
+            expect(sql).toMatch(/WHERE ja\.kanban_status = \$1/i);
             expect(params).toContain('saved');
         });
     });
@@ -105,6 +109,17 @@ describe('ApplicationRepository', () => {
             expect(sql).toMatch(/UPDATE job_applications/i);
             expect(sql).toMatch(/kanban_status/i);
             expect(params).toContain('applied');
+            expect(params).toContain('app-uuid-1');
+        });
+    });
+
+    describe('advanceStatusOffAnalysis', () => {
+        it('moves analysing/analysis-ready to interview-prep, never overriding other statuses', async () => {
+            mockQuery.mockResolvedValue({ rows: [] });
+            await advanceStatusOffAnalysis(fakePool, 'app-uuid-1');
+            const [sql, params] = mockQuery.mock.calls[0] as unknown as [string, unknown[]];
+            expect(sql).toMatch(/UPDATE job_applications SET kanban_status = 'interview-prep'/i);
+            expect(sql).toMatch(/kanban_status IN \('analysing', 'analysis-ready'\)/i);
             expect(params).toContain('app-uuid-1');
         });
     });

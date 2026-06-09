@@ -36,6 +36,11 @@
 .main button {
   font: inherit;
   cursor: pointer;
+}
+/* Reset native chrome only for bare builder buttons; buttons carrying a Tailwind
+   `bg-*` utility (Download, segmented controls) keep their background/padding —
+   otherwise this reset wins on specificity and they render invisible. */
+.main button:not([class*="bg-"]) {
   border: 0; background: none; padding: 0;
 }
 .main button:not([class*="text-"]) { color: inherit; }

@@ -79,6 +79,7 @@ function ApplicationErrorState({ message, onBack }: ApplicationErrorStateProps) 
 
 interface ApplicationHeaderProps {
   readonly detail: ApplicationDetail
+  readonly viewedStage: InterviewStage
   readonly statusPending: boolean
   readonly onStatusChange: (status: ApplicationStatus) => void
   readonly dateStr: string
@@ -89,7 +90,7 @@ interface ApplicationHeaderProps {
  * status control. Mirrors the KB dashboard header (title + subtitle + action);
  * the at-a-glance stat tiles render beneath it via StageGlancePanel.
  */
-function ApplicationHeader({ detail, statusPending, onStatusChange, dateStr }: ApplicationHeaderProps) {
+function ApplicationHeader({ detail, viewedStage, statusPending, onStatusChange, dateStr }: ApplicationHeaderProps) {
   return (
     <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-center gap-3">
@@ -111,6 +112,7 @@ function ApplicationHeader({ detail, statusPending, onStatusChange, dateStr }: A
 
       <ApplicationActionsMenu
         detail={detail}
+        viewedStage={viewedStage}
         statusLabel={STATUS_LABELS[detail.status]}
         statusOptions={STATUS_OPTIONS}
         statusValue={detail.status}
@@ -318,6 +320,7 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
       {/* Page header */}
       <ApplicationHeader
         detail={detail}
+        viewedStage={resolvedStage}
         statusPending={statusMutation.isPending}
         onStatusChange={handleStatusChange}
         dateStr={dateStr}

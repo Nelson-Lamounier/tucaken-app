@@ -12,7 +12,7 @@ import type {
 export const STATUS_FILTER_OPTIONS: readonly { value: ApplicationStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'All Applications' },
   { value: 'analysing', label: 'Analysing' },
-  { value: 'analysis-ready', label: 'Analysis Ready' },
+  { value: 'analysis-ready', label: 'Ready for Review' },
   { value: 'failed', label: 'Failed' },
   { value: 'interview-prep', label: 'Interview Prep' },
   { value: 'applied', label: 'Applied' },
@@ -76,7 +76,7 @@ export const RECOMMENDATION_LABELS: Record<ApplicationRecommendation, string> = 
 
 export const STATUS_LABELS: Record<ApplicationStatus, string> = {
   'analysing': 'Analysing',
-  'analysis-ready': 'Ready',
+  'analysis-ready': 'Ready for Review',
   'coaching': 'Coaching',
   'interview-prep': 'Interview Prep',
   'applied': 'Applied',

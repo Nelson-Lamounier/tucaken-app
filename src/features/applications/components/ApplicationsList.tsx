@@ -9,8 +9,8 @@ import {
 import { useApplications } from '@/hooks/use-admin-applications'
 import { useApplicationsStore } from '@/lib/stores/applications-store'
 import type { ApplicationStatus } from '@/lib/types/applications.types'
-import { STATUS_FILTER_OPTIONS } from './ApplicationTypes'
-import { ApplicationCard } from './ApplicationCard'
+import { STATUS_FILTER_OPTIONS, STATUS_LABELS } from './ApplicationTypes'
+import { ApplicationListRow } from './ApplicationListRow'
 import { CustomDropDown } from '@/components/ui/CustomDropDown'
 import { CommandPallete } from '@/components/ui/CommandPallete'
 import type { CommandPalleteItem } from '@/components/ui/CommandPallete'
@@ -64,7 +64,9 @@ export function ApplicationsList({ initialStage }: { initialStage?: string }) {
     const query = searchQuery.toLowerCase()
     return (
       app.targetCompany.toLowerCase().includes(query) ||
-      app.targetRole.toLowerCase().includes(query)
+      app.targetRole.toLowerCase().includes(query) ||
+      STATUS_LABELS[app.status].toLowerCase().includes(query) ||
+      app.status.toLowerCase().includes(query)
     )
   }) || []
 
@@ -78,7 +80,7 @@ export function ApplicationsList({ initialStage }: { initialStage?: string }) {
   const commandItems = applications?.map((app) => ({
     id: app.slug,
     name: app.targetCompany,
-    description: app.targetRole,
+    description: `${app.targetRole} · ${STATUS_LABELS[app.status]}`,
   })) || []
 
   return (
@@ -94,84 +96,90 @@ export function ApplicationsList({ initialStage }: { initialStage?: string }) {
         }}
       />
 
-      {/* Filters row */}
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-        {/* Status filter dropdown */}
-        <div className="w-full sm:w-64 z-10">
-          <CustomDropDown
-            options={STATUS_FILTER_OPTIONS}
-            value={statusFilter}
-            onChange={(val: string) => setStatusFilter(val as ApplicationStatus | 'all')}
-          />
+      {/* One coupled table: toolbar → headers → rows, all in a single surface. */}
+      <div className="overflow-hidden rounded-md border border-zinc-200 bg-white dark:border-white/10 dark:bg-white/2">
+        {/* Toolbar — filters + search */}
+        <div className="flex flex-col gap-3 border-b border-zinc-200 p-3 dark:border-white/10 sm:flex-row sm:items-center">
+          <div className="z-10 w-full sm:w-64">
+            <CustomDropDown
+              options={STATUS_FILTER_OPTIONS}
+              value={statusFilter}
+              onChange={(val: string) => setStatusFilter(val as ApplicationStatus | 'all')}
+            />
+          </div>
+
+          <div className="group relative flex-1">
+            <button
+              type="button"
+              onClick={() => setPalleteOpen(true)}
+              className="flex w-full items-center justify-between rounded-md bg-zinc-100 py-1.5 pl-3 pr-2 text-sm text-zinc-500 outline-1 -outline-offset-1 outline-zinc-300 transition-colors hover:bg-zinc-200 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-teal-500 dark:bg-white/5 dark:text-zinc-400 dark:outline-white/10 dark:hover:bg-white/10"
+            >
+              <div className="flex items-center">
+                <Search className="mr-2 h-4 w-4 text-zinc-500 group-hover:text-zinc-400" />
+                <span>Search company or role...</span>
+              </div>
+              <kbd className="hidden items-center rounded border border-zinc-200 bg-zinc-100 px-2 py-0.5 font-sans text-xs text-zinc-500 sm:inline-flex dark:border-white/10 dark:bg-white/5 dark:text-zinc-400">
+                <abbr title="Command" className="no-underline">⌘</abbr>K
+              </kbd>
+            </button>
+          </div>
         </div>
 
-        {/* Search trigger button */}
-        <div className="relative flex-1 group">
-          <button
-            onClick={() => setPalleteOpen(true)}
-            className="flex w-full items-center justify-between rounded-lg border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 py-1.5 pl-3 pr-2 text-sm text-zinc-500 dark:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-teal-500 hover:bg-zinc-100 dark:hover:bg-white/10 transition-colors"
-          >
-            <div className="flex items-center">
-              <Search className="mr-2 h-4 w-4 text-zinc-500 group-hover:text-zinc-400" />
-              <span>Search company or role...</span>
-            </div>
-            <kbd className="hidden sm:inline-flex items-center rounded border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5 px-2 py-0.5 font-sans text-xs text-zinc-500 dark:text-zinc-400">
-              <abbr title="Command" className="no-underline">⌘</abbr>K
-            </kbd>
-          </button>
-        </div>
-      </div>
+        {/* Body */}
+        {isLoading && (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="h-8 w-8 animate-spin text-violet-400" />
+          </div>
+        )}
 
-      {/* Content */}
-      {isLoading && (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-8 w-8 animate-spin text-violet-400" />
-        </div>
-      )}
-
-      {error && (
-        <div className="flex items-center gap-3 rounded-xl border border-red-600/20 bg-red-50 text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400 px-4 py-3 text-sm">
+        {error && (
+          <div className="m-3 flex items-center gap-3 rounded-md border border-red-600/20 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
             <AlertCircle className="h-5 w-5 shrink-0" />
             <span>Failed to load applications: {error.message}</span>
-        </div>
-      )}
-
-      {!isLoading && !error && filteredApps.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <Target className="mb-4 h-12 w-12 text-zinc-300 dark:text-zinc-700" />
-          <h3 className="text-lg font-medium text-zinc-700 dark:text-zinc-400">
-            No applications found
-          </h3>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-600">
-            {searchQuery
-              ? 'Try adjusting your search or filters'
-              : 'Start by analysing a new job description above'}
-          </p>
-        </div>
-      )}
-
-      {!isLoading && !error && filteredApps.length > 0 && (
-        <>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {paginatedApps.map((app) => (
-              <ApplicationCard
-                key={app.slug}
-                app={app}
-                onClick={() => navigate({ to: '/applications/$slug', params: { slug: app.slug } })}
-              />
-            ))}
           </div>
-          {totalPages > 1 && (
-            <div className="mt-8">
-              <Pagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={setCurrentPage}
-              />
+        )}
+
+        {!isLoading && !error && filteredApps.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <Target className="mb-4 h-12 w-12 text-zinc-300 dark:text-zinc-700" />
+            <h3 className="text-lg font-medium text-zinc-700 dark:text-zinc-400">No applications found</h3>
+            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-600">
+              {searchQuery ? 'Try adjusting your search or filters' : 'Start by analysing a new job description above'}
+            </p>
+          </div>
+        )}
+
+        {!isLoading && !error && filteredApps.length > 0 && (
+          <>
+            {/* Column headers — aligned with ApplicationListRow's grid template. */}
+            <div className="hidden grid-cols-[1.5fr_1.5fr_14rem_9rem] items-center gap-4 border-b border-zinc-200 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-400 dark:border-white/10 dark:text-zinc-500 sm:grid">
+              <span>Company</span>
+              <span>Position</span>
+              <span>Stage</span>
+              <span>Status</span>
             </div>
-          )}
-        </>
-      )}
+            {/* Rows — divided, new applications append under the current ones. */}
+            <div className="divide-y divide-zinc-200 dark:divide-white/10">
+              {paginatedApps.map((app) => (
+                <ApplicationListRow
+                  key={app.slug}
+                  app={app}
+                  onClick={() => navigate({ to: '/applications/$slug', params: { slug: app.slug } })}
+                />
+              ))}
+            </div>
+            {totalPages > 1 && (
+              <div className="border-t border-zinc-200 p-3 dark:border-white/10">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   )
 }

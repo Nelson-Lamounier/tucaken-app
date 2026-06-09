@@ -440,6 +440,30 @@ export interface AnalysisOutput {
   readonly resumeSuggestions: ResumeSuggestions
   /** Generated tailored resume from the Applications Agent */
   readonly tailoredResume?: ResumeData
+  /** ATS check for the persisted tailored resume (resumes.ats_check_json). */
+  readonly atsCheck?: AtsCheckResult | null
+}
+
+/** One JD keyword and whether the tailored resume covers it (grounded = KB-verified). */
+export interface AtsKeywordCoverage {
+  readonly term: string
+  readonly present: boolean
+  readonly grounded: boolean
+}
+
+/**
+ * ATS check result produced by the job-strategist (render resume PDF → parse
+ * back → assert). Mirrors AtsCheckResultSchema in ai-applications.
+ */
+export interface AtsCheckResult {
+  readonly machineReadable: boolean
+  readonly standardSectionsDetected: readonly string[]
+  readonly contactDetected: { readonly name: string; readonly email: string }
+  readonly parseBreakers: readonly string[]
+  readonly jdKeywordCoverage: readonly AtsKeywordCoverage[]
+  readonly status: 'passed' | 'issues' | 'unverified'
+  readonly passed: boolean
+  readonly issues: readonly string[]
 }
 
 /** Interview question from the Coach Agent */

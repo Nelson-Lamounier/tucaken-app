@@ -34,6 +34,7 @@ import {
   getApplication,
   updateApplicationStatus as pgUpdateStatus,
   updateInterviewStage,
+  advanceStatusOffAnalysis,
   deleteApplication as pgDeleteApplication,
   updateApplicationAnnotations,
 } from '../lib/repositories/applications.js';
@@ -256,7 +257,7 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
         jobUrl:         a.jobUrl ?? null,
         fitRating:      null,
         recommendation: null,
-        interviewStage: 'applied',
+        interviewStage: a.interviewStage,
         costUsd:        null,
         appliedAt:      a.appliedAt ?? null,
         createdAt:      a.createdAt ?? null,
@@ -357,11 +358,12 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
       );
 
       const resumeResult = await db.query<{
-        id:           string;
-        content_json: unknown;
-        generated_at: Date;
+        id:             string;
+        content_json:   unknown;
+        ats_check_json: unknown;
+        generated_at:   Date;
       }>(
-        `SELECT id, content_json, generated_at
+        `SELECT id, content_json, ats_check_json, generated_at
            FROM resumes WHERE job_application_id = $1
           ORDER BY generated_at DESC LIMIT 1`,
         [slug],
@@ -445,6 +447,8 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
         metadata:          rawAnalysis['metadata'] ?? null,
         resumeSuggestions: rawAnalysis['resumeSuggestions'] ?? null,
         tailoredResume:    persistedResume ?? rawAnalysis['tailoredResumeData'] ?? null,
+        // ATS check for the persisted tailored resume (resumes.ats_check_json).
+        atsCheck:          resumeResult.rows[0]?.ats_check_json ?? null,
       } : null;
 
       // Map research agent output → ResearchOutput shape.
@@ -594,6 +598,12 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
       }
 
       await upsertStageUserState(db, application.id, stage, body.userState ?? {}, body.scheduleAt ?? null);
+
+      // Scheduling a stage means interview prep has begun — move off the transient
+      // analysis status so the list stops reading "Ready for Review".
+      if (body.scheduleAt) {
+        await advanceStatusOffAnalysis(db, application.id);
+      }
 
       if (body.scheduleAt && isPrepStage(stage)) {
         const { createJob, insertCoachRunAdapter } = makeCoachAdapters(config, slug);
