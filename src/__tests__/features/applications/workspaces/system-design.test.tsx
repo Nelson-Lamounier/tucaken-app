@@ -31,7 +31,10 @@ describe('SystemDesignWorkspace', () => {
         </WorkspaceShell>
       </QueryClientProvider>,
     )
-    expect(screen.getByText('Schedule & format')).toBeTruthy()
+    // Schedule & format now lives in the dashboard glance (shared draft via
+    // StageDraftProvider), not the workspace.
+    expect(screen.queryByText('Schedule & format')).toBeNull()
     expect(screen.getByText('Your own system design work')).toBeTruthy()
+    expect(screen.getByText('Framework to have ready')).toBeTruthy()
   })
 })

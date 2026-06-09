@@ -1,8 +1,9 @@
-import { CheckCircle2, AlertTriangle, XCircle, Target, Sparkles } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, XCircle, Target, Sparkles, Handshake } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { Tone } from '@/components/ui/tone'
 import type {
   ApplicationDetail,
+  ApplicationStatus,
   InterviewStage,
   FitRating,
   StageState,
@@ -56,6 +57,25 @@ function fitTile(detail: ApplicationDetail): GlanceTileData {
     icon: Target,
     meter: { level: FIT_LEVEL[rating], max: 4 },
   }
+}
+
+const OFFER_STATUS_TILE: Partial<Record<ApplicationStatus, { value: string; tone: Tone; sub: string }>> = {
+  'offer-received': { value: 'Received', tone: 'accent', sub: 'Evaluate & decide' },
+  accepted: { value: 'Accepted', tone: 'good', sub: 'Offer accepted' },
+  rejected: { value: 'Declined', tone: 'muted', sub: 'Offer declined' },
+  withdrawn: { value: 'Withdrawn', tone: 'muted', sub: 'You withdrew' },
+}
+
+const OFFER_PENDING: { value: string; tone: Tone; sub: string } = {
+  value: 'Pending',
+  tone: 'muted',
+  sub: 'Awaiting the offer',
+}
+
+/** Offer/decision status tile — the final stage's left-hand glance tile. */
+export function offerStatusTile(detail: ApplicationDetail): GlanceTileData {
+  const meta = OFFER_STATUS_TILE[detail.status] ?? OFFER_PENDING
+  return { key: 'offer-status', label: 'Offer', value: meta.value, name: 'Offer', sub: meta.sub, tone: meta.tone, icon: Handshake }
 }
 
 function gapTone(gapCount: number, disqualifying: number): Tone {

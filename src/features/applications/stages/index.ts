@@ -36,7 +36,7 @@ export type { StageDraft } from './hooks/useStageDraft'
 export { useStoryBank } from './hooks/useStoryBank'
 export type { StoryDraft } from './hooks/useStoryBank'
 export { useOfferDraft, personalFitScore } from './hooks/useOfferDraft'
-export type { OfferComponents, OfferDraft, DecisionFactor } from './hooks/useOfferDraft'
+export type { OfferDraft, DecisionFactor } from './hooks/useOfferDraft'
 
 export {
   STAGE_ORDER,

@@ -60,6 +60,7 @@ jest.unstable_mockModule('../../src/lib/repositories/interview-stages.js', () =>
   markNotApplicable:     markNotApplicableMock,
   linkCoachRun:          linkCoachRunMock,
   getStagesForApp:       getStagesForAppMock,
+  listScheduledInterviews: jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
   reconcilePrepStatus:   jest.fn(),
   advanceStageLifecycle: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
   STAGE_OUTCOMES:        ['advanced', 'rejected', 'withdrew', 'not_completed', 'skipped'],

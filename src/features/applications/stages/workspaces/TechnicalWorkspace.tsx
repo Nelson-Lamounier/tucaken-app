@@ -8,8 +8,6 @@ import type { ApplicationDetail } from '@/lib/types/applications.types'
 import { TONE, type Tone } from '@/components/ui/tone'
 import { Card } from '@/components/ui/Card'
 import { EvidenceDeck, type EvidenceCard } from '../components/EvidenceDeck'
-import { CoachingGuidance } from '../components/CoachingSections'
-import { parseCoachingSections } from '../lib/coaching-sections'
 import { SummaryGroup, SummaryRow, RailField, RailBullets, RailRichText } from '../components/workspace-shell'
 import { researchToTopics, resolveStagePrep, type EvidenceStrength } from '../types/workspace'
 import type {
@@ -570,7 +568,6 @@ function coachPrepFields(prep: ReturnType<typeof resolveStagePrep>) {
   return {
     technicalQuestions,
     questionsToAsk,
-    coachingSections: parseCoachingSections(prep?.coachingNotes),
     showTechnicalQuestions: technicalQuestions.length > 0,
     showQuestionsToAsk: questionsToAsk.length > 0,
   }
@@ -702,9 +699,7 @@ export function TechnicalWorkspace({ detail }: TechnicalWorkspaceProps) {
 
       <TechnicalCoachSupplements data={data} />
 
-      {/* Coaching guidance — positioning lives above the dashboards; these are the
-          remaining coach sections, split into focused collapsible groups. */}
-      <CoachingGuidance sections={data.coachingSections} appKey={{ slug: detail.slug, stage: 'technical' }} />
+      {/* Coaching notes render as the page intro (StageCoachingNarrative), not here. */}
 
       {data.showDevops && (
         <DevopsGroup topics={data.devopsEvidence} matchesRole={data.focusPillars.has('devops-sre-platform')} />
