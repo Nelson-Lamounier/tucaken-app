@@ -39,7 +39,7 @@ import {
  * in a StageDraftProvider so the panel and the workspace share one persisted
  * draft. Phone-screen and technical mirror this layout.
  */
-const STAGE_USES_DRAFT_PROVIDER = new Set<InterviewStage>(['phone-screen', 'technical', 'system-design', 'behavioural'])
+const STAGE_USES_DRAFT_PROVIDER = new Set<InterviewStage>(['phone-screen', 'technical', 'system-design', 'behavioural', 'bar-raiser'])
 
 /** Returns the bare workspace node for a stage — no gate, no callbacks. */
 function stageWorkspaceNode(stage: InterviewStage, detail: ApplicationDetail) {

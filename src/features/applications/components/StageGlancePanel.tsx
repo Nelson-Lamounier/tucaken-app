@@ -2,11 +2,11 @@
 
 import { useEffect, type ReactNode } from 'react'
 import { motion, useReducedMotion, useMotionValue, useTransform, animate } from 'motion/react'
-import { PieChart, Gauge, CheckCircle2, Circle, ListChecks, CalendarClock, Route } from 'lucide-react'
+import { PieChart, Gauge, CheckCircle2, Circle, ListChecks, CalendarClock, Route, Handshake, Target, ShieldCheck, TrendingUp } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { TONE, type Tone } from '@/components/ui/tone'
 import type { ApplicationDetail, InterviewStage } from '@/lib/types/applications.types'
-import { stageGlanceTiles, type GlanceTileData } from '../lib/stage-glance'
+import { stageGlanceTiles, offerStatusTile, type GlanceTileData } from '../lib/stage-glance'
 import { resolveStagePrep } from '../stages/types/workspace'
 import { ScheduleCard } from '../stages/components/ScheduleCard'
 import { useStageDraftContext } from '../stages/hooks/stage-draft-context'
@@ -509,25 +509,31 @@ const TECHNICAL_WHAT_TO_EXPECT: readonly string[] = [
 ]
 
 /**
- * The "what to expect" descriptions — the right panel paired with the readiness
- * ring. Prefers the coach's parsed "interview will focus on" items (bold label +
- * detail) when present; otherwise falls back to the honest static list.
+ * The "what to expect" panel paired with the readiness ring. Prefers the coach's
+ * tailored `stageDescription` (prose) when present; otherwise falls back to the
+ * honest static list.
  */
-function WhatToExpectPanel({ items }: { readonly items: readonly string[] }) {
+function WhatToExpectPanel({ items, description }: { readonly items: readonly string[]; readonly description?: string | null }) {
   return (
     <div className={`flex h-full flex-col ${SURFACE}`}>
       <div className="flex items-center gap-2">
         <ListChecks className="size-5 text-accent" />
         <span className="text-[10px] font-medium uppercase text-zinc-400 dark:text-zinc-500">What to expect</span>
       </div>
-      <ul className="mt-4 flex flex-1 flex-col justify-center gap-4">
-        {items.map(item => (
-          <li key={item} className="flex items-start gap-3 text-sm text-zinc-700 dark:text-zinc-300">
-            <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
-            <span className="leading-relaxed">{item}</span>
-          </li>
-        ))}
-      </ul>
+      {description && description.trim().length > 0 ? (
+        <p className="mt-4 flex-1 overflow-y-auto whitespace-pre-line text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">
+          {description.trim()}
+        </p>
+      ) : (
+        <ul className="mt-4 flex flex-1 flex-col justify-center gap-4">
+          {items.map(item => (
+            <li key={item} className="flex items-start gap-3 text-sm text-zinc-700 dark:text-zinc-300">
+              <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-accent" aria-hidden />
+              <span className="leading-relaxed">{item}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
@@ -586,17 +592,19 @@ function GlanceGrid({ stageKey, left, right }: { readonly stageKey: string; read
 /** Right column shared by readiness-led stages: [What to expect | Schedule] + optional narrative. */
 function ExpectScheduleColumn({
   expectations,
+  description,
   schedulePlaceholder,
   narrative,
 }: {
   readonly expectations: readonly string[]
+  readonly description?: string | null
   readonly schedulePlaceholder: string
   readonly narrative: ReactNode
 }) {
   return (
     <motion.div variants={TILE} style={{ willChange: 'transform' }} className="flex flex-col gap-4 lg:col-span-2">
       <div className="grid gap-4 sm:grid-cols-2">
-        <WhatToExpectPanel items={expectations} />
+        <WhatToExpectPanel items={expectations} description={description} />
         <SchedulePanel placeholder={schedulePlaceholder} />
       </div>
       {narrative}
@@ -606,7 +614,7 @@ function ExpectScheduleColumn({
 
 /** Phone-screen glance — readiness ring + expectations/schedule + career-arc narrative. */
 function PhoneScreenGlance({ detail }: { readonly detail: ApplicationDetail }) {
-  const careerArc = resolveStagePrep(detail, 'phone-screen')?.careerArcSummary
+  const prep = resolveStagePrep(detail, 'phone-screen')
   return (
     <GlanceGrid
       stageKey="phone-screen"
@@ -614,8 +622,9 @@ function PhoneScreenGlance({ detail }: { readonly detail: ApplicationDetail }) {
       right={
         <ExpectScheduleColumn
           expectations={PHONE_WHAT_TO_EXPECT}
+          description={prep?.stageDescription}
           schedulePlaceholder="e.g. 30 min · recruiter Jane Doe"
-          narrative={careerArc ? <NarrativePanel icon={Route} label="Your career arc" summary={careerArc} /> : null}
+          narrative={prep?.careerArcSummary ? <NarrativePanel icon={Route} label="Your career arc" summary={prep.careerArcSummary} /> : null}
         />
       }
     />
@@ -631,6 +640,7 @@ function TechnicalGlance({ detail }: { readonly detail: ApplicationDetail }) {
       right={
         <ExpectScheduleColumn
           expectations={TECHNICAL_WHAT_TO_EXPECT}
+          description={resolveStagePrep(detail, 'technical')?.stageDescription}
           schedulePlaceholder="e.g. 30m coding + 30m systems discussion"
           narrative={null}
         />
@@ -640,11 +650,11 @@ function TechnicalGlance({ detail }: { readonly detail: ApplicationDetail }) {
 }
 
 /** Behavioural glance — [What to expect | Schedule] side by side. */
-function BehaviouralGlance() {
+function BehaviouralGlance({ detail }: { readonly detail: ApplicationDetail }) {
   return (
     <motion.div key="behavioural" className="grid gap-4 sm:grid-cols-2" variants={GRID} initial="hidden" animate="show">
       <motion.div variants={TILE} style={{ willChange: 'transform' }}>
-        <WhatToExpectPanel items={BEHAVIOURAL_WHAT_TO_EXPECT} />
+        <WhatToExpectPanel items={BEHAVIOURAL_WHAT_TO_EXPECT} description={resolveStagePrep(detail, 'behavioural')?.stageDescription} />
       </motion.div>
       <motion.div variants={TILE} style={{ willChange: 'transform' }}>
         <SchedulePanel placeholder="e.g. 45m behavioural" />
@@ -696,15 +706,143 @@ function SystemDesignGlance({ detail }: { readonly detail: ApplicationDetail }) 
 }
 
 /**
+ * Bar-raiser glance — like system-design: the research evidence is omitted;
+ * Schedule & format (left) sits side by side with the prep-status tile (right).
+ */
+function BarRaiserGlance({ detail }: { readonly detail: ApplicationDetail }) {
+  const prepTile = stageGlanceTiles('bar-raiser', detail).find(tile => tile.key === 'prep')
+  return (
+    <motion.div key="bar-raiser" className="grid gap-4 sm:grid-cols-2" variants={GRID} initial="hidden" animate="show">
+      <motion.div variants={TILE} style={{ willChange: 'transform' }}>
+        <SchedulePanel placeholder="e.g. 60m leadership principles" />
+      </motion.div>
+      {prepTile && (
+        <motion.div variants={TILE} style={{ willChange: 'transform' }}>
+          <GlanceTile tile={prepTile} />
+        </motion.div>
+      )}
+    </motion.div>
+  )
+}
+
+/** One negotiation-leverage point — icon + a bold metric + the statement. */
+interface LeverageSignal {
+  readonly key: string
+  readonly icon: LucideIcon
+  readonly value: string
+  readonly label: string
+}
+
+/**
+ * The real negotiation-leverage data: a candidate's strongest factual bargaining
+ * points, mirroring `negotiationLeverage` (strong fit, verified skills, scale).
+ */
+function leverageSignals(detail: ApplicationDetail): LeverageSignal[] {
+  const research = detail.research
+  if (!research) return []
+  const out: LeverageSignal[] = []
+  if (research.fitRating === 'STRONG_FIT') {
+    out.push({ key: 'fit', icon: Target, value: 'Strong fit', label: "You clear the role's core bar — rated a strong match." })
+  }
+  const verified = research.verifiedMatches?.length ?? 0
+  if (verified > 0) {
+    out.push({ key: 'verified', icon: ShieldCheck, value: `${verified} verified`, label: 'Required skills proven directly in your work — not just claimed.' })
+  }
+  const scale = research.experienceSignals?.scale
+  if (scale) {
+    out.push({ key: 'scale', icon: TrendingUp, value: scale, label: 'Demonstrated impact at this scale.' })
+  }
+  return out
+}
+
+/**
+ * Negotiation-leverage panel — the tall left dashboard panel for the final stage.
+ * Renders each leverage point as an icon-led card (bold metric + statement); the
+ * count drives a "N points" summary. Honest empty state before analysis.
+ */
+function LeveragePanel({ detail }: { readonly detail: ApplicationDetail }) {
+  const signals = leverageSignals(detail)
+  return (
+    <div className={`flex h-full flex-col ${SURFACE}`}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Handshake className="size-5 text-accent" />
+          <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">Negotiation leverage</span>
+        </div>
+        {signals.length > 0 && (
+          <span className="text-xs font-semibold tabular-nums text-accent">
+            {signals.length} {signals.length === 1 ? 'point' : 'points'}
+          </span>
+        )}
+      </div>
+
+      {signals.length === 0 ? (
+        <p className="mt-4 flex flex-1 items-center justify-center text-center text-sm text-zinc-500 dark:text-zinc-400">
+          Leverage points appear once the Research Agent has analysed this application.
+        </p>
+      ) : (
+        <ul className="mt-4 flex flex-1 flex-col justify-center gap-3">
+          {signals.map(signal => (
+            <li
+              key={signal.key}
+              className="flex items-start gap-3 rounded-md bg-white p-3 ring-1 ring-zinc-200 shadow-sm dark:bg-white/2 dark:ring-0 dark:inset-ring dark:inset-ring-white/10 dark:shadow-none"
+            >
+              <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-accent/12 text-accent">
+                <signal.icon className="size-4" aria-hidden />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{signal.value}</p>
+                <p className="text-xs leading-relaxed text-zinc-600 dark:text-zinc-300">{signal.label}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Final glance — the offer/decision stage. The negotiation-leverage panel (the
+ * candidate's strongest bargaining points) on the left; the offer-status and
+ * "Stage 7 of 7" prep tiles on the right. The offer decision lives in the header
+ * actions menu (ApplicationActionsMenu), not here.
+ */
+function FinalGlance({ detail }: { readonly detail: ApplicationDetail }) {
+  const prepTile = stageGlanceTiles('final', detail).find(tile => tile.key === 'prep')
+  return (
+    <GlanceGrid
+      stageKey="final"
+      left={<LeveragePanel detail={detail} />}
+      right={
+        <motion.div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:col-span-2">
+          <motion.div variants={TILE} style={{ willChange: 'transform' }}>
+            <GlanceTile tile={offerStatusTile(detail)} />
+          </motion.div>
+          {prepTile && (
+            <motion.div variants={TILE} style={{ willChange: 'transform' }}>
+              <GlanceTile tile={prepTile} />
+            </motion.div>
+          )}
+        </motion.div>
+      }
+    />
+  )
+}
+
+/**
  * KB-style "at a glance" dashboard panel for the active stage. Phone-screen and
  * technical lead with a readiness ring + [What to expect | Schedule] + a coach
- * narrative; system-design shows only its prep-status tile; the remaining stages
- * show the skill-coverage donut + 2×2 stat tiles.
+ * narrative; system-design and bar-raiser show [Schedule | prep-status]; final
+ * shows [offer-status | prep-status]; the remaining stages show the
+ * skill-coverage donut + 2×2 stat tiles.
  */
 export function StageGlancePanel({ detail, stage }: StageGlancePanelProps) {
   if (stage === 'phone-screen') return <PhoneScreenGlance detail={detail} />
   if (stage === 'technical') return <TechnicalGlance detail={detail} />
   if (stage === 'system-design') return <SystemDesignGlance detail={detail} />
-  if (stage === 'behavioural') return <BehaviouralGlance />
+  if (stage === 'behavioural') return <BehaviouralGlance detail={detail} />
+  if (stage === 'bar-raiser') return <BarRaiserGlance detail={detail} />
+  if (stage === 'final') return <FinalGlance detail={detail} />
   return <ResearchGlance detail={detail} stage={stage} />
 }

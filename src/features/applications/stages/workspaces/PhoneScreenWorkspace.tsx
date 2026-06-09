@@ -104,14 +104,15 @@ interface CompConversationGroupProps {
   readonly onTargetChange: (value: string) => void
 }
 
-/** Comp conversation — an editable, persisted control; rendered inline (not a row). */
+/** Comp conversation — static inline section (no dropdown); editable, persisted target. */
 function CompConversationGroup({ compScript, compTarget, onTargetChange }: CompConversationGroupProps) {
   const deflect =
     compScript?.deflectTemplate ??
     `I'm focused on finding the right fit. Based on the role and my experience I'm targeting ${compTarget.trim() || '[your target]'} — is that in range?`
   return (
-    <SummaryGroup id="comp" title="Comp conversation">
-      <Card className="space-y-4 p-4">
+    <section className="space-y-3 rounded-md border border-zinc-200 bg-zinc-50/50 p-4 dark:border-white/10 dark:bg-white/2">
+      <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Comp conversation</h3>
+      <div className="space-y-4 rounded-md bg-white p-4 ring-1 ring-zinc-200 shadow-sm dark:bg-white/2 dark:ring-0 dark:inset-ring dark:inset-ring-white/10 dark:shadow-none">
         {compScript ? (
           <>
             <p className="text-sm text-zinc-700 dark:text-zinc-300">{compScript.targetEcho}</p>
@@ -138,11 +139,11 @@ function CompConversationGroup({ compScript, compTarget, onTargetChange }: CompC
             className="block w-full rounded-md border-0 bg-zinc-50 p-2 text-sm text-zinc-900 shadow-sm ring-1 ring-inset ring-zinc-300 focus:ring-2 focus:ring-inset focus:ring-teal-500 dark:bg-white/5 dark:text-white dark:ring-white/10"
           />
         </div>
-        <p className="rounded-lg bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:bg-white/5 dark:text-zinc-400">
+        <p className="rounded-md bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:bg-white/5 dark:text-zinc-400">
           Suggested response: &ldquo;{deflect}&rdquo;
         </p>
-      </Card>
-    </SummaryGroup>
+      </div>
+    </section>
   )
 }
 

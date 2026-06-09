@@ -4,12 +4,10 @@ import { useMemo, useState } from 'react'
 import { PenLine } from 'lucide-react'
 import type { ApplicationDetail } from '@/lib/types/applications.types'
 import { Card } from '@/components/ui/Card'
-import { ScheduleCard } from '../components/ScheduleCard'
 import { EvidenceIndicator } from '../components/EvidenceIndicator'
 import { StoryCard } from '../components/StoryCard'
 import { StoryForm } from '../components/StoryForm'
 import { SummaryGroup, SummaryRow } from '../components/workspace-shell'
-import { useStageDraft } from '../hooks/useStageDraft'
 import { useStoryBank } from '../hooks/useStoryBank'
 import {
   LEADERSHIP_PRINCIPLES,
@@ -116,8 +114,8 @@ function ValuesMatrixGroup({
  * the StoryForm overlay sits at the fragment root.
  */
 export function BarRaiserWorkspace({ detail }: BarRaiserWorkspaceProps) {
-  const stageUserState = detail.stages?.['bar-raiser']?.user_state as Partial<import('../hooks/useStageDraft').StageDraft> | undefined
-  const { draft, setSchedule } = useStageDraft(detail.slug, 'bar-raiser', stageUserState)
+  // Schedule & format is edited from the dashboard SchedulePanel (shared draft via
+  // StageDraftProvider), so the workspace no longer owns a stage-draft instance.
   const { stories, addStory } = useStoryBank(detail.slug)
 
   const [draftThemes, setDraftThemes] = useState<readonly StoryTheme[] | null>(null)
@@ -143,10 +141,6 @@ export function BarRaiserWorkspace({ detail }: BarRaiserWorkspaceProps) {
 
   return (
     <>
-      <SummaryGroup id="schedule" title="Schedule & format">
-        <ScheduleCard scheduleAt={draft.scheduleAt} formatNote={draft.formatNote} onChange={setSchedule} formatPlaceholder="e.g. 60m leadership principles" />
-      </SummaryGroup>
-
       {walkthrough.length > 0 && <BarRaiserWalkthrough cards={walkthrough} coverage={coverage} />}
 
       <ValuesMatrixGroup rows={rows} onDraft={draftFrom} />

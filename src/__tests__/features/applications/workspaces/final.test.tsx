@@ -25,6 +25,8 @@ describe('FinalWorkspace', () => {
         </WorkspaceShell>
       </QueryClientProvider>,
     )
-    expect(screen.getByText('The offer')).toBeTruthy()
+    // Compensation figures are no longer collected (PII / contract compliance).
+    expect(screen.queryByText('The offer')).toBeNull()
+    expect(screen.getByText('Your decision factors')).toBeTruthy()
   })
 })
