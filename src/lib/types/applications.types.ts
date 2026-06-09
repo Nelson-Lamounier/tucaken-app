@@ -57,6 +57,21 @@ export type InterviewStage =
   | 'final'
 
 /**
+ * A scheduled interview stage joined to its application — powers the calendar.
+ * `slug` is the application id (the `/applications/$slug` route param).
+ */
+export interface ScheduledInterview {
+  readonly slug: string
+  readonly company: string
+  readonly role: string
+  readonly status: ApplicationStatus
+  readonly stage: InterviewStage
+  readonly stageStatus: string
+  /** ISO 8601 timestamp the user scheduled (interview_stages.scheduled_at). */
+  readonly scheduledAt: string
+}
+
+/**
  * Overall fit rating assigned by the Research Agent.
  * Determines the colour-coding on dashboard cards.
  */
