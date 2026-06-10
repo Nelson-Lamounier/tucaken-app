@@ -6,7 +6,11 @@ import { DashboardPage } from '@/components/layouts/DashboardPage'
 
 export const Route = createFileRoute('/_dashboard/applications/new')({
   // Prefetch the resume list so the picker resolves on first render (no skeleton flash).
-  loader: ({ context }) => context.queryClient.ensureQueryData(resumeVersionsQueryOptions()),
+  // Return void — the SSR-query integration dehydrates the cache; returning the
+  // data as loader output would double-serialize it and break deserialization.
+  loader: async ({ context }) => {
+    await context.queryClient.ensureQueryData(resumeVersionsQueryOptions())
+  },
   component: ApplicationsNewRoute,
 })
 
