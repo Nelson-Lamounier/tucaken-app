@@ -40,8 +40,10 @@ describe('ProgressBars onComplete', () => {
     const onComplete = vi.fn()
     render(<ProgressBars slug="app-1" startedAt={Date.now()} onComplete={onComplete} />)
 
+    // Held briefly so the "Done" state is visible, then fires.
+    vi.advanceTimersByTime(1_000)
     expect(onComplete).not.toHaveBeenCalled()
-    vi.advanceTimersByTime(1_300)
+    vi.advanceTimersByTime(1_000)
     expect(onComplete).toHaveBeenCalledTimes(1)
   })
 

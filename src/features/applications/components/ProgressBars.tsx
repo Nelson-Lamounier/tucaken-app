@@ -134,7 +134,7 @@ export function ProgressBars({
   // user register the "Resume ready" state before redirecting.
   useEffect(() => {
     if (!isFinished || isFailed || !onComplete) return
-    const t = setTimeout(onComplete, 1_200)
+    const t = setTimeout(onComplete, 1_800)
     return () => clearTimeout(t)
   }, [isFinished, isFailed, onComplete])
 
@@ -192,6 +192,34 @@ export function ProgressBars({
     : isFinished
     ? 'Your tailored resume and analysis are ready.'
     : 'This usually takes 4–6 minutes. You can leave this page.'
+
+  // ── Success state ─────────────────────────────────────────────────────────
+  // A clear "Done" moment with a success icon, held briefly before the parent
+  // (modal) auto-advances to the results page.
+  if (isFinished && !isFailed) {
+    return (
+      <div className="flex flex-col items-center gap-5 w-full max-w-2xl mx-auto px-6 py-16 sm:px-10 text-center">
+        <span className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 ring-1 ring-emerald-600/20 dark:bg-emerald-500/15 dark:ring-emerald-500/30">
+          <CheckCircle2 className="h-9 w-9 text-emerald-600 dark:text-emerald-400" />
+        </span>
+        <div>
+          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Done</h3>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            Your tailored resume and analysis are ready.
+          </p>
+        </div>
+        <Link
+          to="/applications/$slug"
+          params={{ slug }}
+          className="inline-flex items-center gap-1.5 rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
+        >
+          View results
+          <span aria-hidden="true">→</span>
+        </Link>
+        <p className="text-xs text-zinc-400 dark:text-zinc-500">Taking you to your results…</p>
+      </div>
+    )
+  }
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
