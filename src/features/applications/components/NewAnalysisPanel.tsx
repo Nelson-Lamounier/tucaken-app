@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { AlertCircle, Loader2 } from 'lucide-react'
+import { AlertCircle, Loader2, X } from 'lucide-react'
 import { useForm } from '@tanstack/react-form'
 import { useApplicationsTrigger } from '../hooks/use-applications-trigger'
 import { usePipelineNotificationsStore } from '@/lib/stores/pipeline-notifications-store'
@@ -7,7 +7,7 @@ import type { InterviewStage } from '@/lib/types/applications.types'
 import { MIN_JD_LENGTH } from './ApplicationTypes'
 import { FormInput } from '@/components/ui/Field'
 import { Button } from '@/components/ui/Button'
-import { ProgressBars } from './ProgressBars'
+import { AnalysisProgressModal } from './AnalysisProgressModal'
 import { ResumeMenuSelect } from './ResumeMenuSelect'
 
 function DraftSaver({ values }: { readonly values: Record<string, unknown> }) {
@@ -34,6 +34,15 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
   const addNotification = usePipelineNotificationsStore((s) => s.addNotification)
   const [submittedSlug, setSubmittedSlug] = useState<string | null>(null)
   const [submittedRunId, setSubmittedRunId] = useState<string | null>(null)
+  const [submittedAt, setSubmittedAt] = useState<number | null>(null)
+  const [isProgressOpen, setIsProgressOpen] = useState(false)
+
+  const clearSubmission = () => {
+    setSubmittedSlug(null)
+    setSubmittedRunId(null)
+    setSubmittedAt(null)
+    setIsProgressOpen(false)
+  }
 
   const [initialDraft] = useState(() => {
     if (typeof window === 'undefined') return null
@@ -60,6 +69,8 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
         localStorage.removeItem('application-form-draft')
         form.reset()
         setSubmittedSlug(`mock-${Date.now()}`)
+        setSubmittedAt(Date.now())
+        setIsProgressOpen(true)
         return
       }
 
@@ -81,6 +92,8 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
             form.reset()
             setSubmittedSlug(data.applicationId)
             setSubmittedRunId(data.pipelineRunId)
+            setSubmittedAt(Date.now())
+            setIsProgressOpen(true)
             addNotification({
               type: 'application',
               slug: data.applicationId,
@@ -88,7 +101,7 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
               status: 'running',
               link: `/applications/${encodeURIComponent(data.applicationId)}`,
             })
-            // Navigation is handed off to ProgressBars via submittedSlug
+            // Progress is shown via AnalysisProgressModal (opened above)
           },
         },
       )
@@ -108,15 +121,8 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
     return () => window.removeEventListener('application-retry', handleRetry)
   }, [form])
 
-  if (submittedSlug) {
-    return (
-      <div className="mb-8 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-white/10 dark:bg-white/5 shadow-sm">
-        <ProgressBars slug={submittedSlug} pipelineRunId={submittedRunId ?? undefined} />
-      </div>
-    )
-  }
-
   return (
+    <>
     <div className="mb-8 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-white/10 dark:bg-white/5 shadow-sm">
       <div className="flex items-center justify-between gap-4 px-6 py-5 border-b border-zinc-200 dark:border-white/10">
         <div className="min-w-0">
@@ -317,5 +323,37 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
           />
         </form>
     </div>
+
+    {submittedSlug && (
+      <div className="fixed bottom-6 right-6 z-30 flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-2 shadow-lg dark:border-white/10 dark:bg-zinc-900">
+        <button
+          type="button"
+          onClick={() => setIsProgressOpen(true)}
+          className="inline-flex items-center gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-200"
+        >
+          <Loader2 className="size-4 animate-spin text-teal-600 dark:text-teal-400" />
+          View progress
+        </button>
+        <button
+          type="button"
+          onClick={clearSubmission}
+          aria-label="Dismiss analysis progress"
+          className="rounded-full p-0.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+    )}
+
+    {submittedSlug && submittedAt !== null && (
+      <AnalysisProgressModal
+        isOpen={isProgressOpen}
+        onClose={() => setIsProgressOpen(false)}
+        slug={submittedSlug}
+        pipelineRunId={submittedRunId ?? undefined}
+        startedAt={submittedAt}
+      />
+    )}
+    </>
   )
 }
