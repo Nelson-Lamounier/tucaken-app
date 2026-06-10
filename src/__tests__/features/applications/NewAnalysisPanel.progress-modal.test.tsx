@@ -51,23 +51,17 @@ describe('NewAnalysisPanel progress modal', () => {
     localStorage.clear()
   })
 
-  it('auto-opens the modal on submit, then toggles via close / pill / dismiss', async () => {
+  it('auto-opens the modal on submit and closes it on dismiss', async () => {
     render(<NewAnalysisPanel resumeId="resume-1" onResumeChange={vi.fn()} />)
 
     fillAndTestSubmit()
 
+    // Auto-opens on submit.
     await waitFor(() => expect(screen.getByTestId('progress-modal')).toBeTruthy())
 
+    // Closing the modal hides it. Tracking/return is handled by the Pipeline
+    // Notifications bell (no separate in-page pill).
     fireEvent.click(screen.getByRole('button', { name: 'close-modal' }))
     expect(screen.queryByTestId('progress-modal')).toBeNull()
-    const pill = screen.getByRole('button', { name: /View progress/i })
-    expect(pill).toBeTruthy()
-
-    fireEvent.click(pill)
-    expect(screen.getByTestId('progress-modal')).toBeTruthy()
-
-    fireEvent.click(screen.getByRole('button', { name: /Dismiss analysis progress/i }))
-    expect(screen.queryByTestId('progress-modal')).toBeNull()
-    expect(screen.queryByRole('button', { name: /View progress/i })).toBeNull()
   })
 })
