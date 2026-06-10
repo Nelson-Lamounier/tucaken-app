@@ -59,11 +59,23 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
     },
     onSubmit: async ({ value }) => {
       if (value.testMode) {
+        const mockCompany = value.targetCompany.trim()
+        const mockRole = value.targetRole.trim()
+        const mockSlug = `mock-${Date.now()}`
         localStorage.removeItem('application-form-draft')
         form.reset()
-        setSubmittedSlug(`mock-${Date.now()}`)
+        setSubmittedSlug(mockSlug)
         setSubmittedAt(Date.now())
         setIsProgressOpen(true)
+        // Register the run in the notification bell too (the mock detail endpoint
+        // drives it running → ready). Link to the list since the mock app has no page.
+        addNotification({
+          type: 'application',
+          slug: mockSlug,
+          label: `${mockCompany} — ${mockRole} (test)`,
+          status: 'running',
+          link: '/applications/list',
+        })
         return
       }
 
