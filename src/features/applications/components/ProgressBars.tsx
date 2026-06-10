@@ -181,7 +181,7 @@ export function ProgressBars({
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col gap-7 w-full max-w-2xl mx-auto px-4 py-8">
+    <div className="flex flex-col gap-8 w-full px-6 py-10 sm:px-10">
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
