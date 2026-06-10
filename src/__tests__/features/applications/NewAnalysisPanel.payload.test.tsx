@@ -16,11 +16,6 @@ vi.mock('@/features/applications/components/ResumeMenuSelect', () => ({
   ResumeMenuSelect: () => <div data-testid="resume-menu" />,
 }))
 
-// Panel reads the resume list for its header copy — stub it (no QueryClient in this test).
-vi.mock('@/features/applications/hooks/use-resume-versions', () => ({
-  useResumeVersions: () => ({ data: undefined, isLoading: false }),
-}))
-
 vi.mock('@/lib/stores/pipeline-notifications-store', () => ({
   usePipelineNotificationsStore: (selector: (s: unknown) => unknown) =>
     selector({ addNotification: vi.fn() }),

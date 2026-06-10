@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { AlertCircle, Loader2 } from 'lucide-react'
 import { useForm } from '@tanstack/react-form'
 import { useApplicationsTrigger } from '../hooks/use-applications-trigger'
-import { useResumeVersions } from '../hooks/use-resume-versions'
 import { usePipelineNotificationsStore } from '@/lib/stores/pipeline-notifications-store'
 import type { InterviewStage } from '@/lib/types/applications.types'
 import { MIN_JD_LENGTH } from './ApplicationTypes'
@@ -18,9 +17,8 @@ function DraftSaver({ values }: { readonly values: Record<string, unknown> }) {
   return null
 }
 
-/** Header copy that adapts to whether a resume is selected, scratch, or the user has none. */
-function getSubtitle(hasNoResumes: boolean, resumeId: string | null): string {
-  if (hasNoResumes) return 'You have no resumes yet — the agent will build one from scratch.'
+/** Header copy that adapts to whether the agent builds from scratch or uses a selected resume. */
+function getSubtitle(resumeId: string | null): string {
   if (resumeId === '') return 'The agent will build your resume from scratch.'
   return 'Paste a job description to analyse against your selected resume.'
 }
@@ -34,8 +32,6 @@ export interface NewAnalysisPanelProps {
 export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelProps) {
   const trigger = useApplicationsTrigger()
   const addNotification = usePipelineNotificationsStore((s) => s.addNotification)
-  const { data: resumeVersions } = useResumeVersions()
-  const hasNoResumes = Array.isArray(resumeVersions) && resumeVersions.length === 0
   const [submittedSlug, setSubmittedSlug] = useState<string | null>(null)
   const [submittedRunId, setSubmittedRunId] = useState<string | null>(null)
 
@@ -128,7 +124,7 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
             Analyse New Job Description
           </h2>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            {getSubtitle(hasNoResumes, resumeId)}
+            {getSubtitle(resumeId)}
           </p>
         </div>
         <div className="flex-none">
@@ -149,96 +145,96 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
             children={(values) => <DraftSaver values={values} />}
           />
 
-          {/* Company + Role row */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <form.Field
-              name="targetCompany"
-              children={(field) => (
-                <FormInput
-                  field={field}
-                  label="Target Company"
-                  placeholder="e.g. Revolut"
-                />
-              )}
-            />
-            <form.Field
-              name="targetRole"
-              children={(field) => (
-                <FormInput
-                  field={field}
-                  label="Target Role"
-                  placeholder="e.g. Senior DevOps Engineer"
-                />
-              )}
-            />
-          </div>
-
-          {/* Options row */}
-          <div className="mt-5 flex flex-wrap items-center gap-6 px-1">
-            <div className="flex items-center gap-2">
+          {/* Side-by-side: target details + options (left), job description (right) */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* Left column: target details + options */}
+            <div className="space-y-4">
               <form.Field
-                name="includeCoverLetter"
+                name="targetCompany"
                 children={(field) => (
-                  <input
-                    id={field.name}
-                    name={field.name}
-                    type="checkbox"
-                    checked={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.checked)}
-                    className="h-4 w-4 rounded border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-800 text-indigo-600 focus:ring-indigo-500/20 focus:ring-offset-0 focus:ring-offset-white dark:focus:ring-offset-zinc-900"
+                  <FormInput
+                    field={field}
+                    label="Target Company"
+                    placeholder="e.g. Revolut"
                   />
                 )}
               />
-              <label htmlFor="includeCoverLetter" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Generate Cover Letter
-              </label>
-            </div>
-
-            <div className="flex items-center gap-2">
               <form.Field
-                name="testMode"
+                name="targetRole"
                 children={(field) => (
-                  <input
-                    id={field.name}
-                    name={field.name}
-                    type="checkbox"
-                    checked={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.checked)}
-                    className="h-4 w-4 rounded border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-800 text-emerald-500 focus:ring-emerald-500/20 focus:ring-offset-0 focus:ring-offset-white dark:focus:ring-offset-zinc-900"
+                  <FormInput
+                    field={field}
+                    label="Target Role"
+                    placeholder="e.g. Senior DevOps Engineer"
                   />
                 )}
               />
-              <label htmlFor="testMode" className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                Run in Test Mode (Mock API)
-              </label>
-            </div>
-          </div>
 
-          {/* Job Description textarea */}
-          <div className="mt-4">
-            <div className="mb-1.5 flex items-center justify-between">
-              <label htmlFor="job-description" className="block text-sm/6 font-medium text-zinc-900 dark:text-white">
-                Job Description
-              </label>
-              <form.Subscribe
-                selector={(state) => state.values.jobDescription}
-                children={(jd) => (
-                  <span
-                    className={`text-xs ${
-                      jd.length >= MIN_JD_LENGTH ? 'text-emerald-500' : 'text-zinc-500'
-                    }`}
-                  >
-                    {jd.length} / {MIN_JD_LENGTH} min characters
-                  </span>
-                )}
-              />
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-1">
+                <div className="flex items-center gap-2">
+                  <form.Field
+                    name="includeCoverLetter"
+                    children={(field) => (
+                      <input
+                        id={field.name}
+                        name={field.name}
+                        type="checkbox"
+                        checked={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.checked)}
+                        className="h-4 w-4 rounded border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-800 text-indigo-600 focus:ring-indigo-500/20 focus:ring-offset-0 focus:ring-offset-white dark:focus:ring-offset-zinc-900"
+                      />
+                    )}
+                  />
+                  <label htmlFor="includeCoverLetter" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    Generate Cover Letter
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <form.Field
+                    name="testMode"
+                    children={(field) => (
+                      <input
+                        id={field.name}
+                        name={field.name}
+                        type="checkbox"
+                        checked={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.checked)}
+                        className="h-4 w-4 rounded border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-800 text-emerald-500 focus:ring-emerald-500/20 focus:ring-offset-0 focus:ring-offset-white dark:focus:ring-offset-zinc-900"
+                      />
+                    )}
+                  />
+                  <label htmlFor="testMode" className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                    Run in Test Mode (Mock API)
+                  </label>
+                </div>
+              </div>
             </div>
-            <form.Field
-              name="jobDescription"
-              children={(field) => (
-                <div className="mt-2">
+
+            {/* Right column: job description */}
+            <div className="flex flex-col">
+              <div className="mb-1.5 flex items-center justify-between">
+                <label htmlFor="jobDescription" className="block text-sm/6 font-medium text-zinc-900 dark:text-white">
+                  Job Description
+                </label>
+                <form.Subscribe
+                  selector={(state) => state.values.jobDescription}
+                  children={(jd) => (
+                    <span
+                      className={`text-xs ${
+                        jd.length >= MIN_JD_LENGTH ? 'text-emerald-500' : 'text-zinc-500'
+                      }`}
+                    >
+                      {jd.length} / {MIN_JD_LENGTH} min characters
+                    </span>
+                  )}
+                />
+              </div>
+              <form.Field
+                name="jobDescription"
+                children={(field) => (
                   <textarea
                     id={field.name}
                     name={field.name}
@@ -246,12 +242,11 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
                     placeholder="Paste the full job description here. Include responsibilities, requirements, qualifications, and any other relevant details…"
-                    rows={12}
-                    className="block p-2 w-full rounded-md border-0 bg-zinc-50 dark:bg-white/5 py-1.5 text-zinc-900 dark:text-white shadow-sm ring-1 ring-inset ring-zinc-300 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-teal-500 sm:text-sm/6"
+                    className="block h-full min-h-64 w-full flex-1 resize-y rounded-md border-0 bg-zinc-50 p-2 text-zinc-900 shadow-sm ring-1 ring-inset ring-zinc-300 focus:ring-2 focus:ring-inset focus:ring-teal-500 sm:text-sm/6 dark:bg-white/5 dark:text-white dark:ring-white/10"
                   />
-                </div>
-              )}
-            />
+                )}
+              />
+            </div>
           </div>
 
           {/* Error */}

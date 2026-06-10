@@ -47,13 +47,7 @@ export function ResumeMenuSelect({ resumeId, onChange }: ResumeMenuSelectProps) 
 
   const hasNoResumes = sorted.length === 0
   const selected = sorted.find((r) => r.resumeId === resumeId)
-
-  let buttonLabel = 'Build from scratch with agent'
-  if (selected) {
-    buttonLabel = selected.label
-  } else if (hasNoResumes) {
-    buttonLabel = 'No resume yet — build from scratch'
-  }
+  const buttonLabel = selected ? selected.label : 'Build from scratch with agent'
 
   return (
     <Listbox value={resumeId} onChange={onChange} as="div" className="relative">

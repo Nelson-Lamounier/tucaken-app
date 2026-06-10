@@ -94,11 +94,12 @@ describe('ResumeMenuSelect', () => {
     expect(onChange).not.toHaveBeenCalled()
   })
 
-  it('informs the user when they have no resumes', () => {
+  it('informs the user they have no resumes only inside the dropdown', () => {
     useResumeVersionsMock.mockReturnValue({ data: [], isLoading: false })
     const onChange = vi.fn()
     render(<ResumeMenuSelect resumeId="" onChange={onChange} />)
-    expect(screen.getByText(/No resume yet/i)).toBeTruthy()
+    // Button stays neutral — the no-resume hint is not on the trigger.
+    expect(screen.queryByText(/no resumes yet/i)).toBeNull()
     fireEvent.click(screen.getByRole('button'))
     expect(screen.getByText(/no resumes yet/i)).toBeTruthy()
   })
