@@ -145,10 +145,10 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
             children={(values) => <DraftSaver values={values} />}
           />
 
-          {/* Side-by-side: target details + options (left), job description (right) */}
+          {/* Side-by-side: target details (left) + job description (right) */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            {/* Left column: target details + options */}
-            <div className="space-y-4">
+            {/* Left column: target company + role side by side */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <form.Field
                 name="targetCompany"
                 children={(field) => (
@@ -169,48 +169,6 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
                   />
                 )}
               />
-
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-1">
-                <div className="flex items-center gap-2">
-                  <form.Field
-                    name="includeCoverLetter"
-                    children={(field) => (
-                      <input
-                        id={field.name}
-                        name={field.name}
-                        type="checkbox"
-                        checked={field.state.value}
-                        onBlur={field.handleBlur}
-                        onChange={(e) => field.handleChange(e.target.checked)}
-                        className="h-4 w-4 rounded border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-800 text-indigo-600 focus:ring-indigo-500/20 focus:ring-offset-0 focus:ring-offset-white dark:focus:ring-offset-zinc-900"
-                      />
-                    )}
-                  />
-                  <label htmlFor="includeCoverLetter" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                    Generate Cover Letter
-                  </label>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <form.Field
-                    name="testMode"
-                    children={(field) => (
-                      <input
-                        id={field.name}
-                        name={field.name}
-                        type="checkbox"
-                        checked={field.state.value}
-                        onBlur={field.handleBlur}
-                        onChange={(e) => field.handleChange(e.target.checked)}
-                        className="h-4 w-4 rounded border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-800 text-emerald-500 focus:ring-emerald-500/20 focus:ring-offset-0 focus:ring-offset-white dark:focus:ring-offset-zinc-900"
-                      />
-                    )}
-                  />
-                  <label htmlFor="testMode" className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                    Run in Test Mode (Mock API)
-                  </label>
-                </div>
-              </div>
             </div>
 
             {/* Right column: job description */}
@@ -242,10 +200,53 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
                     placeholder="Paste the full job description here. Include responsibilities, requirements, qualifications, and any other relevant details…"
-                    className="block h-full min-h-64 w-full flex-1 resize-y rounded-md border-0 bg-zinc-50 p-2 text-zinc-900 shadow-sm ring-1 ring-inset ring-zinc-300 focus:ring-2 focus:ring-inset focus:ring-teal-500 sm:text-sm/6 dark:bg-white/5 dark:text-white dark:ring-white/10"
+                    className="block h-full min-h-80 w-full flex-1 resize-y rounded-md border-0 bg-zinc-50 p-2 text-zinc-900 shadow-sm ring-1 ring-inset ring-zinc-300 focus:ring-2 focus:ring-inset focus:ring-teal-500 sm:text-sm/6 lg:min-h-96 dark:bg-white/5 dark:text-white dark:ring-white/10"
                   />
                 )}
               />
+            </div>
+          </div>
+
+          {/* Options row — bottom of the component */}
+          <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3">
+            <div className="flex items-center gap-2">
+              <form.Field
+                name="includeCoverLetter"
+                children={(field) => (
+                  <input
+                    id={field.name}
+                    name={field.name}
+                    type="checkbox"
+                    checked={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.checked)}
+                    className="h-4 w-4 rounded border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-800 text-indigo-600 focus:ring-indigo-500/20 focus:ring-offset-0 focus:ring-offset-white dark:focus:ring-offset-zinc-900"
+                  />
+                )}
+              />
+              <label htmlFor="includeCoverLetter" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                Generate Cover Letter
+              </label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <form.Field
+                name="testMode"
+                children={(field) => (
+                  <input
+                    id={field.name}
+                    name={field.name}
+                    type="checkbox"
+                    checked={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.checked)}
+                    className="h-4 w-4 rounded border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-800 text-emerald-500 focus:ring-emerald-500/20 focus:ring-offset-0 focus:ring-offset-white dark:focus:ring-offset-zinc-900"
+                  />
+                )}
+              />
+              <label htmlFor="testMode" className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                Run in Test Mode (Mock API)
+              </label>
             </div>
           </div>
 
