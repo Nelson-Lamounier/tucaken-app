@@ -75,6 +75,16 @@ const PIPELINE_STAGES: PipelineStage[] = [
   },
 ]
 
+// Test-mode (`mock-…`) runs finish in ~26s and have no pipeline_runs row to drive
+// the stepper, so a compressed timeline lets every stage visibly progress and
+// complete before the run is marked ready (otherwise "Done" appears mid-stepper).
+const MOCK_PIPELINE_STAGES: PipelineStage[] = [
+  { ...PIPELINE_STAGES[0], startMs: 0,      endMs: 2_000 },
+  { ...PIPELINE_STAGES[1], startMs: 2_000,  endMs: 11_000 },
+  { ...PIPELINE_STAGES[2], startMs: 11_000, endMs: 21_000 },
+  { ...PIPELINE_STAGES[3], startMs: 21_000, endMs: 25_000 },
+]
+
 // =============================================================================
 // Helpers
 // =============================================================================
@@ -148,16 +158,20 @@ export function ProgressBars({
     return null
   }
 
+  // Mock runs have no pipeline_runs row, so the stepper falls back to wall-clock
+  // estimation — use the compressed timeline that matches the ~26s mock finish.
+  const stages = slug.startsWith('mock-') ? MOCK_PIPELINE_STAGES : PIPELINE_STAGES
+
   const activeStageId = pipelineStatusToStageId(pipelineRun?.status) ?? null
   const activeStageIdx = activeStageId
-    ? PIPELINE_STAGES.findIndex(s => s.id === activeStageId)
+    ? stages.findIndex(s => s.id === activeStageId)
     : -1
 
   function getStageStatus(idx: number): StageStatus {
     if (isFailed) {
       const lastStarted = activeStageIdx >= 0
         ? activeStageIdx
-        : PIPELINE_STAGES.reduce((acc, s, i) => elapsedMs >= s.startMs ? i : acc, 0)
+        : stages.reduce((acc, s, i) => elapsedMs >= s.startMs ? i : acc, 0)
       if (idx < lastStarted) return 'complete'
       if (idx === lastStarted) return 'failed'
       return 'upcoming'
@@ -170,7 +184,7 @@ export function ProgressBars({
       return 'upcoming'
     }
     // Fallback: wall-clock estimation
-    const s = PIPELINE_STAGES[idx]
+    const s = stages[idx]
     if (elapsedMs >= s.endMs)   return 'complete'
     if (elapsedMs >= s.startMs) return 'current'
     return 'upcoming'
@@ -208,14 +222,6 @@ export function ProgressBars({
             Your tailored resume and analysis are ready.
           </p>
         </div>
-        <Link
-          to="/applications/$slug"
-          params={{ slug }}
-          className="inline-flex items-center gap-1.5 rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-500 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500"
-        >
-          View results
-          <span aria-hidden="true">→</span>
-        </Link>
         <p className="text-xs text-zinc-400 dark:text-zinc-500">Taking you to your results…</p>
       </div>
     )
@@ -242,9 +248,9 @@ export function ProgressBars({
 
       {/* Steps */}
       <ol className="space-y-0" role="list" aria-label="Pipeline progress">
-        {PIPELINE_STAGES.map((stage, idx) => {
+        {stages.map((stage, idx) => {
           const status = getStageStatus(idx)
-          const isLast  = idx === PIPELINE_STAGES.length - 1
+          const isLast  = idx === stages.length - 1
           const { Icon } = stage
 
           return (
