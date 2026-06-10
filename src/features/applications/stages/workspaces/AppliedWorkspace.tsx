@@ -13,6 +13,7 @@ import { EvidenceIndicator } from '../components/EvidenceIndicator'
 import { EvidenceDeck, type EvidenceCard } from '../components/EvidenceDeck'
 import { SummaryGroup, SummaryRow } from '../components/workspace-shell'
 import { AtsPanel } from '../components/AtsPanel'
+import { JdUnderstandingPanel } from '../components/JdUnderstandingPanel'
 
 interface AppliedWorkspaceProps {
   readonly detail: ApplicationDetail
@@ -308,6 +309,8 @@ export function AppliedWorkspace({ detail }: AppliedWorkspaceProps) {
       <FitExperienceSection detail={detail} />
 
       <KnowledgeBaseHealthPanel compact retrieval={detail.research?.kbRetrievalStats} />
+
+      {detail.analysis?.jdExtraction ? <JdUnderstandingPanel jd={detail.analysis.jdExtraction} /> : null}
 
       {atsCheck ? <AtsPanel ats={atsCheck} /> : null}
 

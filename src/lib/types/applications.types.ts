@@ -458,6 +458,24 @@ export interface AnalysisOutput {
   readonly tailoredResume?: ResumeData
   /** ATS check for the persisted tailored resume (resumes.ats_check_json). */
   readonly atsCheck?: AtsCheckResult | null
+  /** Structured signal the JD-extractor read from the job description (Phase 0). */
+  readonly jdExtraction?: JdExtraction | null
+}
+
+/**
+ * Structured read of the job description produced by the JD-extractor agent at
+ * analyse time — used to sharpen KB retrieval and shown in the UI as "what the
+ * system understood from your JD". Mirrors JdExtraction in ai-applications.
+ */
+export interface JdExtraction {
+  readonly requiredSkills: readonly string[]
+  readonly preferredSkills: readonly string[]
+  readonly tools: readonly string[]
+  readonly concepts: readonly string[]
+  readonly responsibilities: readonly string[]
+  readonly domain: string
+  readonly seniority: string
+  readonly retrievalKeywords: readonly string[]
 }
 
 /** One JD keyword and whether the tailored resume covers it (grounded = KB-verified). */
