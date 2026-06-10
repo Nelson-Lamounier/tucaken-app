@@ -26,10 +26,9 @@ export interface NewAnalysisPanelProps {
   /** `null` = default not yet resolved; `''` = build from scratch; otherwise a resume id. */
   readonly resumeId: string | null
   readonly onResumeChange: (resumeId: string) => void
-  readonly onSuccess?: () => void
 }
 
-export function NewAnalysisPanel({ resumeId, onResumeChange, onSuccess: _onSuccess }: NewAnalysisPanelProps) {
+export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelProps) {
   const trigger = useApplicationsTrigger()
   const addNotification = usePipelineNotificationsStore((s) => s.addNotification)
   const [submittedSlug, setSubmittedSlug] = useState<string | null>(null)
@@ -88,7 +87,7 @@ export function NewAnalysisPanel({ resumeId, onResumeChange, onSuccess: _onSucce
               status: 'running',
               link: `/applications/${encodeURIComponent(data.applicationId)}`,
             })
-            // We now skip calling onSuccess() to let the ProgressBars take over navigation
+            // Navigation is handed off to ProgressBars via submittedSlug
           },
         },
       )
@@ -302,7 +301,11 @@ export function NewAnalysisPanel({ resumeId, onResumeChange, onSuccess: _onSucce
           <form.Subscribe
             selector={(state) => [state.values.jobDescription, state.values.targetCompany, state.values.targetRole]}
             children={([jd, company, role]) => {
-              const isValid = jd.length >= MIN_JD_LENGTH && company.trim().length > 0 && role.trim().length > 0
+              const isValid =
+                resumeId !== null &&
+                jd.length >= MIN_JD_LENGTH &&
+                company.trim().length > 0 &&
+                role.trim().length > 0
               
               return (
                 <div className="mt-5 flex items-center justify-between">

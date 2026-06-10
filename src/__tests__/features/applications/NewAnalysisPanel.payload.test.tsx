@@ -50,4 +50,23 @@ describe('NewAnalysisPanel payload', () => {
       targetRole: 'Senior DevOps Engineer',
     })
   })
+
+  it('disables submit while the resume default is unresolved (resumeId null)', () => {
+    render(<NewAnalysisPanel resumeId={null} onResumeChange={vi.fn()} />)
+
+    fireEvent.change(screen.getByPlaceholderText('e.g. Revolut'), {
+      target: { value: 'Revolut' },
+    })
+    fireEvent.change(screen.getByPlaceholderText('e.g. Senior DevOps Engineer'), {
+      target: { value: 'Senior DevOps Engineer' },
+    })
+    fireEvent.change(
+      screen.getByPlaceholderText(/Paste the full job description/i),
+      { target: { value: 'x'.repeat(60) } },
+    )
+
+    const startButton = screen.getByRole('button', { name: /Start Analysis/i })
+    expect(startButton).toHaveProperty('disabled', true)
+    expect(mutateMock).not.toHaveBeenCalled()
+  })
 })
