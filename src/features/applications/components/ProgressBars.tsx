@@ -134,7 +134,7 @@ export function ProgressBars({
   // user register the "Resume ready" state before redirecting.
   useEffect(() => {
     if (!isFinished || isFailed || !onComplete) return
-    const t = setTimeout(onComplete, 1_800)
+    const t = setTimeout(onComplete, 3_500)
     return () => clearTimeout(t)
   }, [isFinished, isFailed, onComplete])
 
