@@ -94,10 +94,14 @@ export function ProgressBars({
   slug,
   pipelineRunId,
   startedAt,
+  onComplete,
 }: {
   slug: string
   pipelineRunId?: string
   startedAt: number
+  /** Called shortly after the run finishes successfully — used to auto-advance
+   *  to the results page while this view is on screen (modal open). */
+  onComplete?: () => void
 }) {
   const { data, timedOut } = useApplicationDetail(slug)
   const requeue = useApplicationRequeue()
@@ -123,6 +127,16 @@ export function ProgressBars({
     const iv = setInterval(() => setElapsedMs(Date.now() - startedAt), 1_000)
     return () => clearInterval(iv)
   }, [isFinished, isFailed, startedAt])
+
+  // ── Auto-advance to results when finished (only while this view is mounted) ──
+  // The modal unmounts ProgressBars on close, so a dismissed run never navigates;
+  // it stays tracked via the Pipeline Notifications bell. The short delay lets the
+  // user register the "Resume ready" state before redirecting.
+  useEffect(() => {
+    if (!isFinished || isFailed || !onComplete) return
+    const t = setTimeout(onComplete, 1_200)
+    return () => clearTimeout(t)
+  }, [isFinished, isFailed, onComplete])
 
   // ── Stage status resolution ───────────────────────────────────────────────
   // Real pipeline_runs status takes priority over wall-clock estimation.

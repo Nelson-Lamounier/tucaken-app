@@ -1,6 +1,8 @@
 'use client'
 
+import { useCallback } from 'react'
 import { Dialog, DialogBackdrop, DialogPanel } from '@headlessui/react'
+import { useNavigate } from '@tanstack/react-router'
 import { ProgressBars } from './ProgressBars'
 
 export interface AnalysisProgressModalProps {
@@ -14,8 +16,9 @@ export interface AnalysisProgressModalProps {
 
 /**
  * Centered, dismissible modal that hosts the pipeline `ProgressBars`. Closing it
- * only hides the modal — the pipeline keeps running and the parent's "View
- * progress" pill re-opens it.
+ * only hides the modal — the pipeline keeps running and is tracked via the
+ * Pipeline Notifications bell. When the run finishes while the modal is open, it
+ * auto-advances to the results page.
  */
 export function AnalysisProgressModal({
   isOpen,
@@ -24,6 +27,11 @@ export function AnalysisProgressModal({
   pipelineRunId,
   startedAt,
 }: AnalysisProgressModalProps) {
+  const navigate = useNavigate()
+  const handleComplete = useCallback(() => {
+    void navigate({ to: '/applications/$slug', params: { slug } })
+  }, [navigate, slug])
+
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-50">
       <DialogBackdrop
@@ -35,7 +43,7 @@ export function AnalysisProgressModal({
           transition
           className="w-full max-w-4xl overflow-hidden rounded-md border border-zinc-200 bg-white shadow-xl dark:border-white/10 dark:bg-zinc-900 data-closed:scale-95 data-closed:opacity-0 data-enter:duration-200 data-enter:ease-out data-leave:duration-150 data-leave:ease-in"
         >
-          <ProgressBars slug={slug} pipelineRunId={pipelineRunId} startedAt={startedAt} />
+          <ProgressBars slug={slug} pipelineRunId={pipelineRunId} startedAt={startedAt} onComplete={handleComplete} />
         </DialogPanel>
       </div>
     </Dialog>
