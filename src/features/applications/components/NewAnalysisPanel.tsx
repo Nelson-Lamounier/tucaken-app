@@ -4,8 +4,6 @@ import {
   AlertCircle,
   Loader2,
   Send,
-  Wand2,
-  FileText,
 } from 'lucide-react'
 import { useForm } from '@tanstack/react-form'
 import { useApplicationsTrigger } from '../hooks/use-applications-trigger'
@@ -15,6 +13,7 @@ import { INTERVIEW_STAGE_OPTIONS, MIN_JD_LENGTH } from './ApplicationTypes'
 import { FormInput } from '@/components/ui/Field'
 import { Button } from '@/components/ui/Button'
 import { ProgressBars } from './ProgressBars'
+import { ResumeMenuSelect } from './ResumeMenuSelect'
 
 function DraftSaver({ values }: { readonly values: Record<string, unknown> }) {
   useEffect(() => {
@@ -24,11 +23,13 @@ function DraftSaver({ values }: { readonly values: Record<string, unknown> }) {
 }
 
 export interface NewAnalysisPanelProps {
-  preselectedResumeId: string
-  onSuccess?: () => void
+  /** `null` = default not yet resolved; `''` = build from scratch; otherwise a resume id. */
+  readonly resumeId: string | null
+  readonly onResumeChange: (resumeId: string) => void
+  readonly onSuccess?: () => void
 }
 
-export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }: NewAnalysisPanelProps) {
+export function NewAnalysisPanel({ resumeId, onResumeChange, onSuccess: _onSuccess }: NewAnalysisPanelProps) {
   const trigger = useApplicationsTrigger()
   const addNotification = usePipelineNotificationsStore((s) => s.addNotification)
   const [submittedSlug, setSubmittedSlug] = useState<string | null>(null)
@@ -71,7 +72,7 @@ export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }:
           targetCompany: company,
           targetRole: role,
           interviewStage: value.interviewStage,
-          resumeId: preselectedResumeId,
+          resumeId: resumeId ?? '',
           includeCoverLetter: value.includeCoverLetter,
         },
         {
@@ -127,24 +128,14 @@ export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }:
               Analyse New Job Description
             </h2>
             <p className="text-xs text-zinc-500">
-              {preselectedResumeId
-                ? 'Paste a job description to analyse against your selected resume'
-                : 'Paste a job description — the agent will build your resume from scratch'}
+              {resumeId === ''
+                ? 'Paste a job description — the agent will build your resume from scratch'
+                : 'Paste a job description to analyse against your selected resume'}
             </p>
           </div>
         </div>
         <div className="flex-none">
-          {preselectedResumeId ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 text-indigo-700 ring-indigo-600/20 dark:bg-indigo-500/10 dark:text-indigo-400 dark:ring-indigo-500/20 px-2.5 py-1 text-xs font-medium ring-1 ring-inset">
-              <FileText className="size-3" />
-              Resume selected
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 text-violet-700 ring-violet-600/20 dark:bg-violet-500/10 dark:text-violet-400 dark:ring-violet-500/20 px-2.5 py-1 text-xs font-medium ring-1 ring-inset">
-              <Wand2 className="size-3" />
-              Building from scratch
-            </span>
-          )}
+          <ResumeMenuSelect resumeId={resumeId} onChange={onResumeChange} />
         </div>
       </div>
 
@@ -185,8 +176,8 @@ export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }:
             />
           </div>
 
-          {/* Interview Stage + Resume Version row */}
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* Interview Stage */}
+          <div className="mt-4">
             <div>
               <label htmlFor="interview-stage" className="mb-1.5 block text-sm/6 font-medium text-zinc-900 dark:text-white">
                 Interview Stage
@@ -212,10 +203,6 @@ export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }:
                   )}
                 />
               </div>
-            </div>
-
-            <div className="hidden">
-              {/* the resume version selection has been moved to a previous pipeline step */}
             </div>
           </div>
 
