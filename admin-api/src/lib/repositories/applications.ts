@@ -30,7 +30,10 @@ function rowToApplication(row: Record<string, unknown>): Application {
         jobUrl:         row['job_url']          as string | null,
         jobDescription: row['job_description']  as string,
         kanbanStatus:   row['kanban_status']    as string,
-        interviewStage: (row['interview_stage'] as string | null | undefined) ?? 'applied',
+        // Prefer the derived furthest-reached stage (from interview_stages) over the
+        // manual pointer, which only advances on an explicit "Advance" click.
+        interviewStage: (row['reached_stage'] as string | null | undefined)
+                        ?? (row['interview_stage'] as string | null | undefined) ?? 'applied',
         userAnnotations: (row['user_annotations'] as Record<string, unknown> | null | undefined) ?? {},
         appliedAt:      row['applied_at']       ? new Date(row['applied_at']  as string) : null,
         createdAt:      row['created_at']       ? new Date(row['created_at']  as string) : undefined,
@@ -89,20 +92,47 @@ export async function updateApplicationAnnotations(
     );
 }
 
+/**
+ * The furthest hiring stage an application has actually reached: the latest (by
+ * canonical order) of the manual `interview_stage` pointer and any stage that has
+ * been engaged in `interview_stages` (coach ran, user scheduled, or advanced).
+ * Correlated subquery referencing the outer `ja` alias.
+ */
+const REACHED_STAGE_SQL = `(
+        SELECT cand.st FROM (
+          SELECT ja.interview_stage AS st
+          UNION ALL
+          SELECT s.stage_type
+            FROM interview_stages s
+           WHERE s.job_application_id = ja.id
+             AND (s.coach_run_id IS NOT NULL OR s.scheduled_at IS NOT NULL OR s.stage_status IN ('current','completed'))
+          UNION ALL
+          SELECT c.stage_type
+            FROM coaching_content c
+           WHERE c.job_application_id = ja.id
+        ) cand
+        ORDER BY array_position(
+          ARRAY['applied','phone-screen','technical','system-design','behavioural','bar-raiser','final']::text[],
+          cand.st
+        ) DESC NULLS LAST
+        LIMIT 1
+      ) AS reached_stage`;
+
+const APPLICATION_COLUMNS = `ja.id, ja.user_id, ja.company, ja.role, ja.job_url, ja.job_description,
+                ja.kanban_status, ja.interview_stage, ja.applied_at, ja.created_at, ja.updated_at`;
+
 export async function listApplications(pool: Queryable, kanbanStatus?: string): Promise<Application[]> {
     if (kanbanStatus !== undefined) {
         const result = await pool.query(
-            `SELECT id, user_id, company, role, job_url, job_description,
-                    kanban_status, interview_stage, applied_at, created_at, updated_at
-             FROM job_applications WHERE kanban_status = $1 ORDER BY created_at DESC LIMIT ${LIST_APPLICATIONS_LIMIT}`,
+            `SELECT ${APPLICATION_COLUMNS}, ${REACHED_STAGE_SQL}
+             FROM job_applications ja WHERE ja.kanban_status = $1 ORDER BY ja.created_at DESC LIMIT ${LIST_APPLICATIONS_LIMIT}`,
             [kanbanStatus],
         );
         return (result.rows as Record<string, unknown>[]).map(rowToApplication);
     }
     const result = await pool.query(
-        `SELECT id, user_id, company, role, job_url, job_description,
-                kanban_status, interview_stage, applied_at, created_at, updated_at
-         FROM job_applications ORDER BY created_at DESC LIMIT ${LIST_APPLICATIONS_LIMIT}`,
+        `SELECT ${APPLICATION_COLUMNS}, ${REACHED_STAGE_SQL}
+         FROM job_applications ja ORDER BY ja.created_at DESC LIMIT ${LIST_APPLICATIONS_LIMIT}`,
     );
     return (result.rows as Record<string, unknown>[]).map(rowToApplication);
 }
@@ -111,6 +141,20 @@ export async function updateApplicationStatus(pool: Queryable, id: string, kanba
     await pool.query(
         `UPDATE job_applications SET kanban_status = $1, updated_at = NOW() WHERE id = $2`,
         [kanbanStatus, id],
+    );
+}
+
+/**
+ * Advance an application off the transient analysis states once interview prep
+ * begins. `analysing` / `analysis-ready` are only meaningful while the Research
+ * Agent runs; scheduling a stage means the candidate is past that, so move to
+ * `interview-prep`. Idempotent and never overrides a status the user set.
+ */
+export async function advanceStatusOffAnalysis(pool: Queryable, id: string): Promise<void> {
+    await pool.query(
+        `UPDATE job_applications SET kanban_status = 'interview-prep', updated_at = NOW()
+          WHERE id = $1 AND kanban_status IN ('analysing', 'analysis-ready')`,
+        [id],
     );
 }
 

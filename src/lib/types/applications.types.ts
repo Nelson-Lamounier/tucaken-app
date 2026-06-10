@@ -57,6 +57,21 @@ export type InterviewStage =
   | 'final'
 
 /**
+ * A scheduled interview stage joined to its application — powers the calendar.
+ * `slug` is the application id (the `/applications/$slug` route param).
+ */
+export interface ScheduledInterview {
+  readonly slug: string
+  readonly company: string
+  readonly role: string
+  readonly status: ApplicationStatus
+  readonly stage: InterviewStage
+  readonly stageStatus: string
+  /** ISO 8601 timestamp the user scheduled (interview_stages.scheduled_at). */
+  readonly scheduledAt: string
+}
+
+/**
  * Overall fit rating assigned by the Research Agent.
  * Determines the colour-coding on dashboard cards.
  */
@@ -353,6 +368,22 @@ export interface ResearchOutput {
   readonly pillarClassification?: PillarClassification
   /** RAG retrieval health for this run — present only on post-hygiene runs. */
   readonly kbRetrievalStats?: KbRetrievalStats
+  /**
+   * Ranked project references keyed by lowercased topic skill — the user's
+   * documented projects most relevant to each topic. Computed live by admin-api
+   * (deterministic stack/tag/name match). Absent when no projects match.
+   */
+  readonly topicProjectRefs?: Record<string, readonly ProjectReferenceData[]>
+}
+
+/** A deep-link to one of the user's project case-studies (routes to /projects/$id). */
+export interface ProjectReferenceData {
+  readonly id: string
+  readonly title: string
+  /** One-line pitch. */
+  readonly pitch: string
+  /** Top matched stack/skill tags. */
+  readonly highlights?: readonly string[]
 }
 
 /** Analysis metadata from the Applications Agent */
@@ -425,6 +456,30 @@ export interface AnalysisOutput {
   readonly resumeSuggestions: ResumeSuggestions
   /** Generated tailored resume from the Applications Agent */
   readonly tailoredResume?: ResumeData
+  /** ATS check for the persisted tailored resume (resumes.ats_check_json). */
+  readonly atsCheck?: AtsCheckResult | null
+}
+
+/** One JD keyword and whether the tailored resume covers it (grounded = KB-verified). */
+export interface AtsKeywordCoverage {
+  readonly term: string
+  readonly present: boolean
+  readonly grounded: boolean
+}
+
+/**
+ * ATS check result produced by the job-strategist (render resume PDF → parse
+ * back → assert). Mirrors AtsCheckResultSchema in ai-applications.
+ */
+export interface AtsCheckResult {
+  readonly machineReadable: boolean
+  readonly standardSectionsDetected: readonly string[]
+  readonly contactDetected: { readonly name: string; readonly email: string }
+  readonly parseBreakers: readonly string[]
+  readonly jdKeywordCoverage: readonly AtsKeywordCoverage[]
+  readonly status: 'passed' | 'issues' | 'unverified'
+  readonly passed: boolean
+  readonly issues: readonly string[]
 }
 
 /** Interview question from the Coach Agent */
@@ -490,6 +545,7 @@ export interface FinalCheckpoint {
  * field so the UI can place them across the page without parsing prose. String
  * fields are Markdown; only `positioning` is required.
  */
+/** Legacy 7-field coaching shape — kept only so the adapter can map old rows. */
 export interface CoachingNotes {
   readonly positioning: string
   readonly interviewFocus?: readonly InterviewFocusItem[]
@@ -499,6 +555,21 @@ export interface CoachingNotes {
   readonly debrief?: string
   /** Structured checklist (new) or legacy Markdown string (old rows). */
   readonly finalCheckpoint?: string | FinalCheckpoint
+}
+
+/**
+ * One composable coaching block. The coach emits an ordered list of these; the
+ * UI distributes them to build a per-stage narrative. `checklist` present → the
+ * section renders as an interactive, persisted checklist.
+ */
+export interface CoachingSection {
+  /** Stable kebab-case id, e.g. "esl-coaching" — lets the UI place a section. */
+  readonly key: string
+  readonly title: string
+  /** Narrative content (markdown). */
+  readonly body: string
+  /** When present, the section renders as a tickable checklist. */
+  readonly checklist?: readonly string[]
 }
 
 /** Coach Agent output — part of ApplicationDetail */
@@ -521,7 +592,7 @@ export interface InterviewPrepOutput {
    * Stage coaching. New rows are a structured `CoachingNotes` object; legacy
    * rows are a Markdown string. `parseCoachingSections` handles both.
    */
-  readonly coachingNotes: string | CoachingNotes
+  readonly coachingNotes: string | CoachingNotes | readonly CoachingSection[]
   /** Phone-screen only: 2-3 sentence career-arc narrative */
   readonly careerArcSummary?: string
   /** Phone-screen only: JD-cross-referenced verified talking points */

@@ -18,6 +18,7 @@ import type {
   ApplicationSummary,
   ApplicationStatus,
   ApplicationDetail,
+  ScheduledInterview,
 } from '@/lib/types/applications.types'
 import type { ResumeData } from '@/lib/resumes/resume-data'
 import { requireAuth } from './auth-guard'
@@ -61,6 +62,20 @@ export const getApplicationsFn = createServerFn({ method: 'GET' })
     )
     return body.applications
   })
+
+/**
+ * Lists every scheduled interview (interview_stages.scheduled_at set) for the
+ * authenticated user, across applications — the calendar's data source.
+ */
+export const getScheduledInterviewsFn = createServerFn({ method: 'GET' }).handler(async () => {
+  await requireAuth()
+
+  const body = await apiFetch<{ interviews: ScheduledInterview[]; count: number }>(
+    '/applications/scheduled-interviews',
+    { pathTemplate: '/applications/scheduled-interviews' },
+  )
+  return body.interviews
+})
 
 /**
  * Retrieves the full detail of a single application by slug.

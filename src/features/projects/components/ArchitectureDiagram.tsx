@@ -11,7 +11,9 @@ export interface ArchitectureDiagramProps {
  * Renders a project architecture diagram. Mermaid is rendered client-side only
  * (it touches the DOM and isn't SSR-safe), so the canvas stays empty until
  * after hydration. All SVG — whether rendered from Mermaid or stored directly —
- * is sanitised with DOMPurify (SVG profile, no scripts) before injection.
+ * Stored SVG is sanitised with DOMPurify (SVG profile); Mermaid output is
+ * sanitised by Mermaid (securityLevel: 'strict') and injected as-is — a second
+ * DOMPurify pass strips its <style> + foreignObject labels.
  * Offers a raw-source toggle and an SVG download.
  */
 export function ArchitectureDiagram({ format, source }: ArchitectureDiagramProps) {
@@ -26,23 +28,55 @@ export function ArchitectureDiagram({ format, source }: ArchitectureDiagramProps
     let cancelled = false
     void (async () => {
       try {
-        const DOMPurify = (await import('dompurify')).default
-        const sanitize = (raw: string) =>
-          DOMPurify.sanitize(raw, { USE_PROFILES: { svg: true, svgFilters: true } })
-
         if (format === 'svg') {
-          if (!cancelled) { setSvg(sanitize(source)); setError(null) }
+          // Stored / hand-authored SVG is untrusted HTML — sanitise it (SVG-only
+          // profile keeps the visual elements; ADD style for any <style> block).
+          const DOMPurify = (await import('dompurify')).default
+          const clean = DOMPurify.sanitize(source, {
+            USE_PROFILES: { svg: true, svgFilters: true },
+            ADD_TAGS: ['style'],
+          })
+          if (!cancelled) { setSvg(clean); setError(null) }
           return
         }
 
         const mermaid = (await import('mermaid')).default
+        const isDark = theme === 'dark'
         mermaid.initialize({
           startOnLoad:   false,
-          theme:         theme === 'dark' ? 'dark' : 'default',
           securityLevel: 'strict',
+          theme:         'base',
+          flowchart:     { curve: 'basis', padding: 14 },
+          themeVariables: isDark
+            ? {
+                background:         'transparent',
+                primaryColor:       '#134e4a', // teal-900 node fill
+                primaryBorderColor: '#2dd4bf', // teal-400 border
+                primaryTextColor:   '#e4e4e7', // zinc-200 label text
+                nodeTextColor:      '#e4e4e7',
+                secondaryColor:     '#1e293b', // slate-800 (subgraphs / 2nd level)
+                tertiaryColor:      '#0f172a', // slate-900
+                lineColor:          '#cbd5e1', // slate-300 edges — distinct from nodes
+                fontSize:           '14px',
+              }
+            : {
+                background:         'transparent',
+                primaryColor:       '#ccfbf1', // teal-100 node fill
+                primaryBorderColor: '#0d9488', // teal-600 border
+                primaryTextColor:   '#18181b', // zinc-900 label text
+                nodeTextColor:      '#18181b',
+                secondaryColor:     '#f1f5f9', // slate-100
+                tertiaryColor:      '#e2e8f0', // slate-200
+                lineColor:          '#475569', // slate-600 edges — distinct from nodes
+                fontSize:           '14px',
+              },
         })
+        // Mermaid's securityLevel: 'strict' already HTML-encodes label text and
+        // strips scripts/click handlers, so its own SVG is safe to inject. A second
+        // DOMPurify SVG-profile pass strips Mermaid's <style> block + the
+        // <foreignObject> HTML node labels, leaving unlabelled/uncoloured shapes.
         const { svg: rendered } = await mermaid.render(`arch-${reactId}`, source)
-        if (!cancelled) { setSvg(sanitize(rendered)); setError(null) }
+        if (!cancelled) { setSvg(rendered); setError(null) }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to render diagram')
       }
@@ -51,8 +85,14 @@ export function ArchitectureDiagram({ format, source }: ArchitectureDiagramProps
   }, [format, source, theme, reactId])
 
   const downloadSvg = () => {
-    if (!svg) return
-    const blob = new Blob([svg], { type: 'image/svg+xml' })
+    // Re-serialise the live SVG node to well-formed XML. The in-page markup is
+    // HTML-parsed and Mermaid's foreignObject labels carry HTML void tags (<br>)
+    // that aren't valid standalone XML — dumping the raw string yields a .svg that
+    // fails to open. XMLSerializer self-closes void elements + keeps namespaces.
+    const node = containerRef.current?.querySelector('svg')
+    if (!node) return
+    const xml  = new XMLSerializer().serializeToString(node)
+    const blob = new Blob([`<?xml version="1.0" encoding="UTF-8"?>\n${xml}`], { type: 'image/svg+xml' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
     a.href = url
@@ -86,25 +126,26 @@ export function ArchitectureDiagram({ format, source }: ArchitectureDiagramProps
       </div>
 
       {showSource && (
-        <pre className="overflow-x-auto rounded-xl bg-zinc-950/60 p-4 text-xs leading-relaxed text-zinc-300 inset-ring inset-ring-white/10">
+        <pre className="overflow-x-auto rounded-md bg-zinc-950/60 p-4 text-xs leading-relaxed text-zinc-300 inset-ring inset-ring-white/10">
           <code>{source}</code>
         </pre>
       )}
       {!showSource && error && (
-        <p className="rounded-xl bg-rose-400/5 px-4 py-6 text-center text-xs text-rose-300 inset-ring inset-ring-rose-400/30">
+        <p className="rounded-md bg-rose-400/5 px-4 py-6 text-center text-xs text-rose-300 inset-ring inset-ring-rose-400/30">
           {error}
         </p>
       )}
       {!showSource && !error && svg && (
         <div
           ref={containerRef}
-          className="flex justify-center overflow-x-auto rounded-xl bg-white/2 p-4 inset-ring inset-ring-white/10 [&_svg]:max-w-full"
-          // SVG is sanitised with DOMPurify (SVG profile, scripts stripped) above.
+          className="flex justify-center overflow-x-auto rounded-md bg-white/2 p-4 inset-ring inset-ring-white/10 [&_svg]:max-w-full"
+          // Stored SVG is DOMPurify-sanitised above; Mermaid output is sanitised by
+          // Mermaid itself (securityLevel: 'strict') — see the effect.
           dangerouslySetInnerHTML={{ __html: svg }}
         />
       )}
       {!showSource && !error && !svg && (
-        <div className="h-40 animate-pulse rounded-xl bg-white/2 inset-ring inset-ring-white/10" aria-label="Rendering diagram" />
+        <div className="h-40 animate-pulse rounded-md bg-white/2 inset-ring inset-ring-white/10" aria-label="Rendering diagram" />
       )}
     </div>
   )

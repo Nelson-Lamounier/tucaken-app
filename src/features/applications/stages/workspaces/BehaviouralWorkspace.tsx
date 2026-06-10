@@ -4,14 +4,10 @@ import { useMemo, useState } from 'react'
 import { Plus, BookOpen } from 'lucide-react'
 import type { ApplicationDetail, InterviewQuestion } from '@/lib/types/applications.types'
 import { Card } from '@/components/ui/Card'
-import { ScheduleCard } from '../components/ScheduleCard'
 import { StoryCard } from '../components/StoryCard'
 import { StoryForm } from '../components/StoryForm'
 import { PracticeModal } from '../components/PracticeModal'
 import { SummaryGroup, SummaryRow, RailField, RailBullets, RailRichText } from '../components/workspace-shell'
-import { CoachingGuidance } from '../components/CoachingSections'
-import { parseCoachingSections } from '../lib/coaching-sections'
-import { useStageDraft } from '../hooks/useStageDraft'
 import { useStoryBank } from '../hooks/useStoryBank'
 import { STORY_THEMES, resolveStagePrep } from '../types/workspace'
 import type { StarStory, StoryTheme } from '../types/workspace'
@@ -224,14 +220,14 @@ function CoachBehaviouralQuestionsGroup({ questions }: { readonly questions: rea
 }
 
 export function BehaviouralWorkspace({ detail }: BehaviouralWorkspaceProps) {
-  const stageUserState = detail.stages?.['behavioural']?.user_state as Partial<import('../hooks/useStageDraft').StageDraft> | undefined
-  const { draft, setSchedule } = useStageDraft(detail.slug, 'behavioural', stageUserState)
+  // Schedule & format is edited from the dashboard SchedulePanel (shared draft via
+  // StageDraftProvider), so the workspace no longer owns a stage-draft instance.
   const { stories, addStory, updateStory, removeStory } = useStoryBank(detail.slug)
 
-  // Coach-generated behavioural prep (role-tailored questions + free-text notes).
+  // Coach-generated behavioural prep (role-tailored questions). Coaching notes
+  // render as the page intro (StageCoachingNarrative), not here.
   const prep = resolveStagePrep(detail, 'behavioural')
   const coachQuestions = prep?.behaviouralQuestions ?? []
-  const coachingNotes = prep?.coachingNotes
 
   const [filter, setFilter] = useState<Filter>('All')
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -255,13 +251,7 @@ export function BehaviouralWorkspace({ detail }: BehaviouralWorkspaceProps) {
 
   return (
     <>
-      <SummaryGroup id="schedule" title="Schedule & format">
-        <ScheduleCard scheduleAt={draft.scheduleAt} formatNote={draft.formatNote} onChange={setSchedule} formatPlaceholder="e.g. 45m behavioural" />
-      </SummaryGroup>
-
       <CoachBehaviouralQuestionsGroup questions={coachQuestions} />
-
-      <CoachingGuidance sections={parseCoachingSections(coachingNotes)} />
 
       <StoryBankGroup
         stories={stories}

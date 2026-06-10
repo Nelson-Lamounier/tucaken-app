@@ -5,11 +5,10 @@ import { ListChecks, FolderOpen } from 'lucide-react'
 import type { ApplicationDetail, SystemTour } from '@/lib/types/applications.types'
 import { Card } from '@/components/ui/Card'
 import { ArchitectureDiagram } from '@/features/projects/components/ArchitectureDiagram'
-import { ScheduleCard } from '../components/ScheduleCard'
 import { CollapsibleSection } from '../components/CollapsibleSection'
 import { SummaryGroup, SummaryRow } from '../components/workspace-shell'
-import { useStageDraft } from '../hooks/useStageDraft'
-import { resolveStagePrep } from '../types/workspace'
+import { resolveStagePrep, researchToProjectRefs } from '../types/workspace'
+import { ProjectReferenceSheet } from '../components/ProjectReferenceSheet'
 import { SystemDesignWalkthrough } from './SystemDesignWalkthrough'
 
 interface SystemDesignWorkspaceProps {
@@ -198,32 +197,27 @@ function SystemToursGroup({ tours }: { readonly tours: readonly SystemTour[] }) 
   )
 }
 
-/** Framework to have ready — single row whose detail is the six-step framework. */
+/** Framework to have ready — static inline section (no group dropdown, no rail).
+ *  Each step keeps its own inline collapsible dropdown on the page. */
 function FrameworkGroup() {
   return (
-    <SummaryGroup
-      id="framework"
-      title="Framework to have ready"
-      subtitle="Drive the discussion with a repeatable structure."
-    >
-      <SummaryRow
-        id="framework-six-step"
-        label="Framework to have ready"
-        detail={
-          <Card className="px-4">
-            {FRAMEWORK.map(({ step, prompts }) => (
-              <CollapsibleSection key={step} title={step}>
-                <ul className="list-disc space-y-1 pl-5">
-                  {prompts.map(prompt => (
-                    <li key={prompt}>{prompt}</li>
-                  ))}
-                </ul>
-              </CollapsibleSection>
-            ))}
-          </Card>
-        }
-      />
-    </SummaryGroup>
+    <section className="space-y-3 rounded-md border border-zinc-200 bg-zinc-50/50 p-4 dark:border-white/10 dark:bg-white/2">
+      <div>
+        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Framework to have ready</h3>
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">Drive the discussion with a repeatable structure.</p>
+      </div>
+      <div className="rounded-md bg-white px-4 ring-1 ring-zinc-200 shadow-sm dark:bg-white/2 dark:ring-0 dark:inset-ring dark:inset-ring-white/10 dark:shadow-none">
+        {FRAMEWORK.map(({ step, prompts }) => (
+          <CollapsibleSection key={step} title={step}>
+            <ul className="list-disc space-y-1 pl-5 text-sm text-zinc-600 dark:text-zinc-300">
+              {prompts.map(prompt => (
+                <li key={prompt}>{prompt}</li>
+              ))}
+            </ul>
+          </CollapsibleSection>
+        ))}
+      </div>
+    </section>
   )
 }
 
@@ -237,8 +231,8 @@ function FrameworkGroup() {
  * Renders a fragment of SummaryGroups into the WorkspaceShell's left column.
  */
 export function SystemDesignWorkspace({ detail }: SystemDesignWorkspaceProps) {
-  const stageUserState = detail.stages?.['system-design']?.user_state as Partial<import('../hooks/useStageDraft').StageDraft> | undefined
-  const { draft, setSchedule } = useStageDraft(detail.slug, 'system-design', stageUserState)
+  // Schedule & format is edited from the dashboard SchedulePanel (shared draft via
+  // StageDraftProvider), so the workspace no longer owns a stage-draft instance.
 
   // Surface the grounded system-tour walkthroughs only when the user actually
   // has tours AND the round is a system-design / architecture-review round (or
@@ -254,18 +248,10 @@ export function SystemDesignWorkspace({ detail }: SystemDesignWorkspaceProps) {
   const walkthrough = prep?.systemDesignWalkthrough ?? []
   const coverage = prep?.systemDesignCoverage ?? null
 
+  const projectRefs = researchToProjectRefs(detail.research)
+
   return (
     <>
-      {/* Schedule + format — primary editable control, rendered inline */}
-      <SummaryGroup id="schedule" title="Schedule & format">
-        <ScheduleCard
-          scheduleAt={draft.scheduleAt}
-          formatNote={draft.formatNote}
-          onChange={setSchedule}
-          formatPlaceholder="e.g. 45m design + 15m questions"
-        />
-      </SummaryGroup>
-
       {walkthrough.length > 0 ? (
         <SystemDesignWalkthrough cards={walkthrough} coverage={coverage} />
       ) : (
@@ -273,6 +259,8 @@ export function SystemDesignWorkspace({ detail }: SystemDesignWorkspaceProps) {
       )}
 
       <SystemToursGroup tours={tours} />
+
+      <ProjectReferenceSheet refs={projectRefs} />
 
       <FrameworkGroup />
     </>

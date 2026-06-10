@@ -30,7 +30,7 @@ export function ComponentCard({ component, repositories, staged, disabled = fals
   return (
     <div
       ref={setNodeRef}
-      className={`rounded-xl bg-white/2 inset-ring inset-ring-white/10 transition-opacity ${
+      className={`rounded-md bg-white/2 inset-ring inset-ring-white/10 transition-opacity ${
         isDragging ? 'opacity-40' : ''
       } ${staged ? 'inset-ring-teal-400/40' : ''}`}
     >

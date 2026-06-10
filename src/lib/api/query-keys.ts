@@ -73,6 +73,8 @@ export const adminKeys = {
     /** Individual application detail */
     detail: (slug: string) =>
       ['admin', 'applications', 'detail', slug] as const,
+    /** All scheduled interviews (calendar) */
+    scheduledInterviews: ['admin', 'applications', 'scheduled-interviews'] as const,
   },
 
   /** GitHub integration query keys */

@@ -13,23 +13,29 @@ import {
 const DEFAULT: ProjectFilterValue = { type: 'all', status: 'all' }
 
 describe('ProjectFilterBar', () => {
-  it('marks the active chip via aria-pressed', () => {
-    render(<ProjectFilterBar value={{ type: 'open_source', status: 'all' }} onChange={vi.fn()} />)
-    const active = screen.getByRole('button', { name: 'Open source' })
-    expect(active.getAttribute('aria-pressed')).toBe('true')
+  it('renders the current filter selections + the search trigger', () => {
+    render(
+      <ProjectFilterBar value={{ type: 'open_source', status: 'all' }} onChange={vi.fn()} onSearchClick={vi.fn()} />,
+    )
+    // The dropdown triggers show the selected labels.
+    expect(screen.getByText('Open source')).toBeTruthy()
+    expect(screen.getByText('Any status')).toBeTruthy()
+    // The standardised search trigger is present.
+    expect(screen.getByRole('button', { name: /search projects/i })).toBeTruthy()
   })
 
-  it('emits onChange with the next type when a chip is clicked', async () => {
+  it('calls onSearchClick when the search trigger is clicked', async () => {
+    const onSearchClick = vi.fn()
+    render(<ProjectFilterBar value={DEFAULT} onChange={vi.fn()} onSearchClick={onSearchClick} />)
+    await userEvent.click(screen.getByRole('button', { name: /search projects/i }))
+    expect(onSearchClick).toHaveBeenCalledTimes(1)
+  })
+
+  it('emits onChange when a type is selected from the dropdown', async () => {
     const onChange = vi.fn()
-    render(<ProjectFilterBar value={DEFAULT} onChange={onChange} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Open source' }))
+    render(<ProjectFilterBar value={DEFAULT} onChange={onChange} onSearchClick={vi.fn()} />)
+    await userEvent.click(screen.getByRole('button', { name: /all types/i }))
+    await userEvent.click(screen.getByRole('option', { name: 'Open source' }))
     expect(onChange).toHaveBeenCalledWith({ type: 'open_source', status: 'all' })
-  })
-
-  it('emits onChange preserving the type when a status chip is clicked', async () => {
-    const onChange = vi.fn()
-    render(<ProjectFilterBar value={{ type: 'side_project', status: 'all' }} onChange={onChange} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Active' }))
-    expect(onChange).toHaveBeenCalledWith({ type: 'side_project', status: 'active' })
   })
 })

@@ -39,7 +39,7 @@ export function SplitPanel({
   return (
     <div
       ref={setNodeRef}
-      className={`rounded-2xl bg-white/2 p-4 inset-ring transition-colors ${
+      className={`rounded-md bg-white/2 p-4 inset-ring transition-colors ${
         isOver ? 'inset-ring-teal-400/50 bg-teal-400/5' : 'inset-ring-white/10'
       }`}
     >
@@ -51,7 +51,7 @@ export function SplitPanel({
       </div>
 
       {stagedComponents.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center text-xs text-zinc-500">
+        <p className="rounded-md border border-dashed border-white/10 px-4 py-8 text-center text-xs text-zinc-500">
           Drag components here to carve them into a new project.
         </p>
       ) : (

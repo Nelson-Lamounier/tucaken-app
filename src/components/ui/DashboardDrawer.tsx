@@ -2,7 +2,7 @@
 
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react'
 import { XMarkIcon } from '@heroicons/react/24/outline'
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 
 export interface DashboardDrawerProps {
   readonly isOpen: boolean
@@ -14,18 +14,12 @@ export interface DashboardDrawerProps {
   readonly unstyledContent?: boolean
   readonly fullBleed?: boolean
   /**
-   * Render as a non-modal slide-over: no focus trap, scroll lock, inert
-   * background, or outside-click close. The sidebar and header stay interactive,
-   * so nav links navigate in a single click and the theme toggle does not close
-   * the panel. Close via the X button, a Cancel action, or the Escape key.
+   * When false, the drawer is NON-MODAL: it does not trap focus, does not mark
+   * the rest of the page inert, and does not close on outside click — so the
+   * surrounding chrome (header nav, theme toggle) stays fully interactive while
+   * the drawer is open. Closes only via the X button. Default true (modal Dialog).
    */
-  readonly nonModal?: boolean
-  /**
-   * Use a theme-adaptive surface (white in light mode, zinc-900 in dark) instead
-   * of the default always-dark panel. Only opt in when the drawer's content also
-   * supports light mode, or its text becomes unreadable on the light surface.
-   */
-  readonly lightSurface?: boolean
+  readonly modal?: boolean
 }
 
 export function DashboardDrawer({
@@ -37,95 +31,49 @@ export function DashboardDrawer({
   actions,
   unstyledContent = false,
   fullBleed = false,
-  nonModal = false,
-  lightSurface = false,
+  modal = true,
 }: DashboardDrawerProps) {
-  // Surface classes: adaptive (light/dark) when opted in, else the legacy dark-only panel.
-  const surfaceClassName = lightSurface ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-900'
-  const borderColorClassName = lightSurface ? 'border-zinc-200 dark:border-white/10' : 'border-white/10'
-  const titleClassName = lightSurface ? 'text-zinc-900 dark:text-white' : 'text-white'
-  const descriptionClassName = lightSurface ? 'text-zinc-500 dark:text-zinc-400' : 'text-zinc-400'
-  const closeHoverClassName = lightSurface ? 'hover:text-zinc-900 dark:hover:text-white' : 'hover:text-white'
-  const panelClassName = `flex h-full flex-col overflow-y-auto ${surfaceClassName} shadow-2xl py-6 lg:border-l ${borderColorClassName}`
-  // Modal Dialog handles Escape itself; the non-modal slide-over needs parity.
-  useEffect(() => {
-    if (!nonModal || !isOpen) return
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [nonModal, isOpen, onClose])
-
-  const closeButton = (
-    <button
-      type="button"
-      onClick={onClose}
-      className={`rounded-md text-zinc-400 ${closeHoverClassName} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 transition-colors`}
-    >
-      <span className="sr-only">Close panel</span>
-      <XMarkIcon aria-hidden="true" className="size-6" />
-    </button>
-  )
-
-  const content = unstyledContent ? (
-    children
-  ) : (
-    <div className="h-full overflow-y-auto overflow-x-hidden no-scrollbar">
-      {children}
-    </div>
-  )
-
-  const contentWrapperClassName = `relative mt-6 flex-1 overflow-hidden flex flex-col${fullBleed ? '' : ' px-4 sm:px-6'}`
-
-  // ---------------------------------------------------------------------------
-  // Non-modal slide-over: chrome stays interactive (one-click nav, theme toggle
-  // keeps the panel open). Only the panel itself captures pointer events.
-  // ---------------------------------------------------------------------------
-  if (nonModal) {
-    return (
-      <div
-        aria-hidden={!isOpen}
-        className="pointer-events-none fixed inset-0 z-30 overflow-hidden"
-      >
-        <div className="pointer-events-none fixed top-16 bottom-0 right-0 flex w-full lg:w-[calc(100vw-18rem)]">
-          <div
-            role="dialog"
-            aria-label={typeof title === 'string' ? title : undefined}
-            aria-modal="false"
-            className={`pointer-events-auto w-full transform transition duration-500 ease-in-out sm:duration-700 ${
-              isOpen ? 'translate-x-0' : 'translate-x-full'
-            }`}
-          >
-            <div className={panelClassName}>
-              {/* Header */}
-              <div className="px-4 sm:px-6">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h2 className={`text-lg font-semibold ${titleClassName}`}>{title}</h2>
-                    {description && (
-                      <p className={`mt-1 text-sm ${descriptionClassName}`}>{description}</p>
-                    )}
-                  </div>
-                  <div className="ml-3 flex h-7 items-center gap-4">
-                    {actions}
-                    {closeButton}
-                  </div>
-                </div>
-              </div>
-
-              {/* Content */}
-              <div className={contentWrapperClassName}>{content}</div>
-            </div>
+  // Shared panel body — `Title` is DialogTitle (modal) or a plain h2 (non-modal).
+  const panelBody = (Title: typeof DialogTitle | 'h2') => (
+    <div className="flex h-full flex-col overflow-y-auto bg-white py-6 shadow-2xl lg:border-l lg:border-zinc-200 dark:bg-zinc-900 dark:lg:border-white/10">
+      {/* Header */}
+      <div className="px-4 sm:px-6">
+        <div className="flex items-start justify-between">
+          <div>
+            <Title className="text-lg font-semibold text-zinc-900 dark:text-white">{title}</Title>
+            {description && (
+              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{description}</p>
+            )}
+          </div>
+          <div className="ml-3 flex h-7 items-center gap-4">
+            {actions}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md text-zinc-500 transition-colors hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-zinc-400 dark:hover:text-white"
+            >
+              <span className="sr-only">Close panel</span>
+              <XMarkIcon aria-hidden="true" className="size-6" />
+            </button>
           </div>
         </div>
       </div>
-    )
+
+      {/* Content */}
+      <div className={`relative mt-6 flex-1 overflow-hidden flex flex-col${fullBleed ? '' : ' px-4 sm:px-6'}`}>
+        {unstyledContent ? (
+          children
+        ) : (
+          <div className="h-full overflow-y-auto overflow-x-hidden no-scrollbar">{children}</div>
+        )}
+      </div>
+    </div>
+  )
+
+  if (!modal) {
+    return <NonModalDrawer isOpen={isOpen}>{panelBody('h2')}</NonModalDrawer>
   }
 
-  // ---------------------------------------------------------------------------
-  // Default: modal Dialog (focus trap, scroll lock, outside-click + Escape close).
-  // ---------------------------------------------------------------------------
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-30" unmount>
       {/* Backdrop — pointer-events-none keeps it invisible to clicks */}
@@ -139,32 +87,41 @@ export function DashboardDrawer({
               transition
               className="pointer-events-auto w-full transform transition duration-500 ease-in-out data-closed:translate-x-full sm:duration-700"
             >
-              <div className={panelClassName}>
-                {/* Header */}
-                <div className="px-4 sm:px-6">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <DialogTitle className={`text-lg font-semibold ${titleClassName}`}>
-                        {title}
-                      </DialogTitle>
-                      {description && (
-                        <p className={`mt-1 text-sm ${descriptionClassName}`}>{description}</p>
-                      )}
-                    </div>
-                    <div className="ml-3 flex h-7 items-center gap-4">
-                      {actions}
-                      {closeButton}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div className={contentWrapperClassName}>{content}</div>
-              </div>
+              {panelBody(DialogTitle)}
             </DialogPanel>
           </div>
         </div>
       </div>
     </Dialog>
+  )
+}
+
+/**
+ * Non-modal slide-over: plain DOM (no Headless UI Dialog), so the rest of the
+ * page is NOT made inert and stays interactive. No focus trap, no outside-click
+ * close. The dimming backdrop is pointer-events-none so chrome clicks pass through.
+ */
+function NonModalDrawer({ isOpen, children }: { readonly isOpen: boolean; readonly children: React.ReactNode }) {
+  const [entered, setEntered] = useState(false)
+  useEffect(() => {
+    if (!isOpen) { setEntered(false); return }
+    // Next frame so the translate-x transition runs on open.
+    const id = requestAnimationFrame(() => setEntered(true))
+    return () => cancelAnimationFrame(id)
+  }, [isOpen])
+
+  if (!isOpen) return null
+
+  return (
+    <div className="relative z-30">
+      <div aria-hidden="true" className="fixed inset-0 bg-black/80 backdrop-blur-sm pointer-events-none" />
+      <div className="pointer-events-none fixed top-16 bottom-0 right-0 flex w-full lg:w-[calc(100vw-18rem)]">
+        <div
+          className={`pointer-events-auto w-full transform transition-transform duration-500 ease-in-out sm:duration-700 ${entered ? 'translate-x-0' : 'translate-x-full'}`}
+        >
+          {children}
+        </div>
+      </div>
+    </div>
   )
 }

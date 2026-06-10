@@ -12,7 +12,7 @@ export function Challenges({ items }: { readonly items: ProjectChallenge[] }) {
           {items.map((c) => (
             <li
               key={c.id}
-              className="rounded-xl bg-white/2 px-4 py-3 inset-ring inset-ring-white/10"
+              className="rounded-md bg-white/2 px-4 py-3 inset-ring inset-ring-white/10"
             >
               <p className="text-sm font-medium text-zinc-100">{c.problem}</p>
               {c.solution && (

@@ -33,6 +33,7 @@ jest.unstable_mockModule('../../src/lib/repositories/applications.js', () => ({
   deleteApplication:       pgDeleteApplicationMock,
   updateApplicationStatus: pgUpdateApplicationStatusMock,
   updateInterviewStage:    jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  advanceStatusOffAnalysis: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
   updateApplicationAnnotations: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 }));
 
@@ -41,6 +42,7 @@ jest.unstable_mockModule('../../src/lib/repositories/interview-stages.js', () =>
   markNotApplicable:     jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
   linkCoachRun:          jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
   getStagesForApp:       jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
+  listScheduledInterviews: jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
   reconcilePrepStatus:   jest.fn(),
   advanceStageLifecycle: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
   STAGE_OUTCOMES:        ['advanced', 'rejected', 'withdrew', 'not_completed', 'skipped'],
@@ -255,6 +257,7 @@ describe('GET /:slug — application detail', () => {
       metadata:          null,
       resumeSuggestions: ['Add Kubernetes'],
       tailoredResume:    { basics: { name: 'Nelson' } },
+      atsCheck:          null,
     });
     // research: pipeline field names normalised to UI ResearchOutput shape.
     expect(body.application['research']).toEqual({

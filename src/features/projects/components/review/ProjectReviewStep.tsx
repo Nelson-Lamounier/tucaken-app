@@ -33,7 +33,7 @@ export function ProjectReviewStep({ onComplete }: ProjectReviewStepProps) {
   if (isPending) return <ReviewSkeleton />
   if (isError) {
     return (
-      <div className="rounded-2xl bg-rose-400/5 px-6 py-10 text-center inset-ring inset-ring-rose-400/30">
+      <div className="rounded-md bg-rose-400/5 px-6 py-10 text-center inset-ring inset-ring-rose-400/30">
         <p className="text-sm font-medium text-rose-300">Couldn't load proposals</p>
         <p className="mt-1 text-xs text-rose-300/80">{error instanceof Error ? error.message : 'Unknown error'}</p>
       </div>
@@ -61,8 +61,8 @@ export function ProjectReviewStep({ onComplete }: ProjectReviewStepProps) {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-start gap-3 rounded-2xl bg-white/2 px-5 py-4 inset-ring inset-ring-white/10">
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-indigo-400/10 text-indigo-300 inset-ring inset-ring-indigo-400/30">
+      <div className="flex items-start gap-3 rounded-md bg-white/2 px-5 py-4 inset-ring inset-ring-white/10">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-indigo-400/10 text-indigo-300 inset-ring inset-ring-indigo-400/30">
           <Sparkles className="size-4" />
         </span>
         <div>
@@ -101,8 +101,8 @@ function AllReviewed({
   readonly isPro:       boolean
 }) {
   return (
-    <div className="flex flex-col items-center gap-4 rounded-2xl bg-white/2 px-6 py-16 text-center inset-ring inset-ring-white/10">
-      <span className="flex size-12 items-center justify-center rounded-2xl bg-emerald-400/10 text-emerald-300 inset-ring inset-ring-emerald-400/30">
+    <div className="flex flex-col items-center gap-4 rounded-md bg-white/2 px-6 py-16 text-center inset-ring inset-ring-white/10">
+      <span className="flex size-12 items-center justify-center rounded-md bg-emerald-400/10 text-emerald-300 inset-ring inset-ring-emerald-400/30">
         <CheckCircle2 className="size-6" />
       </span>
       <div className="max-w-sm space-y-1">
@@ -149,9 +149,9 @@ function AllReviewed({
 function ReviewSkeleton() {
   return (
     <div className="space-y-3" aria-label="Loading proposals">
-      <div className="h-16 animate-pulse rounded-2xl bg-white/2 inset-ring inset-ring-white/10" />
+      <div className="h-16 animate-pulse rounded-md bg-white/2 inset-ring inset-ring-white/10" />
       {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="h-20 animate-pulse rounded-2xl bg-white/2 inset-ring inset-ring-white/10" />
+        <div key={i} className="h-20 animate-pulse rounded-md bg-white/2 inset-ring inset-ring-white/10" />
       ))}
     </div>
   )

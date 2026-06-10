@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import type { ApplicationDetail, ApplicationStatus } from '@/lib/types/applications.types'
+import type { ApplicationDetail, ApplicationStatus, InterviewStage } from '@/lib/types/applications.types'
 import { adminKeys } from '@/lib/api/query-keys'
 import { useToastStore } from '@/lib/stores/toast-store'
 import { DashboardDrawer } from '@/components/ui/DashboardDrawer'
@@ -25,6 +25,8 @@ import { mapApplicationToBuilderState } from '../utils/resume-adapters'
 
 interface ApplicationActionsMenuProps {
   readonly detail: ApplicationDetail
+  /** The stage tab currently being viewed (?stage=) — resume actions show on 'applied'. */
+  readonly viewedStage: InterviewStage
   /** Status-select props — the menu doubles as the status control. */
   readonly statusLabel: ReactNode
   readonly statusOptions: ReadonlyArray<{ label: string; value: string }>
@@ -40,6 +42,7 @@ interface ApplicationActionsMenuProps {
  */
 export function ApplicationActionsMenu({
   detail,
+  viewedStage,
   statusLabel,
   statusOptions,
   statusValue,
@@ -53,6 +56,10 @@ export function ApplicationActionsMenu({
   const [isBuilderOpen, setIsBuilderOpen] = useState(false)
   const [builderKey, setBuilderKey] = useState(0)
   const prevStateRef = useRef<AppState | null>(null)
+
+  // Resume attachments / edit / publish are relevant when viewing the Applied
+  // stage tab (?stage=applied) — not gated on the application's furthest stage.
+  const isApplied = viewedStage === 'applied'
 
   const handleOpenBuilder = useCallback(() => {
     if (!detail.analysis?.tailoredResume) return
@@ -158,14 +165,14 @@ export function ApplicationActionsMenu({
         options={statusOptions}
         selectedValue={statusValue}
         onSelect={val => onStatusChange(val as ApplicationStatus)}
-        onDownloadResume={hasTailoredResume ? handleDownloadResume : undefined}
-        onDownloadCoverLetter={detail.analysis?.coverLetter ? handleDownloadCoverLetter : undefined}
-        onEdit={hasTailoredResume ? handleOpenBuilder : undefined}
-        onPublish={hasTailoredResume ? () => publishMutation.mutate() : undefined}
+        onDownloadResume={isApplied && hasTailoredResume ? handleDownloadResume : undefined}
+        onDownloadCoverLetter={isApplied && detail.analysis?.coverLetter ? handleDownloadCoverLetter : undefined}
+        onEdit={isApplied && hasTailoredResume ? handleOpenBuilder : undefined}
+        onPublish={isApplied && hasTailoredResume ? () => publishMutation.mutate() : undefined}
         onDelete={() => deleteMutation.mutate()}
       />
 
-      {detail.analysis?.tailoredResume && (
+      {isApplied && detail.analysis?.tailoredResume && (
         <DashboardDrawer
           isOpen={isBuilderOpen}
           onClose={handleCloseBuilder}
@@ -173,6 +180,7 @@ export function ApplicationActionsMenu({
           description={`${detail.targetCompany} — ${detail.targetRole}`}
           unstyledContent
           fullBleed
+          modal={false}
         >
           {isBuilderOpen && <ResumeBuilderApp key={builderKey} onClose={handleCloseBuilder} />}
         </DashboardDrawer>

@@ -28,12 +28,14 @@ import { buildPipelineJob, sanitizeLabel } from '../lib/k8s-job-builder.js';
 import { getBatchApi } from '../lib/k8s.js';
 import { getPool, withUser } from '../lib/pg.js';
 import type { Queryable } from '../lib/pg.js';
+import { loadProjectRefIndex, rankProjectsForSkills } from '../lib/repositories/project-references.js';
 import { logger } from '../lib/observability/logger.js';
 import {
   listApplications,
   getApplication,
   updateApplicationStatus as pgUpdateStatus,
   updateInterviewStage,
+  advanceStatusOffAnalysis,
   deleteApplication as pgDeleteApplication,
   updateApplicationAnnotations,
 } from '../lib/repositories/applications.js';
@@ -42,6 +44,7 @@ import {
   markNotApplicable as pgMarkNotApplicable,
   linkCoachRun,
   getStagesForApp,
+  listScheduledInterviews,
   advanceStageLifecycle,
   setStageOutcome,
   isStageOutcome,
@@ -171,6 +174,23 @@ function normaliseResearch(raw: Record<string, unknown>): Record<string, unknown
   return result;
 }
 
+/**
+ * Collect the topic skills (verified + partial + gap) from a normalised research
+ * object, for ranking project references. Tolerant of shape — reads `.skill`.
+ */
+function collectResearchSkills(research: Record<string, unknown>): string[] {
+  const skills: string[] = [];
+  for (const key of ['verifiedMatches', 'partialMatches', 'gaps']) {
+    const arr = research[key];
+    if (!Array.isArray(arr)) continue;
+    for (const item of arr) {
+      const skill = (item as Record<string, unknown>)?.['skill'];
+      if (typeof skill === 'string' && skill.trim().length > 0) skills.push(skill);
+    }
+  }
+  return skills;
+}
+
 // ── Shared coach dispatch helpers ─────────────────────────────────────────────
 
 /**
@@ -255,7 +275,7 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
         jobUrl:         a.jobUrl ?? null,
         fitRating:      null,
         recommendation: null,
-        interviewStage: 'applied',
+        interviewStage: a.interviewStage,
         costUsd:        null,
         appliedAt:      a.appliedAt ?? null,
         createdAt:      a.createdAt ?? null,
@@ -279,6 +299,31 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
         return { ...t, band, context };
       });
       return ctx.json({ summary, transitions: framed, ranges: FUNNEL_RANGES });
+    });
+  });
+
+  // ── GET /scheduled-interviews — all scheduled stages, for the calendar ───
+  /**
+   * Lists every interview stage with a `scheduled_at` for the caller's own
+   * applications (RLS-scoped), joined to company/role/status. Registered before
+   * `/:slug` so the literal path is not captured as a slug.
+   */
+  app.get('/scheduled-interviews', async (ctx) => {
+    const userId = ctx.get('userId');
+    if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
+
+    return withUser(getPool(config), userId, async (db) => {
+      const rows = await listScheduledInterviews(db);
+      const interviews = rows.map(r => ({
+        slug:        r.slug,
+        company:     r.company,
+        role:        r.role,
+        status:      r.kanban_status,
+        stage:       r.stage_type,
+        stageStatus: r.stage_status,
+        scheduledAt: r.scheduled_at,
+      }));
+      return ctx.json({ interviews, count: interviews.length });
     });
   });
 
@@ -331,11 +376,12 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
       );
 
       const resumeResult = await db.query<{
-        id:           string;
-        content_json: unknown;
-        generated_at: Date;
+        id:             string;
+        content_json:   unknown;
+        ats_check_json: unknown;
+        generated_at:   Date;
       }>(
-        `SELECT id, content_json, generated_at
+        `SELECT id, content_json, ats_check_json, generated_at
            FROM resumes WHERE job_application_id = $1
           ORDER BY generated_at DESC LIMIT 1`,
         [slug],
@@ -419,12 +465,30 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
         metadata:          rawAnalysis['metadata'] ?? null,
         resumeSuggestions: rawAnalysis['resumeSuggestions'] ?? null,
         tailoredResume:    persistedResume ?? rawAnalysis['tailoredResumeData'] ?? null,
+        // ATS check for the persisted tailored resume (resumes.ats_check_json).
+        atsCheck:          resumeResult.rows[0]?.ats_check_json ?? null,
       } : null;
 
       // Map research agent output → ResearchOutput shape.
       // Field names differ between the pipeline contract (@bedrock/shared) and
       // the UI types (applications.types.ts), so we normalise here.
       const research = rawResearch ? normaliseResearch(rawResearch) : null;
+
+      // Rank the user's documented projects against the stage topics (verified /
+      // partial / gap skills) so the UI can deep-link project references per topic.
+      // Deterministic + RLS-scoped + fail-open — empty map on any issue.
+      if (research) {
+        try {
+          const skills = collectResearchSkills(research);
+          if (skills.length > 0) {
+            const refIndex = await loadProjectRefIndex(db);
+            const refs = rankProjectsForSkills(refIndex, skills);
+            if (Object.keys(refs).length > 0) research['topicProjectRefs'] = refs;
+          }
+        } catch (err) {
+          console.error('[applications/detail] project-reference ranking failed (non-fatal)', err);
+        }
+      }
 
       // DevOps real-work evidence: technology_evidence ⋈ technology_ontology ⋈ devops_topic_mappings.
       // Reuses the outer withUser-scoped db client (RLS). Prose-suppressed. Fail-open.
@@ -568,6 +632,12 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
       }
 
       await upsertStageUserState(db, application.id, stage, body.userState ?? {}, body.scheduleAt ?? null);
+
+      // Scheduling a stage means interview prep has begun — move off the transient
+      // analysis status so the list stops reading "Ready for Review".
+      if (body.scheduleAt) {
+        await advanceStatusOffAnalysis(db, application.id);
+      }
 
       if (body.scheduleAt && isPrepStage(stage)) {
         const { createJob, insertCoachRunAdapter } = makeCoachAdapters(config, slug);

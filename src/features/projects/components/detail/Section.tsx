@@ -8,7 +8,7 @@ export interface SectionProps {
 
 export function Section({ icon: Icon, title, subtitle, action, children }: SectionProps) {
   return (
-    <section className="overflow-hidden rounded-2xl bg-white/2 inset-ring inset-ring-white/10">
+    <section className="overflow-hidden rounded-md bg-white/2 inset-ring inset-ring-white/10">
       <header className="flex items-start justify-between gap-3 border-b border-white/5 px-6 py-4">
         <div className="flex min-w-0 items-center gap-2">
           {Icon && (

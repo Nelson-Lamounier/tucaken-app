@@ -46,7 +46,7 @@ function DecisionCard({ projectId, decision }: DecisionCardProps) {
   const remove = useDeleteDecision(projectId)
 
   return (
-    <li className="rounded-xl bg-white/2 px-4 py-3 inset-ring inset-ring-white/10">
+    <li className="rounded-md bg-white/2 px-4 py-3 inset-ring inset-ring-white/10">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <InlineText

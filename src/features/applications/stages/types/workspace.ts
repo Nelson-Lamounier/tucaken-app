@@ -4,6 +4,7 @@ import type {
   InterviewPrepOutput,
   ResearchOutput,
   CoachingNotes,
+  CoachingSection,
 } from '@/lib/types/applications.types'
 
 // =============================================================================
@@ -90,8 +91,8 @@ export interface StageWorkspaceData {
   readonly projectRefs: readonly ProjectReference[]
   /** Questions to ask the interviewer — real, from the Coach Agent. */
   readonly questionsToAsk: readonly ChecklistEntry[]
-  /** Stage coaching — structured object (new) or legacy Markdown string. */
-  readonly coachingNotes: string | CoachingNotes | null
+  /** Stage coaching — sections array (new), or legacy object / Markdown string. */
+  readonly coachingNotes: string | CoachingNotes | readonly CoachingSection[] | null
 }
 
 /**
@@ -103,19 +104,26 @@ export interface StageWorkspaceData {
  */
 export function researchToTopics(research: ResearchOutput | null): readonly EvidenceTopic[] {
   if (!research) return []
+  const refsFor = (skill: string): readonly ProjectReference[] =>
+    (research.topicProjectRefs?.[skill.trim().toLowerCase()] ?? []).map((r) => ({
+      id: r.id,
+      title: r.title,
+      pitch: r.pitch,
+      highlights: r.highlights,
+    }))
   const strong: EvidenceTopic[] = research.verifiedMatches.map((m, i) => ({
     id: `vm-${String(i)}`,
     title: m.skill,
     strength: 'strong',
     summary: m.sourceCitation,
-    projectRefs: [], // BACKEND: follow-on (topic→project linkage)
+    projectRefs: refsFor(m.skill),
   }))
   const moderate: EvidenceTopic[] = research.partialMatches.map((m, i) => ({
     id: `pm-${String(i)}`,
     title: m.skill,
     strength: 'moderate',
     summary: m.gapDescription,
-    projectRefs: [],
+    projectRefs: refsFor(m.skill),
     beHonest: m.framingSuggestion,
   }))
   const none: EvidenceTopic[] = research.gaps.map((g, i) => ({
@@ -123,10 +131,27 @@ export function researchToTopics(research: ResearchOutput | null): readonly Evid
     title: g.skill,
     strength: 'none',
     summary: g.severity,
-    projectRefs: [],
+    projectRefs: refsFor(g.skill),
     beHonest: `Acknowledge the gap directly${g.isDisqualifying ? ' — this one is weighted heavily for the role' : ''}.`,
   }))
   return [...strong, ...moderate, ...none]
+}
+
+/**
+ * Ranked project references for the whole stage ("Your project reference sheet")
+ * — union of per-topic refs, deduped by project id, most-referenced first.
+ */
+export function researchToProjectRefs(research: ResearchOutput | null): readonly ProjectReference[] {
+  if (!research?.topicProjectRefs) return []
+  const byId = new Map<string, { ref: ProjectReference; count: number }>()
+  for (const refs of Object.values(research.topicProjectRefs)) {
+    for (const r of refs) {
+      const existing = byId.get(r.id)
+      if (existing) existing.count += 1
+      else byId.set(r.id, { ref: { id: r.id, title: r.title, pitch: r.pitch, highlights: r.highlights }, count: 1 })
+    }
+  }
+  return [...byId.values()].sort((a, b) => b.count - a.count).map((e) => e.ref)
 }
 
 /**

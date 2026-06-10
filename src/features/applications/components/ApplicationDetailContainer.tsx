@@ -18,7 +18,7 @@ import { BarRaiserWorkspace } from '../stages/workspaces/BarRaiserWorkspace'
 import { FinalWorkspace } from '../stages/workspaces/FinalWorkspace'
 import { AppliedWorkspace } from '../stages/workspaces/AppliedWorkspace'
 import { StageGlancePanel } from './StageGlancePanel'
-import { StagePositioning } from '../stages/components/CoachingSections'
+import { StageCoachingNarrative } from '../stages/components/CoachingSections'
 import { StageDraftProvider } from '../stages/hooks/stage-draft-context'
 import type { StageDraft } from '../stages/hooks/useStageDraft'
 import { STAGE_ORDER, stageIndex } from '../stages/types/stage'
@@ -39,7 +39,7 @@ import {
  * in a StageDraftProvider so the panel and the workspace share one persisted
  * draft. Phone-screen and technical mirror this layout.
  */
-const STAGE_USES_DRAFT_PROVIDER = new Set<InterviewStage>(['phone-screen', 'technical'])
+const STAGE_USES_DRAFT_PROVIDER = new Set<InterviewStage>(['phone-screen', 'technical', 'system-design', 'behavioural', 'bar-raiser'])
 
 /** Returns the bare workspace node for a stage — no gate, no callbacks. */
 function stageWorkspaceNode(stage: InterviewStage, detail: ApplicationDetail) {
@@ -79,6 +79,7 @@ function ApplicationErrorState({ message, onBack }: ApplicationErrorStateProps) 
 
 interface ApplicationHeaderProps {
   readonly detail: ApplicationDetail
+  readonly viewedStage: InterviewStage
   readonly statusPending: boolean
   readonly onStatusChange: (status: ApplicationStatus) => void
   readonly dateStr: string
@@ -89,7 +90,7 @@ interface ApplicationHeaderProps {
  * status control. Mirrors the KB dashboard header (title + subtitle + action);
  * the at-a-glance stat tiles render beneath it via StageGlancePanel.
  */
-function ApplicationHeader({ detail, statusPending, onStatusChange, dateStr }: ApplicationHeaderProps) {
+function ApplicationHeader({ detail, viewedStage, statusPending, onStatusChange, dateStr }: ApplicationHeaderProps) {
   return (
     <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-center gap-3">
@@ -111,6 +112,7 @@ function ApplicationHeader({ detail, statusPending, onStatusChange, dateStr }: A
 
       <ApplicationActionsMenu
         detail={detail}
+        viewedStage={viewedStage}
         statusLabel={STATUS_LABELS[detail.status]}
         statusOptions={STATUS_OPTIONS}
         statusValue={detail.status}
@@ -245,8 +247,9 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
   // workspace share one persisted draft (see below).
   const stageRegion = (
     <>
-      {/* Coach's stage positioning — frames the round, sits above the dashboards */}
-      {STAGE_USES_DRAFT_PROVIDER.has(resolvedStage) && <StagePositioning detail={detail} stage={resolvedStage} />}
+      {/* Coach's notes as the page intro — an ordered narrative of sections, above
+          the dashboards. Null-safe: renders only when the stage has coaching. */}
+      <StageCoachingNarrative detail={detail} stage={resolvedStage} />
 
       {/* At-a-glance dashboard panel — dynamic per active stage */}
       <StageGlancePanel detail={detail} stage={resolvedStage} />
@@ -317,6 +320,7 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
       {/* Page header */}
       <ApplicationHeader
         detail={detail}
+        viewedStage={resolvedStage}
         statusPending={statusMutation.isPending}
         onStatusChange={handleStatusChange}
         dateStr={dateStr}
