@@ -30,6 +30,8 @@ export function ResumeMenuSelect({ resumeId, onChange }: ResumeMenuSelectProps) 
   const sorted = useMemo(() => (resumes ? sortResumes(resumes) : []), [resumes])
 
   // Resolve the default exactly once: only while resumeId is still unresolved (null).
+  // `sorted` stays in the dep array for correctness, but the `resumeId !== null` guard
+  // makes any later re-fire (e.g. a query refetch) a no-op — do not remove that guard.
   useEffect(() => {
     if (resumeId !== null || isLoading) return
     onChange(sorted.length > 0 ? sorted[0].resumeId : BUILD_FROM_SCRATCH)
@@ -54,7 +56,7 @@ export function ResumeMenuSelect({ resumeId, onChange }: ResumeMenuSelectProps) 
         className="inline-flex items-center gap-2 rounded-md bg-zinc-100 dark:bg-white/5 px-3 py-1.5 text-sm text-zinc-900 dark:text-white outline-1 -outline-offset-1 outline-zinc-300 dark:outline-white/10 hover:bg-zinc-200 dark:hover:bg-white/10 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-teal-500 transition-colors"
       >
         {selected ? <DocumentTextIcon className="size-4 text-zinc-500" /> : <Wand2 className="size-4 text-violet-500" />}
-        <span className="max-w-[12rem] truncate">{buttonLabel}</span>
+        <span className="max-w-48 truncate">{buttonLabel}</span>
         <ChevronUpDownIcon aria-hidden="true" className="size-4 text-zinc-400" />
       </ListboxButton>
 
