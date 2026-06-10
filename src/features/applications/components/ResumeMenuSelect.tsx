@@ -36,7 +36,10 @@ export function ResumeMenuSelect({ resumeId, onChange }: ResumeMenuSelectProps) 
     onChange(sorted.length > 0 ? sorted[0].resumeId : BUILD_FROM_SCRATCH)
   }, [resumeId, isLoading, sorted, onChange])
 
-  if (isLoading || resumeId === null) {
+  // Only show the skeleton during a genuine fetch. Once data is present we can
+  // render immediately using the resolved default, even before the parent's
+  // `resumeId` flips from `null` (the effect above syncs it a tick later).
+  if (isLoading) {
     return (
       <div
         className="h-8 w-44 animate-pulse rounded-md bg-zinc-200 dark:bg-white/10"
@@ -46,11 +49,13 @@ export function ResumeMenuSelect({ resumeId, onChange }: ResumeMenuSelectProps) 
   }
 
   const hasNoResumes = sorted.length === 0
-  const selected = sorted.find((r) => r.resumeId === resumeId)
+  const defaultId = hasNoResumes ? BUILD_FROM_SCRATCH : sorted[0].resumeId
+  const effectiveId = resumeId ?? defaultId
+  const selected = sorted.find((r) => r.resumeId === effectiveId)
   const buttonLabel = selected ? selected.label : 'Build from scratch with agent'
 
   return (
-    <Listbox value={resumeId} onChange={onChange} as="div" className="relative">
+    <Listbox value={effectiveId} onChange={onChange} as="div" className="relative">
       <ListboxButton
         aria-label={`Select resume — ${buttonLabel}`}
         className="inline-flex items-center gap-2 rounded-md bg-zinc-100 dark:bg-white/5 px-3 py-1.5 text-sm text-zinc-900 dark:text-white outline-1 -outline-offset-1 outline-zinc-300 dark:outline-white/10 hover:bg-zinc-200 dark:hover:bg-white/10 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-teal-500 transition-colors"

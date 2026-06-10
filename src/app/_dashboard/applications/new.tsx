@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { NewAnalysisPanel } from '@/features/applications/components/NewAnalysisPanel'
+import { resumeVersionsQueryOptions } from '@/features/applications/hooks/use-resume-versions'
 import { DashboardPage } from '@/components/layouts/DashboardPage'
 
 export const Route = createFileRoute('/_dashboard/applications/new')({
+  // Prefetch the resume list so the picker resolves on first render (no skeleton flash).
+  loader: ({ context }) => context.queryClient.ensureQueryData(resumeVersionsQueryOptions()),
   component: ApplicationsNewRoute,
 })
 
