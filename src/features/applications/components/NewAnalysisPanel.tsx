@@ -63,13 +63,13 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
         form.reset()
         openProgress({ slug: mockSlug, startedAt: Date.now() })
         // Register the run in the notification bell too (the mock detail endpoint
-        // drives it running → ready). Link to the list since the mock app has no page.
+        // drives it running → ready, and renders at /applications/<mock-slug>).
         addNotification({
           type: 'application',
           slug: mockSlug,
           label: `${mockCompany} — ${mockRole} (test)`,
           status: 'running',
-          link: '/applications/list',
+          link: `/applications/${encodeURIComponent(mockSlug)}`,
         })
         return
       }
