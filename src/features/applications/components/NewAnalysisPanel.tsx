@@ -149,6 +149,14 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
             {/* Left column: target company + role stacked */}
             <div className="space-y-4 lg:col-span-1">
+              <div>
+                <h3 className="text-sm font-semibold text-zinc-900 dark:text-white">
+                  Who is this for?
+                </h3>
+                <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                  Tell the agent which company and role you are targeting. These details are used to tailor the analysis and cover letter to the job.
+                </p>
+              </div>
               <form.Field
                 name="targetCompany"
                 children={(field) => (
