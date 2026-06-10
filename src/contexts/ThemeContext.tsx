@@ -45,16 +45,19 @@ function readStoredTheme(): Theme {
 }
 
 /**
+ * Toggles the `.dark` class on `<html>` to match `next`. No persistence —
+ * called on every commit to re-assert the class (see the provider effect).
+ */
+function syncDomClass(next: Theme): void {
+  document.documentElement.classList.toggle('dark', next === 'dark')
+}
+
+/**
  * Applies `next` as the active theme by toggling `.dark` on `<html>`
  * and persisting to `localStorage`.
  */
 function applyThemeToDom(next: Theme): void {
-  const root = document.documentElement
-  if (next === 'dark') {
-    root.classList.add('dark')
-  } else {
-    root.classList.remove('dark')
-  }
+  syncDomClass(next)
   try {
     localStorage.setItem(STORAGE_KEY, next)
   } catch {
@@ -83,12 +86,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setTheme(next)
   }, [])
 
-  // On mount, re-sync the DOM class with the React state.
-  // Handles the edge case where the anti-flash script and React disagree
-  // (e.g. CDN/HTTP2 serving CSS before the inline script executes).
+  // Re-assert the `.dark` class after EVERY commit, not just on mount. The
+  // document shell (`<html className="h-full antialiased">` in __root.tsx) is
+  // React-controlled; when it re-renders (router revalidation, error/pending
+  // boundaries, devtools) React reconciles the className back to the static
+  // literal and strips the imperatively-added `.dark`, leaving the page in the
+  // wrong theme until a full reload re-runs the anti-flash script. Re-syncing
+  // on every render heals that immediately. No deps array = run on each commit.
   useEffect(() => {
-    applyThemeToDom(theme)
-  }, []) // intentionally runs only once on mount — re-sync DOM on first render
+    syncDomClass(theme)
+  })
 
   const toggleTheme = useCallback(() => {
     applyTheme(theme === 'dark' ? 'light' : 'dark')
