@@ -20,7 +20,7 @@ import type { AdminApiBindings } from '../lib/types.js';
 import type { AdminApiConfig } from '../lib/config.js';
 import { getJobImage, isImageConfigured } from '../lib/config.js';
 import { getBatchApi } from '../lib/k8s.js';
-import { traceParentEnv, observabilityEnv, ingestionModelEnv } from '../lib/k8s-job-builder.js';
+import { traceParentEnv, observabilityEnv, ingestionModelEnv, MODEL_JOB_BACKOFF_LIMIT } from '../lib/k8s-job-builder.js';
 import { buildIngestionJobSpec } from '../lib/ingestion-job.js';
 
 const REPO_FULL_NAME_RE = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/;
@@ -76,7 +76,7 @@ function buildRollupJobSpec(
         },
         spec: {
             ttlSecondsAfterFinished: 3600,
-            backoffLimit:            2,
+            backoffLimit:            MODEL_JOB_BACKOFF_LIMIT,
             activeDeadlineSeconds:   300,
             template: {
                 metadata: { labels: { app: 'rollup-refresh', userId: safeUserId } },

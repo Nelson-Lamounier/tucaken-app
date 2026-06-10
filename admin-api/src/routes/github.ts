@@ -48,7 +48,7 @@ import {
 } from '../lib/github-app.js';
 import type { V1Job } from '@kubernetes/client-node';
 import { getBatchApi } from '../lib/k8s.js';
-import { traceParentEnv, observabilityEnv } from '../lib/k8s-job-builder.js';
+import { traceParentEnv, observabilityEnv, MODEL_JOB_BACKOFF_LIMIT } from '../lib/k8s-job-builder.js';
 import { buildIngestionJobSpec } from '../lib/ingestion-job.js';
 import { getPool } from '../lib/pg.js';
 import { ensureDefaultProject } from '../lib/repositories/projects.js';
@@ -477,7 +477,7 @@ export async function buildTechExtractJobSpec(
         },
         spec: {
             ttlSecondsAfterFinished: 3600,
-            backoffLimit:            2,
+            backoffLimit:            MODEL_JOB_BACKOFF_LIMIT,
             activeDeadlineSeconds:   1800,
             template: {
                 metadata: { labels: { app: 'tech-extractor', userId: safeUser, repoSlug } },
