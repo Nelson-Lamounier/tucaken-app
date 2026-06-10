@@ -133,7 +133,7 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
       </div>
 
       <form
-        className="px-6 pb-6 pt-5"
+        className="p-6 sm:p-8"
         onSubmit={(e) => {
             e.preventDefault()
             e.stopPropagation()
@@ -145,10 +145,10 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
             children={(values) => <DraftSaver values={values} />}
           />
 
-          {/* Side-by-side: target details (left) + job description (right) */}
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            {/* Left column: target company + role side by side */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* Side-by-side: narrow target details (left) + wider job description (right) */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
+            {/* Left column: target company + role stacked */}
+            <div className="space-y-4 lg:col-span-1">
               <form.Field
                 name="targetCompany"
                 children={(field) => (
@@ -171,8 +171,8 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
               />
             </div>
 
-            {/* Right column: job description */}
-            <div className="flex flex-col">
+            {/* Right column: job description (wider — 2/3) */}
+            <div className="flex flex-col lg:col-span-2">
               <div className="mb-1.5 flex items-center justify-between">
                 <label htmlFor="jobDescription" className="block text-sm/6 font-medium text-zinc-900 dark:text-white">
                   Job Description
