@@ -20,6 +20,12 @@ export interface DashboardDrawerProps {
    * the panel. Close via the X button, a Cancel action, or the Escape key.
    */
   readonly nonModal?: boolean
+  /**
+   * Use a theme-adaptive surface (white in light mode, zinc-900 in dark) instead
+   * of the default always-dark panel. Only opt in when the drawer's content also
+   * supports light mode, or its text becomes unreadable on the light surface.
+   */
+  readonly lightSurface?: boolean
 }
 
 export function DashboardDrawer({
@@ -32,7 +38,15 @@ export function DashboardDrawer({
   unstyledContent = false,
   fullBleed = false,
   nonModal = false,
+  lightSurface = false,
 }: DashboardDrawerProps) {
+  // Surface classes: adaptive (light/dark) when opted in, else the legacy dark-only panel.
+  const surfaceClassName = lightSurface ? 'bg-white dark:bg-zinc-900' : 'bg-zinc-900'
+  const borderColorClassName = lightSurface ? 'border-zinc-200 dark:border-white/10' : 'border-white/10'
+  const titleClassName = lightSurface ? 'text-zinc-900 dark:text-white' : 'text-white'
+  const descriptionClassName = lightSurface ? 'text-zinc-500 dark:text-zinc-400' : 'text-zinc-400'
+  const closeHoverClassName = lightSurface ? 'hover:text-zinc-900 dark:hover:text-white' : 'hover:text-white'
+  const panelClassName = `flex h-full flex-col overflow-y-auto ${surfaceClassName} shadow-2xl py-6 lg:border-l ${borderColorClassName}`
   // Modal Dialog handles Escape itself; the non-modal slide-over needs parity.
   useEffect(() => {
     if (!nonModal || !isOpen) return
@@ -47,7 +61,7 @@ export function DashboardDrawer({
     <button
       type="button"
       onClick={onClose}
-      className="rounded-md text-zinc-400 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 transition-colors"
+      className={`rounded-md text-zinc-400 ${closeHoverClassName} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 transition-colors`}
     >
       <span className="sr-only">Close panel</span>
       <XMarkIcon aria-hidden="true" className="size-6" />
@@ -83,14 +97,14 @@ export function DashboardDrawer({
               isOpen ? 'translate-x-0' : 'translate-x-full'
             }`}
           >
-            <div className="flex h-full flex-col overflow-y-auto bg-zinc-900 shadow-2xl py-6 lg:border-l lg:border-white/10">
+            <div className={panelClassName}>
               {/* Header */}
               <div className="px-4 sm:px-6">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold text-white">{title}</h2>
+                    <h2 className={`text-lg font-semibold ${titleClassName}`}>{title}</h2>
                     {description && (
-                      <p className="mt-1 text-sm text-zinc-400">{description}</p>
+                      <p className={`mt-1 text-sm ${descriptionClassName}`}>{description}</p>
                     )}
                   </div>
                   <div className="ml-3 flex h-7 items-center gap-4">
@@ -125,16 +139,16 @@ export function DashboardDrawer({
               transition
               className="pointer-events-auto w-full transform transition duration-500 ease-in-out data-closed:translate-x-full sm:duration-700"
             >
-              <div className="flex h-full flex-col overflow-y-auto bg-zinc-900 shadow-2xl py-6 lg:border-l lg:border-white/10">
+              <div className={panelClassName}>
                 {/* Header */}
                 <div className="px-4 sm:px-6">
                   <div className="flex items-start justify-between">
                     <div>
-                      <DialogTitle className="text-lg font-semibold text-white">
+                      <DialogTitle className={`text-lg font-semibold ${titleClassName}`}>
                         {title}
                       </DialogTitle>
                       {description && (
-                        <p className="mt-1 text-sm text-zinc-400">{description}</p>
+                        <p className={`mt-1 text-sm ${descriptionClassName}`}>{description}</p>
                       )}
                     </div>
                     <div className="ml-3 flex h-7 items-center gap-4">

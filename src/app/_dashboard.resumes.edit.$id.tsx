@@ -60,6 +60,7 @@ function EditResumePage() {
       onClose={handleClose}
       title="Edit Resume Version"
       description={resume?.label ? `Updating ${resume.label}` : ''}
+      lightSurface
     >
       {isLoading ? (
         <div className="flex h-64 items-center justify-center">

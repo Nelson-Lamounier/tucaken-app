@@ -199,8 +199,8 @@ export function ResumeForm({
     }
   })
 
-  const labelClasses = "block text-sm/6 font-medium text-white mb-1 mt-3"
-  const inputClasses = "block w-full rounded-md border-0 bg-white/5 py-1.5 px-3 text-white shadow-sm ring-1 ring-inset ring-white/10 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm/6"
+  const labelClasses = "block text-sm/6 font-medium text-zinc-900 dark:text-white mb-1 mt-3"
+  const inputClasses = "block w-full rounded-md border-0 bg-zinc-50 dark:bg-white/5 py-1.5 px-3 text-zinc-900 dark:text-white shadow-sm ring-1 ring-inset ring-zinc-200 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm/6"
 
   return (
     <form 
@@ -216,9 +216,9 @@ export function ResumeForm({
         {/* ==================================================================== */}
         {/* VERSION CONFIGURATION */}
         {/* ==================================================================== */}
-        <div className="border-b border-white/10 pb-12 pt-4">
-          <h2 className="text-base/7 font-semibold text-white">Version Configuration</h2>
-          <p className="mt-1 text-sm/6 text-zinc-400">
+        <div className="border-b border-zinc-200 dark:border-white/10 pb-12 pt-4">
+          <h2 className="text-base/7 font-semibold text-zinc-900 dark:text-white">Version Configuration</h2>
+          <p className="mt-1 text-sm/6 text-zinc-500 dark:text-zinc-400">
             Identify this version of your resume (e.g. 'Frontend Engineer', 'Tech Lead').
           </p>
           <div className="mt-6">
@@ -234,9 +234,9 @@ export function ResumeForm({
         {/* ==================================================================== */}
         {/* PROFILE DETAILS */}
         {/* ==================================================================== */}
-        <div className="border-b border-white/10 pb-12">
-          <h2 className="text-base/7 font-semibold text-white">Profile Details</h2>
-          <p className="mt-1 text-sm/6 text-zinc-400">The header section of your resume document.</p>
+        <div className="border-b border-zinc-200 dark:border-white/10 pb-12">
+          <h2 className="text-base/7 font-semibold text-zinc-900 dark:text-white">Profile Details</h2>
+          <p className="mt-1 text-sm/6 text-zinc-500 dark:text-zinc-400">The header section of your resume document.</p>
           <div className="mt-6 grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-6">
             <div className="sm:col-span-3">
               <form.Field name="data.profile.name" children={(field) => <FormInput label="Full Name" field={field} />} />
@@ -268,8 +268,8 @@ export function ResumeForm({
         {/* ==================================================================== */}
         {/* KEY ACHIEVEMENTS */}
         {/* ==================================================================== */}
-        <div className="border-b border-white/10 pb-12">
-          <h2 className="text-base/7 font-semibold text-white">Key Achievements</h2>
+        <div className="border-b border-zinc-200 dark:border-white/10 pb-12">
+          <h2 className="text-base/7 font-semibold text-zinc-900 dark:text-white">Key Achievements</h2>
           <div className="mt-4 space-y-4">
             <form.Field
               name="data.keyAchievements"
@@ -311,8 +311,8 @@ export function ResumeForm({
         {/* ==================================================================== */}
         {/* EXPERIENCE */}
         {/* ==================================================================== */}
-        <div className="border-b border-white/10 pb-12">
-          <h2 className="text-base/7 font-semibold text-white">Work Experience</h2>
+        <div className="border-b border-zinc-200 dark:border-white/10 pb-12">
+          <h2 className="text-base/7 font-semibold text-zinc-900 dark:text-white">Work Experience</h2>
           <div className="mt-6 space-y-8">
             <form.Field
               name="data.experience"
@@ -320,7 +320,7 @@ export function ResumeForm({
               children={(field) => (
                 <>
                   {field.state.value.map((_, index) => (
-                    <div key={index} className="rounded-lg bg-white/5 p-6 ring-1 ring-white/10 relative">
+                    <div key={index} className="rounded-lg bg-zinc-50 dark:bg-white/5 p-6 ring-1 ring-zinc-200 dark:ring-white/10 relative">
                       <div className="absolute right-4 top-4">
                         <RemoveButton onClick={() => field.removeValue(index)} />
                       </div>
@@ -379,8 +379,8 @@ export function ResumeForm({
         {/* ==================================================================== */}
         {/* SKILLS */}
         {/* ==================================================================== */}
-        <div className="border-b border-white/10 pb-12">
-          <h2 className="text-base/7 font-semibold text-white">Skills</h2>
+        <div className="border-b border-zinc-200 dark:border-white/10 pb-12">
+          <h2 className="text-base/7 font-semibold text-zinc-900 dark:text-white">Skills</h2>
           <div className="mt-6 space-y-8">
             <form.Field
               name="data.skills"
@@ -388,7 +388,7 @@ export function ResumeForm({
               children={(field) => (
                 <>
                   {field.state.value.map((_, index) => (
-                    <div key={index} className="rounded-lg bg-white/5 p-6 ring-1 ring-white/10 relative">
+                    <div key={index} className="rounded-lg bg-zinc-50 dark:bg-white/5 p-6 ring-1 ring-zinc-200 dark:ring-white/10 relative">
                       <div className="absolute right-4 top-4">
                         <RemoveButton onClick={() => field.removeValue(index)} />
                       </div>
@@ -437,8 +437,8 @@ export function ResumeForm({
         {/* ==================================================================== */}
         {/* EDUCATION */}
         {/* ==================================================================== */}
-        <div className="border-b border-white/10 pb-12">
-          <h2 className="text-base/7 font-semibold text-white">Education</h2>
+        <div className="border-b border-zinc-200 dark:border-white/10 pb-12">
+          <h2 className="text-base/7 font-semibold text-zinc-900 dark:text-white">Education</h2>
           <div className="mt-4 space-y-4">
             <form.Field
               name="data.education"
@@ -446,7 +446,7 @@ export function ResumeForm({
               children={(field) => (
                 <>
                   {field.state.value.map((_, index) => (
-                    <div key={index} className="flex items-start gap-4 rounded-lg bg-white/5 p-4 ring-1 ring-white/10">
+                    <div key={index} className="flex items-start gap-4 rounded-lg bg-zinc-50 dark:bg-white/5 p-4 ring-1 ring-zinc-200 dark:ring-white/10">
                       <div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-3">
                         <form.Field name={`data.education[${index}].degree`} children={(f) => <FormInput label="Degree" field={f} />} />
                         <form.Field name={`data.education[${index}].institution`} children={(f) => <FormInput label="Institution" field={f} />} />
@@ -467,8 +467,8 @@ export function ResumeForm({
         {/* ==================================================================== */}
         {/* PROJECTS */}
         {/* ==================================================================== */}
-        <div className="border-b border-white/10 pb-12">
-          <h2 className="text-base/7 font-semibold text-white">Projects</h2>
+        <div className="border-b border-zinc-200 dark:border-white/10 pb-12">
+          <h2 className="text-base/7 font-semibold text-zinc-900 dark:text-white">Projects</h2>
           <div className="mt-6 space-y-6">
             <form.Field
               name="data.projects"
@@ -476,7 +476,7 @@ export function ResumeForm({
               children={(field) => (
                 <>
                   {field.state.value.map((_, index) => (
-                    <div key={index} className="relative rounded-lg bg-white/5 p-6 ring-1 ring-white/10">
+                    <div key={index} className="relative rounded-lg bg-zinc-50 dark:bg-white/5 p-6 ring-1 ring-zinc-200 dark:ring-white/10">
                       <div className="absolute right-4 top-4">
                         <RemoveButton onClick={() => field.removeValue(index)} />
                       </div>
@@ -499,8 +499,8 @@ export function ResumeForm({
         {/* ==================================================================== */}
         {/* CERTIFICATIONS */}
         {/* ==================================================================== */}
-        <div className="border-b border-white/10 pb-12">
-          <h2 className="text-base/7 font-semibold text-white">Certifications</h2>
+        <div className="border-b border-zinc-200 dark:border-white/10 pb-12">
+          <h2 className="text-base/7 font-semibold text-zinc-900 dark:text-white">Certifications</h2>
           <div className="mt-4 space-y-4">
              <form.Field
               name="data.certifications"
@@ -508,7 +508,7 @@ export function ResumeForm({
               children={(field) => (
                 <>
                   {field.state.value.map((_, index) => (
-                    <div key={index} className="flex items-start gap-4 rounded-lg bg-white/5 p-4 ring-1 ring-white/10">
+                    <div key={index} className="flex items-start gap-4 rounded-lg bg-zinc-50 dark:bg-white/5 p-4 ring-1 ring-zinc-200 dark:ring-white/10">
                       <div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-3">
                         <form.Field name={`data.certifications[${index}].name`} children={(f) => <FormInput label="Name" field={f} />} />
                         <form.Field name={`data.certifications[${index}].issuer`} children={(f) => <FormInput label="Issuer" field={f} />} />
@@ -528,7 +528,7 @@ export function ResumeForm({
 
       </div>
 
-      <div className="mt-8 flex items-center justify-end gap-x-4 border-t border-white/10 pt-8">
+      <div className="mt-8 flex items-center justify-end gap-x-4 border-t border-zinc-200 dark:border-white/10 pt-8">
         <Button variant="ghost" type="button" onClick={onCancel}>
           Cancel
         </Button>

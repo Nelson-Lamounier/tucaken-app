@@ -52,6 +52,7 @@ function CreateResumePage() {
       onClose={handleClose}
       title="Create New Resume Version"
       nonModal
+      lightSurface
     >
       <div className="pb-8">
         <ResumeForm
