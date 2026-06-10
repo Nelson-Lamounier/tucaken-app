@@ -109,7 +109,7 @@ export function ResumeMenuSelect({ resumeId, onChange }: ResumeMenuSelectProps) 
         <div className="border-t border-zinc-200 dark:border-white/10 px-3 py-2">
           <Link
             to="/resumes/new"
-            className="inline-flex items-center text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500"
+            className="inline-flex items-center text-xs font-medium text-teal-600 dark:text-teal-400 hover:text-teal-500"
           >
             Create new resume
             <span aria-hidden="true" className="ml-1">&rarr;</span>
