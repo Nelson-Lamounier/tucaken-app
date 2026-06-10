@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from '@headlessui/react'
 import { ChevronUpDownIcon } from '@heroicons/react/16/solid'
 import { CheckIcon } from '@heroicons/react/20/solid'
@@ -27,7 +27,7 @@ function sortResumes(resumes: readonly AdminResume[]): AdminResume[] {
 
 export function ResumeMenuSelect({ resumeId, onChange }: ResumeMenuSelectProps) {
   const { data: resumes, isLoading } = useResumeVersions()
-  const sorted = resumes ? sortResumes(resumes) : []
+  const sorted = useMemo(() => (resumes ? sortResumes(resumes) : []), [resumes])
 
   // Resolve the default exactly once: only while resumeId is still unresolved (null).
   useEffect(() => {
@@ -49,7 +49,10 @@ export function ResumeMenuSelect({ resumeId, onChange }: ResumeMenuSelectProps) 
 
   return (
     <Listbox value={resumeId} onChange={onChange} as="div" className="relative">
-      <ListboxButton className="inline-flex items-center gap-2 rounded-md bg-zinc-100 dark:bg-white/5 px-3 py-1.5 text-sm text-zinc-900 dark:text-white outline-1 -outline-offset-1 outline-zinc-300 dark:outline-white/10 hover:bg-zinc-200 dark:hover:bg-white/10 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-teal-500 transition-colors">
+      <ListboxButton
+        aria-label={`Select resume — ${buttonLabel}`}
+        className="inline-flex items-center gap-2 rounded-md bg-zinc-100 dark:bg-white/5 px-3 py-1.5 text-sm text-zinc-900 dark:text-white outline-1 -outline-offset-1 outline-zinc-300 dark:outline-white/10 hover:bg-zinc-200 dark:hover:bg-white/10 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-teal-500 transition-colors"
+      >
         {selected ? <DocumentTextIcon className="size-4 text-zinc-500" /> : <Wand2 className="size-4 text-violet-500" />}
         <span className="max-w-[12rem] truncate">{buttonLabel}</span>
         <ChevronUpDownIcon aria-hidden="true" className="size-4 text-zinc-400" />

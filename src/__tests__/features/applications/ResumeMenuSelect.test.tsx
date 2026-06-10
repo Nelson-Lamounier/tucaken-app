@@ -85,4 +85,12 @@ describe('ResumeMenuSelect', () => {
     fireEvent.click(screen.getByText('Build from scratch with agent'))
     expect(onChange).toHaveBeenCalledWith('')
   })
+
+  it('renders a skeleton and does not resolve a default while loading', () => {
+    useResumeVersionsMock.mockReturnValue({ data: undefined, isLoading: true })
+    const onChange = vi.fn()
+    render(<ResumeMenuSelect resumeId={null} onChange={onChange} />)
+    expect(screen.getByLabelText('Loading resumes')).toBeTruthy()
+    expect(onChange).not.toHaveBeenCalled()
+  })
 })
