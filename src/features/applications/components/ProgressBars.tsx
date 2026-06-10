@@ -43,24 +43,24 @@ interface PipelineStage {
 const PIPELINE_STAGES: PipelineStage[] = [
   {
     id: 'queued',
-    name: 'Pipeline initialised',
-    description: 'K8s Job scheduled — pod pulling image and starting.',
+    name: 'Getting started',
+    description: 'Setting up your run. This takes a few seconds.',
     Icon: Cpu,
     startMs: 0,
     endMs: 8_000,
   },
   {
     id: 'research',
-    name: 'Research Agent',
-    description: 'Haiku 4.5 analysing job description and querying your Knowledge Base.',
+    name: 'Researching the role',
+    description: 'Reading the job description and matching it against your knowledge base.',
     Icon: FileSearch,
     startMs: 8_000,
     endMs: 90_000,
   },
   {
     id: 'strategist',
-    name: 'Strategist Agent',
-    description: 'Sonnet 4.6 generating tailored resume and cover letter.',
+    name: 'Writing your resume',
+    description: 'Tailoring your resume to the role.',
     Icon: FileText,
     startMs: 90_000,
     endMs: 240_000,
@@ -68,7 +68,7 @@ const PIPELINE_STAGES: PipelineStage[] = [
   {
     id: 'persist',
     name: 'Saving results',
-    description: 'Validating and persisting resume + analysis to database.',
+    description: 'Saving your resume and analysis.',
     Icon: Database,
     startMs: 240_000,
     endMs: 260_000,
@@ -164,24 +164,24 @@ export function ProgressBars({
 
   // ── Heading copy ──────────────────────────────────────────────────────────
   const heading = isFailed
-    ? 'Analysis failed'
+    ? 'Build failed'
     : timedOut
-    ? 'Analysis timed out'
+    ? 'Build timed out'
     : isFinished
-    ? 'Analysis complete'
-    : 'Analysing application'
+    ? 'Resume ready'
+    : 'Building your resume'
 
   const subheading = isFailed
-    ? 'The pipeline encountered an error. Requeue via the DLQ to retry.'
+    ? 'The run hit an error. Retry to run it again.'
     : timedOut
-    ? 'No status update after 10 minutes — the K8s Job may have crashed. Requeue to retry.'
+    ? 'No update for 10 minutes. The run may have stalled. Retry to run it again.'
     : isFinished
-    ? 'Your tailored resume and cover letter are ready.'
-    : 'Bedrock agents are running. This typically takes 4–6 minutes.'
+    ? 'Your tailored resume and analysis are ready.'
+    : 'This usually takes 4–6 minutes. You can leave this page.'
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col gap-8 w-full px-6 py-10 sm:px-10">
+    <div className="flex flex-col gap-8 w-full max-w-2xl mx-auto px-6 py-10 sm:px-10">
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
@@ -282,8 +282,8 @@ export function ProgressBars({
 
       {/* Footer */}
       <div className="flex items-center justify-between gap-4">
-        <p className="text-xs text-zinc-500 dark:text-zinc-600">
-          Feel free to navigate away — you'll be notified when complete.
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          You can leave this page. We'll notify you when it's ready.
         </p>
 
         {(isFailed || timedOut) ? (
