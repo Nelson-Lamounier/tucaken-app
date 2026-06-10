@@ -6,7 +6,7 @@ import { DocumentTextIcon } from '@heroicons/react/24/outline'
 import { Link } from '@tanstack/react-router'
 import { useResumeVersions, type AdminResume } from '../hooks/use-resume-versions'
 
-/** Empty string is a real, submittable value meaning "let the agent build a resume". */
+/** Empty string is a real, submittable value meaning "let Tucaken build a resume". */
 const BUILD_FROM_SCRATCH = ''
 
 export interface ResumeMenuSelectProps {
@@ -52,7 +52,7 @@ export function ResumeMenuSelect({ resumeId, onChange }: ResumeMenuSelectProps) 
   const defaultId = hasNoResumes ? BUILD_FROM_SCRATCH : sorted[0].resumeId
   const effectiveId = resumeId ?? defaultId
   const selected = sorted.find((r) => r.resumeId === effectiveId)
-  const buttonLabel = selected ? selected.label : 'Build from scratch with agent'
+  const buttonLabel = selected ? selected.label : 'Build from scratch with Tucaken'
 
   return (
     <Listbox value={effectiveId} onChange={onChange} as="div" className="relative">
@@ -94,7 +94,7 @@ export function ResumeMenuSelect({ resumeId, onChange }: ResumeMenuSelectProps) 
 
         {hasNoResumes && (
           <p className="border-t border-zinc-200 dark:border-white/10 px-3 py-2 text-xs text-zinc-500">
-            You have no resumes yet. The agent will build one from scratch.
+            You have no resumes yet. Tucaken will build one from scratch.
           </p>
         )}
 
@@ -102,7 +102,7 @@ export function ResumeMenuSelect({ resumeId, onChange }: ResumeMenuSelectProps) 
           value={BUILD_FROM_SCRATCH}
           className="group flex cursor-pointer items-center justify-between gap-2 border-t border-zinc-200 dark:border-white/10 px-3 py-2 data-focus:bg-zinc-100 dark:data-focus:bg-white/5"
         >
-          <span className="text-zinc-700 dark:text-zinc-300">Build from scratch with agent</span>
+          <span className="text-zinc-700 dark:text-zinc-300">Build from scratch with Tucaken</span>
           <CheckIcon className="size-4 text-teal-600 opacity-0 group-data-selected:opacity-100" />
         </ListboxOption>
 

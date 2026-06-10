@@ -82,7 +82,7 @@ describe('ResumeMenuSelect', () => {
     const onChange = vi.fn()
     render(<ResumeMenuSelect resumeId="active" onChange={onChange} />)
     fireEvent.click(screen.getByRole('button'))
-    fireEvent.click(screen.getByText('Build from scratch with agent'))
+    fireEvent.click(screen.getByText('Build from scratch with Tucaken'))
     expect(onChange).toHaveBeenCalledWith('')
   })
 

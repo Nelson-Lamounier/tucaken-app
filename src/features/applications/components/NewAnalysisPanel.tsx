@@ -17,9 +17,9 @@ function DraftSaver({ values }: { readonly values: Record<string, unknown> }) {
   return null
 }
 
-/** Header copy that adapts to whether the agent builds from scratch or uses a selected resume. */
+/** Header copy that adapts to whether Tucaken builds from scratch or uses a selected resume. */
 function getSubtitle(resumeId: string | null): string {
-  if (resumeId === '') return 'The agent will build your resume from scratch.'
+  if (resumeId === '') return 'No resume selected. Tucaken builds one from scratch as it analyses the job.'
   return 'Paste a job description to analyse against your selected resume.'
 }
 
@@ -151,10 +151,10 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
             <div className="space-y-4 lg:col-span-1">
               <div>
                 <h3 className="text-sm font-semibold text-zinc-900 dark:text-white">
-                  Who is this for?
+                  Target company & role
                 </h3>
                 <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                  Tell the agent which company and role you are targeting. These details are used to tailor the analysis and cover letter to the job.
+                  Company and role let Tucaken tailor your analysis and cover letter. Which are you targeting?
                 </p>
               </div>
               <form.Field
@@ -193,7 +193,7 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
                         jd.length >= MIN_JD_LENGTH ? 'text-emerald-500' : 'text-zinc-500'
                       }`}
                     >
-                      {jd.length} / {MIN_JD_LENGTH} min characters
+                      {jd.length} / {MIN_JD_LENGTH} characters minimum
                     </span>
                   )}
                 />
@@ -207,8 +207,8 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
                     value={field.state.value}
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
-                    placeholder="Paste the full job description here. Include responsibilities, requirements, qualifications, and any other relevant details…"
-                    className="block h-full min-h-80 w-full flex-1 resize-y rounded-md border-0 bg-zinc-50 p-2 text-zinc-900 shadow-sm ring-1 ring-inset ring-zinc-300 focus:ring-2 focus:ring-inset focus:ring-teal-500 sm:text-sm/6 lg:min-h-96 dark:bg-white/5 dark:text-white dark:ring-white/10"
+                    placeholder="Paste the full job description: responsibilities, requirements, qualifications."
+                    className="block h-full min-h-80 w-full flex-1 resize-y rounded-md border-0 bg-zinc-50 p-2 text-base/6 text-zinc-900 shadow-sm ring-1 ring-inset ring-zinc-300 focus:ring-2 focus:ring-inset focus:ring-teal-500 lg:min-h-96 dark:bg-white/5 dark:text-white dark:ring-white/10"
                   />
                 )}
               />
@@ -253,8 +253,9 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
                 )}
               />
               <label htmlFor="testMode" className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                Run in Test Mode (Mock API)
+                Run in Test Mode
               </label>
+              <span className="text-xs text-zinc-400 dark:text-zinc-500">mock data, skips the real run</span>
             </div>
           </div>
 
@@ -263,9 +264,12 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
             <div className="mt-4 flex flex-col gap-2 rounded-lg bg-red-50 text-red-700 border border-red-600/20 dark:bg-red-500/10 dark:text-red-500 dark:border-red-500/20 px-4 py-3 text-sm">
               <div className="flex items-center gap-2 font-semibold">
                 <AlertCircle className="h-4 w-4 shrink-0" />
-                Analysis trigger failed
+                Couldn’t start the analysis
               </div>
-              <p className="text-red-600 dark:text-red-400 whitespace-pre-wrap break-words">{trigger.error.message}</p>
+              <p className="text-red-600 dark:text-red-400">
+                Check the job description and target details, then try again. If it keeps failing, the analysis service may be down.
+              </p>
+              <p className="text-red-600/80 dark:text-red-400/80 whitespace-pre-wrap wrap-break-word text-xs">{trigger.error.message}</p>
             </div>
           )}
 
@@ -284,7 +288,7 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
                   <p className="text-xs text-zinc-500">
                     {isValid
                       ? '✓ Ready to analyse'
-                      : 'Fill in company, role, and a job description (min 50 chars)'}
+                      : `Fill in company, role, and a job description (${MIN_JD_LENGTH}+ characters)`}
                   </p>
                   <div className="flex gap-3">
                     <Button

@@ -15,8 +15,8 @@ function ApplicationsNewRoute() {
 
   return (
     <DashboardPage
-      title="Resume Analysis"
-      description="Create a new resume analysis."
+      title="Resume Builder"
+      description="Paste a job description and Tucaken tailors your resume and cover letter to it."
     >
       <NewAnalysisPanel resumeId={resumeId} onResumeChange={setResumeId} />
     </DashboardPage>
