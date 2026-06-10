@@ -16,7 +16,11 @@ import { BellIcon } from '@heroicons/react/24/outline'
 import { Link } from '@tanstack/react-router'
 import { Loader2, CheckCircle, XCircle, ClipboardCheck, X } from 'lucide-react'
 import { usePipelineNotificationsStore } from '@/lib/stores/pipeline-notifications-store'
-import type { PipelineNotification, PipelineNotificationStatus } from '@/lib/stores/pipeline-notifications-store'
+import type {
+  PipelineNotification,
+  PipelineNotificationStatus,
+  PipelineNotificationType,
+} from '@/lib/stores/pipeline-notifications-store'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -27,33 +31,33 @@ const ONE_DAY_MS = 24 * 60 * 60 * 1_000
 function StatusIcon({ status }: { status: PipelineNotificationStatus }) {
   switch (status) {
     case 'running':
-      return <Loader2 className="h-4 w-4 animate-spin text-violet-400" />
+      return <Loader2 className="h-4 w-4 animate-spin text-violet-600 dark:text-violet-400" />
     case 'review':
-      return <ClipboardCheck className="h-4 w-4 text-amber-400" />
+      return <ClipboardCheck className="h-4 w-4 text-amber-600 dark:text-amber-400" />
     case 'complete':
-      return <CheckCircle className="h-4 w-4 text-emerald-400" />
+      return <CheckCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
     case 'failed':
-      return <XCircle className="h-4 w-4 text-red-400" />
+      return <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
   }
 }
 
 // ── Status label + colour ─────────────────────────────────────────────────────
 
-function statusLabel(status: PipelineNotificationStatus): string {
-  switch (status) {
-    case 'running':  return 'In progress'
-    case 'review':   return 'Ready for review'
-    case 'complete': return 'Published'
-    case 'failed':   return 'Failed'
-  }
+/** Wording adapts to the pipeline type — "Analysing"/"Ready" reads right for
+ *  applications, "In progress"/"Published" for articles. */
+function statusLabel(status: PipelineNotificationStatus, type: PipelineNotificationType): string {
+  if (status === 'running') return type === 'application' ? 'Analysing' : 'In progress'
+  if (status === 'review') return 'Ready for review'
+  if (status === 'complete') return type === 'application' ? 'Ready' : 'Published'
+  return 'Failed'
 }
 
 function statusTextClass(status: PipelineNotificationStatus): string {
   switch (status) {
-    case 'running':  return 'text-violet-400'
-    case 'review':   return 'text-amber-400'
-    case 'complete': return 'text-emerald-400'
-    case 'failed':   return 'text-red-400'
+    case 'running':  return 'text-violet-600 dark:text-violet-400'
+    case 'review':   return 'text-amber-600 dark:text-amber-400'
+    case 'complete': return 'text-emerald-600 dark:text-emerald-400'
+    case 'failed':   return 'text-red-600 dark:text-red-400'
   }
 }
 
@@ -89,7 +93,7 @@ function NotificationRow({ notification }: { notification: PipelineNotification 
   return (
     <MenuItem>
       {/* Wrapper div keeps the row interactive while also hosting the remove button */}
-      <div className="group relative flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-zinc-800 data-focus:bg-zinc-800">
+      <div className="group relative mx-1 flex items-start gap-3 rounded-md px-3 py-2.5 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 data-focus:bg-zinc-100 dark:data-focus:bg-zinc-800">
         {/* Clickable pipeline link area */}
         <Link
           to={notification.link as Parameters<typeof Link>[0]['to']}
@@ -105,16 +109,16 @@ function NotificationRow({ notification }: { notification: PipelineNotification 
           </div>
 
           <div className="min-w-0 flex-1 pr-5">
-            <p className="truncate text-sm font-medium text-zinc-200">
+            <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-200">
               {notification.type === 'article' ? 'Article' : 'Application'}
             </p>
-            <p className="truncate text-xs text-zinc-400">{notification.label}</p>
+            <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">{notification.label}</p>
             <div className="mt-0.5 flex items-center gap-1.5">
               <span className={`text-[10px] font-medium ${statusTextClass(notification.status)}`}>
-                {statusLabel(notification.status)}
+                {statusLabel(notification.status, notification.type)}
               </span>
-              <span className="text-[10px] text-zinc-600">·</span>
-              <span className="text-[10px] text-zinc-600">
+              <span className="text-[10px] text-zinc-400 dark:text-zinc-600">·</span>
+              <span className="text-[10px] text-zinc-400 dark:text-zinc-600">
                 {formatRelativeTime(notification.createdAt)}
               </span>
             </div>
@@ -125,7 +129,7 @@ function NotificationRow({ notification }: { notification: PipelineNotification 
         <button
           type="button"
           onClick={handleRemove}
-          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-zinc-600 opacity-0 transition-opacity hover:text-zinc-300 group-hover:opacity-100"
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-zinc-400 opacity-0 transition-opacity hover:text-zinc-700 dark:text-zinc-600 dark:hover:text-zinc-300 group-hover:opacity-100"
           title="Remove notification"
         >
           <X className="h-3.5 w-3.5" />
@@ -168,19 +172,19 @@ export function NotificationPanel() {
         leaveFrom="transform opacity-100 scale-100"
         leaveTo="transform opacity-0 scale-95"
       >
-        <MenuItems className="absolute right-0 z-20 mt-2.5 w-80 origin-top-right rounded-xl bg-zinc-900 border border-zinc-700/50 py-1 shadow-xl shadow-black/20 focus:outline-none">
+        <MenuItems className="absolute right-0 z-20 mt-2.5 w-80 origin-top-right rounded-md border border-zinc-200 bg-white py-1 shadow-lg ring-1 ring-black/5 focus:outline-none dark:border-zinc-700/50 dark:bg-zinc-900 dark:shadow-black/20 dark:ring-0">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-2.5">
-            <p className="text-sm font-semibold text-zinc-200">
+          <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-2.5 dark:border-zinc-800">
+            <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-200">
               Pipeline Notifications
               {recentNotifications.length > 0 && (
-                <span className="ml-2 text-xs font-normal text-zinc-500">last 24h</span>
+                <span className="ml-2 text-xs font-normal text-zinc-400 dark:text-zinc-500">last 24h</span>
               )}
             </p>
             {unreadCount > 0 && (
               <button
                 onClick={markAllAsRead}
-                className="text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
+                className="text-[11px] text-zinc-500 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300 transition-colors"
               >
                 Mark all read
               </button>
@@ -190,7 +194,7 @@ export function NotificationPanel() {
           {/* Notification list */}
           <div className="max-h-80 overflow-y-auto py-1">
             {recentNotifications.length === 0 ? (
-              <p className="px-4 py-6 text-center text-xs text-zinc-600">
+              <p className="px-4 py-6 text-center text-xs text-zinc-500 dark:text-zinc-600">
                 No pipeline activity in the last 24 hours
               </p>
             ) : (
