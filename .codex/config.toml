@@ -1,6 +1,0 @@
-[mcp_servers.motion]
-command = "sh"
-args = [
-    "-c",
-    """export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" >/dev/null 2>&1; export TOKEN=$(security find-generic-password -a "$USER" -s "10edaa43b20d66553ca352626f786613f725436e16ae8f1cbb5f53b562637983" -w 2>/dev/null); exec npx -y 'https://api.motion.dev/registry.tgz?package=motion-studio-mcp&version=latest'""",
-]
