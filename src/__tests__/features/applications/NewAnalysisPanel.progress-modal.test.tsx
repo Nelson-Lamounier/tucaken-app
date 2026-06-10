@@ -20,16 +20,11 @@ vi.mock('@/lib/stores/pipeline-notifications-store', () => ({
     selector({ addNotification: vi.fn() }),
 }))
 
-// Stub the modal so we can observe open/close without the polling internals.
-vi.mock('@/features/applications/components/AnalysisProgressModal', () => ({
-  AnalysisProgressModal: ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) =>
-    isOpen ? (
-      <div data-testid="progress-modal">
-        <button type="button" onClick={onClose}>
-          close-modal
-        </button>
-      </div>
-    ) : null,
+// The modal is now app-global, driven by this store. The panel just opens it.
+const openProgressMock = vi.fn()
+vi.mock('@/lib/stores/progress-modal-store', () => ({
+  useProgressModalStore: (selector: (s: unknown) => unknown) =>
+    selector({ openProgress: openProgressMock, closeProgress: vi.fn() }),
 }))
 
 function fillAndTestSubmit() {
@@ -48,20 +43,18 @@ function fillAndTestSubmit() {
 
 describe('NewAnalysisPanel progress modal', () => {
   beforeEach(() => {
+    openProgressMock.mockReset()
     localStorage.clear()
   })
 
-  it('auto-opens the modal on submit and closes it on dismiss', async () => {
+  it('opens the global progress modal on submit', async () => {
     render(<NewAnalysisPanel resumeId="resume-1" onResumeChange={vi.fn()} />)
 
     fillAndTestSubmit()
 
-    // Auto-opens on submit.
-    await waitFor(() => expect(screen.getByTestId('progress-modal')).toBeTruthy())
-
-    // Closing the modal hides it. Tracking/return is handled by the Pipeline
-    // Notifications bell (no separate in-page pill).
-    fireEvent.click(screen.getByRole('button', { name: 'close-modal' }))
-    expect(screen.queryByTestId('progress-modal')).toBeNull()
+    await waitFor(() => expect(openProgressMock).toHaveBeenCalledTimes(1))
+    expect(openProgressMock.mock.calls[0][0]).toMatchObject({
+      slug: expect.stringMatching(/^mock-/),
+    })
   })
 })

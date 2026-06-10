@@ -3,11 +3,11 @@ import { AlertCircle, Loader2 } from 'lucide-react'
 import { useForm } from '@tanstack/react-form'
 import { useApplicationsTrigger } from '../hooks/use-applications-trigger'
 import { usePipelineNotificationsStore } from '@/lib/stores/pipeline-notifications-store'
+import { useProgressModalStore } from '@/lib/stores/progress-modal-store'
 import type { InterviewStage } from '@/lib/types/applications.types'
 import { MIN_JD_LENGTH } from './ApplicationTypes'
 import { FormInput } from '@/components/ui/Field'
 import { Button } from '@/components/ui/Button'
-import { AnalysisProgressModal } from './AnalysisProgressModal'
 import { ResumeMenuSelect } from './ResumeMenuSelect'
 
 function DraftSaver({ values }: { readonly values: Record<string, unknown> }) {
@@ -32,10 +32,7 @@ export interface NewAnalysisPanelProps {
 export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelProps) {
   const trigger = useApplicationsTrigger()
   const addNotification = usePipelineNotificationsStore((s) => s.addNotification)
-  const [submittedSlug, setSubmittedSlug] = useState<string | null>(null)
-  const [submittedRunId, setSubmittedRunId] = useState<string | null>(null)
-  const [submittedAt, setSubmittedAt] = useState<number | null>(null)
-  const [isProgressOpen, setIsProgressOpen] = useState(false)
+  const openProgress = useProgressModalStore((s) => s.openProgress)
 
   const [initialDraft] = useState(() => {
     if (typeof window === 'undefined') return null
@@ -64,9 +61,7 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
         const mockSlug = `mock-${Date.now()}`
         localStorage.removeItem('application-form-draft')
         form.reset()
-        setSubmittedSlug(mockSlug)
-        setSubmittedAt(Date.now())
-        setIsProgressOpen(true)
+        openProgress({ slug: mockSlug, startedAt: Date.now() })
         // Register the run in the notification bell too (the mock detail endpoint
         // drives it running → ready). Link to the list since the mock app has no page.
         addNotification({
@@ -95,18 +90,19 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
           onSuccess: (data) => {
             localStorage.removeItem('application-form-draft')
             form.reset()
-            setSubmittedSlug(data.applicationId)
-            setSubmittedRunId(data.pipelineRunId)
-            setSubmittedAt(Date.now())
-            setIsProgressOpen(true)
+            openProgress({
+              slug: data.applicationId,
+              pipelineRunId: data.pipelineRunId,
+              startedAt: Date.now(),
+            })
             addNotification({
               type: 'application',
               slug: data.applicationId,
               label: `${company} — ${role}`,
               status: 'running',
               link: `/applications/${encodeURIComponent(data.applicationId)}`,
+              pipelineRunId: data.pipelineRunId,
             })
-            // Progress is shown via AnalysisProgressModal (opened above)
           },
         },
       )
@@ -127,7 +123,6 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
   }, [form])
 
   return (
-    <>
     <div className="mb-8 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-white/10 dark:bg-white/5 shadow-sm">
       <div className="flex items-center justify-between gap-4 px-6 py-5 border-b border-zinc-200 dark:border-white/10">
         <div className="min-w-0">
@@ -328,16 +323,5 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
           />
         </form>
     </div>
-
-    {submittedSlug && submittedAt !== null && (
-      <AnalysisProgressModal
-        isOpen={isProgressOpen}
-        onClose={() => setIsProgressOpen(false)}
-        slug={submittedSlug}
-        pipelineRunId={submittedRunId ?? undefined}
-        startedAt={submittedAt}
-      />
-    )}
-    </>
   )
 }

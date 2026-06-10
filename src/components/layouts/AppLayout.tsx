@@ -37,6 +37,7 @@ import {
 import { Link } from "@tanstack/react-router";
 import { HeaderNav } from "../ui/HeaderNav";
 import { PipelineNotificationWatcher } from "../ui/PipelineNotificationWatcher";
+import { GlobalAnalysisProgressModal } from "../../features/applications/components/GlobalAnalysisProgressModal";
 import { IngestionSyncWatcher } from "../ui/IngestionSyncWatcher";
 import type { MeResponse } from "@/server/me";
 import logo from "@/images/logo.png";
@@ -175,6 +176,8 @@ export default function AppLayout({
       <PipelineNotificationWatcher />
       {/* Refreshes KB-derived views when a repo resync completes — renders null */}
       <IngestionSyncWatcher />
+      {/* App-global analysis progress modal (opened from submit or a running notification) */}
+      <GlobalAnalysisProgressModal />
 
       {/* =========================================================
           Mobile Off-Canvas Sidebar

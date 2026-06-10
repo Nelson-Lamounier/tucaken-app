@@ -21,6 +21,7 @@ import type {
   PipelineNotificationStatus,
   PipelineNotificationType,
 } from '@/lib/stores/pipeline-notifications-store'
+import { useProgressModalStore } from '@/lib/stores/progress-modal-store'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -76,10 +77,24 @@ function formatRelativeTime(timestamp: number): string {
 
 function NotificationRow({ notification }: { notification: PipelineNotification }) {
   const { markAsRead, removeNotification } = usePipelineNotificationsStore()
+  const openProgress = useProgressModalStore((s) => s.openProgress)
+
+  // A running application run reopens the live progress modal instead of
+  // navigating to the (not-yet-ready) application page.
+  const reopensProgress = notification.type === 'application' && notification.status === 'running'
 
   const handleLinkClick = useCallback(() => {
     markAsRead(notification.id)
   }, [markAsRead, notification.id])
+
+  const handleOpenProgress = useCallback(() => {
+    markAsRead(notification.id)
+    openProgress({
+      slug: notification.slug,
+      pipelineRunId: notification.pipelineRunId,
+      startedAt: notification.createdAt,
+    })
+  }, [markAsRead, openProgress, notification.id, notification.slug, notification.pipelineRunId, notification.createdAt])
 
   const handleRemove = useCallback(
     (e: React.MouseEvent) => {
@@ -90,40 +105,55 @@ function NotificationRow({ notification }: { notification: PipelineNotification 
     [removeNotification, notification.id],
   )
 
+  const rowInner = (
+    <>
+      {/* Status icon + unread dot */}
+      <div className="relative mt-0.5 shrink-0">
+        <StatusIcon status={notification.status} />
+        {!notification.read && (
+          <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-violet-500" />
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1 pr-5">
+        <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-200">
+          {notification.type === 'article' ? 'Article' : 'Application'}
+        </p>
+        <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">{notification.label}</p>
+        <div className="mt-0.5 flex items-center gap-1.5">
+          <span className={`text-[10px] font-medium ${statusTextClass(notification.status)}`}>
+            {statusLabel(notification.status, notification.type)}
+          </span>
+          <span className="text-[10px] text-zinc-400 dark:text-zinc-600">·</span>
+          <span className="text-[10px] text-zinc-400 dark:text-zinc-600">
+            {formatRelativeTime(notification.createdAt)}
+          </span>
+        </div>
+      </div>
+    </>
+  )
+
   return (
     <MenuItem>
       {/* Wrapper div keeps the row interactive while also hosting the remove button */}
       <div className="group relative mx-1 flex items-start gap-3 rounded-md px-3 py-2.5 transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 data-focus:bg-zinc-100 dark:data-focus:bg-zinc-800">
-        {/* Clickable pipeline link area */}
-        <Link
-          to={notification.link as Parameters<typeof Link>[0]['to']}
-          onClick={handleLinkClick}
-          className="flex min-w-0 flex-1 items-start gap-3 outline-none"
-        >
-          {/* Status icon + unread dot */}
-          <div className="relative mt-0.5 shrink-0">
-            <StatusIcon status={notification.status} />
-            {!notification.read && (
-              <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-violet-500" />
-            )}
-          </div>
-
-          <div className="min-w-0 flex-1 pr-5">
-            <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-200">
-              {notification.type === 'article' ? 'Article' : 'Application'}
-            </p>
-            <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">{notification.label}</p>
-            <div className="mt-0.5 flex items-center gap-1.5">
-              <span className={`text-[10px] font-medium ${statusTextClass(notification.status)}`}>
-                {statusLabel(notification.status, notification.type)}
-              </span>
-              <span className="text-[10px] text-zinc-400 dark:text-zinc-600">·</span>
-              <span className="text-[10px] text-zinc-400 dark:text-zinc-600">
-                {formatRelativeTime(notification.createdAt)}
-              </span>
-            </div>
-          </div>
-        </Link>
+        {reopensProgress ? (
+          <button
+            type="button"
+            onClick={handleOpenProgress}
+            className="flex min-w-0 flex-1 items-start gap-3 text-left outline-none"
+          >
+            {rowInner}
+          </button>
+        ) : (
+          <Link
+            to={notification.link as Parameters<typeof Link>[0]['to']}
+            onClick={handleLinkClick}
+            className="flex min-w-0 flex-1 items-start gap-3 outline-none"
+          >
+            {rowInner}
+          </Link>
+        )}
 
         {/* Remove button — appears on row hover */}
         <button
