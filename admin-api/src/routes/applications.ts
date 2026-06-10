@@ -467,6 +467,8 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
         tailoredResume:    persistedResume ?? rawAnalysis['tailoredResumeData'] ?? null,
         // ATS check for the persisted tailored resume (resumes.ats_check_json).
         atsCheck:          resumeResult.rows[0]?.ats_check_json ?? null,
+        // Structured JD signal extracted at analyse time (metadata.jdExtraction).
+        jdExtraction:      latestAnalysis?.metadata?.['jdExtraction'] ?? null,
       } : null;
 
       // Map research agent output → ResearchOutput shape.

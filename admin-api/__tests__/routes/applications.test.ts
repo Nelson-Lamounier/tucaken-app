@@ -258,6 +258,7 @@ describe('GET /:slug — application detail', () => {
       resumeSuggestions: ['Add Kubernetes'],
       tailoredResume:    { basics: { name: 'Nelson' } },
       atsCheck:          null,
+      jdExtraction:      null,
     });
     // research: pipeline field names normalised to UI ResearchOutput shape.
     expect(body.application['research']).toEqual({
