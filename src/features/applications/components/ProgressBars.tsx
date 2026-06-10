@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
+import { Link } from '@tanstack/react-router'
 import {
   CheckCircle2,
   Loader2,
@@ -90,8 +90,15 @@ function formatElapsed(ms: number): string {
 // Component
 // =============================================================================
 
-export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRunId?: string }) {
-  const navigate = useNavigate()
+export function ProgressBars({
+  slug,
+  pipelineRunId,
+  startedAt,
+}: {
+  slug: string
+  pipelineRunId?: string
+  startedAt: number
+}) {
   const { data, timedOut } = useApplicationDetail(slug)
   const requeue = useApplicationRequeue()
 
@@ -107,24 +114,15 @@ export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRu
   const isFailed   = data?.status === 'failed' || pipelineRun?.status === 'failed'
   const isFinished = data != null && !['analysing', 'coaching'].includes(data.status)
   // ── Elapsed wall-clock ────────────────────────────────────────────────────
-  const startEpochRef = useRef<number | null>(null)
-  const [elapsedMs, setElapsedMs] = useState(0)
+  // Derived from the caller-supplied start time so the timer stays correct even
+  // if this component unmounts (modal closed) and remounts (modal re-opened).
+  const [elapsedMs, setElapsedMs] = useState(() => Date.now() - startedAt)
 
   useEffect(() => {
     if (isFinished || isFailed) return
-    if (!startEpochRef.current) startEpochRef.current = Date.now()
-    const iv = setInterval(() => setElapsedMs(Date.now() - startEpochRef.current!), 1_000)
+    const iv = setInterval(() => setElapsedMs(Date.now() - startedAt), 1_000)
     return () => clearInterval(iv)
-  }, [isFinished, isFailed])
-
-  // ── Auto-redirect on success ──────────────────────────────────────────────
-  useEffect(() => {
-    if (!isFinished || isFailed) return
-    const t = setTimeout(() => {
-      void navigate({ to: '/applications/$slug', params: { slug } })
-    }, 800)
-    return () => clearTimeout(t)
-  }, [isFinished, isFailed, navigate, slug])
+  }, [isFinished, isFailed, startedAt])
 
   // ── Stage status resolution ───────────────────────────────────────────────
   // Real pipeline_runs status takes priority over wall-clock estimation.
@@ -178,7 +176,7 @@ export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRu
     : timedOut
     ? 'No status update after 10 minutes — the K8s Job may have crashed. Requeue to retry.'
     : isFinished
-    ? 'Redirecting to your results…'
+    ? 'Your tailored resume and cover letter are ready.'
     : 'Bedrock agents are running. This typically takes 4–6 minutes.'
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -308,7 +306,7 @@ export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRu
             params={{ slug }}
             className="flex-none text-xs text-zinc-500 dark:text-zinc-600 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
           >
-            Go to overview →
+            View results →
           </Link>
         )}
       </div>
