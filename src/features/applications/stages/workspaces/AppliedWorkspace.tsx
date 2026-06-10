@@ -12,6 +12,7 @@ import { KnowledgeBaseHealthPanel } from '@/components/kb/KnowledgeBaseHealthPan
 import { EvidenceIndicator } from '../components/EvidenceIndicator'
 import { EvidenceDeck, type EvidenceCard } from '../components/EvidenceDeck'
 import { SummaryGroup, SummaryRow } from '../components/workspace-shell'
+import { AtsPanel } from '../components/AtsPanel'
 
 interface AppliedWorkspaceProps {
   readonly detail: ApplicationDetail
@@ -300,12 +301,15 @@ export function AppliedWorkspace({ detail }: AppliedWorkspaceProps) {
   const partialMatches = detail.research?.partialMatches ?? []
   const gaps = detail.research?.gaps ?? []
   const resumeSummary = detail.analysis?.resumeSuggestions?.summary
+  const atsCheck = detail.analysis?.atsCheck
 
   return (
     <>
       <FitExperienceSection detail={detail} />
 
       <KnowledgeBaseHealthPanel compact retrieval={detail.research?.kbRetrievalStats} />
+
+      {atsCheck ? <AtsPanel ats={atsCheck} /> : null}
 
       {resumeSummary ? <ResumeSuggestionsGroup summary={resumeSummary} /> : null}
 

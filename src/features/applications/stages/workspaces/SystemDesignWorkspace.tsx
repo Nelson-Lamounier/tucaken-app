@@ -7,7 +7,8 @@ import { Card } from '@/components/ui/Card'
 import { ArchitectureDiagram } from '@/features/projects/components/ArchitectureDiagram'
 import { CollapsibleSection } from '../components/CollapsibleSection'
 import { SummaryGroup, SummaryRow } from '../components/workspace-shell'
-import { resolveStagePrep } from '../types/workspace'
+import { resolveStagePrep, researchToProjectRefs } from '../types/workspace'
+import { ProjectReferenceSheet } from '../components/ProjectReferenceSheet'
 import { SystemDesignWalkthrough } from './SystemDesignWalkthrough'
 
 interface SystemDesignWorkspaceProps {
@@ -247,6 +248,8 @@ export function SystemDesignWorkspace({ detail }: SystemDesignWorkspaceProps) {
   const walkthrough = prep?.systemDesignWalkthrough ?? []
   const coverage = prep?.systemDesignCoverage ?? null
 
+  const projectRefs = researchToProjectRefs(detail.research)
+
   return (
     <>
       {walkthrough.length > 0 ? (
@@ -256,6 +259,8 @@ export function SystemDesignWorkspace({ detail }: SystemDesignWorkspaceProps) {
       )}
 
       <SystemToursGroup tours={tours} />
+
+      <ProjectReferenceSheet refs={projectRefs} />
 
       <FrameworkGroup />
     </>

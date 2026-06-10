@@ -35,7 +35,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
       <Link
         to="/projects/$id"
         params={{ id: project.id }}
-        className="group flex h-full overflow-hidden rounded-2xl bg-white/2 inset-ring inset-ring-white/10 transition-colors hover:bg-white/5"
+        className="group flex h-full overflow-hidden rounded-md bg-white/2 inset-ring inset-ring-white/10 transition-colors hover:bg-white/5"
       >
         <div className="flex w-14 shrink-0 items-center justify-center bg-teal-500/10 text-teal-300">
           <ShapeIcon className="size-5" />

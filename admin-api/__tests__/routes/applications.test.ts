@@ -33,6 +33,7 @@ jest.unstable_mockModule('../../src/lib/repositories/applications.js', () => ({
   deleteApplication:       pgDeleteApplicationMock,
   updateApplicationStatus: pgUpdateApplicationStatusMock,
   updateInterviewStage:    jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  advanceStatusOffAnalysis: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
   updateApplicationAnnotations: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 }));
 
@@ -256,6 +257,7 @@ describe('GET /:slug — application detail', () => {
       metadata:          null,
       resumeSuggestions: ['Add Kubernetes'],
       tailoredResume:    { basics: { name: 'Nelson' } },
+      atsCheck:          null,
     });
     // research: pipeline field names normalised to UI ResearchOutput shape.
     expect(body.application['research']).toEqual({

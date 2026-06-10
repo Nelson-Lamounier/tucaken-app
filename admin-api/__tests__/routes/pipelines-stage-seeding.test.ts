@@ -58,6 +58,7 @@ jest.unstable_mockModule('../../src/lib/repositories/applications.js', () => ({
   getApplication:          jest.fn<() => Promise<unknown>>().mockResolvedValue(null),
   updateApplicationStatus: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
   updateInterviewStage:    jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  advanceStatusOffAnalysis: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
   deleteApplication:       jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
   updateApplicationAnnotations: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 }));

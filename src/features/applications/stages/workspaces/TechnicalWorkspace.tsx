@@ -1,15 +1,15 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Link } from '@tanstack/react-router'
 import { motion, useReducedMotion } from 'motion/react'
-import { ExternalLink, FolderOpen, RotateCw, CheckCircle2, CircleSlash } from 'lucide-react'
+import { ExternalLink, RotateCw, CheckCircle2, CircleSlash } from 'lucide-react'
 import type { ApplicationDetail } from '@/lib/types/applications.types'
 import { TONE, type Tone } from '@/components/ui/tone'
 import { Card } from '@/components/ui/Card'
 import { EvidenceDeck, type EvidenceCard } from '../components/EvidenceDeck'
 import { SummaryGroup, SummaryRow, RailField, RailBullets, RailRichText } from '../components/workspace-shell'
-import { researchToTopics, resolveStagePrep, type EvidenceStrength } from '../types/workspace'
+import { researchToTopics, researchToProjectRefs, resolveStagePrep, type EvidenceStrength } from '../types/workspace'
+import { ProjectReferenceSheet } from '../components/ProjectReferenceSheet'
 import type {
   DsaRealWorkTopic,
   DsaTopicCalibration,
@@ -484,24 +484,6 @@ function PracticeGroup() {
   )
 }
 
-/** Project reference sheet — placeholder until topic→project linkage ships. */
-function ProjectReferenceGroup() {
-  return (
-    <SummaryGroup id="project-reference" title="Your project reference sheet" subtitle="The projects you&apos;re most likely to reference.">
-      <Card className="flex flex-col items-center gap-3 px-4 py-8 text-center">
-        <FolderOpen className="size-6 text-zinc-400" aria-hidden />
-        <p className="max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
-          Ranked project references land once topic-to-project linking ships. For now, browse your
-          case-studies directly.
-        </p>
-        <Link to="/projects" className="text-sm font-medium text-accent hover:underline">
-          Open your projects
-        </Link>
-      </Card>
-    </SummaryGroup>
-  )
-}
-
 interface TechnicalWorkspaceProps {
   readonly detail: ApplicationDetail
 }
@@ -520,6 +502,7 @@ function buildEvidenceMap(real: readonly DsaRealWorkTopic[]): ReadonlyMap<string
 /** Memoised derivations for the technical workspace. */
 function useTechnicalWorkspaceData(detail: ApplicationDetail) {
   const topics = useMemo(() => researchToTopics(detail.research), [detail.research])
+  const projectRefs = useMemo(() => researchToProjectRefs(detail.research), [detail.research])
   const prep = useMemo(() => resolveStagePrep(detail, 'technical'), [detail])
 
   const dsaCalibration = detail.research?.dsaTopicCalibration
@@ -545,6 +528,7 @@ function useTechnicalWorkspaceData(detail: ApplicationDetail) {
 
   return {
     topics,
+    projectRefs,
     dsaCalibration,
     pc,
     focusPillars,
@@ -691,7 +675,7 @@ export function TechnicalWorkspace({ detail }: TechnicalWorkspaceProps) {
         />
       )}
 
-      <ProjectReferenceGroup />
+      <ProjectReferenceSheet refs={data.projectRefs} />
 
       <PrepChecklistGroup items={data.checklist} />
 

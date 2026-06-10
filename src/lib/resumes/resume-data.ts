@@ -60,6 +60,8 @@ export interface ResumeData {
   skills: ResumeSkillGroup[]
   education: ResumeEducation[]
   projects: ResumeProject[]
+  /** Strategist-decided section render order. Empty/absent → canonical fallback. */
+  sectionOrder?: string[]
 }
 
 export const resumeData: ResumeData = {

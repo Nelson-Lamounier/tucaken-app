@@ -7,6 +7,31 @@ import {
   type CoverLetterData,
 } from '@/features/resume-theme/app/state'
 
+/** Builder section keys the strategist's sectionOrder may reference. */
+const CANONICAL_SECTION_ORDER = [
+  'summary',
+  'experience',
+  'projects',
+  'education',
+  'skills',
+  'certifications',
+] as const
+
+const VALID_SECTION_KEYS = new Set<string>(CANONICAL_SECTION_ORDER)
+
+/**
+ * Resolve the builder section order from the strategist's emitted order
+ * (restructure decision). Keeps only known keys; appends any canonical sections
+ * the backend omitted so nothing is dropped. Falls back to canonical when the
+ * backend provided nothing usable.
+ */
+function resolveSectionOrder(emitted: readonly string[] | undefined): string[] {
+  const fromBackend = (emitted ?? []).filter((k) => VALID_SECTION_KEYS.has(k))
+  if (fromBackend.length === 0) return [...CANONICAL_SECTION_ORDER]
+  const seen = new Set(fromBackend)
+  return [...fromBackend, ...CANONICAL_SECTION_ORDER.filter((k) => !seen.has(k))]
+}
+
 /**
  * Maps the application's tailored resume data + cover letter string into
  * the resume builder's full AppState so the builder can be pre-populated.
@@ -67,14 +92,7 @@ export function mapApplicationToBuilderState(
     })),
     languages: [],
     custom: [],
-    sectionOrder: [
-      'summary',
-      'experience',
-      'projects',
-      'education',
-      'skills',
-      'certifications',
-    ],
+    sectionOrder: resolveSectionOrder(appResume.sectionOrder),
   }
 
   const cover = parseCoverLetterString(

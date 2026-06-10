@@ -34,7 +34,7 @@ export function ProjectEditor({ projectId }: { readonly projectId: string }) {
   if (isPending) return <EditorSkeleton />
   if (isError) {
     return (
-      <div className="rounded-2xl bg-rose-400/5 px-6 py-10 text-center inset-ring inset-ring-rose-400/30">
+      <div className="rounded-md bg-rose-400/5 px-6 py-10 text-center inset-ring inset-ring-rose-400/30">
         <p className="text-sm font-medium text-rose-300">Couldn't load project</p>
         <p className="mt-1 text-xs text-rose-300/80">{error instanceof Error ? error.message : 'Unknown error'}</p>
       </div>
@@ -42,7 +42,7 @@ export function ProjectEditor({ projectId }: { readonly projectId: string }) {
   }
   if (!project) {
     return (
-      <div className="rounded-2xl bg-white/2 px-6 py-10 text-center inset-ring inset-ring-white/10">
+      <div className="rounded-md bg-white/2 px-6 py-10 text-center inset-ring inset-ring-white/10">
         <p className="text-sm text-zinc-400">Project not found.</p>
       </div>
     )
@@ -72,7 +72,7 @@ export function ProjectEditor({ projectId }: { readonly projectId: string }) {
   return (
     <DndContext sensors={sensors} onDragEnd={onDragEnd}>
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.2fr_1fr]">
-        <section className="rounded-2xl bg-white/2 p-4 inset-ring inset-ring-white/10">
+        <section className="rounded-md bg-white/2 p-4 inset-ring inset-ring-white/10">
           <div className="mb-3 flex items-center gap-2">
             <span className="flex size-6 items-center justify-center rounded-md bg-white/5 text-zinc-400 inset-ring inset-ring-white/10">
               <Layers className="size-3.5" />
@@ -120,10 +120,10 @@ export function ProjectEditor({ projectId }: { readonly projectId: string }) {
 function EditorSkeleton() {
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.2fr_1fr]" aria-label="Loading editor">
-      <div className="h-64 animate-pulse rounded-2xl bg-white/2 inset-ring inset-ring-white/10" />
+      <div className="h-64 animate-pulse rounded-md bg-white/2 inset-ring inset-ring-white/10" />
       <div className="space-y-5">
-        <div className="h-40 animate-pulse rounded-2xl bg-white/2 inset-ring inset-ring-white/10" />
-        <div className="h-40 animate-pulse rounded-2xl bg-white/2 inset-ring inset-ring-white/10" />
+        <div className="h-40 animate-pulse rounded-md bg-white/2 inset-ring inset-ring-white/10" />
+        <div className="h-40 animate-pulse rounded-md bg-white/2 inset-ring inset-ring-white/10" />
       </div>
     </div>
   )

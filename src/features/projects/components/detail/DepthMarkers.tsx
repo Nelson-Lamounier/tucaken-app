@@ -48,9 +48,9 @@ interface MarkerProps {
 
 function Marker({ icon: Icon, label, present, detail }: MarkerProps) {
   return (
-    <div className="flex items-start gap-3 rounded-xl bg-white/2 px-4 py-3 inset-ring inset-ring-white/10">
+    <div className="flex items-start gap-3 rounded-md bg-white/2 px-4 py-3 inset-ring inset-ring-white/10">
       <span
-        className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${
+        className={`flex size-8 shrink-0 items-center justify-center rounded-md ${
           present
             ? 'bg-teal-400/10 text-teal-300 inset-ring inset-ring-teal-400/30'
             : 'bg-white/5 text-zinc-500 inset-ring inset-ring-white/10'
