@@ -9,7 +9,7 @@
 
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { queryOptions, useQuery } from '@tanstack/react-query'
 import { adminKeys } from '@/lib/api/query-keys'
 import { getResumesFn } from '@/server/resumes'
 
@@ -29,13 +29,12 @@ export interface AdminResumeWithData extends AdminResume {
 const STALE_TIME = 60_000
 
 /**
- * Fetches all resume versions for the dropdown selector.
- * Pre-sorts by date (newest first) with the active resume at the top.
- *
- * @returns TanStack Query result with AdminResume[]
+ * Query options for the resume-version list. Shared by the hook and by route
+ * loaders so the data can be prefetched (`ensureQueryData`) and hydrate the
+ * client-side query — avoiding a cold fetch on mount.
  */
-export function useResumeVersions() {
-  return useQuery<AdminResume[]>({
+export const resumeVersionsQueryOptions = () =>
+  queryOptions({
     queryKey: adminKeys.resumes.list(),
     queryFn: async (): Promise<AdminResume[]> => {
       const result = await getResumesFn()
@@ -43,4 +42,13 @@ export function useResumeVersions() {
     },
     staleTime: STALE_TIME,
   })
+
+/**
+ * Fetches all resume versions for the dropdown selector.
+ * Pre-sorts by date (newest first) with the active resume at the top.
+ *
+ * @returns TanStack Query result with AdminResume[]
+ */
+export function useResumeVersions() {
+  return useQuery(resumeVersionsQueryOptions())
 }

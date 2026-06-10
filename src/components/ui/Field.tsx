@@ -58,7 +58,7 @@ interface FormTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaEle
 export function FormTextarea({ label, field, className = '', ...props }: FormTextareaProps) {
   return (
     <div>
-      <label htmlFor={field.name} className="block text-sm/6 font-medium text-white">
+      <label htmlFor={field.name} className="block text-sm/6 font-medium text-zinc-700 dark:text-zinc-200">
         {label}
       </label>
       <div className="mt-2">

@@ -1,20 +1,14 @@
 import { useState, useEffect } from 'react'
-import {
-  Sparkles,
-  AlertCircle,
-  Loader2,
-  Send,
-  Wand2,
-  FileText,
-} from 'lucide-react'
+import { AlertCircle, Loader2 } from 'lucide-react'
 import { useForm } from '@tanstack/react-form'
 import { useApplicationsTrigger } from '../hooks/use-applications-trigger'
 import { usePipelineNotificationsStore } from '@/lib/stores/pipeline-notifications-store'
+import { useProgressModalStore } from '@/lib/stores/progress-modal-store'
 import type { InterviewStage } from '@/lib/types/applications.types'
-import { INTERVIEW_STAGE_OPTIONS, MIN_JD_LENGTH } from './ApplicationTypes'
+import { MIN_JD_LENGTH } from './ApplicationTypes'
 import { FormInput } from '@/components/ui/Field'
 import { Button } from '@/components/ui/Button'
-import { ProgressBars } from './ProgressBars'
+import { ResumeMenuSelect } from './ResumeMenuSelect'
 
 function DraftSaver({ values }: { readonly values: Record<string, unknown> }) {
   useEffect(() => {
@@ -23,16 +17,22 @@ function DraftSaver({ values }: { readonly values: Record<string, unknown> }) {
   return null
 }
 
-export interface NewAnalysisPanelProps {
-  preselectedResumeId: string
-  onSuccess?: () => void
+/** Header copy that adapts to whether Tucaken builds from scratch or uses a selected resume. */
+function getSubtitle(resumeId: string | null): string {
+  if (resumeId === '') return 'No resume selected. Tucaken builds one from scratch as it analyses the job.'
+  return 'Paste a job description to analyse against your selected resume.'
 }
 
-export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }: NewAnalysisPanelProps) {
+export interface NewAnalysisPanelProps {
+  /** `null` = default not yet resolved; `''` = build from scratch; otherwise a resume id. */
+  readonly resumeId: string | null
+  readonly onResumeChange: (resumeId: string) => void
+}
+
+export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelProps) {
   const trigger = useApplicationsTrigger()
   const addNotification = usePipelineNotificationsStore((s) => s.addNotification)
-  const [submittedSlug, setSubmittedSlug] = useState<string | null>(null)
-  const [submittedRunId, setSubmittedRunId] = useState<string | null>(null)
+  const openProgress = useProgressModalStore((s) => s.openProgress)
 
   const [initialDraft] = useState(() => {
     if (typeof window === 'undefined') return null
@@ -56,9 +56,21 @@ export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }:
     },
     onSubmit: async ({ value }) => {
       if (value.testMode) {
+        const mockCompany = value.targetCompany.trim()
+        const mockRole = value.targetRole.trim()
+        const mockSlug = `mock-${Date.now()}`
         localStorage.removeItem('application-form-draft')
         form.reset()
-        setSubmittedSlug(`mock-${Date.now()}`)
+        openProgress({ slug: mockSlug, startedAt: Date.now() })
+        // Register the run in the notification bell too (the mock detail endpoint
+        // drives it running → ready, and renders at /applications/<mock-slug>).
+        addNotification({
+          type: 'application',
+          slug: mockSlug,
+          label: `${mockCompany} — ${mockRole} (test)`,
+          status: 'running',
+          link: `/applications/${encodeURIComponent(mockSlug)}`,
+        })
         return
       }
 
@@ -71,23 +83,26 @@ export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }:
           targetCompany: company,
           targetRole: role,
           interviewStage: value.interviewStage,
-          resumeId: preselectedResumeId,
+          resumeId: resumeId ?? '',
           includeCoverLetter: value.includeCoverLetter,
         },
         {
           onSuccess: (data) => {
             localStorage.removeItem('application-form-draft')
             form.reset()
-            setSubmittedSlug(data.applicationId)
-            setSubmittedRunId(data.pipelineRunId)
+            openProgress({
+              slug: data.applicationId,
+              pipelineRunId: data.pipelineRunId,
+              startedAt: Date.now(),
+            })
             addNotification({
               type: 'application',
               slug: data.applicationId,
               label: `${company} — ${role}`,
               status: 'running',
               link: `/applications/${encodeURIComponent(data.applicationId)}`,
+              pipelineRunId: data.pipelineRunId,
             })
-            // We now skip calling onSuccess() to let the ProgressBars take over navigation
           },
         },
       )
@@ -107,49 +122,24 @@ export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }:
     return () => window.removeEventListener('application-retry', handleRetry)
   }, [form])
 
-  if (submittedSlug) {
-    return (
-      <div className="mb-8 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-white/10 dark:bg-white/5 shadow-sm">
-        <ProgressBars slug={submittedSlug} pipelineRunId={submittedRunId ?? undefined} />
-      </div>
-    )
-  }
-
   return (
     <div className="mb-8 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-white/10 dark:bg-white/5 shadow-sm">
-      <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-zinc-200 dark:border-white/10">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl">
-            <Sparkles className="h-5 w-5 text-violet-500 dark:text-violet-400" />
-          </div>
-          <div>
-            <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
-              Analyse New Job Description
-            </h2>
-            <p className="text-xs text-zinc-500">
-              {preselectedResumeId
-                ? 'Paste a job description to analyse against your selected resume'
-                : 'Paste a job description — the agent will build your resume from scratch'}
-            </p>
-          </div>
+      <div className="flex items-center justify-between gap-4 px-6 py-5 border-b border-zinc-200 dark:border-white/10">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+            Analyse New Job Description
+          </h2>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            {getSubtitle(resumeId)}
+          </p>
         </div>
         <div className="flex-none">
-          {preselectedResumeId ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 text-indigo-700 ring-indigo-600/20 dark:bg-indigo-500/10 dark:text-indigo-400 dark:ring-indigo-500/20 px-2.5 py-1 text-xs font-medium ring-1 ring-inset">
-              <FileText className="size-3" />
-              Resume selected
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 text-violet-700 ring-violet-600/20 dark:bg-violet-500/10 dark:text-violet-400 dark:ring-violet-500/20 px-2.5 py-1 text-xs font-medium ring-1 ring-inset">
-              <Wand2 className="size-3" />
-              Building from scratch
-            </span>
-          )}
+          <ResumeMenuSelect resumeId={resumeId} onChange={onResumeChange} />
         </div>
       </div>
 
       <form
-        className="px-6 pb-6 pt-5"
+        className="p-6 sm:p-8"
         onSubmit={(e) => {
             e.preventDefault()
             e.stopPropagation()
@@ -161,66 +151,78 @@ export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }:
             children={(values) => <DraftSaver values={values} />}
           />
 
-          {/* Company + Role row */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <form.Field
-              name="targetCompany"
-              children={(field) => (
-                <FormInput
-                  field={field}
-                  label="Target Company"
-                  placeholder="e.g. Revolut"
-                />
-              )}
-            />
-            <form.Field
-              name="targetRole"
-              children={(field) => (
-                <FormInput
-                  field={field}
-                  label="Target Role"
-                  placeholder="e.g. Senior DevOps Engineer"
-                />
-              )}
-            />
-          </div>
+          {/* Side-by-side: narrow target details (left) + wider job description (right) */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
+            {/* Left column: target company + role stacked */}
+            <div className="space-y-4 lg:col-span-1">
+              <div>
+                <h3 className="text-sm font-semibold text-zinc-900 dark:text-white">
+                  Target company & role
+                </h3>
+                <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                  Company and role let Tucaken tailor your analysis and cover letter. Which are you targeting?
+                </p>
+              </div>
+              <form.Field
+                name="targetCompany"
+                children={(field) => (
+                  <FormInput
+                    field={field}
+                    label="Target Company"
+                    placeholder="e.g. Revolut"
+                  />
+                )}
+              />
+              <form.Field
+                name="targetRole"
+                children={(field) => (
+                  <FormInput
+                    field={field}
+                    label="Target Role"
+                    placeholder="e.g. Senior DevOps Engineer"
+                  />
+                )}
+              />
+            </div>
 
-          {/* Interview Stage + Resume Version row */}
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="interview-stage" className="mb-1.5 block text-sm/6 font-medium text-zinc-900 dark:text-white">
-                Interview Stage
-              </label>
-              <div className="mt-2">
-                <form.Field
-                  name="interviewStage"
-                  children={(field) => (
-                    <select
-                      id={field.name}
-                      name={field.name}
-                      value={field.state.value}
-                      onBlur={field.handleBlur}
-                      onChange={(e) => field.handleChange(e.target.value as InterviewStage)}
-                      className="block p-2 w-full rounded-md border-0 bg-zinc-50 dark:bg-white/5 py-1.5 text-zinc-900 dark:text-white shadow-sm ring-1 ring-inset ring-zinc-300 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-teal-500 sm:text-sm/6"
+            {/* Right column: job description (wider — 2/3) */}
+            <div className="flex flex-col lg:col-span-2">
+              <div className="mb-1.5 flex items-center justify-between">
+                <label htmlFor="jobDescription" className="block text-sm/6 font-medium text-zinc-900 dark:text-white">
+                  Job Description
+                </label>
+                <form.Subscribe
+                  selector={(state) => state.values.jobDescription}
+                  children={(jd) => (
+                    <span
+                      className={`text-xs ${
+                        jd.length >= MIN_JD_LENGTH ? 'text-emerald-500' : 'text-zinc-500'
+                      }`}
                     >
-                      {INTERVIEW_STAGE_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value} className="bg-white text-zinc-900 dark:bg-zinc-800 dark:text-white">
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
+                      {jd.length} / {MIN_JD_LENGTH} characters minimum
+                    </span>
                   )}
                 />
               </div>
-            </div>
-
-            <div className="hidden">
-              {/* the resume version selection has been moved to a previous pipeline step */}
+              <form.Field
+                name="jobDescription"
+                children={(field) => (
+                  <textarea
+                    id={field.name}
+                    name={field.name}
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    placeholder="Paste the full job description: responsibilities, requirements, qualifications."
+                    className="block h-full min-h-80 w-full flex-1 resize-y rounded-md border-0 bg-zinc-50 p-2 text-base/6 text-zinc-900 shadow-sm ring-1 ring-inset ring-zinc-300 focus:ring-2 focus:ring-inset focus:ring-teal-500 lg:min-h-96 dark:bg-white/5 dark:text-white dark:ring-white/10"
+                  />
+                )}
+              />
             </div>
           </div>
 
-          {/* Options row */}
-          <div className="mt-5 flex flex-wrap items-center gap-6 px-1">
+          {/* Options row — bottom of the component */}
+          <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3">
             <div className="flex items-center gap-2">
               <form.Field
                 name="includeCoverLetter"
@@ -257,47 +259,10 @@ export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }:
                 )}
               />
               <label htmlFor="testMode" className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                Run in Test Mode (Mock API)
+                Run in Test Mode
               </label>
+              <span className="text-xs text-zinc-400 dark:text-zinc-500">mock data, skips the real run</span>
             </div>
-          </div>
-
-          {/* Job Description textarea */}
-          <div className="mt-4">
-            <div className="mb-1.5 flex items-center justify-between">
-              <label htmlFor="job-description" className="block text-sm/6 font-medium text-zinc-900 dark:text-white">
-                Job Description
-              </label>
-              <form.Subscribe
-                selector={(state) => state.values.jobDescription}
-                children={(jd) => (
-                  <span
-                    className={`text-xs ${
-                      jd.length >= MIN_JD_LENGTH ? 'text-emerald-500' : 'text-zinc-500'
-                    }`}
-                  >
-                    {jd.length} / {MIN_JD_LENGTH} min characters
-                  </span>
-                )}
-              />
-            </div>
-            <form.Field
-              name="jobDescription"
-              children={(field) => (
-                <div className="mt-2">
-                  <textarea
-                    id={field.name}
-                    name={field.name}
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    placeholder="Paste the full job description here. Include responsibilities, requirements, qualifications, and any other relevant details…"
-                    rows={12}
-                    className="block p-2 w-full rounded-md border-0 bg-zinc-50 dark:bg-white/5 py-1.5 text-zinc-900 dark:text-white shadow-sm ring-1 ring-inset ring-zinc-300 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-teal-500 sm:text-sm/6"
-                  />
-                </div>
-              )}
-            />
           </div>
 
           {/* Error */}
@@ -305,9 +270,12 @@ export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }:
             <div className="mt-4 flex flex-col gap-2 rounded-lg bg-red-50 text-red-700 border border-red-600/20 dark:bg-red-500/10 dark:text-red-500 dark:border-red-500/20 px-4 py-3 text-sm">
               <div className="flex items-center gap-2 font-semibold">
                 <AlertCircle className="h-4 w-4 shrink-0" />
-                Analysis trigger failed
+                Couldn’t start the analysis
               </div>
-              <p className="text-red-600 dark:text-red-400 whitespace-pre-wrap break-words">{trigger.error.message}</p>
+              <p className="text-red-600 dark:text-red-400">
+                Check the job description and target details, then try again. If it keeps failing, the analysis service may be down.
+              </p>
+              <p className="text-red-600/80 dark:text-red-400/80 whitespace-pre-wrap wrap-break-word text-xs">{trigger.error.message}</p>
             </div>
           )}
 
@@ -315,14 +283,18 @@ export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }:
           <form.Subscribe
             selector={(state) => [state.values.jobDescription, state.values.targetCompany, state.values.targetRole]}
             children={([jd, company, role]) => {
-              const isValid = jd.length >= MIN_JD_LENGTH && company.trim().length > 0 && role.trim().length > 0
+              const isValid =
+                resumeId !== null &&
+                jd.length >= MIN_JD_LENGTH &&
+                company.trim().length > 0 &&
+                role.trim().length > 0
               
               return (
                 <div className="mt-5 flex items-center justify-between">
                   <p className="text-xs text-zinc-500">
                     {isValid
                       ? '✓ Ready to analyse'
-                      : 'Fill in company, role, and a job description (min 50 chars)'}
+                      : `Fill in company, role, and a job description (${MIN_JD_LENGTH}+ characters)`}
                   </p>
                   <div className="flex gap-3">
                     <Button
@@ -341,11 +313,7 @@ export function NewAnalysisPanel({ preselectedResumeId, onSuccess: _onSuccess }:
                       disabled={!isValid || trigger.isPending}
                       className="gap-2"
                     >
-                      {trigger.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Send className="h-4 w-4" />
-                      )}
+                      {trigger.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                       {trigger.isPending ? 'Analysing…' : 'Start Analysis'}
                     </Button>
                   </div>

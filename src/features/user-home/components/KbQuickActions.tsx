@@ -50,7 +50,7 @@ export function KbQuickActions() {
       >
         <motion.div variants={ITEM} whileHover={{ y: -3 }} whileTap={{ scale: 0.985 }} transition={PRESS} style={{ willChange: 'transform' }}>
           <Link to="/applications/new" className={CARD_CLASS}>
-            <ActionBody icon={Bot} title="Resume Analysis" sub="Create a new resume analysis" />
+            <ActionBody icon={Bot} title="Resume Builder" sub="Tailor your resume to a job" />
           </Link>
         </motion.div>
 
