@@ -3,7 +3,6 @@ import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from '@headless
 import { ChevronUpDownIcon } from '@heroicons/react/16/solid'
 import { CheckIcon } from '@heroicons/react/20/solid'
 import { DocumentTextIcon } from '@heroicons/react/24/outline'
-import { Wand2 } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { useResumeVersions, type AdminResume } from '../hooks/use-resume-versions'
 
@@ -46,8 +45,15 @@ export function ResumeMenuSelect({ resumeId, onChange }: ResumeMenuSelectProps) 
     )
   }
 
+  const hasNoResumes = sorted.length === 0
   const selected = sorted.find((r) => r.resumeId === resumeId)
-  const buttonLabel = selected ? selected.label : 'Build from scratch with agent'
+
+  let buttonLabel = 'Build from scratch with agent'
+  if (selected) {
+    buttonLabel = selected.label
+  } else if (hasNoResumes) {
+    buttonLabel = 'No resume yet — build from scratch'
+  }
 
   return (
     <Listbox value={resumeId} onChange={onChange} as="div" className="relative">
@@ -55,7 +61,7 @@ export function ResumeMenuSelect({ resumeId, onChange }: ResumeMenuSelectProps) 
         aria-label={`Select resume — ${buttonLabel}`}
         className="inline-flex items-center gap-2 rounded-md bg-zinc-100 dark:bg-white/5 px-3 py-1.5 text-sm text-zinc-900 dark:text-white outline-1 -outline-offset-1 outline-zinc-300 dark:outline-white/10 hover:bg-zinc-200 dark:hover:bg-white/10 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-teal-500 transition-colors"
       >
-        {selected ? <DocumentTextIcon className="size-4 text-zinc-500" /> : <Wand2 className="size-4 text-violet-500" />}
+        {selected && <DocumentTextIcon className="size-4 text-zinc-500" />}
         <span className="max-w-48 truncate">{buttonLabel}</span>
         <ChevronUpDownIcon aria-hidden="true" className="size-4 text-zinc-400" />
       </ListboxButton>
@@ -87,14 +93,17 @@ export function ResumeMenuSelect({ resumeId, onChange }: ResumeMenuSelectProps) 
           </ListboxOption>
         ))}
 
+        {hasNoResumes && (
+          <p className="border-t border-zinc-200 dark:border-white/10 px-3 py-2 text-xs text-zinc-500">
+            You have no resumes yet. The agent will build one from scratch.
+          </p>
+        )}
+
         <ListboxOption
           value={BUILD_FROM_SCRATCH}
           className="group flex cursor-pointer items-center justify-between gap-2 border-t border-zinc-200 dark:border-white/10 px-3 py-2 data-focus:bg-zinc-100 dark:data-focus:bg-white/5"
         >
-          <span className="flex items-center gap-2 text-violet-600 dark:text-violet-400">
-            <Wand2 className="size-4" />
-            Build from scratch with agent
-          </span>
+          <span className="text-zinc-700 dark:text-zinc-300">Build from scratch with agent</span>
           <CheckIcon className="size-4 text-teal-600 opacity-0 group-data-selected:opacity-100" />
         </ListboxOption>
 

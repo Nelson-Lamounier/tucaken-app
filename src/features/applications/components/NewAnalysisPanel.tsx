@@ -1,15 +1,11 @@
 import { useState, useEffect } from 'react'
-import {
-  Sparkles,
-  AlertCircle,
-  Loader2,
-  Send,
-} from 'lucide-react'
+import { AlertCircle, Loader2 } from 'lucide-react'
 import { useForm } from '@tanstack/react-form'
 import { useApplicationsTrigger } from '../hooks/use-applications-trigger'
+import { useResumeVersions } from '../hooks/use-resume-versions'
 import { usePipelineNotificationsStore } from '@/lib/stores/pipeline-notifications-store'
 import type { InterviewStage } from '@/lib/types/applications.types'
-import { INTERVIEW_STAGE_OPTIONS, MIN_JD_LENGTH } from './ApplicationTypes'
+import { MIN_JD_LENGTH } from './ApplicationTypes'
 import { FormInput } from '@/components/ui/Field'
 import { Button } from '@/components/ui/Button'
 import { ProgressBars } from './ProgressBars'
@@ -22,6 +18,13 @@ function DraftSaver({ values }: { readonly values: Record<string, unknown> }) {
   return null
 }
 
+/** Header copy that adapts to whether a resume is selected, scratch, or the user has none. */
+function getSubtitle(hasNoResumes: boolean, resumeId: string | null): string {
+  if (hasNoResumes) return 'You have no resumes yet — the agent will build one from scratch.'
+  if (resumeId === '') return 'The agent will build your resume from scratch.'
+  return 'Paste a job description to analyse against your selected resume.'
+}
+
 export interface NewAnalysisPanelProps {
   /** `null` = default not yet resolved; `''` = build from scratch; otherwise a resume id. */
   readonly resumeId: string | null
@@ -31,6 +34,8 @@ export interface NewAnalysisPanelProps {
 export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelProps) {
   const trigger = useApplicationsTrigger()
   const addNotification = usePipelineNotificationsStore((s) => s.addNotification)
+  const { data: resumeVersions } = useResumeVersions()
+  const hasNoResumes = Array.isArray(resumeVersions) && resumeVersions.length === 0
   const [submittedSlug, setSubmittedSlug] = useState<string | null>(null)
   const [submittedRunId, setSubmittedRunId] = useState<string | null>(null)
 
@@ -117,21 +122,14 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
 
   return (
     <div className="mb-8 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-white/10 dark:bg-white/5 shadow-sm">
-      <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-zinc-200 dark:border-white/10">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl">
-            <Sparkles className="h-5 w-5 text-violet-500 dark:text-violet-400" />
-          </div>
-          <div>
-            <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
-              Analyse New Job Description
-            </h2>
-            <p className="text-xs text-zinc-500">
-              {resumeId === ''
-                ? 'Paste a job description — the agent will build your resume from scratch'
-                : 'Paste a job description to analyse against your selected resume'}
-            </p>
-          </div>
+      <div className="flex items-center justify-between gap-4 px-6 py-5 border-b border-zinc-200 dark:border-white/10">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+            Analyse New Job Description
+          </h2>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            {getSubtitle(hasNoResumes, resumeId)}
+          </p>
         </div>
         <div className="flex-none">
           <ResumeMenuSelect resumeId={resumeId} onChange={onResumeChange} />
@@ -173,36 +171,6 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
                 />
               )}
             />
-          </div>
-
-          {/* Interview Stage */}
-          <div className="mt-4">
-            <div>
-              <label htmlFor="interview-stage" className="mb-1.5 block text-sm/6 font-medium text-zinc-900 dark:text-white">
-                Interview Stage
-              </label>
-              <div className="mt-2">
-                <form.Field
-                  name="interviewStage"
-                  children={(field) => (
-                    <select
-                      id={field.name}
-                      name={field.name}
-                      value={field.state.value}
-                      onBlur={field.handleBlur}
-                      onChange={(e) => field.handleChange(e.target.value as InterviewStage)}
-                      className="block p-2 w-full rounded-md border-0 bg-zinc-50 dark:bg-white/5 py-1.5 text-zinc-900 dark:text-white shadow-sm ring-1 ring-inset ring-zinc-300 dark:ring-white/10 focus:ring-2 focus:ring-inset focus:ring-teal-500 sm:text-sm/6"
-                    >
-                      {INTERVIEW_STAGE_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value} className="bg-white text-zinc-900 dark:bg-zinc-800 dark:text-white">
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                />
-              </div>
-            </div>
           </div>
 
           {/* Options row */}
@@ -331,11 +299,7 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
                       disabled={!isValid || trigger.isPending}
                       className="gap-2"
                     >
-                      {trigger.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Send className="h-4 w-4" />
-                      )}
+                      {trigger.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                       {trigger.isPending ? 'Analysing…' : 'Start Analysis'}
                     </Button>
                   </div>

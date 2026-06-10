@@ -93,4 +93,13 @@ describe('ResumeMenuSelect', () => {
     expect(screen.getByLabelText('Loading resumes')).toBeTruthy()
     expect(onChange).not.toHaveBeenCalled()
   })
+
+  it('informs the user when they have no resumes', () => {
+    useResumeVersionsMock.mockReturnValue({ data: [], isLoading: false })
+    const onChange = vi.fn()
+    render(<ResumeMenuSelect resumeId="" onChange={onChange} />)
+    expect(screen.getByText(/No resume yet/i)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button'))
+    expect(screen.getByText(/no resumes yet/i)).toBeTruthy()
+  })
 })
