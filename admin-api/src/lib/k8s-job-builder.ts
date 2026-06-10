@@ -49,6 +49,12 @@ export interface BuildJobInput {
     env:                 { name: string; value: string }[];
     envFromSecretRefs:   string[];
     activeDeadlineSeconds?: number;   // default 1800
+    /**
+     * Job-level retry count. Default 0: an LLM pipeline failure is usually
+     * deterministic (schema/parse) and a retry re-spends the expensive Sonnet
+     * call; transient Bedrock throttles are already retried inside runAgent.
+     */
+    backoffLimit?: number;
     resources?: {
         requests: { memory: string; cpu: string };
         limits:   { memory: string; cpu: string };
@@ -127,7 +133,7 @@ export function buildPipelineJob(input: BuildJobInput): V1Job {
         metadata: { name: jobName, namespace: input.namespace, labels: sanitisedLabels },
         spec: {
             ttlSecondsAfterFinished: 3600,
-            backoffLimit:            2,
+            backoffLimit:            input.backoffLimit ?? 0,
             activeDeadlineSeconds:   input.activeDeadlineSeconds ?? 1800,
             template: {
                 metadata: {
