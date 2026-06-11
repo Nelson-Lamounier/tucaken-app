@@ -460,6 +460,8 @@ export interface AnalysisOutput {
   readonly atsCheck?: AtsCheckResult | null
   /** Structured signal the JD-extractor read from the job description (Phase 0). */
   readonly jdExtraction?: JdExtraction | null
+  /** Recruiter-snapshot assessment (score, missing keywords, red flags). */
+  readonly recruiterSnapshot?: RecruiterSnapshot | null
 }
 
 /**
@@ -476,6 +478,23 @@ export interface JdExtraction {
   readonly domain: string
   readonly seniority: string
   readonly retrievalKeywords: readonly string[]
+}
+
+/** A red flag identified by the recruiter-snapshot model. */
+export interface RecruiterRedFlag {
+  readonly flag: string
+  readonly why: string
+}
+
+/**
+ * Recruiter-snapshot assessment produced by the job-strategist pipeline.
+ * A 10-second recruiter read: score, rationale, missing keywords, red flags.
+ */
+export interface RecruiterSnapshot {
+  readonly score: number
+  readonly scoreRationale: string
+  readonly missingKeywords: readonly string[]
+  readonly redFlags: readonly RecruiterRedFlag[]
 }
 
 /** One JD keyword and whether the tailored resume covers it (grounded = KB-verified). */
