@@ -7,13 +7,14 @@ import { Button } from '@/components/ui/Button'
 import type { AdminResumeWithData } from '../../applications/hooks/use-resume-versions'
 import { DashboardDrawer } from '@/components/ui/DashboardDrawer'
 import type { ResumeData, ResumeProfile } from '@/lib/resumes/resume-data'
+import type { CoverLetter } from '@/lib/types/applications.types'
 import { ResumeFeedbackWidget } from './ResumeFeedbackWidget'
 
 interface ResumePreviewDrawerProps {
   readonly isOpen: boolean
   readonly onClose: () => void
   readonly resume?: AdminResumeWithData | null
-  readonly coverLetter?: string | null
+  readonly coverLetter?: CoverLetter | null
   readonly coverLetterProfile?: ResumeProfile
   readonly coverLetterCompany?: string
   readonly coverLetterRole?: string
@@ -84,7 +85,7 @@ export function ResumePreviewDrawer({
           >
             <div className="flex flex-col gap-6 [&>div]:rounded-lg [&>div]:shadow-2xl [&>div]:ring-1 [&>div]:ring-white/10 relative z-10 bg-white">
               <CoverLetterDocument
-                content={coverLetter}
+                coverLetter={coverLetter}
                 profile={coverLetterProfile}
                 targetCompany={coverLetterCompany}
                 targetRole={coverLetterRole}

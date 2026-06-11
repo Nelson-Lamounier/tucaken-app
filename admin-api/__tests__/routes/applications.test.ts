@@ -199,7 +199,11 @@ describe('GET /:slug — application detail', () => {
           metadata: {
             analysis: {
               analysisXml:       '<analysis/>',
-              coverLetter:       'Dear hiring team',
+              coverLetter: {
+                greeting: 'Dear Hiring Manager,',
+                paragraphs: ['I am excited to apply for this role.'],
+                signoff: { name: 'Nelson Lamounier', email: 'n@example.com', linkedin: 'linkedin.com/in/nelson', github: 'github.com/nelson' },
+              },
               resumeSuggestions: ['Add Kubernetes'],
               tailoredResumeData: { basics: { name: 'Raw Blob' } },
             },
@@ -253,7 +257,11 @@ describe('GET /:slug — application detail', () => {
     // tailoredResume prefers the validated resumes row over the raw blob.
     expect(body.application['analysis']).toEqual({
       analysisXml:       '<analysis/>',
-      coverLetter:       'Dear hiring team',
+      coverLetter: {
+        greeting: 'Dear Hiring Manager,',
+        paragraphs: ['I am excited to apply for this role.'],
+        signoff: { name: 'Nelson Lamounier', email: 'n@example.com', linkedin: 'linkedin.com/in/nelson', github: 'github.com/nelson' },
+      },
       metadata:          null,
       resumeSuggestions: ['Add Kubernetes'],
       tailoredResume:    { basics: { name: 'Nelson' } },
