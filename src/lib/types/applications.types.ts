@@ -475,6 +475,10 @@ export interface AnalysisOutput {
   readonly atsCheck?: AtsCheckResult | null
   /** Structured signal the JD-extractor read from the job description (Phase 0). */
   readonly jdExtraction?: JdExtraction | null
+  /** Years-of-experience gap signal from the job-strategist pipeline. */
+  readonly yearsGap?: YearsGap | null
+  /** Recruiter-snapshot assessment (score, missing keywords, red flags). */
+  readonly recruiterSnapshot?: RecruiterSnapshot | null
 }
 
 /**
@@ -491,6 +495,23 @@ export interface JdExtraction {
   readonly domain: string
   readonly seniority: string
   readonly retrievalKeywords: readonly string[]
+}
+
+/** A red flag identified by the recruiter-snapshot model. */
+export interface RecruiterRedFlag {
+  readonly flag: string
+  readonly why: string
+}
+
+/**
+ * Recruiter-snapshot assessment produced by the job-strategist pipeline.
+ * A 10-second recruiter read: score, rationale, missing keywords, red flags.
+ */
+export interface RecruiterSnapshot {
+  readonly score: number
+  readonly scoreRationale: string
+  readonly missingKeywords: readonly string[]
+  readonly redFlags: readonly RecruiterRedFlag[]
 }
 
 /** One JD keyword and whether the tailored resume covers it (grounded = KB-verified). */
@@ -513,6 +534,19 @@ export interface AtsCheckResult {
   readonly status: 'passed' | 'issues' | 'unverified'
   readonly passed: boolean
   readonly issues: readonly string[]
+}
+
+/**
+ * Years-of-experience gap signal produced by the job-strategist pipeline.
+ * Mirrors YearsGap in ai-applications.
+ */
+export interface YearsGap {
+  readonly relevantYears: number
+  readonly requiredYears: number | null
+  readonly gapYears: number
+  readonly disqualifying: boolean
+  readonly relevantRoleTitles: readonly string[]
+  readonly framingLine: string
 }
 
 /** Interview question from the Coach Agent */

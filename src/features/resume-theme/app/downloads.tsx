@@ -2,6 +2,7 @@ import html2canvas from 'html2canvas-pro'
 import { jsPDF } from 'jspdf'
 import type { ResumeData, CoverLetterData } from './state'
 import type { ThemeName } from './themes'
+import { emailHref, telHref, urlHref } from './links'
 
 export function sanitizeFilename(s: string) {
   return s.replace(/[^a-z0-9_-]+/gi, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
@@ -16,9 +17,9 @@ export function buildResumeTxt(r: ResumeData): string {
     r.profile.email,
     r.profile.phone,
     r.profile.location,
-    r.profile.linkedin,
-    r.profile.github,
-    r.profile.website,
+    r.profile.linkedin && urlHref(r.profile.linkedin),
+    r.profile.github && urlHref(r.profile.github),
+    r.profile.website && urlHref(r.profile.website),
   ].filter(Boolean).join(" | ");
   if (contact) lines.push(contact);
   lines.push("");
@@ -53,7 +54,7 @@ export function buildResumeTxt(r: ResumeData): string {
         if (r.projects.length) {
           sectionTitle("Projects");
           r.projects.forEach((p) => {
-            lines.push(`${p.name}${p.stack ? "  ·  " + p.stack : ""}${p.url ? "  [" + p.url + "]" : ""}`);
+            lines.push(`${p.name}${p.stack ? "  ·  " + p.stack : ""}${p.url ? "  [" + urlHref(p.url) + "]" : ""}`);
             if (p.description) lines.push(p.description);
             p.bullets.filter(Boolean).forEach((b) => lines.push("  - " + b));
             lines.push("");
@@ -172,10 +173,10 @@ export function buildResumeDoc(r: ResumeData, theme: ThemeName, margin: number):
           .join("")}</ul>`
       : "";
 
-  const entryHead = (left: string, right: string, sub?: string) => `
+  const entryHead = (left: string, right: string, sub?: string, rightIsHtml = false) => `
     <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12pt;">
       <div>${left}</div>
-      <div style="font-size:10pt;color:#555;white-space:nowrap;">${escapeHtml(right || "")}</div>
+      <div style="font-size:10pt;color:#555;white-space:nowrap;">${rightIsHtml ? right : escapeHtml(right || "")}</div>
     </div>
     ${sub ? `<div style="font-size:10pt;color:#666;font-style:italic;">${escapeHtml(sub)}</div>` : ""}`;
 
@@ -186,7 +187,7 @@ export function buildResumeDoc(r: ResumeData, theme: ThemeName, margin: number):
   body += `<header style="${headerStyle}">
     <h1 style="margin:0;font-size:${isClassic ? 22 : 26}pt;font-weight:${theme === "modern" ? 300 : 700};letter-spacing:${theme === "modern" ? "-0.02em" : "0.01em"};">${escapeHtml(r.profile.name)}</h1>
     ${r.profile.title ? `<div style="font-size:11pt;color:${theme === "modern" ? "#0d9488" : "#444"};letter-spacing:0.06em;text-transform:uppercase;margin-top:2pt;">${escapeHtml(r.profile.title)}</div>` : ""}
-    <div style="font-size:10pt;color:#444;margin-top:6pt;">${[r.profile.email, r.profile.phone, r.profile.location, r.profile.linkedin, r.profile.github, r.profile.website].filter(Boolean).map(escapeHtml).join(" · ")}</div>
+    <div style="font-size:10pt;color:#444;margin-top:6pt;">${contactDocHtml(r.profile)}</div>
   </header>`;
 
   for (const key of r.sectionOrder) {
@@ -220,7 +221,9 @@ export function buildResumeDoc(r: ResumeData, theme: ThemeName, margin: number):
                 (p) =>
                   `<div style="margin-top:8pt;">${entryHead(
                     `<span style="font-size:11pt;font-weight:700;">${escapeHtml(p.name)}</span>${p.stack ? `<span style="color:#555;font-size:10pt;"> · ${escapeHtml(p.stack)}</span>` : ""}`,
-                    p.url,
+                    p.url ? anchorHtml(urlHref(p.url), p.url) : "",
+                    undefined,
+                    true,
                   )}${p.description ? `<div style="font-size:10.5pt;color:#222;margin-top:3pt;">${escapeHtml(p.description)}</div>` : ""}${bulletList(p.bullets)}</div>`,
               )
               .join(""),
@@ -311,7 +314,7 @@ export function buildCoverDoc(
     <header style="${headerStyle}">
       <h1 style="margin:0;font-size:22pt;font-weight:${theme === "modern" ? 300 : 700};">${escapeHtml(r.profile.name)}</h1>
       ${r.profile.title ? `<div style="font-size:11pt;color:${theme === "modern" ? "#0d9488" : "#444"};letter-spacing:0.06em;text-transform:uppercase;margin-top:2pt;">${escapeHtml(r.profile.title)}</div>` : ""}
-      <div style="font-size:10pt;color:#444;margin-top:6pt;">${[r.profile.email, r.profile.phone, r.profile.location, r.profile.linkedin].filter(Boolean).map(escapeHtml).join(" · ")}</div>
+      <div style="font-size:10pt;color:#444;margin-top:6pt;">${contactDocHtml(r.profile)}</div>
     </header>
     <div style="font-size:11pt;margin-bottom:6pt;">${escapeHtml(c.date)}</div>
     <div style="font-size:11pt;line-height:1.5;margin-bottom:10pt;">
@@ -372,6 +375,25 @@ function escapeHtml(s: string) {
     .replace(/"/g, "&quot;");
 }
 
+/** Anchor for Word HTML — inherits surrounding color, no underline, label stays bare. */
+function anchorHtml(href: string, label: string): string {
+  return `<a href="${escapeHtml(href)}" style="color:inherit;text-decoration:none;">${escapeHtml(label)}</a>`;
+}
+
+/** Contact line as " · "-joined Word HTML, with email/phone/web fields linkified. */
+function contactDocHtml(p: ResumeData["profile"]): string {
+  return [
+    p.email && anchorHtml(emailHref(p.email), p.email),
+    p.phone && anchorHtml(telHref(p.phone), p.phone),
+    p.location && escapeHtml(p.location),
+    p.linkedin && anchorHtml(urlHref(p.linkedin), p.linkedin),
+    p.github && anchorHtml(urlHref(p.github), p.github),
+    p.website && anchorHtml(urlHref(p.website), p.website),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 export function downloadDoc(htmlContent: string, baseName: string) {
   const blob = new Blob(["﻿", htmlContent], { type: "application/msword" });
   downloadBlob(blob, `${baseName}.doc`);
@@ -394,7 +416,8 @@ export async function downloadPdf(docElementId: string, baseName: string) {
   const pageH = pdf.internal.pageSize.getHeight();
 
   for (let i = 0; i < sheets.length; i++) {
-    const canvas = await html2canvas(sheets[i], {
+    const sheet = sheets[i];
+    const canvas = await html2canvas(sheet, {
       scale: 2,
       useCORS: true,
       backgroundColor: "#ffffff",
@@ -403,8 +426,33 @@ export async function downloadPdf(docElementId: string, baseName: string) {
     const imgData = canvas.toDataURL("image/png");
     if (i > 0) pdf.addPage();
     pdf.addImage(imgData, "PNG", 0, 0, pageW, pageH);
+    // The image is a flat raster — overlay live link annotations by mapping
+    // each anchor's on-screen rect (px) onto the current PDF page (pt). The
+    // x/y scales mirror addImage's stretch so the hotspots stay aligned.
+    addPdfLinks(pdf, sheet, pageW, pageH);
   }
 
   node.style.transform = originalTransform;
   pdf.save(`${baseName}.pdf`);
+}
+
+/** Overlay clickable link hotspots on the current PDF page for every anchor in `sheet`. */
+function addPdfLinks(pdf: jsPDF, sheet: HTMLElement, pageW: number, pageH: number) {
+  const paper = sheet.getBoundingClientRect();
+  if (paper.width === 0 || paper.height === 0) return;
+  const scaleX = pageW / paper.width;
+  const scaleY = pageH / paper.height;
+  sheet.querySelectorAll<HTMLAnchorElement>("a[href]").forEach((anchor) => {
+    const url = anchor.href;
+    if (!url) return;
+    const r = anchor.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) return;
+    pdf.link(
+      (r.left - paper.left) * scaleX,
+      (r.top - paper.top) * scaleY,
+      r.width * scaleX,
+      r.height * scaleY,
+      { url },
+    );
+  });
 }
