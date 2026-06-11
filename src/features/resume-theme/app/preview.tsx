@@ -89,7 +89,7 @@ export function PaginatedDoc({
       <div
         ref={measureRef}
         aria-hidden="true"
-        className={`resume-doc theme-${theme}`}
+        className={`resume-doc theme-${theme}${coverMode ? " cover-mode" : ""}`}
         style={{
           position: "absolute",
           left: -99999,

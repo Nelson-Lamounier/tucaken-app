@@ -14,6 +14,7 @@ import { EvidenceDeck, type EvidenceCard } from '../components/EvidenceDeck'
 import { SummaryGroup, SummaryRow } from '../components/workspace-shell'
 import { AtsPanel } from '../components/AtsPanel'
 import { JdUnderstandingPanel } from '../components/JdUnderstandingPanel'
+import { YearsGapRow } from '../components/YearsGapRow'
 import { RecruiterSnapshotPanel } from '../components/RecruiterSnapshotPanel'
 
 interface AppliedWorkspaceProps {
@@ -304,11 +305,14 @@ export function AppliedWorkspace({ detail }: AppliedWorkspaceProps) {
   const gaps = detail.research?.gaps ?? []
   const resumeSummary = detail.analysis?.resumeSuggestions?.summary
   const atsCheck = detail.analysis?.atsCheck
+  const yearsGap = detail.analysis?.yearsGap
   const recruiterSnapshot = detail.analysis?.recruiterSnapshot
 
   return (
     <>
       <FitExperienceSection detail={detail} />
+
+      {yearsGap ? <YearsGapRow yearsGap={yearsGap} /> : null}
 
       <KnowledgeBaseHealthPanel compact retrieval={detail.research?.kbRetrievalStats} />
 

@@ -10,6 +10,7 @@ import type {
   LangEntry,
   CustomSection,
 } from './state'
+import { emailHref, telHref, urlHref } from './links'
 
 export type ThemeName = "classic" | "modern" | "compact";
 
@@ -21,21 +22,34 @@ export type Block = {
 
 export type ThemeOpts = { margin: number; pageWidth: number };
 
+type ContactItem = { value: string; href?: string };
+
+function contactItems(p: Profile): ContactItem[] {
+  const items: (ContactItem | null)[] = [
+    p.email ? { value: p.email, href: emailHref(p.email) } : null,
+    p.phone ? { value: p.phone, href: telHref(p.phone) } : null,
+    p.location ? { value: p.location } : null,
+    p.linkedin ? { value: p.linkedin, href: urlHref(p.linkedin) } : null,
+    p.github ? { value: p.github, href: urlHref(p.github) } : null,
+    p.website ? { value: p.website, href: urlHref(p.website) } : null,
+  ];
+  return items.filter((x): x is ContactItem => x !== null);
+}
+
 export function ContactRow({ p, sep = " · " }: { p: Profile; sep?: string }) {
-  const parts = [
-    p.email,
-    p.phone,
-    p.location,
-    p.linkedin,
-    p.github,
-    p.website,
-  ].filter(Boolean);
+  const items = contactItems(p);
   return (
     <div className="contact-row">
-      {parts.map((part, i) => (
-        <React.Fragment key={i}>
+      {items.map((item, i) => (
+        <React.Fragment key={item.value}>
           {i > 0 && <span className="sep">{sep}</span>}
-          <span>{part}</span>
+          {item.href ? (
+            <a className="contact-link" href={item.href} target="_blank" rel="noreferrer">
+              {item.value}
+            </a>
+          ) : (
+            <span>{item.value}</span>
+          )}
         </React.Fragment>
       ))}
     </div>
@@ -109,7 +123,16 @@ function ProjectEntryBlock({ e }: { e: ProjectEntry }) {
           <span className="entry-title">{e.name}</span>
           {e.stack && <span className="entry-meta"> · {e.stack}</span>}
         </div>
-        {e.url && <span className="entry-period mono">{e.url}</span>}
+        {e.url && (
+          <a
+            className="entry-period mono contact-link"
+            href={urlHref(e.url)}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {e.url}
+          </a>
+        )}
       </div>
       {e.description && <div className="entry-desc">{e.description}</div>}
       {e.bullets.length > 0 && (
@@ -329,8 +352,10 @@ export const THEME_CSS = `
 .resume-doc .theme-header .name { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.01em; }
 .resume-doc .theme-header .title { margin-top: 2px; font-size: 12px; color: #444; letter-spacing: 0.04em; text-transform: uppercase; font-weight: 500; }
 .resume-doc .contact-row { margin-top: 8px; font-size: 10.5px; color: #444; }
-.resume-doc .contact-row span:not(.sep) { white-space: nowrap; }
+.resume-doc .contact-row span:not(.sep), .resume-doc .contact-row a { white-space: nowrap; }
 .resume-doc .contact-row .sep { color: #bbb; padding: 0 6px; }
+.resume-doc .contact-link { color: inherit; text-decoration: none; }
+.resume-doc .contact-link:hover { text-decoration: underline; }
 
 /* Section heading — base */
 .resume-doc .sect-heading {

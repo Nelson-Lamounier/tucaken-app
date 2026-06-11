@@ -259,6 +259,7 @@ describe('GET /:slug — application detail', () => {
       tailoredResume:    { basics: { name: 'Nelson' } },
       atsCheck:          null,
       jdExtraction:      null,
+      yearsGap:          null,
       recruiterSnapshot: null,
     });
     // research: pipeline field names normalised to UI ResearchOutput shape.
@@ -293,6 +294,63 @@ describe('GET /:slug — application detail', () => {
         personal:  ['win-1'],
       },
     });
+  });
+
+  it('maps yearsGap from analysis metadata when present, null when absent', async () => {
+    const sampleYearsGap = {
+      relevantYears:     5,
+      requiredYears:     8,
+      gapYears:          3,
+      disqualifying:     false,
+      relevantRoleTitles: ['AWS'],
+      framingLine:       '5 years across operations and support',
+    };
+    pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
+    poolQueryMock
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'run-ygap',
+          metadata: {
+            analysis: {
+              analysisXml:  '<analysis/>',
+              coverLetter:  null,
+              yearsGap:     sampleYearsGap,
+            },
+          },
+          created_at: new Date('2026-04-05T00:00:00Z'),
+        }],
+      })
+      .mockResolvedValueOnce({ rows: [] })  // coaching_content
+      .mockResolvedValueOnce({ rows: [] })  // resumes
+      .mockResolvedValueOnce({ rows: [] })  // company_interview_profiles
+      .mockResolvedValueOnce({ rows: [] }); // dsa_evidence
+
+    const resPresent = await buildApp().request('/app-uuid-1');
+    expect(resPresent.status).toBe(200);
+    const bodyPresent = (await resPresent.json()) as { application: Record<string, unknown> };
+    const analysisPresent = bodyPresent.application['analysis'] as Record<string, unknown>;
+    expect(analysisPresent['yearsGap']).toEqual(sampleYearsGap);
+
+    // absent → null
+    pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
+    poolQueryMock
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'run-nogap',
+          metadata: { analysis: { analysisXml: '<analysis/>' } },
+          created_at: new Date('2026-04-06T00:00:00Z'),
+        }],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const resAbsent = await buildApp().request('/app-uuid-1');
+    expect(resAbsent.status).toBe(200);
+    const bodyAbsent = (await resAbsent.json()) as { application: Record<string, unknown> };
+    const analysisAbsent = bodyAbsent.application['analysis'] as Record<string, unknown>;
+    expect(analysisAbsent['yearsGap']).toBeNull();
   });
 
   it('surfaces recruiterSnapshot in analysis when present in pipeline metadata', async () => {
