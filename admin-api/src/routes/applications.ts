@@ -473,6 +473,8 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
         jdExtraction:      latestAnalysis?.metadata?.['jdExtraction'] ?? null,
         // Years-of-experience gap signal (relevant vs required, framing line).
         yearsGap:          rawAnalysis['yearsGap'] ?? null,
+        // Recruiter snapshot (metadata.analysis.recruiterSnapshot) — hybrid score + missing keywords + red flags.
+        recruiterSnapshot: rawAnalysis['recruiterSnapshot'] ?? null,
       } : null;
 
       // Map research agent output → ResearchOutput shape.

@@ -15,6 +15,7 @@ import { SummaryGroup, SummaryRow } from '../components/workspace-shell'
 import { AtsPanel } from '../components/AtsPanel'
 import { JdUnderstandingPanel } from '../components/JdUnderstandingPanel'
 import { YearsGapRow } from '../components/YearsGapRow'
+import { RecruiterSnapshotPanel } from '../components/RecruiterSnapshotPanel'
 
 interface AppliedWorkspaceProps {
   readonly detail: ApplicationDetail
@@ -305,6 +306,7 @@ export function AppliedWorkspace({ detail }: AppliedWorkspaceProps) {
   const resumeSummary = detail.analysis?.resumeSuggestions?.summary
   const atsCheck = detail.analysis?.atsCheck
   const yearsGap = detail.analysis?.yearsGap
+  const recruiterSnapshot = detail.analysis?.recruiterSnapshot
 
   return (
     <>
@@ -315,6 +317,8 @@ export function AppliedWorkspace({ detail }: AppliedWorkspaceProps) {
       <KnowledgeBaseHealthPanel compact retrieval={detail.research?.kbRetrievalStats} />
 
       {detail.analysis?.jdExtraction ? <JdUnderstandingPanel jd={detail.analysis.jdExtraction} /> : null}
+
+      {recruiterSnapshot ? <RecruiterSnapshotPanel snapshot={recruiterSnapshot} /> : null}
 
       {atsCheck ? <AtsPanel ats={atsCheck} /> : null}
 
