@@ -460,6 +460,8 @@ export interface AnalysisOutput {
   readonly atsCheck?: AtsCheckResult | null
   /** Structured signal the JD-extractor read from the job description (Phase 0). */
   readonly jdExtraction?: JdExtraction | null
+  /** Years-of-experience gap signal from the job-strategist pipeline. */
+  readonly yearsGap?: YearsGap | null
 }
 
 /**
@@ -498,6 +500,19 @@ export interface AtsCheckResult {
   readonly status: 'passed' | 'issues' | 'unverified'
   readonly passed: boolean
   readonly issues: readonly string[]
+}
+
+/**
+ * Years-of-experience gap signal produced by the job-strategist pipeline.
+ * Mirrors YearsGap in ai-applications.
+ */
+export interface YearsGap {
+  readonly relevantYears: number
+  readonly requiredYears: number | null
+  readonly gapYears: number
+  readonly disqualifying: boolean
+  readonly relevantRoleTitles: readonly string[]
+  readonly framingLine: string
 }
 
 /** Interview question from the Coach Agent */

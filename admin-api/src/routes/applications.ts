@@ -471,6 +471,8 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
         atsCheck:          resumeResult.rows[0]?.ats_check_json ?? rawAnalysis['atsCheck'] ?? null,
         // Structured JD signal extracted at analyse time (metadata.jdExtraction).
         jdExtraction:      latestAnalysis?.metadata?.['jdExtraction'] ?? null,
+        // Years-of-experience gap signal (relevant vs required, framing line).
+        yearsGap:          rawAnalysis['yearsGap'] ?? null,
       } : null;
 
       // Map research agent output → ResearchOutput shape.
