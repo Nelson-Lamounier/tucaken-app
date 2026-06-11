@@ -163,6 +163,14 @@ the IDE.
 - **No nested ternaries (`S3358`).** Use `if`/`else`, an early return, or a small
   helper. In JSX, split branches into separate `{cond && <X/>}` expressions or
   extract a render helper — never `a ? … : b ? … : c` in one container.
+- **Guard clauses / early returns over nested conditionals.** Validate invalid
+  inputs and edge cases at the top of a function and bail immediately
+  (`if (!x) return …`), so the happy path stays flat and unindented. Prefer this
+  to `if/else` pyramids — it also keeps you clear of `S3358` and deep nesting.
+  Chain status/label logic as sequential early returns
+  (`if (status === 'a') return …`) rather than ternary chains. **In React
+  components, place guard returns *after* all hooks** (hooks must run
+  unconditionally) — hooks first, then `if (loading) return <Skeleton/>`.
 - **No redundant casts / non-null assertions (`S4325`).** Let the compiler narrow
   via type guards, `typeof`, `instanceof`, and discriminated unions; don't write
   `x as T` or `x!` when the type is already known. Catch errors as `unknown`:
