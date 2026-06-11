@@ -1,4 +1,5 @@
 import type { ResumeData as AppResumeData } from '@/lib/resumes/resume-data'
+import type { CoverLetter } from '@/lib/types/applications.types'
 import {
   uid,
   DEFAULT_STATE,
@@ -33,12 +34,12 @@ function resolveSectionOrder(emitted: readonly string[] | undefined): string[] {
 }
 
 /**
- * Maps the application's tailored resume data + cover letter string into
+ * Maps the application's tailored resume data + structured cover letter into
  * the resume builder's full AppState so the builder can be pre-populated.
  */
 export function mapApplicationToBuilderState(
   appResume: AppResumeData,
-  coverLetter: string | null,
+  coverLetter: CoverLetter | null,
   company: string,
   role: string,
 ): AppState {
@@ -95,7 +96,7 @@ export function mapApplicationToBuilderState(
     sectionOrder: resolveSectionOrder(appResume.sectionOrder),
   }
 
-  const cover = parseCoverLetterString(
+  const cover = mapStructuredCoverLetter(
     coverLetter,
     appResume.profile.name,
     company,
@@ -105,15 +106,21 @@ export function mapApplicationToBuilderState(
   return { ...DEFAULT_STATE, resume, cover }
 }
 
-function parseCoverLetterString(
-  text: string | null,
+/**
+ * Maps a structured CoverLetter object (from the pipeline) into the builder's
+ * CoverLetterData shape. The builder owns all formatting — paragraphs are
+ * joined with `\n\n` (the separator every renderer splits on), and the signoff
+ * fields are assembled into the `closing` string.
+ */
+function mapStructuredCoverLetter(
+  cl: CoverLetter | null,
   authorName: string,
   company: string,
   role: string,
 ): CoverLetterData {
   const base: CoverLetterData = {
     recipientName: 'Hiring Manager',
-    recipientTitle: `${role}`,
+    recipientTitle: role,
     company,
     companyAddress: '',
     date: new Date().toLocaleDateString('en-US', {
@@ -122,58 +129,19 @@ function parseCoverLetterString(
       day: 'numeric',
     }),
     greeting: 'Dear Hiring Manager,',
-    body: text ?? '',
+    body: '',
     closing: `Sincerely,\n${authorName}`,
     jobDescription: '',
   }
 
-  if (!text) return base
+  if (!cl) return base
 
-  const lines = text.split('\n').map((l) => l.trim())
-  const nonEmpty = lines.filter(Boolean)
+  base.greeting = cl.greeting
+  base.body = cl.paragraphs.join('\n\n')
 
-  // Extract greeting — first line starting with "Dear"
-  const greetingIdx = nonEmpty.findIndex((l) =>
-    l.toLowerCase().startsWith('dear '),
-  )
-  if (greetingIdx !== -1) {
-    base.greeting = nonEmpty[greetingIdx]
-  }
-
-  // Extract closing — last block starting with common sign-offs
-  const closingKeywords = [
-    'sincerely',
-    'best regards',
-    'regards',
-    'yours truly',
-    'warm regards',
-    'best,',
-  ]
-  let closingIdx = -1
-  for (let i = nonEmpty.length - 1; i >= 0; i--) {
-    if (closingKeywords.some((k) => nonEmpty[i].toLowerCase().startsWith(k))) {
-      closingIdx = i
-      break
-    }
-  }
-
-  if (greetingIdx !== -1 && closingIdx > greetingIdx) {
-    // Body is everything between greeting and closing
-    const bodyLines = nonEmpty.slice(greetingIdx + 1, closingIdx)
-    base.body = bodyLines
-      .reduce<string[]>((acc, line) => {
-        if (line === '' && acc.length > 0 && acc[acc.length - 1] !== '') {
-          acc.push('')
-        } else if (line !== '') {
-          acc.push(line)
-        }
-        return acc
-      }, [])
-      .join('\n')
-    base.closing = nonEmpty.slice(closingIdx).join('\n')
-  } else if (greetingIdx !== -1) {
-    base.body = nonEmpty.slice(greetingIdx + 1).join('\n')
-  }
+  const { name, email, linkedin, github } = cl.signoff
+  const signoffLines = [name, email, linkedin, github].filter(Boolean)
+  base.closing = `Sincerely,\n${signoffLines.join('\n')}`
 
   return base
 }

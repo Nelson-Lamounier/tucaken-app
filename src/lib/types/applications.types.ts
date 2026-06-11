@@ -444,12 +444,27 @@ export interface ResumeSuggestions {
   readonly eslCorrectionItems?: ResumeEslCorrection[]
 }
 
+/** Signoff block of a structured cover letter */
+export interface CoverLetterSignoff {
+  readonly name: string
+  readonly email: string
+  readonly linkedin: string
+  readonly github: string
+}
+
+/** Structured cover letter produced by the job-strategist pipeline */
+export interface CoverLetter {
+  readonly greeting: string
+  readonly paragraphs: readonly string[]
+  readonly signoff: CoverLetterSignoff
+}
+
 /** Applications Agent output — part of ApplicationDetail */
 export interface AnalysisOutput {
   /** Full XML analysis document */
   readonly analysisXml: string
-  /** Generated cover letter (plain text or Markdown). Null if skipped. */
-  readonly coverLetter: string | null
+  /** Generated cover letter (structured object). Null if skipped. */
+  readonly coverLetter: CoverLetter | null
   /** Structured analysis metadata */
   readonly metadata: AnalysisMetadata
   /** Resume modification suggestions */
