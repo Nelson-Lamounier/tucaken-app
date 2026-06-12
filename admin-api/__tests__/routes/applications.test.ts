@@ -284,6 +284,9 @@ describe('GET /:slug — application detail', () => {
         scale:         'hyperscale',
       },
       technologyInventory: null,
+      dimensionMix:        null,
+      companyProblem:      '',
+      skillEvidenceLedger: [],
     });
     // technicalRoundType defaults to 'dsa' when no company profile exists.
     expect(body.application['technicalRoundType']).toBe('dsa');
