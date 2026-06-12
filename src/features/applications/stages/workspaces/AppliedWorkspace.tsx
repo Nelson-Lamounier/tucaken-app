@@ -14,6 +14,7 @@ import { EvidenceDeck, type EvidenceCard } from '../components/EvidenceDeck'
 import { SummaryGroup, SummaryRow } from '../components/workspace-shell'
 import { AtsPanel } from '../components/AtsPanel'
 import { JdUnderstandingPanel } from '../components/JdUnderstandingPanel'
+import { RoleEmphasisPanel } from '../components/RoleEmphasisPanel'
 import { YearsGapRow } from '../components/YearsGapRow'
 import { RecruiterSnapshotPanel } from '../components/RecruiterSnapshotPanel'
 
@@ -317,6 +318,8 @@ export function AppliedWorkspace({ detail }: AppliedWorkspaceProps) {
       <KnowledgeBaseHealthPanel compact retrieval={detail.research?.kbRetrievalStats} />
 
       {detail.analysis?.jdExtraction ? <JdUnderstandingPanel jd={detail.analysis.jdExtraction} /> : null}
+
+      {detail.research?.dimensionMix ? <RoleEmphasisPanel mix={detail.research.dimensionMix} /> : null}
 
       {recruiterSnapshot ? <RecruiterSnapshotPanel snapshot={recruiterSnapshot} /> : null}
 
