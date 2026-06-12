@@ -353,6 +353,19 @@ export interface KbRetrievalStats {
   readonly repoBreakdown: readonly { readonly repo: string; readonly count: number }[]
 }
 
+/**
+ * JD "Role Emphasis" weighting — how the job description splits its emphasis
+ * across role dimensions. Each value is an integer 0-100; the set ~sums to 100.
+ * "technical" absorbs generic engineering. Present only on post-dimensionMix runs.
+ */
+export interface DimensionMix {
+  readonly customerFacing: number
+  readonly technical: number
+  readonly aiMl: number
+  readonly supportOps: number
+  readonly monitoring: number
+}
+
 /** Research Agent output — part of ApplicationDetail */
 export interface ResearchOutput {
   readonly fitSummary: string
@@ -368,6 +381,10 @@ export interface ResearchOutput {
   readonly pillarClassification?: PillarClassification
   /** RAG retrieval health for this run — present only on post-hygiene runs. */
   readonly kbRetrievalStats?: KbRetrievalStats
+  /** JD "Role Emphasis" weighting across role dimensions — present only on post-dimensionMix runs. */
+  readonly dimensionMix?: DimensionMix | null
+  /** The core business problem this role exists to solve — present only on post-dimensionMix runs. */
+  readonly companyProblem?: string
   /**
    * Ranked project references keyed by lowercased topic skill — the user's
    * documented projects most relevant to each topic. Computed live by admin-api

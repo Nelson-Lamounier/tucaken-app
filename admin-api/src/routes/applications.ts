@@ -154,6 +154,8 @@ function normaliseResearch(raw: Record<string, unknown>): Record<string, unknown
       scale:         signals['scaleIndicators'],
     } : undefined,
     technologyInventory: raw['technologyInventory'] ?? null,
+    dimensionMix: raw['dimensionMix'] ?? null,
+    companyProblem: raw['companyProblem'] ?? '',
   };
 
   // Pass dsaTopicCalibration through verbatim when present.
