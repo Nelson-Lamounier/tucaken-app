@@ -366,6 +366,22 @@ export interface DimensionMix {
   readonly monitoring: number
 }
 
+/** Evidence verdict for one JD tool in the Skill Evidence Ledger. */
+export type EvidenceStatus = 'verified' | 'transferable' | 'gap'
+
+/**
+ * One JD-tool's evidence row: whether the user's repos prove the tool, the
+ * supporting file citations, the evidence prose, and (for transferable) a bridge
+ * narrative. Persisted on `pipeline_runs.metadata.research.skillEvidenceLedger`.
+ */
+export interface SkillEvidenceEntry {
+  readonly tool: string
+  readonly status: EvidenceStatus
+  readonly evidenceFiles: string[]
+  readonly evidence: string
+  readonly transferableBridge: string
+}
+
 /** Research Agent output — part of ApplicationDetail */
 export interface ResearchOutput {
   readonly fitSummary: string
@@ -385,6 +401,8 @@ export interface ResearchOutput {
   readonly dimensionMix?: DimensionMix | null
   /** The core business problem this role exists to solve — present only on post-dimensionMix runs. */
   readonly companyProblem?: string
+  /** Per-JD-tool evidence ledger — what the user's repos prove for each tool. */
+  readonly skillEvidenceLedger?: SkillEvidenceEntry[]
   /**
    * Ranked project references keyed by lowercased topic skill — the user's
    * documented projects most relevant to each topic. Computed live by admin-api

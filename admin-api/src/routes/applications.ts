@@ -156,6 +156,7 @@ function normaliseResearch(raw: Record<string, unknown>): Record<string, unknown
     technologyInventory: raw['technologyInventory'] ?? null,
     dimensionMix: raw['dimensionMix'] ?? null,
     companyProblem: raw['companyProblem'] ?? '',
+    skillEvidenceLedger: raw['skillEvidenceLedger'] ?? [],
   };
 
   // Pass dsaTopicCalibration through verbatim when present.
