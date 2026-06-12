@@ -15,6 +15,8 @@ import { SummaryGroup, SummaryRow } from '../components/workspace-shell'
 import { AtsPanel } from '../components/AtsPanel'
 import { JdUnderstandingPanel } from '../components/JdUnderstandingPanel'
 import { RoleEmphasisPanel } from '../components/RoleEmphasisPanel'
+import { CompanyProblemPanel } from '../components/CompanyProblemPanel'
+import { SkillEvidenceLedgerPanel } from '../components/SkillEvidenceLedgerPanel'
 import { YearsGapRow } from '../components/YearsGapRow'
 import { RecruiterSnapshotPanel } from '../components/RecruiterSnapshotPanel'
 
@@ -320,6 +322,14 @@ export function AppliedWorkspace({ detail }: AppliedWorkspaceProps) {
       {detail.analysis?.jdExtraction ? <JdUnderstandingPanel jd={detail.analysis.jdExtraction} /> : null}
 
       {detail.research?.dimensionMix ? <RoleEmphasisPanel mix={detail.research.dimensionMix} /> : null}
+
+      {detail.research?.companyProblem ? (
+        <CompanyProblemPanel problem={detail.research.companyProblem} />
+      ) : null}
+
+      {detail.research?.skillEvidenceLedger?.length ? (
+        <SkillEvidenceLedgerPanel ledger={detail.research.skillEvidenceLedger} />
+      ) : null}
 
       {recruiterSnapshot ? <RecruiterSnapshotPanel snapshot={recruiterSnapshot} /> : null}
 

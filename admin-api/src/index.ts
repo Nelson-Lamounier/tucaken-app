@@ -36,6 +36,7 @@ import { createFinopsRouter } from './routes/finops.js';
 import { createGitHubRouter, createGitHubWebhookRouter } from './routes/github.js';
 import { createHealthRouter } from './routes/health.js';
 import { createAdminUsersRouter } from './routes/admin-users.js';
+import { createRoleOntologyRouter } from './routes/role-ontology.js';
 import { createIngestionRouter } from './routes/ingestion.js';
 import { createKbRouter } from './routes/kb.js';
 import { createInternalBillingRouter } from './routes/internal-billing.js';
@@ -172,6 +173,8 @@ app.use('/api/admin/ingestion/*',     requireAdminGroup());
 // `/api/admin/users/*` is the support tool surface — restore deleted users,
 // future ops actions. Locked behind the `admin` Cognito group.
 app.use('/api/admin/users/*',         requireAdminGroup());
+// Read-only operator visibility into the role-ontology auto-training loop.
+app.use('/api/admin/role-ontology/*', requireAdminGroup());
 
 // ── Protected routes ─────────────────────────────────────────────────────────
 app.route('/api/admin/bedrock-usage', createBedrockUsageRouter(config));
@@ -191,6 +194,7 @@ app.route('/api/admin/drafts',         createDraftsRouter(config));
 app.route('/api/admin/profile',        createProfileRouter(config));
 app.route('/api/admin/projects',       createProjectsRouter(config));
 app.route('/api/admin/users',          createAdminUsersRouter(config));
+app.route('/api/admin/role-ontology',  createRoleOntologyRouter(config));
 
 // ── 404 handler ──────────────────────────────────────────────────────────────
 app.notFound((ctx) => ctx.json({ error: 'Not found' }, 404));
