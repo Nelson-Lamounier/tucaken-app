@@ -231,6 +231,30 @@ describe('POST /strategist-job — K8s Job strategist pipeline', () => {
     expect(envMap['TARGET_ROLE']).toBe('Senior Engineer');
     expect(envMap['JOB_DESCRIPTION']).toBe('Build cool stuff');
     expect(envMap['MODE']).toBe('standard');
+    // Filter-then-rank flag forwarded from admin-api env; defaults to 'off' (fail-open).
+    expect(envMap['RETRIEVAL_PREFILTER']).toBe('off');
+  });
+
+  it('forwards RETRIEVAL_PREFILTER=on into the Job env when set on admin-api', async () => {
+    const prev = process.env['RETRIEVAL_PREFILTER'];
+    process.env['RETRIEVAL_PREFILTER'] = 'on';
+    try {
+      const app = await buildAuthedApp();
+      const res = await app.request('/strategist-job', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(validBody),
+      });
+      expect(res.status).toBe(202);
+
+      const callArgs = createNamespacedJobMock.mock.calls[0] as unknown as [{ body: { spec: { template: { spec: { containers: Array<{ env: Array<{ name: string; value: string }> }> } } } } }];
+      const env = callArgs[0].body.spec.template.spec.containers[0]!.env;
+      const envMap = Object.fromEntries(env.map(e => [e.name, e.value]));
+      expect(envMap['RETRIEVAL_PREFILTER']).toBe('on');
+    } finally {
+      if (prev === undefined) delete process.env['RETRIEVAL_PREFILTER'];
+      else process.env['RETRIEVAL_PREFILTER'] = prev;
+    }
   });
 });
 
