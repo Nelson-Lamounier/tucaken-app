@@ -249,6 +249,10 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
           { name: 'JOB_DESCRIPTION',    value: truncatedJd },
           { name: 'MODE',               value: mode },
           { name: 'RESEARCH_MODEL',     value: config.researchModel },
+          // Filter-then-rank retrieval gate (Increment 2). Read by the strategist
+          // pod at run-pipeline.ts; absent ⇒ pure-vector retrieval (fail-open).
+          // Forwarded from the admin-api env so the ephemeral Job inherits the flag.
+          { name: 'RETRIEVAL_PREFILTER', value: process.env['RETRIEVAL_PREFILTER'] ?? 'off' },
           { name: 'AWS_REGION',         value: config.awsRegion },
           ...(resumeId ? [{ name: 'RESUME_ID', value: resumeId }] : []),
         ],
