@@ -29,8 +29,11 @@ export function AnalysisProgressModal({
 }: AnalysisProgressModalProps) {
   const navigate = useNavigate()
   const handleComplete = useCallback(() => {
+    // Dismiss the modal first — navigating alone leaves the Dialog backdrop
+    // mounted over the results page, forcing the user to click it to proceed.
+    onClose()
     void navigate({ to: '/applications/$slug', params: { slug } })
-  }, [navigate, slug])
+  }, [navigate, slug, onClose])
 
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-50">
