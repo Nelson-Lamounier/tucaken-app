@@ -67,7 +67,7 @@ export function IntegrateRepoDialog({ open, onClose, targets, repoDefaults }: In
               </DialogTitle>
               <p className="mt-1 text-xs text-zinc-400">
                 Fold a synced repository into an existing project — useful when one system spans
-                several repos.
+                several repos. The project's case study refreshes automatically to include it.
               </p>
             </div>
             <button
