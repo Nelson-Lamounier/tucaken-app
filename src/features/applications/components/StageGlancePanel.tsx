@@ -9,6 +9,7 @@ import type { ApplicationDetail, InterviewStage } from '@/lib/types/applications
 import { stageGlanceTiles, offerStatusTile, type GlanceTileData } from '../lib/stage-glance'
 import { resolveStagePrep } from '../stages/types/workspace'
 import { JdUnderstandingPanel } from '../stages/components/JdUnderstandingPanel'
+import { RoleEmphasisPanel } from '../stages/components/RoleEmphasisPanel'
 import { ScheduleCard } from '../stages/components/ScheduleCard'
 import { useStageDraftContext } from '../stages/hooks/stage-draft-context'
 
@@ -673,29 +674,35 @@ function BehaviouralGlance({ detail }: { readonly detail: ApplicationDetail }) {
 function ResearchGlance({ detail, stage }: StageGlancePanelProps) {
   const fit = stageGlanceTiles(stage, detail).find(tile => tile.key === 'fit')
   const jd = detail.analysis?.jdExtraction ?? null
+  const mix = detail.research?.dimensionMix ?? null
   return (
-    <GlanceGrid
-      stageKey={stage}
-      left={<ResearchCompareGraphic detail={detail} />}
-      right={
-        <motion.div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:col-span-2">
-          {jd && (
-            <motion.div variants={TILE} style={{ willChange: 'transform' }} className="sm:col-span-2">
-              <JdUnderstandingPanel jd={jd} />
-            </motion.div>
-          )}
-          {fit && (
-            <motion.div
-              variants={TILE}
-              style={{ willChange: 'transform' }}
-              className={jd ? 'sm:col-span-1' : 'sm:col-span-3'}
-            >
-              <GlanceTile tile={fit} />
-            </motion.div>
-          )}
+    <motion.div key={stage} className="grid gap-4 lg:grid-cols-3" variants={GRID} initial="hidden" animate="show">
+      {/* Row 1, left: skill-coverage donut */}
+      <motion.div variants={TILE} style={{ willChange: 'transform' }} className="lg:col-span-1">
+        <ResearchCompareGraphic detail={detail} />
+      </motion.div>
+
+      {/* Row 1, right: "What we understood from the JD" beside the Fit tile */}
+      <motion.div variants={TILE} style={{ willChange: 'transform' }} className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:col-span-2">
+        {jd && (
+          <div className="sm:col-span-2">
+            <JdUnderstandingPanel jd={jd} />
+          </div>
+        )}
+        {fit && (
+          <div className={jd ? 'sm:col-span-1' : 'sm:col-span-3'}>
+            <GlanceTile tile={fit} />
+          </div>
+        )}
+      </motion.div>
+
+      {/* Row 2, full width: role emphasis (JD dimension weighting) */}
+      {mix && (
+        <motion.div variants={TILE} style={{ willChange: 'transform' }} className="lg:col-span-3">
+          <RoleEmphasisPanel mix={mix} />
         </motion.div>
-      }
-    />
+      )}
+    </motion.div>
   )
 }
 
