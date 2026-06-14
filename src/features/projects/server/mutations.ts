@@ -136,6 +136,27 @@ export function useMergeProjects(targetId: string) {
 }
 
 /**
+ * Integrate a synced repository into an existing project. Each synced repo has
+ * a 1:1 "default" project; folding it in is a merge with the repo's default as
+ * the source (it gets archived, its component reassigned to the target). Target
+ * is dynamic (chosen in the dialog), so — unlike useMergeProjects — it's a
+ * parameter of the call, not the hook. Invalidates the target detail and the
+ * list so the absorbed repo default disappears and the target gains the repo.
+ */
+export function useIntegrateRepo() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ targetId, sourceIds }: { targetId: string; sourceIds: string[] }) =>
+      mergeProjectsFn({ data: { targetId, sourceIds } }),
+    onSuccess: (_res, { targetId }) => {
+      void queryClient.invalidateQueries({ queryKey: projectsQueries.detail(targetId).queryKey })
+      void queryClient.invalidateQueries({ queryKey: ['projects', 'list'] })
+    },
+  })
+}
+
+/**
  * Confirm an AI-suggested grouping. Flips is_user_confirmed and (server-side)
  * dispatches the case-study Job. Invalidates the proposals list (the project
  * leaves the unconfirmed set) and the main list.
