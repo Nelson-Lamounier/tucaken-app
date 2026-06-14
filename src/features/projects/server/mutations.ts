@@ -140,15 +140,30 @@ export function useMergeProjects(targetId: string) {
  * a 1:1 "default" project; folding it in is a merge with the repo's default as
  * the source (it gets archived, its component reassigned to the target). Target
  * is dynamic (chosen in the dialog), so — unlike useMergeProjects — it's a
- * parameter of the call, not the hook. Invalidates the target detail and the
- * list so the absorbed repo default disappears and the target gains the repo.
+ * parameter of the call, not the hook.
+ *
+ * After the merge, it auto-dispatches a case-study regenerate for the target so
+ * the study reflects the new repo in one action (the server runs it as an
+ * incremental refine — preserve prior + add the new repo). The regenerate is
+ * best-effort: a dispatch failure must not fail the merge the user just made
+ * (they can still regenerate manually). Invalidates the target detail + list so
+ * the absorbed repo default disappears and the "regenerating" state shows.
  */
 export function useIntegrateRepo() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ targetId, sourceIds }: { targetId: string; sourceIds: string[] }) =>
-      mergeProjectsFn({ data: { targetId, sourceIds } }),
+    mutationFn: async ({ targetId, sourceIds }: { targetId: string; sourceIds: string[] }) => {
+      const merge = await mergeProjectsFn({ data: { targetId, sourceIds } })
+      let regenerateDispatched = false
+      try {
+        await regenerateProjectFn({ data: targetId })
+        regenerateDispatched = true
+      } catch {
+        // non-fatal — the merge succeeded; the case study can be regenerated manually
+      }
+      return { merge, regenerateDispatched }
+    },
     onSuccess: (_res, { targetId }) => {
       void queryClient.invalidateQueries({ queryKey: projectsQueries.detail(targetId).queryKey })
       void queryClient.invalidateQueries({ queryKey: ['projects', 'list'] })
