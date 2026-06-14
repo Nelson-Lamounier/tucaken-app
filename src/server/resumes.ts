@@ -75,7 +75,8 @@ export const getResumesFn = createServerFn({ method: 'GET' }).handler(
       '/resumes',
     )
     // Normalise: older API shape returns `id`, newer returns `resumeId`.
-    return response.resumes.map((r) => ({
+    // Guard against an unexpected/empty payload shape (no `resumes` key).
+    return (response.resumes ?? []).map((r) => ({
       ...r,
       resumeId: r.resumeId ?? r.id ?? '',
     })) satisfies ResumeSummary[]

@@ -13,6 +13,7 @@
  */
 
 import type { ResumeData, ResumeProfile } from './resume-data'
+import type { CoverLetter } from '@/lib/types/applications.types'
 
 /**
  * Normalise a raw string value into a full href suitable for a PDF link.
@@ -312,59 +313,17 @@ export function buildResumeDomForPdf(data: ResumeData): HTMLDivElement {
 // Cover Letter DOM Builder
 // =============================================================================
 
-const CLOSING_RE = /^(sincerely|best regards|warm regards|kind regards|yours truly|yours faithfully|respectfully|with regards|regards)/i
-
-interface ParsedCoverLetter {
-  salutation: string
-  body: string[]
-  closing: string
-  signature: string
-}
-
-function parseLetter(raw: string): ParsedCoverLetter {
-  const paragraphs = raw.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean)
-
-  let salutation = ''
-  let closing = ''
-  let signature = ''
-  const body: string[] = []
-  let salutationIdx = -1
-  let closingIdx = -1
-
-  for (let i = 0; i < paragraphs.length; i++) {
-    if (!salutation && /^dear\b/i.test(paragraphs[i])) {
-      salutation = paragraphs[i]
-      salutationIdx = i
-    }
-    if (CLOSING_RE.test(paragraphs[i].split('\n')[0])) {
-      closingIdx = i
-      const parts = paragraphs[i].split('\n')
-      closing = parts[0]
-      signature = parts.slice(1).join('\n').trim()
-    }
-  }
-
-  const start = salutationIdx >= 0 ? salutationIdx + 1 : 0
-  for (let i = start; i < paragraphs.length; i++) {
-    if (i === closingIdx) break
-    body.push(paragraphs[i])
-  }
-
-  return { salutation, body, closing, signature }
-}
-
 /**
  * Builds a cover letter as a plain DOM element with inline styles for PDF capture.
  * Mirrors the CoverLetterDocument.tsx layout using inline styles (html2canvas compatible).
+ * Accepts the structured CoverLetter object — no string parsing required.
  */
 export function buildCoverLetterDomForPdf(
-  content: string,
+  coverLetter: CoverLetter,
   profile?: ResumeProfile,
   targetCompany?: string,
   targetRole?: string,
 ): HTMLDivElement {
-  const { salutation, body, closing, signature } = parseLetter(content)
-
   const date = new Date().toLocaleDateString('en-IE', {
     year: 'numeric',
     month: 'long',
@@ -431,31 +390,36 @@ export function buildCoverLetterDomForPdf(
     </div>
   `
 
-  // ──── SALUTATION ────
-  if (salutation) {
-    bodyEl.innerHTML += `<p style="font-size: 10.5px; font-weight: 600; color: ${HEADING}; margin: 0 0 16px 0;">${salutation}</p>`
+  // ──── GREETING ────
+  if (coverLetter.greeting) {
+    bodyEl.innerHTML += `<p style="font-size: 10.5px; font-weight: 600; color: ${HEADING}; margin: 0 0 16px 0;">${coverLetter.greeting}</p>`
   }
 
   // ──── BODY PARAGRAPHS ────
-  if (body.length > 0) {
-    bodyEl.innerHTML += body
-      .map((p) => `<p style="font-size: 10.5px; line-height: 1.75; color: ${BODY}; margin: 0 0 14px 0;">${p}</p>`)
-      .join('')
+  for (const para of coverLetter.paragraphs) {
+    bodyEl.innerHTML += `<p style="font-size: 10.5px; line-height: 1.75; color: ${BODY}; margin: 0 0 14px 0;">${para}</p>`
   }
 
-  // ──── CLOSING ────
-  if (closing) {
-    bodyEl.innerHTML += `<p style="font-size: 10.5px; color: ${HEADING}; margin: 8px 0 24px 0;">${closing}</p>`
-  }
+  // ──── SIGNOFF ────
+  bodyEl.innerHTML += `<p style="font-size: 10.5px; color: ${HEADING}; margin: 8px 0 24px 0;">Sincerely,</p>`
 
-  // ──── SIGNATURE ────
-  const sigName = signature || profile?.name || ''
+  const sigName = coverLetter.signoff.name || profile?.name || ''
   const sigTitle = profile?.title || ''
+  const sigEmail = coverLetter.signoff.email
+  const sigLinkedin = coverLetter.signoff.linkedin
+  const sigGithub = coverLetter.signoff.github
+
   if (sigName) {
+    const contactLines = [sigEmail, sigLinkedin, sigGithub]
+      .filter(Boolean)
+      .map((v) => `<p style="font-size: 10px; color: ${MUTED}; margin: 2px 0 0 0;" data-pdf-link="${toHref(v)}">${v}</p>`)
+      .join('')
+
     bodyEl.innerHTML += `
       <div>
         <p style="font-size: 10.5px; font-weight: 600; color: ${HEADING}; margin: 0;">${sigName}</p>
         ${sigTitle ? `<p style="font-size: 10px; color: ${MUTED}; margin: 2px 0 0 0;">${sigTitle}</p>` : ''}
+        ${contactLines}
       </div>
     `
   }

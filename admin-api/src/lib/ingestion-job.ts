@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import type { V1Job } from '@kubernetes/client-node';
 
 import type { AdminApiConfig } from './config.js';
-import { traceParentEnv, observabilityEnv, ingestionModelEnv } from './k8s-job-builder.js';
+import { traceParentEnv, observabilityEnv, ingestionModelEnv, MODEL_JOB_BACKOFF_LIMIT } from './k8s-job-builder.js';
 
 const MAX_NAME_LEN = 63;
 
@@ -68,7 +68,7 @@ export function buildIngestionJobSpec(
         },
         spec: {
             ttlSecondsAfterFinished: 3600,
-            backoffLimit:            2,
+            backoffLimit:            MODEL_JOB_BACKOFF_LIMIT,
             activeDeadlineSeconds:   900,
             template: {
                 metadata: { labels: { app: 'ingestion-worker', userId: safeUser, repoSlug } },

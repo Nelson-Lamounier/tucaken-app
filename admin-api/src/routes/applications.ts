@@ -154,6 +154,9 @@ function normaliseResearch(raw: Record<string, unknown>): Record<string, unknown
       scale:         signals['scaleIndicators'],
     } : undefined,
     technologyInventory: raw['technologyInventory'] ?? null,
+    dimensionMix: raw['dimensionMix'] ?? null,
+    companyProblem: raw['companyProblem'] ?? '',
+    skillEvidenceLedger: raw['skillEvidenceLedger'] ?? [],
   };
 
   // Pass dsaTopicCalibration through verbatim when present.
@@ -465,8 +468,16 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
         metadata:          rawAnalysis['metadata'] ?? null,
         resumeSuggestions: rawAnalysis['resumeSuggestions'] ?? null,
         tailoredResume:    persistedResume ?? rawAnalysis['tailoredResumeData'] ?? null,
-        // ATS check for the persisted tailored resume (resumes.ats_check_json).
-        atsCheck:          resumeResult.rows[0]?.ats_check_json ?? null,
+        // ATS check for the persisted tailored resume. Prefer resumes.ats_check_json;
+        // fall back to the copy stashed in pipeline_runs.metadata.analysis.atsCheck
+        // (so the panel still renders if the RLS-scoped resumes write was lost).
+        atsCheck:          resumeResult.rows[0]?.ats_check_json ?? rawAnalysis['atsCheck'] ?? null,
+        // Structured JD signal extracted at analyse time (metadata.jdExtraction).
+        jdExtraction:      latestAnalysis?.metadata?.['jdExtraction'] ?? null,
+        // Years-of-experience gap signal (relevant vs required, framing line).
+        yearsGap:          rawAnalysis['yearsGap'] ?? null,
+        // Recruiter snapshot (metadata.analysis.recruiterSnapshot) — hybrid score + missing keywords + red flags.
+        recruiterSnapshot: rawAnalysis['recruiterSnapshot'] ?? null,
       } : null;
 
       // Map research agent output → ResearchOutput shape.

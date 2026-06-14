@@ -19,8 +19,10 @@ import { Hono } from 'hono';
 import type { AdminApiBindings } from '../lib/types.js';
 import type { AdminApiConfig } from '../lib/config.js';
 import { getJobImage, isImageConfigured } from '../lib/config.js';
+import { getPool } from '../lib/pg.js';
+import { tryClaimSyncSlot } from '../lib/sync-state.js';
 import { getBatchApi } from '../lib/k8s.js';
-import { traceParentEnv, observabilityEnv, ingestionModelEnv } from '../lib/k8s-job-builder.js';
+import { traceParentEnv, observabilityEnv, ingestionModelEnv, MODEL_JOB_BACKOFF_LIMIT } from '../lib/k8s-job-builder.js';
 import { buildIngestionJobSpec } from '../lib/ingestion-job.js';
 
 const REPO_FULL_NAME_RE = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/;
@@ -76,7 +78,7 @@ function buildRollupJobSpec(
         },
         spec: {
             ttlSecondsAfterFinished: 3600,
-            backoffLimit:            2,
+            backoffLimit:            MODEL_JOB_BACKOFF_LIMIT,
             activeDeadlineSeconds:   300,
             template: {
                 metadata: { labels: { app: 'rollup-refresh', userId: safeUserId } },
@@ -164,6 +166,16 @@ export function createIngestionRouter(config: AdminApiConfig): Hono<AdminApiBind
             return ctx.json({ error: 'Ingestion image not yet configured — wait ~60s for ESO/kubelet sync' }, 502);
         }
 
+        // Dedup: skip if a Job is already in flight for this repo. The admin
+        // trigger has no quota gate, so an unguarded re-trigger would race a
+        // live Job's writes on document_embeddings. tryClaimSyncSlot is the
+        // atomic lock; claiming here also stamps sync_status='pending'. Placed
+        // after the image check so a 502 never leaves a stuck 'pending'.
+        const pool = getPool(config);
+        if (!(await tryClaimSyncSlot(pool, userId, repoFullName))) {
+            return ctx.json({ status: 'already_running', userId, repoFullName }, 200);
+        }
+
         const job = buildJobSpec(config, ingestionImage, userId, repoFullName, forceReindex, Date.now());
 
         try {
@@ -171,6 +183,13 @@ export function createIngestionRouter(config: AdminApiConfig): Hono<AdminApiBind
             await getBatchApi().createNamespacedJob({ namespace: config.ingestionNamespace, body: job });
         } catch (err: unknown) {
             console.error('[ingestion] failed to create K8s Job', err);
+            // Release the claim so a failed dispatch doesn't leave a stuck
+            // 'pending' that blocks every future trigger for this repo.
+            await pool.query(
+                `UPDATE repo_sync_state SET sync_status = 'error', error_message = 'JOB_DISPATCH_FAILED'
+                 WHERE user_id = $1::uuid AND repo_full_name = $2`,
+                [userId, repoFullName],
+            ).catch(() => {});
             return ctx.json({ error: 'Failed to schedule ingestion Job' }, 502);
         }
 

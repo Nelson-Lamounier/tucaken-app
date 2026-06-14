@@ -57,6 +57,7 @@ jest.unstable_mockModule('../lib/k8s-job-builder.js', () => ({
     ],
     traceParentEnv: () => null,
     ingestionModelEnv: () => [],
+    MODEL_JOB_BACKOFF_LIMIT: 0,
     sanitizeLabel: (v: string) =>
         v.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '').slice(0, 63),
 }));
@@ -191,7 +192,9 @@ describe('buildTechExtractJobSpec', () => {
     it('spec has correct ttl, backoffLimit, activeDeadlineSeconds, restartPolicy', async () => {
         const job = await buildTechExtractJobSpec(MOCK_CONFIG, IMAGE, USER_ID, REPO, TIMESTAMP);
         expect(job.spec!.ttlSecondsAfterFinished).toBe(3600);
-        expect(job.spec!.backoffLimit).toBe(2);
+        // 0 — model Jobs no longer retry (MODEL_JOB_BACKOFF_LIMIT); a deterministic
+        // failure must not re-spend Bedrock.
+        expect(job.spec!.backoffLimit).toBe(0);
         expect(job.spec!.activeDeadlineSeconds).toBe(1800);
         expect(job.spec!.template.spec!.restartPolicy).toBe('Never');
     });

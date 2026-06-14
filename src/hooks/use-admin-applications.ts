@@ -104,7 +104,11 @@ export function useApplicationDetail(slug: string) {
           } : null,
           analysis: isReady ? {
              analysisXml: '<xml>Mock</xml>',
-             coverLetter: 'Dear Hiring Manager,\n\nI am a mock applicant.',
+             coverLetter: {
+               greeting: 'Dear Hiring Manager,',
+               paragraphs: ['I am a mock applicant.'],
+               signoff: { name: 'Mock User', email: 'mock@example.com', linkedin: '', github: '' },
+             },
              metadata: { overallFitRating: 'STRONG_FIT', applicationRecommendation: 'APPLY' },
              resumeSuggestions: { additions: 1, reframes: 1, eslCorrections: 0, summary: 'Pretty good.' }
           } : null,

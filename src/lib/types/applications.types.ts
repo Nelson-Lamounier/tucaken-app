@@ -353,6 +353,35 @@ export interface KbRetrievalStats {
   readonly repoBreakdown: readonly { readonly repo: string; readonly count: number }[]
 }
 
+/**
+ * JD "Role Emphasis" weighting — how the job description splits its emphasis
+ * across role dimensions. Each value is an integer 0-100; the set ~sums to 100.
+ * "technical" absorbs generic engineering. Present only on post-dimensionMix runs.
+ */
+export interface DimensionMix {
+  readonly customerFacing: number
+  readonly technical: number
+  readonly aiMl: number
+  readonly supportOps: number
+  readonly monitoring: number
+}
+
+/** Evidence verdict for one JD tool in the Skill Evidence Ledger. */
+export type EvidenceStatus = 'verified' | 'transferable' | 'gap'
+
+/**
+ * One JD-tool's evidence row: whether the user's repos prove the tool, the
+ * supporting file citations, the evidence prose, and (for transferable) a bridge
+ * narrative. Persisted on `pipeline_runs.metadata.research.skillEvidenceLedger`.
+ */
+export interface SkillEvidenceEntry {
+  readonly tool: string
+  readonly status: EvidenceStatus
+  readonly evidenceFiles: string[]
+  readonly evidence: string
+  readonly transferableBridge: string
+}
+
 /** Research Agent output — part of ApplicationDetail */
 export interface ResearchOutput {
   readonly fitSummary: string
@@ -368,6 +397,12 @@ export interface ResearchOutput {
   readonly pillarClassification?: PillarClassification
   /** RAG retrieval health for this run — present only on post-hygiene runs. */
   readonly kbRetrievalStats?: KbRetrievalStats
+  /** JD "Role Emphasis" weighting across role dimensions — present only on post-dimensionMix runs. */
+  readonly dimensionMix?: DimensionMix | null
+  /** The core business problem this role exists to solve — present only on post-dimensionMix runs. */
+  readonly companyProblem?: string
+  /** Per-JD-tool evidence ledger — what the user's repos prove for each tool. */
+  readonly skillEvidenceLedger?: SkillEvidenceEntry[]
   /**
    * Ranked project references keyed by lowercased topic skill — the user's
    * documented projects most relevant to each topic. Computed live by admin-api
@@ -444,12 +479,27 @@ export interface ResumeSuggestions {
   readonly eslCorrectionItems?: ResumeEslCorrection[]
 }
 
+/** Signoff block of a structured cover letter */
+export interface CoverLetterSignoff {
+  readonly name: string
+  readonly email: string
+  readonly linkedin: string
+  readonly github: string
+}
+
+/** Structured cover letter produced by the job-strategist pipeline */
+export interface CoverLetter {
+  readonly greeting: string
+  readonly paragraphs: readonly string[]
+  readonly signoff: CoverLetterSignoff
+}
+
 /** Applications Agent output — part of ApplicationDetail */
 export interface AnalysisOutput {
   /** Full XML analysis document */
   readonly analysisXml: string
-  /** Generated cover letter (plain text or Markdown). Null if skipped. */
-  readonly coverLetter: string | null
+  /** Generated cover letter (structured object). Null if skipped. */
+  readonly coverLetter: CoverLetter | null
   /** Structured analysis metadata */
   readonly metadata: AnalysisMetadata
   /** Resume modification suggestions */
@@ -458,6 +508,45 @@ export interface AnalysisOutput {
   readonly tailoredResume?: ResumeData
   /** ATS check for the persisted tailored resume (resumes.ats_check_json). */
   readonly atsCheck?: AtsCheckResult | null
+  /** Structured signal the JD-extractor read from the job description (Phase 0). */
+  readonly jdExtraction?: JdExtraction | null
+  /** Years-of-experience gap signal from the job-strategist pipeline. */
+  readonly yearsGap?: YearsGap | null
+  /** Recruiter-snapshot assessment (score, missing keywords, red flags). */
+  readonly recruiterSnapshot?: RecruiterSnapshot | null
+}
+
+/**
+ * Structured read of the job description produced by the JD-extractor agent at
+ * analyse time — used to sharpen KB retrieval and shown in the UI as "what the
+ * system understood from your JD". Mirrors JdExtraction in ai-applications.
+ */
+export interface JdExtraction {
+  readonly requiredSkills: readonly string[]
+  readonly preferredSkills: readonly string[]
+  readonly tools: readonly string[]
+  readonly concepts: readonly string[]
+  readonly responsibilities: readonly string[]
+  readonly domain: string
+  readonly seniority: string
+  readonly retrievalKeywords: readonly string[]
+}
+
+/** A red flag identified by the recruiter-snapshot model. */
+export interface RecruiterRedFlag {
+  readonly flag: string
+  readonly why: string
+}
+
+/**
+ * Recruiter-snapshot assessment produced by the job-strategist pipeline.
+ * A 10-second recruiter read: score, rationale, missing keywords, red flags.
+ */
+export interface RecruiterSnapshot {
+  readonly score: number
+  readonly scoreRationale: string
+  readonly missingKeywords: readonly string[]
+  readonly redFlags: readonly RecruiterRedFlag[]
 }
 
 /** One JD keyword and whether the tailored resume covers it (grounded = KB-verified). */
@@ -480,6 +569,19 @@ export interface AtsCheckResult {
   readonly status: 'passed' | 'issues' | 'unverified'
   readonly passed: boolean
   readonly issues: readonly string[]
+}
+
+/**
+ * Years-of-experience gap signal produced by the job-strategist pipeline.
+ * Mirrors YearsGap in ai-applications.
+ */
+export interface YearsGap {
+  readonly relevantYears: number
+  readonly requiredYears: number | null
+  readonly gapYears: number
+  readonly disqualifying: boolean
+  readonly relevantRoleTitles: readonly string[]
+  readonly framingLine: string
 }
 
 /** Interview question from the Coach Agent */

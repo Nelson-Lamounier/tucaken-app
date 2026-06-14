@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
+import { Link } from '@tanstack/react-router'
 import {
   CheckCircle2,
   Loader2,
@@ -43,24 +43,24 @@ interface PipelineStage {
 const PIPELINE_STAGES: PipelineStage[] = [
   {
     id: 'queued',
-    name: 'Pipeline initialised',
-    description: 'K8s Job scheduled — pod pulling image and starting.',
+    name: 'Getting started',
+    description: 'Setting up your run. This takes a few seconds.',
     Icon: Cpu,
     startMs: 0,
     endMs: 8_000,
   },
   {
     id: 'research',
-    name: 'Research Agent',
-    description: 'Haiku 4.5 analysing job description and querying your Knowledge Base.',
+    name: 'Researching the role',
+    description: 'Reading the job description and matching it against your knowledge base.',
     Icon: FileSearch,
     startMs: 8_000,
     endMs: 90_000,
   },
   {
     id: 'strategist',
-    name: 'Strategist Agent',
-    description: 'Sonnet 4.6 generating tailored resume and cover letter.',
+    name: 'Writing your resume',
+    description: 'Tailoring your resume to the role.',
     Icon: FileText,
     startMs: 90_000,
     endMs: 240_000,
@@ -68,11 +68,21 @@ const PIPELINE_STAGES: PipelineStage[] = [
   {
     id: 'persist',
     name: 'Saving results',
-    description: 'Validating and persisting resume + analysis to database.',
+    description: 'Saving your resume and analysis.',
     Icon: Database,
     startMs: 240_000,
     endMs: 260_000,
   },
+]
+
+// Test-mode (`mock-…`) runs finish in ~26s and have no pipeline_runs row to drive
+// the stepper, so a compressed timeline lets every stage visibly progress and
+// complete before the run is marked ready (otherwise "Done" appears mid-stepper).
+const MOCK_PIPELINE_STAGES: PipelineStage[] = [
+  { ...PIPELINE_STAGES[0], startMs: 0,      endMs: 2_000 },
+  { ...PIPELINE_STAGES[1], startMs: 2_000,  endMs: 11_000 },
+  { ...PIPELINE_STAGES[2], startMs: 11_000, endMs: 21_000 },
+  { ...PIPELINE_STAGES[3], startMs: 21_000, endMs: 25_000 },
 ]
 
 // =============================================================================
@@ -90,8 +100,19 @@ function formatElapsed(ms: number): string {
 // Component
 // =============================================================================
 
-export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRunId?: string }) {
-  const navigate = useNavigate()
+export function ProgressBars({
+  slug,
+  pipelineRunId,
+  startedAt,
+  onComplete,
+}: {
+  slug: string
+  pipelineRunId?: string
+  startedAt: number
+  /** Called shortly after the run finishes successfully — used to auto-advance
+   *  to the results page while this view is on screen (modal open). */
+  onComplete?: () => void
+}) {
   const { data, timedOut } = useApplicationDetail(slug)
   const requeue = useApplicationRequeue()
 
@@ -107,24 +128,25 @@ export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRu
   const isFailed   = data?.status === 'failed' || pipelineRun?.status === 'failed'
   const isFinished = data != null && !['analysing', 'coaching'].includes(data.status)
   // ── Elapsed wall-clock ────────────────────────────────────────────────────
-  const startEpochRef = useRef<number | null>(null)
-  const [elapsedMs, setElapsedMs] = useState(0)
+  // Derived from the caller-supplied start time so the timer stays correct even
+  // if this component unmounts (modal closed) and remounts (modal re-opened).
+  const [elapsedMs, setElapsedMs] = useState(() => Date.now() - startedAt)
 
   useEffect(() => {
     if (isFinished || isFailed) return
-    if (!startEpochRef.current) startEpochRef.current = Date.now()
-    const iv = setInterval(() => setElapsedMs(Date.now() - startEpochRef.current!), 1_000)
+    const iv = setInterval(() => setElapsedMs(Date.now() - startedAt), 1_000)
     return () => clearInterval(iv)
-  }, [isFinished, isFailed])
+  }, [isFinished, isFailed, startedAt])
 
-  // ── Auto-redirect on success ──────────────────────────────────────────────
+  // ── Auto-advance to results when finished (only while this view is mounted) ──
+  // The modal unmounts ProgressBars on close, so a dismissed run never navigates;
+  // it stays tracked via the Pipeline Notifications bell. The short delay lets the
+  // user register the "Resume ready" state before redirecting.
   useEffect(() => {
-    if (!isFinished || isFailed) return
-    const t = setTimeout(() => {
-      void navigate({ to: '/applications/$slug', params: { slug } })
-    }, 800)
+    if (!isFinished || isFailed || !onComplete) return
+    const t = setTimeout(onComplete, 3_500)
     return () => clearTimeout(t)
-  }, [isFinished, isFailed, navigate, slug])
+  }, [isFinished, isFailed, onComplete])
 
   // ── Stage status resolution ───────────────────────────────────────────────
   // Real pipeline_runs status takes priority over wall-clock estimation.
@@ -136,16 +158,20 @@ export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRu
     return null
   }
 
+  // Mock runs have no pipeline_runs row, so the stepper falls back to wall-clock
+  // estimation — use the compressed timeline that matches the ~26s mock finish.
+  const stages = slug.startsWith('mock-') ? MOCK_PIPELINE_STAGES : PIPELINE_STAGES
+
   const activeStageId = pipelineStatusToStageId(pipelineRun?.status) ?? null
   const activeStageIdx = activeStageId
-    ? PIPELINE_STAGES.findIndex(s => s.id === activeStageId)
+    ? stages.findIndex(s => s.id === activeStageId)
     : -1
 
   function getStageStatus(idx: number): StageStatus {
     if (isFailed) {
       const lastStarted = activeStageIdx >= 0
         ? activeStageIdx
-        : PIPELINE_STAGES.reduce((acc, s, i) => elapsedMs >= s.startMs ? i : acc, 0)
+        : stages.reduce((acc, s, i) => elapsedMs >= s.startMs ? i : acc, 0)
       if (idx < lastStarted) return 'complete'
       if (idx === lastStarted) return 'failed'
       return 'upcoming'
@@ -158,7 +184,7 @@ export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRu
       return 'upcoming'
     }
     // Fallback: wall-clock estimation
-    const s = PIPELINE_STAGES[idx]
+    const s = stages[idx]
     if (elapsedMs >= s.endMs)   return 'complete'
     if (elapsedMs >= s.startMs) return 'current'
     return 'upcoming'
@@ -166,24 +192,44 @@ export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRu
 
   // ── Heading copy ──────────────────────────────────────────────────────────
   const heading = isFailed
-    ? 'Analysis failed'
+    ? 'Build failed'
     : timedOut
-    ? 'Analysis timed out'
+    ? 'Build timed out'
     : isFinished
-    ? 'Analysis complete'
-    : 'Analysing application'
+    ? 'Resume ready'
+    : 'Building your resume'
 
   const subheading = isFailed
-    ? 'The pipeline encountered an error. Requeue via the DLQ to retry.'
+    ? 'The run hit an error. Retry to run it again.'
     : timedOut
-    ? 'No status update after 10 minutes — the K8s Job may have crashed. Requeue to retry.'
+    ? 'No update for 10 minutes. The run may have stalled. Retry to run it again.'
     : isFinished
-    ? 'Redirecting to your results…'
-    : 'Bedrock agents are running. This typically takes 4–6 minutes.'
+    ? 'Your tailored resume and analysis are ready.'
+    : 'This usually takes 4–6 minutes. You can leave this page.'
+
+  // ── Success state ─────────────────────────────────────────────────────────
+  // A clear "Done" moment with a success icon, held briefly before the parent
+  // (modal) auto-advances to the results page.
+  if (isFinished && !isFailed) {
+    return (
+      <div className="flex flex-col items-center gap-5 w-full max-w-2xl mx-auto px-6 py-16 sm:px-10 text-center">
+        <span className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 ring-1 ring-emerald-600/20 dark:bg-emerald-500/15 dark:ring-emerald-500/30">
+          <CheckCircle2 className="h-9 w-9 text-emerald-600 dark:text-emerald-400" />
+        </span>
+        <div>
+          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Done</h3>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            Your tailored resume and analysis are ready.
+          </p>
+        </div>
+        <p className="text-xs text-zinc-400 dark:text-zinc-500">Taking you to your results…</p>
+      </div>
+    )
+  }
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col gap-7 w-full max-w-2xl mx-auto px-4 py-8">
+    <div className="flex flex-col gap-8 w-full max-w-2xl mx-auto px-6 py-10 sm:px-10">
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
@@ -202,9 +248,9 @@ export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRu
 
       {/* Steps */}
       <ol className="space-y-0" role="list" aria-label="Pipeline progress">
-        {PIPELINE_STAGES.map((stage, idx) => {
+        {stages.map((stage, idx) => {
           const status = getStageStatus(idx)
-          const isLast  = idx === PIPELINE_STAGES.length - 1
+          const isLast  = idx === stages.length - 1
           const { Icon } = stage
 
           return (
@@ -284,8 +330,8 @@ export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRu
 
       {/* Footer */}
       <div className="flex items-center justify-between gap-4">
-        <p className="text-xs text-zinc-500 dark:text-zinc-600">
-          Feel free to navigate away — you'll be notified when complete.
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          You can leave this page. We'll notify you when it's ready.
         </p>
 
         {(isFailed || timedOut) ? (
@@ -308,7 +354,7 @@ export function ProgressBars({ slug, pipelineRunId }: { slug: string; pipelineRu
             params={{ slug }}
             className="flex-none text-xs text-zinc-500 dark:text-zinc-600 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
           >
-            Go to overview →
+            View results →
           </Link>
         )}
       </div>

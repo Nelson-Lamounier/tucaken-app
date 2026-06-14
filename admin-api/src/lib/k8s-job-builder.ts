@@ -38,6 +38,18 @@ export function traceParentEnv(): { name: string; value: string } | null {
     return traceparent ? { name: 'TRACEPARENT', value: traceparent } : null;
 }
 
+/**
+ * Single source of truth for the retry policy of ALL model-invoking Jobs
+ * (analyse, coach, ingestion, resume-import, github resync, project case-study).
+ *
+ * 0 = no Job-level retry. A failure re-running the whole pipeline re-spends the
+ * (expensive) Bedrock calls — and most LLM-pipeline failures are deterministic
+ * (schema/parse), so a retry just wastes money. Transient Bedrock throttles are
+ * already retried inside the AWS SDK call. Every model Job MUST use this value;
+ * do not hardcode a Job-level backoffLimit per workload.
+ */
+export const MODEL_JOB_BACKOFF_LIMIT = 0;
+
 export interface BuildJobInput {
     namespace:           string;
     image:               string;
@@ -49,6 +61,12 @@ export interface BuildJobInput {
     env:                 { name: string; value: string }[];
     envFromSecretRefs:   string[];
     activeDeadlineSeconds?: number;   // default 1800
+    /**
+     * Job-level retry count. Default 0: an LLM pipeline failure is usually
+     * deterministic (schema/parse) and a retry re-spends the expensive Sonnet
+     * call; transient Bedrock throttles are already retried inside runAgent.
+     */
+    backoffLimit?: number;
     resources?: {
         requests: { memory: string; cpu: string };
         limits:   { memory: string; cpu: string };
@@ -127,7 +145,7 @@ export function buildPipelineJob(input: BuildJobInput): V1Job {
         metadata: { name: jobName, namespace: input.namespace, labels: sanitisedLabels },
         spec: {
             ttlSecondsAfterFinished: 3600,
-            backoffLimit:            2,
+            backoffLimit:            input.backoffLimit ?? MODEL_JOB_BACKOFF_LIMIT,
             activeDeadlineSeconds:   input.activeDeadlineSeconds ?? 1800,
             template: {
                 metadata: {

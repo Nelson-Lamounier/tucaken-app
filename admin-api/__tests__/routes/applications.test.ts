@@ -199,7 +199,11 @@ describe('GET /:slug — application detail', () => {
           metadata: {
             analysis: {
               analysisXml:       '<analysis/>',
-              coverLetter:       'Dear hiring team',
+              coverLetter: {
+                greeting: 'Dear Hiring Manager,',
+                paragraphs: ['I am excited to apply for this role.'],
+                signoff: { name: 'Nelson Lamounier', email: 'n@example.com', linkedin: 'linkedin.com/in/nelson', github: 'github.com/nelson' },
+              },
               resumeSuggestions: ['Add Kubernetes'],
               tailoredResumeData: { basics: { name: 'Raw Blob' } },
             },
@@ -253,11 +257,18 @@ describe('GET /:slug — application detail', () => {
     // tailoredResume prefers the validated resumes row over the raw blob.
     expect(body.application['analysis']).toEqual({
       analysisXml:       '<analysis/>',
-      coverLetter:       'Dear hiring team',
+      coverLetter: {
+        greeting: 'Dear Hiring Manager,',
+        paragraphs: ['I am excited to apply for this role.'],
+        signoff: { name: 'Nelson Lamounier', email: 'n@example.com', linkedin: 'linkedin.com/in/nelson', github: 'github.com/nelson' },
+      },
       metadata:          null,
       resumeSuggestions: ['Add Kubernetes'],
       tailoredResume:    { basics: { name: 'Nelson' } },
       atsCheck:          null,
+      jdExtraction:      null,
+      yearsGap:          null,
+      recruiterSnapshot: null,
     });
     // research: pipeline field names normalised to UI ResearchOutput shape.
     expect(body.application['research']).toEqual({
@@ -273,6 +284,9 @@ describe('GET /:slug — application detail', () => {
         scale:         'hyperscale',
       },
       technologyInventory: null,
+      dimensionMix:        null,
+      companyProblem:      '',
+      skillEvidenceLedger: [],
     });
     // technicalRoundType defaults to 'dsa' when no company profile exists.
     expect(body.application['technicalRoundType']).toBe('dsa');
@@ -291,6 +305,127 @@ describe('GET /:slug — application detail', () => {
         personal:  ['win-1'],
       },
     });
+  });
+
+  it('maps yearsGap from analysis metadata when present, null when absent', async () => {
+    const sampleYearsGap = {
+      relevantYears:     5,
+      requiredYears:     8,
+      gapYears:          3,
+      disqualifying:     false,
+      relevantRoleTitles: ['AWS'],
+      framingLine:       '5 years across operations and support',
+    };
+    pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
+    poolQueryMock
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'run-ygap',
+          metadata: {
+            analysis: {
+              analysisXml:  '<analysis/>',
+              coverLetter:  null,
+              yearsGap:     sampleYearsGap,
+            },
+          },
+          created_at: new Date('2026-04-05T00:00:00Z'),
+        }],
+      })
+      .mockResolvedValueOnce({ rows: [] })  // coaching_content
+      .mockResolvedValueOnce({ rows: [] })  // resumes
+      .mockResolvedValueOnce({ rows: [] })  // company_interview_profiles
+      .mockResolvedValueOnce({ rows: [] }); // dsa_evidence
+
+    const resPresent = await buildApp().request('/app-uuid-1');
+    expect(resPresent.status).toBe(200);
+    const bodyPresent = (await resPresent.json()) as { application: Record<string, unknown> };
+    const analysisPresent = bodyPresent.application['analysis'] as Record<string, unknown>;
+    expect(analysisPresent['yearsGap']).toEqual(sampleYearsGap);
+
+    // absent → null
+    pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
+    poolQueryMock
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'run-nogap',
+          metadata: { analysis: { analysisXml: '<analysis/>' } },
+          created_at: new Date('2026-04-06T00:00:00Z'),
+        }],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const resAbsent = await buildApp().request('/app-uuid-1');
+    expect(resAbsent.status).toBe(200);
+    const bodyAbsent = (await resAbsent.json()) as { application: Record<string, unknown> };
+    const analysisAbsent = bodyAbsent.application['analysis'] as Record<string, unknown>;
+    expect(analysisAbsent['yearsGap']).toBeNull();
+  });
+
+  it('surfaces recruiterSnapshot in analysis when present in pipeline metadata', async () => {
+    pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
+    const recruiterSnapshot = {
+      score:            45,
+      scoreRationale:   'stretch',
+      missingKeywords:  ['Kafka'],
+      redFlags:         [{ flag: 'x', why: 'y' }],
+    };
+    poolQueryMock
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'run-3',
+          metadata: {
+            analysis: {
+              analysisXml:      '<analysis/>',
+              coverLetter:      'Dear hiring team',
+              resumeSuggestions: [],
+              recruiterSnapshot,
+            },
+          },
+          created_at: new Date('2026-04-05T00:00:00Z'),
+        }],
+      })
+      .mockResolvedValueOnce({ rows: [] })  // coaching_content
+      .mockResolvedValueOnce({ rows: [] })  // resumes
+      .mockResolvedValueOnce({ rows: [] })  // company_interview_profiles
+      .mockResolvedValueOnce({ rows: [] }); // dsa_evidence
+
+    const res = await buildApp().request('/app-uuid-1');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { application: Record<string, unknown> };
+    const analysis = body.application['analysis'] as Record<string, unknown>;
+    expect(analysis['recruiterSnapshot']).toEqual(recruiterSnapshot);
+  });
+
+  it('returns null recruiterSnapshot in analysis when absent from pipeline metadata', async () => {
+    pgGetApplicationMock.mockResolvedValue(APPLICATION_ROW);
+    poolQueryMock
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'run-4',
+          metadata: {
+            analysis: {
+              analysisXml:      '<analysis/>',
+              coverLetter:      'Dear hiring team',
+              resumeSuggestions: [],
+              // no recruiterSnapshot key
+            },
+          },
+          created_at: new Date('2026-04-06T00:00:00Z'),
+        }],
+      })
+      .mockResolvedValueOnce({ rows: [] })  // coaching_content
+      .mockResolvedValueOnce({ rows: [] })  // resumes
+      .mockResolvedValueOnce({ rows: [] })  // company_interview_profiles
+      .mockResolvedValueOnce({ rows: [] }); // dsa_evidence
+
+    const res = await buildApp().request('/app-uuid-1');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { application: Record<string, unknown> };
+    const analysis = body.application['analysis'] as Record<string, unknown>;
+    expect(analysis['recruiterSnapshot']).toBeNull();
   });
 
   it('includes dsaTopicCalibration in research when present in pipeline metadata', async () => {

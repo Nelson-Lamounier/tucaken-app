@@ -61,6 +61,7 @@ jest.unstable_mockModule('../lib/repositories/pipeline-runs.js', () => ({
 jest.unstable_mockModule('../lib/k8s-job-builder.js', () => ({
   buildPipelineJob:  () => ({ metadata: { name: 'job-1' } }),
   sanitizeLabel:     (s: string) => s,
+  MODEL_JOB_BACKOFF_LIMIT: 0,
 }));
 
 // Re-mock pg with a db that has a working .query stub so confirm/regenerate

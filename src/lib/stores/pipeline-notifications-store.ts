@@ -36,6 +36,8 @@ export interface PipelineNotification {
   status: PipelineNotificationStatus
   /** Deep link to the monitoring page */
   readonly link: string
+  /** Pipeline run id, when known — lets a reopened progress modal track real stages. */
+  readonly pipelineRunId?: string
   /** Unix timestamp (ms) when the pipeline was started */
   readonly createdAt: number
   /** Unix timestamp (ms) when the pipeline reached a terminal state */

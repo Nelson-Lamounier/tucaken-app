@@ -1,54 +1,24 @@
 import { useState } from 'react'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { NewAnalysisPanel } from '@/features/applications/components/NewAnalysisPanel'
-import { ResumeSelect } from '@/features/applications/components/ResumeSelect'
-import { FullWidthBar, type FullWidthBarStep } from '@/components/ui/FullWidthBar'
 import { DashboardPage } from '@/components/layouts/DashboardPage'
 
 export const Route = createFileRoute('/_dashboard/applications/new')({
+  // Resume list is fetched client-side via useResumeVersions — auth + serialization
+  // are reliable there. (A loader prefetch crashed under SSR for this endpoint.)
   component: ApplicationsNewRoute,
 })
 
 function ApplicationsNewRoute() {
-  const navigate = useNavigate()
-  const [step, setStep] = useState<1 | 2>(1)
-  const [selectedResumeId, setSelectedResumeId] = useState<string>('')
-
-  const steps: FullWidthBarStep[] = [
-    {
-      name: selectedResumeId ? '1. Resume Selected' : '1. Select Resume',
-      current: step === 1,
-      onClick: () => setStep(1),
-    },
-    {
-      name: '2. Job Details',
-      current: step === 2,
-    },
-  ]
+  // `null` until ResumeMenuSelect resolves the default (active resume / most recent / scratch).
+  const [resumeId, setResumeId] = useState<string | null>(null)
 
   return (
     <DashboardPage
-      title="Resume Analysis"
-      description="Create a new resume analysis."
-      headerBottom={<FullWidthBar steps={steps} />}
+      title="Resume Builder"
+      description="Paste a job description and Tucaken tailors your resume and cover letter to it."
     >
-      {step === 1 && (
-          <ResumeSelect 
-            onSelect={(id) => {
-              setSelectedResumeId(id)
-              setStep(2)
-            }} 
-          />
-        )}
-
-        {step === 2 && (
-          <NewAnalysisPanel 
-            preselectedResumeId={selectedResumeId} 
-            onSuccess={() => {
-               navigate({ to: '/applications/list' })
-            }}
-          />
-        )}
-      </DashboardPage>
+      <NewAnalysisPanel resumeId={resumeId} onResumeChange={setResumeId} />
+    </DashboardPage>
   )
 }
