@@ -51,6 +51,7 @@ import { getBatchApi } from '../lib/k8s.js';
 import { traceParentEnv, observabilityEnv, MODEL_JOB_BACKOFF_LIMIT } from '../lib/k8s-job-builder.js';
 import { buildIngestionJobSpec } from '../lib/ingestion-job.js';
 import { getPool } from '../lib/pg.js';
+import { isSyncInFlight, tryClaimSyncSlot } from '../lib/sync-state.js';
 import { ensureDefaultProject } from '../lib/repositories/projects.js';
 import { secondsUntilNextMonthUTC } from '../lib/retry-after.js';
 import { AdminApiBindings, requireUserId } from '../lib/types.js';
@@ -922,6 +923,13 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
 
         const [appId, key] = requireGitHubConfig(config);
 
+        // Dedup fast path: if a Job is already in flight for this repo, skip
+        // without consuming quota. tryClaimSyncSlot below is the race-free
+        // backstop for the rare double-click that slips past this read.
+        if (await isSyncInFlight(pool, uid, repoFullName)) {
+            return ctx.json({ status: 'already_running', repoFullName, jobName: null }, 200);
+        }
+
         // Quota check before any DB write — fail fast without side effects.
         const { rows: planRows } = await pool.query<{ plan: string }>(
             `SELECT plan FROM users WHERE id = $1::uuid`,
@@ -941,7 +949,14 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         // decrement the counter so the user doesn't lose a monthly credit.
         try {
             await connectRepoWithDefaultProject(pool, uid, repoFullName, defaultBranch);
-            await markRepoPending(pool, uid, repoFullName);
+
+            // Race-free backstop: lost the atomic claim → a concurrent request
+            // already dispatched between the fast-path read and here. Refund the
+            // quota we just incremented and report the in-flight Job.
+            if (!(await tryClaimSyncSlot(pool, uid, repoFullName))) {
+                await decrementQuota(pool, uid).catch(() => {});
+                return ctx.json({ status: 'already_running', repoFullName, jobName: null }, 200);
+            }
             await markSyncTriggered(pool, uid, repoFullName);
 
             // Generate a fresh installation token scoped to this user's repos.
@@ -1065,8 +1080,15 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         if (!rows[0]) return ctx.json({ error: 'Repository not connected' }, 404);
 
         const [appId, key] = requireGitHubConfig(config);
-        await markRepoPending(pool, uid, repoFullName);
+
+        // Double-click guard: two retries racing would dispatch two Jobs that
+        // race document_embeddings writes. The atomic claim makes the loser a
+        // no-op. Retry charges no new quota, so there is nothing to refund.
+        if (!(await tryClaimSyncSlot(pool, uid, repoFullName))) {
+            return ctx.json({ status: 'already_running', repoFullName, jobName: null }, 200);
+        }
         await markSyncTriggered(pool, uid, repoFullName);
+
         const token = await generateInstallationToken(appId, key, conn.installation_id);
         const { jobName } = await dispatchIngestionJob(config, uid, repoFullName, token, true);
 
@@ -1337,7 +1359,16 @@ export function createGitHubWebhookRouter(config: AdminApiConfig): Hono {
             const [appId, key] = requireGitHubConfig(config);
             const token = await generateInstallationToken(appId, key, installationId);
 
-            await markRepoPending(pool, user.userId, repoFullName);
+            // Race-free backstop: the sync_status SELECT above is check-then-act
+            // — two pushes landing together both read 'complete' and pass it. The
+            // atomic claim is the real gate. Lost it → a concurrent push already
+            // dispatched; refund the quota we just charged and skip so we never
+            // run two Jobs racing document_embeddings writes for the same repo.
+            if (!(await tryClaimSyncSlot(pool, user.userId, repoFullName))) {
+                await decrementQuota(pool, user.userId).catch(() => {});
+                console.log(`[github/webhook] push skipped — concurrent dispatch won the claim for ${repoFullName}`);
+                return ctx.json({ ok: true });
+            }
             await markSyncTriggered(pool, user.userId, repoFullName);
 
             try {
