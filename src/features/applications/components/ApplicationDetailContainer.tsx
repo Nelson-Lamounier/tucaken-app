@@ -278,18 +278,6 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
               </StagePrepGate>
             )
           }
-
-          {stageIndex(resolvedStage) < STAGE_ORDER.length - 1 && (
-            <div className="flex justify-end border-t border-zinc-200 pt-6 dark:border-white/10">
-              <Button
-                variant="primary"
-                disabled={statusMutation.isPending}
-                onClick={() => handleAdvance(resolvedStage, detail.status)}
-              >
-                Mark complete and advance
-              </Button>
-            </div>
-          )}
         </WorkspaceShell>
       </div>
     </>
@@ -325,6 +313,21 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
         onStatusChange={handleStatusChange}
         dateStr={dateStr}
       />
+
+      {/* Primary forward action — promoted to the top of the page (above the
+          stage content). Hidden on the final stage where there is nothing to
+          advance to. Mirrors the not-last-stage guard the bottom CTA used. */}
+      {stageIndex(resolvedStage) < STAGE_ORDER.length - 1 && (
+        <div className="mb-6 flex justify-end border-b border-zinc-200 pb-6 dark:border-white/10">
+          <Button
+            variant="primary"
+            disabled={statusMutation.isPending}
+            onClick={() => handleAdvance(resolvedStage, detail.status)}
+          >
+            Mark complete and advance
+          </Button>
+        </div>
+      )}
 
       {STAGE_USES_DRAFT_PROVIDER.has(resolvedStage) ? (
         <StageDraftProvider
