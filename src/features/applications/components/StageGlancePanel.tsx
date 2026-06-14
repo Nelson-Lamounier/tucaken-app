@@ -289,7 +289,7 @@ function ResearchCompareGraphic({ detail }: { readonly detail: ApplicationDetail
       </div>
 
       <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-6">
-        <svg viewBox={`0 0 ${DONUT_SIZE} ${DONUT_SIZE}`} className="size-44 shrink-0" role="img" aria-label="Skill coverage breakdown">
+        <svg viewBox={`0 0 ${DONUT_SIZE} ${DONUT_SIZE}`} className="aspect-square w-full max-w-44 shrink-0" role="img" aria-label="Skill coverage breakdown">
           <circle
             cx={DONUT_MID}
             cy={DONUT_MID}
@@ -677,27 +677,32 @@ function ResearchGlance({ detail, stage }: StageGlancePanelProps) {
   const jd = detail.analysis?.jdExtraction ?? null
   const mix = detail.research?.dimensionMix ?? null
   const atsCheck = detail.analysis?.atsCheck ?? null
+  // @container so the columns respond to the panel's own width (the dashboard has
+  // a sidebar), not the viewport — cards go side by side as soon as there is room
+  // and stack when narrow.
   return (
-    <motion.div key={stage} className="grid gap-4 lg:grid-cols-3" variants={GRID} initial="hidden" animate="show">
-      {/* Left column: Assessment tile (beside ATS) over the skill-coverage donut */}
-      <motion.div variants={TILE} style={{ willChange: 'transform' }} className="flex flex-col gap-4 lg:col-span-1">
-        {fit && <GlanceTile tile={fit} />}
-        <ResearchCompareGraphic detail={detail} />
-      </motion.div>
-
-      {/* Right column: ATS check on top of "What we understood from the JD" */}
-      <motion.div variants={TILE} style={{ willChange: 'transform' }} className="flex flex-col gap-4 lg:col-span-2">
-        {atsCheck && <AtsPanel ats={atsCheck} />}
-        {jd && <JdUnderstandingPanel jd={jd} />}
-      </motion.div>
-
-      {/* Full width: role emphasis (JD dimension weighting) */}
-      {mix && (
-        <motion.div variants={TILE} style={{ willChange: 'transform' }} className="lg:col-span-3">
-          <RoleEmphasisPanel mix={mix} />
+    <div className="@container">
+      <motion.div key={stage} className="grid gap-4 @2xl:grid-cols-3" variants={GRID} initial="hidden" animate="show">
+        {/* Left column (slim): Assessment tile beside ATS, over the skill-coverage donut */}
+        <motion.div variants={TILE} style={{ willChange: 'transform' }} className="flex flex-col gap-4 @2xl:col-span-1">
+          {fit && <GlanceTile tile={fit} />}
+          <ResearchCompareGraphic detail={detail} />
         </motion.div>
-      )}
-    </motion.div>
+
+        {/* Right column (wide): ATS check on top of "What we understood from the JD" */}
+        <motion.div variants={TILE} style={{ willChange: 'transform' }} className="flex flex-col gap-4 @2xl:col-span-2">
+          {atsCheck && <AtsPanel ats={atsCheck} />}
+          {jd && <JdUnderstandingPanel jd={jd} />}
+        </motion.div>
+
+        {/* Full width: role emphasis (JD dimension weighting) */}
+        {mix && (
+          <motion.div variants={TILE} style={{ willChange: 'transform' }} className="@2xl:col-span-3">
+            <RoleEmphasisPanel mix={mix} />
+          </motion.div>
+        )}
+      </motion.div>
+    </div>
   )
 }
 
