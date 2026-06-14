@@ -124,7 +124,9 @@ Panel open/closed state is persisted per user, not per application.
 > **Dev:** The user clicked Technical — does that advance them?
 > **Expert:** No. Clicking a segment changes the **Active Stage** via `?stage` —
 > it's just navigation. The **Current Stage** is still whatever `interviewStage`
-> says. Only the "Mark complete and advance" button **Advances** them.
+> says. Only the "Mark complete and advance" dropdown **Advances** them — the
+> user picks the target stage from it (any of the seven), which sets the
+> Current Stage.
 > **Dev:** And the green dot on the "Distributed systems" card — that's the fit
 > rating?
 > **Expert:** No, that's an **Evidence Indicator** — `strong` for that topic,

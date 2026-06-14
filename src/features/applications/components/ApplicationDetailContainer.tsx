@@ -21,8 +21,8 @@ import { StageGlancePanel } from './StageGlancePanel'
 import { StageCoachingNarrative } from '../stages/components/CoachingSections'
 import { StageDraftProvider } from '../stages/hooks/stage-draft-context'
 import type { StageDraft } from '../stages/hooks/useStageDraft'
-import { STAGE_ORDER, stageIndex } from '../stages/types/stage'
-import { Button } from '@/components/ui/Button'
+import { STAGE_ORDER, stageIndex, isInterviewStage } from '../stages/types/stage'
+import DropDownOptions from '@/components/ui/DropDownOptions'
 import { ApplicationActionsMenu } from './ApplicationActionsMenu'
 import { triggerCoachFn } from '@/server/pipelines'
 import { ConfirmModal } from '../stages/components/ConfirmModal'
@@ -40,6 +40,13 @@ import {
  * draft. Phone-screen and technical mirror this layout.
  */
 const STAGE_USES_DRAFT_PROVIDER = new Set<InterviewStage>(['phone-screen', 'technical', 'system-design', 'behavioural', 'bar-raiser'])
+
+/**
+ * Options for the "Mark complete and advance" dropdown — every hiring stage in
+ * canonical order. Selecting one sets the application's Current Stage to it
+ * (see handleAdvanceTo). Static, so it's built once at module load.
+ */
+const STAGE_SELECT_OPTIONS = STAGE_ORDER.map((stage) => ({ value: stage, label: STAGE_LABELS[stage] }))
 
 /** Returns the bare workspace node for a stage — no gate, no callbacks. */
 function stageWorkspaceNode(stage: InterviewStage, detail: ApplicationDetail) {
@@ -171,14 +178,23 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
     [slug, activeStage, navigate],
   )
 
+  /** Set the application's Current Stage to an explicit target, then view it. */
+  const handleAdvanceTo = useCallback(
+    (target: InterviewStage, status: ApplicationStatus) => {
+      statusMutation.mutate({ slug, status, interviewStage: target })
+      void navigate({ to: '/applications/$slug', params: { slug }, search: { stage: target } })
+    },
+    [slug, navigate, statusMutation],
+  )
+
+  /** Linear advance — used by the per-stage prep gate. Delegates to handleAdvanceTo. */
   const handleAdvance = useCallback(
     (current: InterviewStage, status: ApplicationStatus) => {
       const next = STAGE_ORDER[stageIndex(current) + 1]
       if (!next) return
-      statusMutation.mutate({ slug, status, interviewStage: next })
-      void navigate({ to: '/applications/$slug', params: { slug }, search: { stage: next } })
+      handleAdvanceTo(next, status)
     },
-    [slug, navigate, statusMutation],
+    [handleAdvanceTo],
   )
 
   /** Open the confirm modal before triggering the coach for a given stage. */
@@ -315,19 +331,23 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
       />
 
       {/* Primary forward action — promoted to the top of the page (above the
-          stage content). Hidden on the final stage where there is nothing to
-          advance to. Mirrors the not-last-stage guard the bottom CTA used. */}
-      {stageIndex(resolvedStage) < STAGE_ORDER.length - 1 && (
-        <div className="mb-6 flex justify-end border-b border-zinc-200 pb-6 dark:border-white/10">
-          <Button
-            variant="primary"
-            disabled={statusMutation.isPending}
-            onClick={() => handleAdvance(resolvedStage, detail.status)}
-          >
-            Mark complete and advance
-          </Button>
-        </div>
-      )}
+          stage content). Reuses DropDownOptions (the "Ready for Review" status
+          control) so the stage advance is selectable: the user picks which
+          stage to mark current, rather than only the fixed next one. The
+          current Current Stage carries the checkmark. */}
+      <div className="mb-6 flex justify-end border-b border-zinc-200 pb-6 dark:border-white/10">
+        <DropDownOptions
+          label="Mark complete and advance"
+          disabled={statusMutation.isPending}
+          options={STAGE_SELECT_OPTIONS}
+          selectedValue={detail.interviewStage}
+          onSelect={(val) => {
+            if (isInterviewStage(val) && val !== detail.interviewStage) {
+              handleAdvanceTo(val, detail.status)
+            }
+          }}
+        />
+      </div>
 
       {STAGE_USES_DRAFT_PROVIDER.has(resolvedStage) ? (
         <StageDraftProvider
