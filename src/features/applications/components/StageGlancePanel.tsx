@@ -10,6 +10,7 @@ import { stageGlanceTiles, offerStatusTile, type GlanceTileData } from '../lib/s
 import { resolveStagePrep } from '../stages/types/workspace'
 import { JdUnderstandingPanel } from '../stages/components/JdUnderstandingPanel'
 import { RoleEmphasisPanel } from '../stages/components/RoleEmphasisPanel'
+import { AtsPanel } from '../stages/components/AtsPanel'
 import { ScheduleCard } from '../stages/components/ScheduleCard'
 import { useStageDraftContext } from '../stages/hooks/stage-draft-context'
 
@@ -675,17 +676,19 @@ function ResearchGlance({ detail, stage }: StageGlancePanelProps) {
   const fit = stageGlanceTiles(stage, detail).find(tile => tile.key === 'fit')
   const jd = detail.analysis?.jdExtraction ?? null
   const mix = detail.research?.dimensionMix ?? null
+  const atsCheck = detail.analysis?.atsCheck ?? null
   return (
     <motion.div key={stage} className="grid gap-4 lg:grid-cols-3" variants={GRID} initial="hidden" animate="show">
-      {/* Row 1: skill-coverage donut + "What we understood from the JD" */}
-      <motion.div variants={TILE} style={{ willChange: 'transform' }} className="lg:col-span-1">
+      {/* Row 1, left: skill-coverage donut (top-aligned; the right stack is taller) */}
+      <motion.div variants={TILE} style={{ willChange: 'transform' }} className="lg:col-span-1 lg:self-start">
         <ResearchCompareGraphic detail={detail} />
       </motion.div>
-      {jd && (
-        <motion.div variants={TILE} style={{ willChange: 'transform' }} className="lg:col-span-2">
-          <JdUnderstandingPanel jd={jd} />
-        </motion.div>
-      )}
+
+      {/* Row 1, right: ATS check stacked on top of "What we understood from the JD" */}
+      <motion.div variants={TILE} style={{ willChange: 'transform' }} className="flex flex-col gap-4 lg:col-span-2">
+        {atsCheck && <AtsPanel ats={atsCheck} />}
+        {jd && <JdUnderstandingPanel jd={jd} />}
+      </motion.div>
 
       {/* Row 2: Assessment then Role emphasis, one after another */}
       {fit && (

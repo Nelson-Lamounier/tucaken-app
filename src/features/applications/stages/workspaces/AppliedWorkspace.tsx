@@ -12,7 +12,6 @@ import { KnowledgeBaseHealthPanel } from '@/components/kb/KnowledgeBaseHealthPan
 import { EvidenceIndicator } from '../components/EvidenceIndicator'
 import { EvidenceDeck, type EvidenceCard } from '../components/EvidenceDeck'
 import { SummaryGroup, SummaryRow } from '../components/workspace-shell'
-import { AtsPanel } from '../components/AtsPanel'
 import { CompanyProblemPanel } from '../components/CompanyProblemPanel'
 import { SkillEvidenceLedgerPanel } from '../components/SkillEvidenceLedgerPanel'
 import { YearsGapRow } from '../components/YearsGapRow'
@@ -305,7 +304,6 @@ export function AppliedWorkspace({ detail }: AppliedWorkspaceProps) {
   const partialMatches = detail.research?.partialMatches ?? []
   const gaps = detail.research?.gaps ?? []
   const resumeSummary = detail.analysis?.resumeSuggestions?.summary
-  const atsCheck = detail.analysis?.atsCheck
   const yearsGap = detail.analysis?.yearsGap
   const recruiterSnapshot = detail.analysis?.recruiterSnapshot
 
@@ -326,8 +324,6 @@ export function AppliedWorkspace({ detail }: AppliedWorkspaceProps) {
       ) : null}
 
       {recruiterSnapshot ? <RecruiterSnapshotPanel snapshot={recruiterSnapshot} /> : null}
-
-      {atsCheck ? <AtsPanel ats={atsCheck} /> : null}
 
       {resumeSummary ? <ResumeSuggestionsGroup summary={resumeSummary} /> : null}
 
