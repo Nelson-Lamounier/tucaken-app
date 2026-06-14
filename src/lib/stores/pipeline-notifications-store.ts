@@ -17,7 +17,7 @@ import { persist } from 'zustand/middleware'
 // =============================================================================
 
 /** Pipeline types tracked by the notification system */
-export type PipelineNotificationType = 'article' | 'application'
+export type PipelineNotificationType = 'article' | 'application' | 'case_study'
 
 /** Status values for a tracked pipeline */
 export type PipelineNotificationStatus = 'running' | 'review' | 'complete' | 'failed'

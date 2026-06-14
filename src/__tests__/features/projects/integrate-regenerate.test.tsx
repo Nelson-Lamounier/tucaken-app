@@ -31,14 +31,15 @@ describe('useIntegrateRepo — auto-regenerate on add', () => {
 
   it('merges then dispatches a regenerate for the target', async () => {
     mergeProjectsMock.mockResolvedValue({ componentsReassigned: 1, sourcesArchived: 1 })
-    regenerateProjectMock.mockResolvedValue({ status: 'queued' })
+    regenerateProjectMock.mockResolvedValue({ status: 'queued', pipelineRunId: 'run-1', jobName: 'proj-cs-x', projectId: 'proj-1' })
 
     const { result } = renderHook(() => useIntegrateRepo(), { wrapper })
     const res = await result.current.mutateAsync({ targetId: 'proj-1', sourceIds: ['repo-default-1'] })
 
     expect(mergeProjectsMock).toHaveBeenCalledWith({ data: { targetId: 'proj-1', sourceIds: ['repo-default-1'] } })
     expect(regenerateProjectMock).toHaveBeenCalledWith({ data: 'proj-1' })
-    expect(res.regenerateDispatched).toBe(true)
+    // The regenerate run id is surfaced so the caller can open the progress modal + notification.
+    expect(res.regenerate).toEqual({ pipelineRunId: 'run-1', projectId: 'proj-1' })
   })
 
   it('still succeeds when the regenerate dispatch fails (merge already happened)', async () => {
@@ -48,7 +49,7 @@ describe('useIntegrateRepo — auto-regenerate on add', () => {
     const { result } = renderHook(() => useIntegrateRepo(), { wrapper })
     const res = await result.current.mutateAsync({ targetId: 'proj-1', sourceIds: ['repo-default-1'] })
 
-    expect(res.regenerateDispatched).toBe(false)
+    expect(res.regenerate).toBeNull()
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
   })
 

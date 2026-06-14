@@ -155,14 +155,17 @@ export function useIntegrateRepo() {
   return useMutation({
     mutationFn: async ({ targetId, sourceIds }: { targetId: string; sourceIds: string[] }) => {
       const merge = await mergeProjectsFn({ data: { targetId, sourceIds } })
-      let regenerateDispatched = false
+      // Capture the regenerate run so the caller can surface a live progress
+      // modal + notification. Best-effort: a dispatch failure must not fail the
+      // merge the user just made (they can still regenerate manually).
+      let regenerate: { pipelineRunId: string; projectId: string } | null = null
       try {
-        await regenerateProjectFn({ data: targetId })
-        regenerateDispatched = true
+        const r = await regenerateProjectFn({ data: targetId })
+        regenerate = { pipelineRunId: r.pipelineRunId, projectId: r.projectId }
       } catch {
         // non-fatal — the merge succeeded; the case study can be regenerated manually
       }
-      return { merge, regenerateDispatched }
+      return { merge, regenerate }
     },
     onSuccess: (_res, { targetId }) => {
       void queryClient.invalidateQueries({ queryKey: projectsQueries.detail(targetId).queryKey })

@@ -12,6 +12,8 @@ import {
 import { Check, ChevronsUpDown, FolderGit, FolderGit2, GitBranch, X } from 'lucide-react'
 import type { ProjectSummary } from '../../lib/types'
 import { useIntegrateRepo } from '../../server/mutations'
+import { useCaseStudyProgressStore } from '@/lib/stores/case-study-progress-store'
+import { usePipelineNotificationsStore } from '@/lib/stores/pipeline-notifications-store'
 
 export interface IntegrateRepoDialogProps {
   readonly open: boolean
@@ -29,6 +31,8 @@ export interface IntegrateRepoDialogProps {
  */
 export function IntegrateRepoDialog({ open, onClose, targets, repoDefaults }: IntegrateRepoDialogProps) {
   const integrate = useIntegrateRepo()
+  const openCaseStudyProgress = useCaseStudyProgressStore((s) => s.openProgress)
+  const addNotification = usePipelineNotificationsStore((s) => s.addNotification)
   const [targetId, setTargetId] = useState<string>(targets[0]?.id ?? '')
   const [repoId, setRepoId] = useState<string>('')
 
@@ -51,7 +55,32 @@ export function IntegrateRepoDialog({ open, onClose, targets, repoDefaults }: In
     if (!canSubmit) return
     integrate.mutate(
       { targetId, sourceIds: [repoId] },
-      { onSuccess: () => onClose() },
+      {
+        onSuccess: ({ regenerate }) => {
+          // The merge dispatched a case-study regenerate — surface a live
+          // progress modal and a Pipeline Notification so the user can watch it
+          // run (and reopen it from the bell), exactly like the JD flow.
+          if (regenerate) {
+            const projectName = selectedTarget?.name ?? 'your project'
+            const startedAt = Date.now()
+            openCaseStudyProgress({
+              projectId: regenerate.projectId,
+              projectName,
+              pipelineRunId: regenerate.pipelineRunId,
+              startedAt,
+            })
+            addNotification({
+              type: 'case_study',
+              slug: regenerate.projectId,
+              label: projectName,
+              status: 'running',
+              link: `/projects/${encodeURIComponent(regenerate.projectId)}`,
+              pipelineRunId: regenerate.pipelineRunId,
+            })
+          }
+          onClose()
+        },
+      },
     )
   }
 
