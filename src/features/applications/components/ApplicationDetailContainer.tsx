@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useState, type ReactNode } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, AlertCircle, Building2, Briefcase } from 'lucide-react'
@@ -90,6 +90,8 @@ interface ApplicationHeaderProps {
   readonly statusPending: boolean
   readonly onStatusChange: (status: ApplicationStatus) => void
   readonly dateStr: string
+  /** Stage-advance dropdown, rendered side-by-side with the status control. */
+  readonly advanceControl?: ReactNode
 }
 
 /**
@@ -97,7 +99,7 @@ interface ApplicationHeaderProps {
  * status control. Mirrors the KB dashboard header (title + subtitle + action);
  * the at-a-glance stat tiles render beneath it via StageGlancePanel.
  */
-function ApplicationHeader({ detail, viewedStage, statusPending, onStatusChange, dateStr }: ApplicationHeaderProps) {
+function ApplicationHeader({ detail, viewedStage, statusPending, onStatusChange, dateStr, advanceControl }: ApplicationHeaderProps) {
   return (
     <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-center gap-3">
@@ -117,15 +119,19 @@ function ApplicationHeader({ detail, viewedStage, statusPending, onStatusChange,
         </div>
       </div>
 
-      <ApplicationActionsMenu
-        detail={detail}
-        viewedStage={viewedStage}
-        statusLabel={STATUS_LABELS[detail.status]}
-        statusOptions={STATUS_OPTIONS}
-        statusValue={detail.status}
-        statusPending={statusPending}
-        onStatusChange={onStatusChange}
-      />
+      {/* Status control ("Ready for Review") + stage-advance dropdown, side by side. */}
+      <div className="flex shrink-0 items-center gap-2">
+        <ApplicationActionsMenu
+          detail={detail}
+          viewedStage={viewedStage}
+          statusLabel={STATUS_LABELS[detail.status]}
+          statusOptions={STATUS_OPTIONS}
+          statusValue={detail.status}
+          statusPending={statusPending}
+          onStatusChange={onStatusChange}
+        />
+        {advanceControl}
+      </div>
     </div>
   )
 }
@@ -321,33 +327,31 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
         />
       </div>
 
-      {/* Page header */}
+      {/* Page header — status control and the stage-advance dropdown sit side
+          by side in the header's action group (see ApplicationHeader). The
+          advance dropdown reuses DropDownOptions (the "Ready for Review" status
+          control) so the target stage is selectable; the current Current Stage
+          carries the checkmark. */}
       <ApplicationHeader
         detail={detail}
         viewedStage={resolvedStage}
         statusPending={statusMutation.isPending}
         onStatusChange={handleStatusChange}
         dateStr={dateStr}
+        advanceControl={
+          <DropDownOptions
+            label="Mark complete and advance"
+            disabled={statusMutation.isPending}
+            options={STAGE_SELECT_OPTIONS}
+            selectedValue={detail.interviewStage}
+            onSelect={(val) => {
+              if (isInterviewStage(val) && val !== detail.interviewStage) {
+                handleAdvanceTo(val, detail.status)
+              }
+            }}
+          />
+        }
       />
-
-      {/* Primary forward action — promoted to the top of the page (above the
-          stage content). Reuses DropDownOptions (the "Ready for Review" status
-          control) so the stage advance is selectable: the user picks which
-          stage to mark current, rather than only the fixed next one. The
-          current Current Stage carries the checkmark. */}
-      <div className="mb-6 flex justify-end border-b border-zinc-200 pb-6 dark:border-white/10">
-        <DropDownOptions
-          label="Mark complete and advance"
-          disabled={statusMutation.isPending}
-          options={STAGE_SELECT_OPTIONS}
-          selectedValue={detail.interviewStage}
-          onSelect={(val) => {
-            if (isInterviewStage(val) && val !== detail.interviewStage) {
-              handleAdvanceTo(val, detail.status)
-            }
-          }}
-        />
-      </div>
 
       {STAGE_USES_DRAFT_PROVIDER.has(resolvedStage) ? (
         <StageDraftProvider
