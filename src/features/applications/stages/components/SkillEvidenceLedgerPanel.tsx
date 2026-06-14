@@ -125,10 +125,10 @@ export function SkillEvidenceLedgerPanel({ ledger }: { readonly ledger: SkillEvi
   return (
     <section className="space-y-3 rounded-md border border-zinc-200 bg-zinc-50/50 p-5 dark:border-white/10 dark:bg-white/2">
       <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-        Skill evidence — what your repos prove
+        Skill evidence — from your repos and experience
       </h3>
       <p className="text-xs text-zinc-500 dark:text-zinc-400">
-        Each JD tool, checked against your own code.
+        Each JD skill, grounded in your code where it exists and your career history where it doesn&apos;t.
       </p>
       <ul className="space-y-2">
         {rows.map((entry) => (
