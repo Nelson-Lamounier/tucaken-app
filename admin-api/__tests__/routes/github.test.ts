@@ -602,11 +602,13 @@ describe('POST /connected-repos', () => {
 
     it('inserts repo, marks pending, generates token, dispatches Job', async () => {
         seedQuery([connectedRow]);       // 1. getConnection
-        seedQuery([]);                   // 2. plan SELECT (empty rows → defaults to 'free')
-        seedQuery([{ count: 1 }]);       // 3. quota INSERT…RETURNING: count=1 → allowed
+        seedQuery([]);                   // 2. isSyncInFlight SELECT (empty → not in flight)
+        seedQuery([]);                   // 3. plan SELECT (empty rows → defaults to 'free')
+        seedQuery([{ count: 1 }]);       // 4. quota INSERT…RETURNING: count=1 → allowed
+        seedQuery([{ repo_full_name: 'Nelson-Lamounier/cdk-monitoring' }]); // 5. tryClaimSyncSlot → claim won
         // The repo INSERT now runs inside connectRepoWithDefaultProject on a
         // dedicated transaction client (BEGIN/INSERT…RETURNING/guard/COMMIT) — it
-        // does NOT go through poolQueryMock. 4. markRepoPending, 5. markSyncTriggered.
+        // does NOT go through poolQueryMock. 6. markSyncTriggered.
 
         const res  = await buildApp().request('/connected-repos', {
             method:  'POST',
@@ -621,10 +623,11 @@ describe('POST /connected-repos', () => {
         expect(body.jobName).toMatch(/^ingestion-/);
         expect(body.jobName.length).toBeLessThanOrEqual(63);
 
-        // getConnection (1) + plan SELECT (1) + quota INSERT…RETURNING (1, atomic)
-        // + markRepoPending (1) + markSyncTriggered (1). The repo INSERT runs on
-        // the transaction client (pool.connect()), not poolQueryMock.
-        expect(poolQueryMock).toHaveBeenCalledTimes(5);
+        // getConnection (1) + isSyncInFlight SELECT (1) + plan SELECT (1)
+        // + quota INSERT…RETURNING (1, atomic) + tryClaimSyncSlot (1)
+        // + markSyncTriggered (1). The repo INSERT runs on the transaction
+        // client (pool.connect()), not poolQueryMock.
+        expect(poolQueryMock).toHaveBeenCalledTimes(6);
 
         // Installation token generated for this user's installation
         expect(mockGenerateInstallationToken).toHaveBeenCalledWith('999999', testConfig.githubPrivateKey, '12345');
@@ -645,9 +648,11 @@ describe('POST /connected-repos', () => {
     });
 
     it('stamps unsanitized user-id + repo-full-name annotations for reconciliation', async () => {
-        seedQuery([connectedRow]);
-        seedQuery([]);
-        seedQuery([{ count: 1 }]);
+        seedQuery([connectedRow]);       // getConnection
+        seedQuery([]);                   // isSyncInFlight → not in flight
+        seedQuery([]);                   // plan SELECT → 'free'
+        seedQuery([{ count: 1 }]);       // quota INSERT…RETURNING → allowed
+        seedQuery([{ repo_full_name: 'Nelson-Lamounier/cdk-monitoring' }]); // tryClaimSyncSlot → claim won
 
         await buildApp().request('/connected-repos', {
             method:  'POST',
@@ -770,7 +775,8 @@ describe('POST /connected-repos/:fullName/retry', () => {
     it('re-dispatches without touching usage_quotas (no double charge)', async () => {
         seedQuery([connectedRow]);                       // 1. getConnection
         seedQuery([{ full_name: 'octo/app' }]);          // 2. ownership SELECT
-        // 3. markRepoPending, 4. markSyncTriggered → default { rows: [] }
+        seedQuery([{ repo_full_name: 'octo/app' }]);     // 3. tryClaimSyncSlot → claim won
+        // 4. markSyncTriggered → default { rows: [] }
 
         const res  = await buildApp().request('/connected-repos/octo%2Fapp/retry', { method: 'POST' });
         const body = await res.json() as { status: string; repoFullName: string; jobName: string };

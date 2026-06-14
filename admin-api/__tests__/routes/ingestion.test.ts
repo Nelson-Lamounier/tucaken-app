@@ -20,6 +20,16 @@ jest.unstable_mockModule('../../src/lib/k8s.js', () => ({
     _resetBatchApi: () => {},
 }));
 
+// The trigger now claims an ingestion slot via tryClaimSyncSlot (getPool().query).
+// Default the mock to "claim won" (one row) so dispatch proceeds; the post-failure
+// release UPDATE also runs through this mock and only needs to resolve.
+const poolQueryMock = jest.fn() as jest.Mock<(sql?: string) => Promise<{ rows: object[]; rowCount?: number }>>;
+poolQueryMock.mockResolvedValue({ rows: [{ repo_full_name: 'octocat/hello-world' }], rowCount: 1 });
+
+jest.unstable_mockModule('../../src/lib/pg.js', () => ({
+    getPool: () => ({ query: poolQueryMock }),
+}));
+
 // ---------------------------------------------------------------------------
 // Dynamic imports — resolved AFTER mocks are registered
 // ---------------------------------------------------------------------------
@@ -74,6 +84,8 @@ describe('POST /trigger — create ingestion Job', () => {
   beforeEach(async () => {
     createNamespacedJobMock.mockReset();
     createNamespacedJobMock.mockResolvedValue({});
+    poolQueryMock.mockReset();
+    poolQueryMock.mockResolvedValue({ rows: [{ repo_full_name: 'octocat/hello-world' }], rowCount: 1 });
     // getJobImage() resolves env-var fallback when JOB_IMAGES_DIR is unset
     // or empty; tests set INGESTION_IMAGE so the trigger guard succeeds.
     process.env['INGESTION_IMAGE'] = '771826808455.dkr.ecr.eu-west-1.amazonaws.com/ingestion:latest';
