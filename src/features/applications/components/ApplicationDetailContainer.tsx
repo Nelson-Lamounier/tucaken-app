@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useState, type ReactNode } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, AlertCircle, Building2, Briefcase } from 'lucide-react'
@@ -21,8 +21,8 @@ import { StageGlancePanel } from './StageGlancePanel'
 import { StageCoachingNarrative } from '../stages/components/CoachingSections'
 import { StageDraftProvider } from '../stages/hooks/stage-draft-context'
 import type { StageDraft } from '../stages/hooks/useStageDraft'
-import { STAGE_ORDER, stageIndex } from '../stages/types/stage'
-import { Button } from '@/components/ui/Button'
+import { STAGE_ORDER, stageIndex, isInterviewStage } from '../stages/types/stage'
+import DropDownOptions from '@/components/ui/DropDownOptions'
 import { ApplicationActionsMenu } from './ApplicationActionsMenu'
 import { triggerCoachFn } from '@/server/pipelines'
 import { ConfirmModal } from '../stages/components/ConfirmModal'
@@ -40,6 +40,13 @@ import {
  * draft. Phone-screen and technical mirror this layout.
  */
 const STAGE_USES_DRAFT_PROVIDER = new Set<InterviewStage>(['phone-screen', 'technical', 'system-design', 'behavioural', 'bar-raiser'])
+
+/**
+ * Options for the "Mark complete and advance" dropdown — every hiring stage in
+ * canonical order. Selecting one sets the application's Current Stage to it
+ * (see handleAdvanceTo). Static, so it's built once at module load.
+ */
+const STAGE_SELECT_OPTIONS = STAGE_ORDER.map((stage) => ({ value: stage, label: STAGE_LABELS[stage] }))
 
 /** Returns the bare workspace node for a stage — no gate, no callbacks. */
 function stageWorkspaceNode(stage: InterviewStage, detail: ApplicationDetail) {
@@ -83,6 +90,8 @@ interface ApplicationHeaderProps {
   readonly statusPending: boolean
   readonly onStatusChange: (status: ApplicationStatus) => void
   readonly dateStr: string
+  /** Stage-advance dropdown, rendered side-by-side with the status control. */
+  readonly advanceControl?: ReactNode
 }
 
 /**
@@ -90,7 +99,7 @@ interface ApplicationHeaderProps {
  * status control. Mirrors the KB dashboard header (title + subtitle + action);
  * the at-a-glance stat tiles render beneath it via StageGlancePanel.
  */
-function ApplicationHeader({ detail, viewedStage, statusPending, onStatusChange, dateStr }: ApplicationHeaderProps) {
+function ApplicationHeader({ detail, viewedStage, statusPending, onStatusChange, dateStr, advanceControl }: ApplicationHeaderProps) {
   return (
     <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-center gap-3">
@@ -110,15 +119,19 @@ function ApplicationHeader({ detail, viewedStage, statusPending, onStatusChange,
         </div>
       </div>
 
-      <ApplicationActionsMenu
-        detail={detail}
-        viewedStage={viewedStage}
-        statusLabel={STATUS_LABELS[detail.status]}
-        statusOptions={STATUS_OPTIONS}
-        statusValue={detail.status}
-        statusPending={statusPending}
-        onStatusChange={onStatusChange}
-      />
+      {/* Status control ("Ready for Review") + stage-advance dropdown, side by side. */}
+      <div className="flex shrink-0 items-center gap-2">
+        <ApplicationActionsMenu
+          detail={detail}
+          viewedStage={viewedStage}
+          statusLabel={STATUS_LABELS[detail.status]}
+          statusOptions={STATUS_OPTIONS}
+          statusValue={detail.status}
+          statusPending={statusPending}
+          onStatusChange={onStatusChange}
+        />
+        {advanceControl}
+      </div>
     </div>
   )
 }
@@ -171,14 +184,23 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
     [slug, activeStage, navigate],
   )
 
+  /** Set the application's Current Stage to an explicit target, then view it. */
+  const handleAdvanceTo = useCallback(
+    (target: InterviewStage, status: ApplicationStatus) => {
+      statusMutation.mutate({ slug, status, interviewStage: target })
+      void navigate({ to: '/applications/$slug', params: { slug }, search: { stage: target } })
+    },
+    [slug, navigate, statusMutation],
+  )
+
+  /** Linear advance — used by the per-stage prep gate. Delegates to handleAdvanceTo. */
   const handleAdvance = useCallback(
     (current: InterviewStage, status: ApplicationStatus) => {
       const next = STAGE_ORDER[stageIndex(current) + 1]
       if (!next) return
-      statusMutation.mutate({ slug, status, interviewStage: next })
-      void navigate({ to: '/applications/$slug', params: { slug }, search: { stage: next } })
+      handleAdvanceTo(next, status)
     },
-    [slug, navigate, statusMutation],
+    [handleAdvanceTo],
   )
 
   /** Open the confirm modal before triggering the coach for a given stage. */
@@ -278,18 +300,6 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
               </StagePrepGate>
             )
           }
-
-          {stageIndex(resolvedStage) < STAGE_ORDER.length - 1 && (
-            <div className="flex justify-end border-t border-zinc-200 pt-6 dark:border-white/10">
-              <Button
-                variant="primary"
-                disabled={statusMutation.isPending}
-                onClick={() => handleAdvance(resolvedStage, detail.status)}
-              >
-                Mark complete and advance
-              </Button>
-            </div>
-          )}
         </WorkspaceShell>
       </div>
     </>
@@ -317,13 +327,30 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
         />
       </div>
 
-      {/* Page header */}
+      {/* Page header — status control and the stage-advance dropdown sit side
+          by side in the header's action group (see ApplicationHeader). The
+          advance dropdown reuses DropDownOptions (the "Ready for Review" status
+          control) so the target stage is selectable; the current Current Stage
+          carries the checkmark. */}
       <ApplicationHeader
         detail={detail}
         viewedStage={resolvedStage}
         statusPending={statusMutation.isPending}
         onStatusChange={handleStatusChange}
         dateStr={dateStr}
+        advanceControl={
+          <DropDownOptions
+            label="Mark complete and advance"
+            disabled={statusMutation.isPending}
+            options={STAGE_SELECT_OPTIONS}
+            selectedValue={detail.interviewStage}
+            onSelect={(val) => {
+              if (isInterviewStage(val) && val !== detail.interviewStage) {
+                handleAdvanceTo(val, detail.status)
+              }
+            }}
+          />
+        }
       />
 
       {STAGE_USES_DRAFT_PROVIDER.has(resolvedStage) ? (
