@@ -1,13 +1,20 @@
+import { SlidersHorizontal } from 'lucide-react'
 import type { DimensionMix } from '@/lib/types/applications.types'
 
 /**
  * Role Emphasis panel — visualises the JD's `dimensionMix`: how the job
  * description splits its emphasis across role dimensions (customer-facing,
- * technical, AI/ML, support/ops, monitoring). Each weight is an integer 0-100,
- * the set ~sums to 100. Rendered as labelled horizontal bars, sorted descending
- * by weight, with zero-weight dimensions hidden. Returns null when there is no
- * signal (every weight is 0). Data comes from `detail.research.dimensionMix`.
+ * technical, AI/ML, ops & support, observability). Each weight is an integer
+ * 0-100, the set ~sums to 100. Rendered as labelled horizontal bars in a
+ * responsive grid, sorted descending by weight, with zero-weight dimensions
+ * hidden. Returns null when there is no signal (every weight is 0). Rendered
+ * full-width in the at-a-glance dashboard (StageGlancePanel). Data comes from
+ * `detail.research.dimensionMix`.
  */
+
+/** Shared glance-card surface — matches StageGlancePanel's SURFACE. */
+const SURFACE =
+  'rounded-md bg-white p-5 ring-1 ring-zinc-200 shadow-sm dark:bg-white/2 dark:ring-0 dark:inset-ring dark:inset-ring-white/10 dark:shadow-none'
 
 interface DimensionRow {
   readonly key: keyof DimensionMix
@@ -19,8 +26,8 @@ const DIMENSION_LABELS: Record<keyof DimensionMix, string> = {
   customerFacing: 'Customer-facing',
   technical: 'Technical',
   aiMl: 'AI / ML',
-  supportOps: 'Support / Ops',
-  monitoring: 'Monitoring',
+  supportOps: 'Ops & support',
+  monitoring: 'Observability',
 }
 
 const DIMENSION_KEYS: readonly (keyof DimensionMix)[] = [
@@ -45,15 +52,20 @@ export function RoleEmphasisPanel({ mix }: { readonly mix: DimensionMix }) {
   if (rows.length === 0) return null
 
   return (
-    <section className="space-y-4 rounded-md border border-zinc-200 bg-zinc-50/50 p-5 dark:border-white/10 dark:bg-white/2">
+    <div className={`flex h-full flex-col ${SURFACE}`}>
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Role emphasis</h3>
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">JD weighting</span>
+        <div className="flex items-center gap-2">
+          <SlidersHorizontal className="size-5 text-accent" />
+          <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+            Role emphasis
+          </span>
+        </div>
+        <span className="text-[11px] text-zinc-400 dark:text-zinc-500">From the job description</span>
       </div>
 
-      <ul className="space-y-3">
+      <ul className="mt-4 grid flex-1 gap-x-8 gap-y-3.5 sm:grid-cols-2">
         {rows.map((row) => (
-          <li key={row.key} className="space-y-1">
+          <li key={row.key} className="space-y-1.5">
             <div className="flex items-baseline justify-between gap-3">
               <span className="text-sm text-zinc-700 dark:text-zinc-300">{row.label}</span>
               <span className="text-xs font-medium tabular-nums text-zinc-500 dark:text-zinc-400">
@@ -70,9 +82,9 @@ export function RoleEmphasisPanel({ mix }: { readonly mix: DimensionMix }) {
         ))}
       </ul>
 
-      <p className="text-xs text-zinc-500 dark:text-zinc-400">
-        How this role splits its emphasis — your résumé is weighted to match.
+      <p className="mt-4 text-xs text-zinc-500 dark:text-zinc-400">
+        Your tailored résumé leads with what this role weights most.
       </p>
-    </section>
+    </div>
   )
 }

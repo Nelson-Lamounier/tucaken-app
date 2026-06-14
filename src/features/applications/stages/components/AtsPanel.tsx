@@ -1,6 +1,11 @@
 import { CheckCircle2, AlertTriangle, HelpCircle, FileText } from 'lucide-react'
 import type { AtsCheckResult, AtsKeywordCoverage } from '@/lib/types/applications.types'
 
+/** Shared glance-card surface — matches StageGlancePanel's SURFACE so this card
+ *  sits cohesively above the JD panel in the at-a-glance dashboard. */
+const SURFACE =
+  'rounded-md bg-white p-5 ring-1 ring-zinc-200 shadow-sm dark:bg-white/2 dark:ring-0 dark:inset-ring dark:inset-ring-white/10 dark:shadow-none'
+
 /**
  * ATS check panel — renders the job-strategist's applicant-tracking-system
  * assessment of the tailored resume (machine-readability, standard sections,
@@ -56,7 +61,7 @@ export function AtsPanel({ ats }: { readonly ats: AtsCheckResult }) {
   const total = ats.jdKeywordCoverage.length
 
   return (
-    <section className="space-y-4 rounded-md border border-zinc-200 bg-zinc-50/50 p-5 dark:border-white/10 dark:bg-white/2">
+    <section className={`space-y-4 ${SURFACE}`}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">ATS check</h3>

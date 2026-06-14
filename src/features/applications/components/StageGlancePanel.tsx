@@ -8,6 +8,9 @@ import { TONE, type Tone } from '@/components/ui/tone'
 import type { ApplicationDetail, InterviewStage } from '@/lib/types/applications.types'
 import { stageGlanceTiles, offerStatusTile, type GlanceTileData } from '../lib/stage-glance'
 import { resolveStagePrep } from '../stages/types/workspace'
+import { JdUnderstandingPanel } from '../stages/components/JdUnderstandingPanel'
+import { RoleEmphasisPanel } from '../stages/components/RoleEmphasisPanel'
+import { AtsPanel } from '../stages/components/AtsPanel'
 import { ScheduleCard } from '../stages/components/ScheduleCard'
 import { useStageDraftContext } from '../stages/hooks/stage-draft-context'
 
@@ -286,7 +289,7 @@ function ResearchCompareGraphic({ detail }: { readonly detail: ApplicationDetail
       </div>
 
       <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-6">
-        <svg viewBox={`0 0 ${DONUT_SIZE} ${DONUT_SIZE}`} className="size-44 shrink-0" role="img" aria-label="Skill coverage breakdown">
+        <svg viewBox={`0 0 ${DONUT_SIZE} ${DONUT_SIZE}`} className="aspect-square w-full max-w-44 shrink-0" role="img" aria-label="Skill coverage breakdown">
           <circle
             cx={DONUT_MID}
             cy={DONUT_MID}
@@ -663,23 +666,43 @@ function BehaviouralGlance({ detail }: { readonly detail: ApplicationDetail }) {
   )
 }
 
-/** Research glance — the default stages: skill-coverage donut + 2×2 stat tiles. */
+/**
+ * Research glance — the default/Applied stage. Left: the skill-coverage donut
+ * (verified / partial / gaps). Right: "What we understood from the JD" beside
+ * the Fit tile. The old per-count "Research" tiles were dropped — they merely
+ * restated the donut's verified/partial/gaps numbers (duplication).
+ */
 function ResearchGlance({ detail, stage }: StageGlancePanelProps) {
-  const tiles = stageGlanceTiles(stage, detail)
+  const fit = stageGlanceTiles(stage, detail).find(tile => tile.key === 'fit')
+  const jd = detail.analysis?.jdExtraction ?? null
+  const mix = detail.research?.dimensionMix ?? null
+  const atsCheck = detail.analysis?.atsCheck ?? null
+  // @container so the columns respond to the panel's own width (the dashboard has
+  // a sidebar), not the viewport — cards go side by side as soon as there is room
+  // and stack when narrow.
   return (
-    <GlanceGrid
-      stageKey={stage}
-      left={<ResearchCompareGraphic detail={detail} />}
-      right={
-        <motion.div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:grid-rows-2 lg:col-span-2">
-          {tiles.map(tile => (
-            <motion.div key={tile.key} variants={TILE} style={{ willChange: 'transform' }}>
-              <GlanceTile tile={tile} />
-            </motion.div>
-          ))}
+    <div className="@container">
+      <motion.div key={stage} className="grid gap-4 @2xl:grid-cols-3" variants={GRID} initial="hidden" animate="show">
+        {/* Left column (slim): Assessment tile beside ATS, over the skill-coverage donut */}
+        <motion.div variants={TILE} style={{ willChange: 'transform' }} className="flex flex-col gap-4 @2xl:col-span-1">
+          {fit && <GlanceTile tile={fit} />}
+          <ResearchCompareGraphic detail={detail} />
         </motion.div>
-      }
-    />
+
+        {/* Right column (wide): ATS check on top of "What we understood from the JD" */}
+        <motion.div variants={TILE} style={{ willChange: 'transform' }} className="flex flex-col gap-4 @2xl:col-span-2">
+          {atsCheck && <AtsPanel ats={atsCheck} />}
+          {jd && <JdUnderstandingPanel jd={jd} />}
+        </motion.div>
+
+        {/* Full width: role emphasis (JD dimension weighting) */}
+        {mix && (
+          <motion.div variants={TILE} style={{ willChange: 'transform' }} className="@2xl:col-span-3">
+            <RoleEmphasisPanel mix={mix} />
+          </motion.div>
+        )}
+      </motion.div>
+    </div>
   )
 }
 
