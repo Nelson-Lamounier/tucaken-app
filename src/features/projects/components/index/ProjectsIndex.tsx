@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useNavigate } from '@tanstack/react-router'
-import { FolderOpen, Github } from 'lucide-react'
+import { Link, useNavigate } from '@tanstack/react-router'
+import { FolderOpen, FolderPlus, Github, Sparkles } from 'lucide-react'
 import { CommandPallete, type CommandPalleteItem } from '@/components/ui/CommandPallete'
 import { projectsQueries } from '../../server/queries'
 import { PROJECT_TYPE_LABELS, type ProjectSummary } from '../../lib/types'
+import { partitionProjects } from '../../lib/classify'
 import { ProjectCard } from './ProjectCard'
 import { ProjectFilterBar, type ProjectFilterValue } from './ProjectFilterBar'
+import { IntegrateRepoDialog } from './IntegrateRepoDialog'
 
 const DEFAULT_FILTERS: ProjectFilterValue = { type: 'all', status: 'all' }
 
@@ -14,16 +16,22 @@ export function ProjectsIndex() {
   const navigate = useNavigate()
   const [filters, setFilters] = useState<ProjectFilterValue>(DEFAULT_FILTERS)
   const [palleteOpen, setPalleteOpen] = useState(false)
+  const [integrateOpen, setIntegrateOpen] = useState(false)
 
   const { data, isPending, isError, error } = useQuery(
     projectsQueries.list({ limit: 100, offset: 0, includeArchived: false }),
   )
 
   const items = data?.items ?? []
-  const filtered = useMemo(() => applyFilters(items, filters), [items, filters])
+  // The list endpoint returns every non-archived project. Only user-confirmed
+  // projects ("curated") belong in the grid — raw per-repo defaults stay hidden
+  // (they still enrich JD analysis server-side) and AI proposals live in the
+  // review flow. See lib/classify.
+  const { curated, proposals, defaults } = useMemo(() => partitionProjects(items), [items])
+  const filtered = useMemo(() => applyFilters(curated, filters), [curated, filters])
   const commandItems = useMemo(
-    () => items.map((p) => ({ id: p.id, name: p.name, description: p.tagline ?? PROJECT_TYPE_LABELS[p.type] })),
-    [items],
+    () => curated.map((p) => ({ id: p.id, name: p.name, description: p.tagline ?? PROJECT_TYPE_LABELS[p.type] })),
+    [curated],
   )
 
   // ⌘K / Ctrl+K opens the search palette — mirrors the applications list.
@@ -40,7 +48,14 @@ export function ProjectsIndex() {
 
   if (isPending) return <SkeletonGrid />
   if (isError)   return <ErrorState message={error instanceof Error ? error.message : 'Failed to load projects'} />
+  // No synced repos at all → nothing to build projects from yet.
   if (items.length === 0) return <EmptyState />
+
+  // Repos are synced but the user hasn't curated any project yet. Guide them to
+  // the right next step instead of showing the raw per-repo defaults.
+  if (curated.length === 0) {
+    return <NoCuratedState proposalCount={proposals.length} repoCount={defaults.length} />
+  }
 
   return (
     <div className="space-y-4">
@@ -52,7 +67,27 @@ export function ProjectsIndex() {
         onSelect={(item: CommandPalleteItem) => navigate({ to: '/projects/$id', params: { id: item.id } })}
       />
 
-      <ProjectFilterBar value={filters} onChange={setFilters} onSearchClick={() => setPalleteOpen(true)} />
+      {proposals.length > 0 && <ProposalsBanner count={proposals.length} />}
+
+      <ProjectFilterBar
+        value={filters}
+        onChange={setFilters}
+        onSearchClick={() => setPalleteOpen(true)}
+      />
+
+      {defaults.length > 0 && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => setIntegrateOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1.5 text-xs font-medium text-zinc-200 inset-ring inset-ring-white/10 transition-colors hover:bg-white/10"
+          >
+            <FolderPlus className="size-3.5" />
+            Add a repository to a project
+          </button>
+        </div>
+      )}
+
       {filtered.length === 0 ? (
         <FilteredEmptyState onReset={() => setFilters(DEFAULT_FILTERS)} />
       ) : (
@@ -62,6 +97,13 @@ export function ProjectsIndex() {
           ))}
         </ul>
       )}
+
+      <IntegrateRepoDialog
+        open={integrateOpen}
+        onClose={() => setIntegrateOpen(false)}
+        targets={curated}
+        repoDefaults={defaults}
+      />
     </div>
   )
 }
@@ -72,6 +114,30 @@ function applyFilters(items: ProjectSummary[], filters: ProjectFilterValue): Pro
     if (filters.status !== 'all' && p.status !== filters.status) return false
     return true
   })
+}
+
+/** A nudge to the review flow when AI groupings are waiting to be accepted. */
+function ProposalsBanner({ count }: { readonly count: number }) {
+  return (
+    <Link
+      to="/projects/review"
+      className="flex items-center justify-between gap-3 rounded-md bg-indigo-400/5 px-4 py-3 inset-ring inset-ring-indigo-400/30 transition-colors hover:bg-indigo-400/10"
+    >
+      <span className="flex items-center gap-2.5">
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-indigo-400/10 text-indigo-300 inset-ring inset-ring-indigo-400/30">
+          <Sparkles className="size-3.5" />
+        </span>
+        <span className="text-xs text-zinc-300">
+          Tucaken grouped your repositories into{' '}
+          <span className="font-semibold text-zinc-100">
+            {count} project{count === 1 ? '' : 's'}
+          </span>{' '}
+          to review.
+        </span>
+      </span>
+      <span className="shrink-0 text-xs font-medium text-indigo-300">Review →</span>
+    </Link>
+  )
 }
 
 function SkeletonGrid() {
@@ -91,6 +157,7 @@ function SkeletonGrid() {
   )
 }
 
+/** Shown when the user has no synced repositories at all. */
 function EmptyState() {
   return (
     <div className="flex flex-col items-center gap-4 rounded-md bg-white/2 px-6 py-16 text-center inset-ring inset-ring-white/10">
@@ -110,6 +177,55 @@ function EmptyState() {
         <Github className="size-3.5" />
         Connect repositories
       </a>
+    </div>
+  )
+}
+
+/**
+ * Repos are synced but no project has been curated yet. Two paths:
+ *  - AI proposals exist → send the user to review/accept them.
+ *  - Only raw defaults (e.g. a single repo) → invite them to connect another
+ *    repo so Tucaken can group them, with a link to review once ≥2 exist.
+ * Either way the user is never shown the raw per-repo defaults as "projects".
+ */
+function NoCuratedState({
+  proposalCount,
+  repoCount,
+}: {
+  readonly proposalCount: number
+  readonly repoCount: number
+}) {
+  const hasProposals = proposalCount > 0
+  return (
+    <div className="flex flex-col items-center gap-4 rounded-md bg-white/2 px-6 py-16 text-center inset-ring inset-ring-white/10">
+      <span className="flex size-12 items-center justify-center rounded-md bg-teal-400/10 text-teal-300 inset-ring inset-ring-teal-400/30">
+        {hasProposals ? <Sparkles className="size-6" /> : <FolderPlus className="size-6" />}
+      </span>
+      <div className="max-w-sm space-y-1">
+        <h2 className="text-base font-semibold text-zinc-100">Create your first project</h2>
+        <p className="text-sm text-zinc-500">
+          {hasProposals
+            ? `Tucaken grouped your repositories into ${proposalCount} project${proposalCount === 1 ? '' : 's'}. Review and accept the ones that look right.`
+            : `You've synced ${repoCount} repositor${repoCount === 1 ? 'y' : 'ies'}. Connect another so Tucaken can group related repos into a project — or build one from your existing work.`}
+        </p>
+      </div>
+      {hasProposals ? (
+        <Link
+          to="/projects/review"
+          className="inline-flex items-center gap-1.5 rounded-full bg-teal-500/90 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-teal-400"
+        >
+          <Sparkles className="size-3.5" />
+          Review {proposalCount} proposal{proposalCount === 1 ? '' : 's'}
+        </Link>
+      ) : (
+        <a
+          href="/settings/github"
+          className="inline-flex items-center gap-1.5 rounded-full bg-teal-500/90 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-teal-400"
+        >
+          <Github className="size-3.5" />
+          Connect another repository
+        </a>
+      )}
     </div>
   )
 }
