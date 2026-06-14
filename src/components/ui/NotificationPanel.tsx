@@ -22,6 +22,7 @@ import type {
   PipelineNotificationType,
 } from '@/lib/stores/pipeline-notifications-store'
 import { useProgressModalStore } from '@/lib/stores/progress-modal-store'
+import { useCaseStudyProgressStore } from '@/lib/stores/case-study-progress-store'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -47,10 +48,25 @@ function StatusIcon({ status }: { status: PipelineNotificationStatus }) {
 /** Wording adapts to the pipeline type — "Analysing"/"Ready" reads right for
  *  applications, "In progress"/"Published" for articles. */
 function statusLabel(status: PipelineNotificationStatus, type: PipelineNotificationType): string {
-  if (status === 'running') return type === 'application' ? 'Analysing' : 'In progress'
+  if (status === 'running') {
+    if (type === 'application') return 'Analysing'
+    if (type === 'case_study') return 'Regenerating'
+    return 'In progress'
+  }
   if (status === 'review') return 'Ready for review'
-  if (status === 'complete') return type === 'application' ? 'Ready' : 'Published'
+  if (status === 'complete') {
+    if (type === 'application') return 'Ready'
+    if (type === 'case_study') return 'Updated'
+    return 'Published'
+  }
   return 'Failed'
+}
+
+/** Row title — the pipeline kind. */
+function typeLabel(type: PipelineNotificationType): string {
+  if (type === 'article') return 'Article'
+  if (type === 'case_study') return 'Case study'
+  return 'Application'
 }
 
 function statusTextClass(status: PipelineNotificationStatus): string {
@@ -78,10 +94,13 @@ function formatRelativeTime(timestamp: number): string {
 function NotificationRow({ notification }: { notification: PipelineNotification }) {
   const { markAsRead, removeNotification } = usePipelineNotificationsStore()
   const openProgress = useProgressModalStore((s) => s.openProgress)
+  const openCaseStudyProgress = useCaseStudyProgressStore((s) => s.openProgress)
 
-  // A running application run reopens the live progress modal instead of
-  // navigating to the (not-yet-ready) application page.
-  const reopensProgress = notification.type === 'application' && notification.status === 'running'
+  // A running application/case-study run reopens its live progress modal instead
+  // of navigating to the (not-yet-ready) destination page.
+  const reopensProgress =
+    notification.status === 'running' &&
+    (notification.type === 'application' || notification.type === 'case_study')
 
   const handleLinkClick = useCallback(() => {
     markAsRead(notification.id)
@@ -89,12 +108,21 @@ function NotificationRow({ notification }: { notification: PipelineNotification 
 
   const handleOpenProgress = useCallback(() => {
     markAsRead(notification.id)
+    if (notification.type === 'case_study') {
+      openCaseStudyProgress({
+        projectId: notification.slug,
+        projectName: notification.label,
+        pipelineRunId: notification.pipelineRunId,
+        startedAt: notification.createdAt,
+      })
+      return
+    }
     openProgress({
       slug: notification.slug,
       pipelineRunId: notification.pipelineRunId,
       startedAt: notification.createdAt,
     })
-  }, [markAsRead, openProgress, notification.id, notification.slug, notification.pipelineRunId, notification.createdAt])
+  }, [markAsRead, openProgress, openCaseStudyProgress, notification.id, notification.type, notification.slug, notification.label, notification.pipelineRunId, notification.createdAt])
 
   const handleRemove = useCallback(
     (e: React.MouseEvent) => {
@@ -117,7 +145,7 @@ function NotificationRow({ notification }: { notification: PipelineNotification 
 
       <div className="min-w-0 flex-1 pr-5">
         <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-200">
-          {notification.type === 'article' ? 'Article' : 'Application'}
+          {typeLabel(notification.type)}
         </p>
         <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">{notification.label}</p>
         <div className="mt-0.5 flex items-center gap-1.5">

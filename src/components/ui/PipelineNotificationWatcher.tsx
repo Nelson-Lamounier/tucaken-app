@@ -14,7 +14,7 @@
 import { useEffect } from 'react'
 import { usePipelineNotificationsStore } from '@/lib/stores/pipeline-notifications-store'
 import { usePipelineStatus } from '@/features/ai-agent/hooks/use-pipeline-status'
-import { useApplicationDetail } from '@/hooks/use-admin-applications'
+import { useApplicationDetail, usePipelineRunStatus } from '@/hooks/use-admin-applications'
 
 // ── Article watcher ───────────────────────────────────────────────────────────
 
@@ -69,6 +69,31 @@ function ApplicationNotificationWatcher({ slug }: { slug: string }) {
   return null
 }
 
+// ── Case-study watcher ──────────────────────────────────────────────────────
+
+/**
+ * Watches a single case-study regenerate pipeline (folding a repo into a
+ * project) and updates the notification store when it settles. Unlike the
+ * application pipeline there is no detail page status to read — the run only
+ * resolves queued → complete/failed — so it polls the pipeline run directly.
+ */
+function CaseStudyNotificationWatcher({ slug, pipelineRunId }: { slug: string; pipelineRunId?: string }) {
+  const updateNotification = usePipelineNotificationsStore((s) => s.updateNotification)
+  const run = usePipelineRunStatus(pipelineRunId ?? null, Boolean(pipelineRunId))
+
+  useEffect(() => {
+    const status = run?.status
+    if (status === 'complete') {
+      updateNotification(slug, 'complete')
+    } else if (status === 'failed') {
+      updateNotification(slug, 'failed')
+    }
+    // 'queued' keeps status as 'running'
+  }, [run?.status, slug, updateNotification])
+
+  return null
+}
+
 // ── Root watcher ──────────────────────────────────────────────────────────────
 
 /**
@@ -82,13 +107,13 @@ export function PipelineNotificationWatcher() {
 
   return (
     <>
-      {running.map((n) =>
-        n.type === 'article' ? (
-          <ArticleNotificationWatcher key={n.slug} slug={n.slug} />
-        ) : (
-          <ApplicationNotificationWatcher key={n.slug} slug={n.slug} />
-        ),
-      )}
+      {running.map((n) => {
+        if (n.type === 'article') return <ArticleNotificationWatcher key={n.slug} slug={n.slug} />
+        if (n.type === 'case_study') {
+          return <CaseStudyNotificationWatcher key={n.slug} slug={n.slug} pipelineRunId={n.pipelineRunId} />
+        }
+        return <ApplicationNotificationWatcher key={n.slug} slug={n.slug} />
+      })}
     </>
   )
 }

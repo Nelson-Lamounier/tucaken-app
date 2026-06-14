@@ -38,6 +38,7 @@ import { Link } from "@tanstack/react-router";
 import { HeaderNav } from "../ui/HeaderNav";
 import { PipelineNotificationWatcher } from "../ui/PipelineNotificationWatcher";
 import { GlobalAnalysisProgressModal } from "../../features/applications/components/GlobalAnalysisProgressModal";
+import { GlobalCaseStudyProgressModal } from "../../features/projects/components/GlobalCaseStudyProgressModal";
 import { IngestionSyncWatcher } from "../ui/IngestionSyncWatcher";
 import type { MeResponse } from "@/server/me";
 import logo from "@/images/logo.png";
@@ -178,6 +179,8 @@ export default function AppLayout({
       <IngestionSyncWatcher />
       {/* App-global analysis progress modal (opened from submit or a running notification) */}
       <GlobalAnalysisProgressModal />
+      {/* App-global case-study regenerate progress modal (opened from integrate-repo or a running notification) */}
+      <GlobalCaseStudyProgressModal />
 
       {/* =========================================================
           Mobile Off-Canvas Sidebar
