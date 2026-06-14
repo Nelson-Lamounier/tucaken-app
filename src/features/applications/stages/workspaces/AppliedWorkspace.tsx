@@ -13,7 +13,6 @@ import { EvidenceIndicator } from '../components/EvidenceIndicator'
 import { EvidenceDeck, type EvidenceCard } from '../components/EvidenceDeck'
 import { SummaryGroup, SummaryRow } from '../components/workspace-shell'
 import { AtsPanel } from '../components/AtsPanel'
-import { JdUnderstandingPanel } from '../components/JdUnderstandingPanel'
 import { RoleEmphasisPanel } from '../components/RoleEmphasisPanel'
 import { CompanyProblemPanel } from '../components/CompanyProblemPanel'
 import { SkillEvidenceLedgerPanel } from '../components/SkillEvidenceLedgerPanel'
@@ -318,8 +317,6 @@ export function AppliedWorkspace({ detail }: AppliedWorkspaceProps) {
       {yearsGap ? <YearsGapRow yearsGap={yearsGap} /> : null}
 
       <KnowledgeBaseHealthPanel compact retrieval={detail.research?.kbRetrievalStats} />
-
-      {detail.analysis?.jdExtraction ? <JdUnderstandingPanel jd={detail.analysis.jdExtraction} /> : null}
 
       {detail.research?.dimensionMix ? <RoleEmphasisPanel mix={detail.research.dimensionMix} /> : null}
 

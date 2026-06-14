@@ -8,6 +8,7 @@ import { TONE, type Tone } from '@/components/ui/tone'
 import type { ApplicationDetail, InterviewStage } from '@/lib/types/applications.types'
 import { stageGlanceTiles, offerStatusTile, type GlanceTileData } from '../lib/stage-glance'
 import { resolveStagePrep } from '../stages/types/workspace'
+import { JdUnderstandingPanel } from '../stages/components/JdUnderstandingPanel'
 import { ScheduleCard } from '../stages/components/ScheduleCard'
 import { useStageDraftContext } from '../stages/hooks/stage-draft-context'
 
@@ -663,20 +664,35 @@ function BehaviouralGlance({ detail }: { readonly detail: ApplicationDetail }) {
   )
 }
 
-/** Research glance — the default stages: skill-coverage donut + 2×2 stat tiles. */
+/**
+ * Research glance — the default/Applied stage. Left: the skill-coverage donut
+ * (verified / partial / gaps). Right: "What we understood from the JD" beside
+ * the Fit tile. The old per-count "Research" tiles were dropped — they merely
+ * restated the donut's verified/partial/gaps numbers (duplication).
+ */
 function ResearchGlance({ detail, stage }: StageGlancePanelProps) {
-  const tiles = stageGlanceTiles(stage, detail)
+  const fit = stageGlanceTiles(stage, detail).find(tile => tile.key === 'fit')
+  const jd = detail.analysis?.jdExtraction ?? null
   return (
     <GlanceGrid
       stageKey={stage}
       left={<ResearchCompareGraphic detail={detail} />}
       right={
-        <motion.div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:grid-rows-2 lg:col-span-2">
-          {tiles.map(tile => (
-            <motion.div key={tile.key} variants={TILE} style={{ willChange: 'transform' }}>
-              <GlanceTile tile={tile} />
+        <motion.div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:col-span-2">
+          {jd && (
+            <motion.div variants={TILE} style={{ willChange: 'transform' }} className="sm:col-span-2">
+              <JdUnderstandingPanel jd={jd} />
             </motion.div>
-          ))}
+          )}
+          {fit && (
+            <motion.div
+              variants={TILE}
+              style={{ willChange: 'transform' }}
+              className={jd ? 'sm:col-span-1' : 'sm:col-span-3'}
+            >
+              <GlanceTile tile={fit} />
+            </motion.div>
+          )}
         </motion.div>
       }
     />
