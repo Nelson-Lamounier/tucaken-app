@@ -8,7 +8,8 @@
   ],
   "resolutions": {
     "@grpc/proto-loader/protobufjs": "^7.6.2",
-    "@opentelemetry/otlp-transformer/protobufjs": "^8.5.0"
+    "@opentelemetry/otlp-transformer/protobufjs": "^8.5.0",
+    "esbuild": "^0.28.1"
   },
   "imports": {},
   "scripts": {
