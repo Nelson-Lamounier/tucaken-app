@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { adminKeys } from '@/lib/api/query-keys'
 import { useToastStore } from '@/lib/stores/toast-store'
+import { notifyError } from '@/lib/errors/notify'
 import type { ApplicationStatus, ApplicationSummary, ApplicationDetail, InterviewStage } from '@/lib/types/applications.types'
 import { getApplicationsFn, deleteApplicationFn, getApplicationDetailFn, updateApplicationStatusFn } from '../server/applications'
 import { getPipelineRunStatusFn } from '../server/pipelines'
@@ -201,7 +202,7 @@ export function useDeleteApplication() {
       addToast('success', 'Application deleted.')
     },
     onError: (err) => {
-      addToast('error', `Failed to delete application: ${err.message}`)
+      notifyError(err, 'delete')
     },
   })
 }

@@ -26,7 +26,7 @@ import DropDownOptions from '@/components/ui/DropDownOptions'
 import { ApplicationActionsMenu } from './ApplicationActionsMenu'
 import { triggerCoachFn } from '@/server/pipelines'
 import { ConfirmModal } from '../stages/components/ConfirmModal'
-import { useToastStore } from '@/lib/stores/toast-store'
+import { notifyError } from '@/lib/errors/notify'
 
 import {
   STATUS_OPTIONS,
@@ -149,7 +149,6 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const statusMutation = useApplicationStatus()
-  const { addToast } = useToastStore()
 
   const { data: detail, isLoading, error } = useApplicationDetail(slug)
 
@@ -223,9 +222,9 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
         void queryClient.invalidateQueries({ queryKey: adminKeys.applications.detail(slug) })
       })
       .catch((err: unknown) => {
-        addToast('error', err instanceof Error ? err.message : 'Failed to dispatch coach')
+        notifyError(err, 'coach')
       })
-  }, [confirmGenStage, confirmGenForce, slug, queryClient, addToast])
+  }, [confirmGenStage, confirmGenForce, slug, queryClient])
 
   /** Schedule: trigger a non-force dispatch so the stage row is seeded, then refetch. */
   const handleSchedule = useCallback(
@@ -235,10 +234,10 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
           void queryClient.invalidateQueries({ queryKey: adminKeys.applications.detail(slug) })
         })
         .catch((err: unknown) => {
-          addToast('error', err instanceof Error ? err.message : 'Failed to dispatch coach')
+          notifyError(err, 'coach')
         })
     },
-    [slug, queryClient, addToast],
+    [slug, queryClient],
   )
 
 
