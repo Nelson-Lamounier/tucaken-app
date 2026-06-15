@@ -1,4 +1,6 @@
+import { Link2 } from 'lucide-react'
 import type { EvidenceStatus, SkillEvidenceEntry } from '@/lib/types/applications.types'
+import { tallyLedger, entryRetrievedRepos } from '../lib/evidence-quality'
 
 /**
  * Skill Evidence Ledger — per-JD-tool proof from the user's own repos. One row
@@ -6,6 +8,10 @@ import type { EvidenceStatus, SkillEvidenceEntry } from '@/lib/types/application
  * the cited evidence files as GitHub blob links, and (transferable only) the
  * bridge narrative. Rows sort verified → transferable → gap. Renders nothing for
  * an empty ledger. Data: `detail.research.skillEvidenceLedger`.
+ *
+ * When `retrievalRepoCounts` is supplied (repo → retrieved-passage-count from
+ * the same run's `kbRetrievalStats`), each row also shows whether its cited
+ * repo surfaced in semantic retrieval — the structural↔semantic cross-check.
  */
 
 const STATUS_ORDER: Record<EvidenceStatus, number> = {
@@ -90,17 +96,40 @@ function EvidenceFiles({ files }: { readonly files: readonly string[] }) {
   )
 }
 
-function LedgerRow({ entry }: { readonly entry: SkillEvidenceEntry }) {
+/**
+ * "Also retrieved" chip — shows that an entry's cited repo(s) surfaced in this
+ * run's semantic retrieval, double-confirming the structural evidence. Sums the
+ * retrieved passage counts across the entry's overlapping repos.
+ */
+function RetrievedChip({ entry, counts }: { readonly entry: SkillEvidenceEntry; readonly counts: Map<string, number> }) {
+  const repos = entryRetrievedRepos(entry, counts)
+  if (repos.length === 0) return null
+  const passages = repos.reduce((n, r) => n + r.count, 0)
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-300"
+      title={`Also surfaced in semantic retrieval: ${repos.map((r) => `${r.repo} (${r.count})`).join(', ')}`}
+    >
+      <Link2 className="size-3" aria-hidden />
+      also retrieved · {passages}
+    </span>
+  )
+}
+
+function LedgerRow({ entry, counts }: { readonly entry: SkillEvidenceEntry; readonly counts: Map<string, number> }) {
   return (
     <li className="space-y-2 rounded-md border border-zinc-200 bg-white p-3 dark:border-white/10 dark:bg-white/2">
       <div className="flex items-center justify-between gap-3">
         <span className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
           {entry.tool}
         </span>
-        <span
-          className={`shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-medium ${STATUS_BADGE[entry.status]}`}
-        >
-          {STATUS_LABEL[entry.status]}
+        <span className="flex shrink-0 items-center gap-1.5">
+          {entry.status === 'verified' ? <RetrievedChip entry={entry} counts={counts} /> : null}
+          <span
+            className={`rounded-md border px-2 py-0.5 text-[11px] font-medium ${STATUS_BADGE[entry.status]}`}
+          >
+            {STATUS_LABEL[entry.status]}
+          </span>
         </span>
       </div>
 
@@ -117,10 +146,37 @@ function LedgerRow({ entry }: { readonly entry: SkillEvidenceEntry }) {
   )
 }
 
-export function SkillEvidenceLedgerPanel({ ledger }: { readonly ledger: SkillEvidenceEntry[] }) {
+/** Status-count summary line under the heading. */
+function StatusTally({ ledger }: { readonly ledger: readonly SkillEvidenceEntry[] }) {
+  const t = tallyLedger(ledger)
+  const item = (dot: string, label: string, value: number) => (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={`size-2 rounded-full ${dot}`} aria-hidden />
+      <span className="font-semibold tabular-nums text-zinc-700 dark:text-zinc-200">{value}</span>
+      <span className="text-zinc-400">{label}</span>
+    </span>
+  )
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+      {item('bg-emerald-500', 'verified', t.verified)}
+      {item('bg-amber-500', 'transferable', t.transferable)}
+      {item('bg-zinc-300 dark:bg-white/20', 'gap', t.gap)}
+    </div>
+  )
+}
+
+export function SkillEvidenceLedgerPanel({
+  ledger,
+  retrievalRepoCounts,
+}: {
+  readonly ledger: SkillEvidenceEntry[]
+  /** repo → retrieved-passage-count from the same run's kbRetrievalStats. */
+  readonly retrievalRepoCounts?: Map<string, number>
+}) {
   if (ledger.length === 0) return null
 
   const rows = [...ledger].sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status])
+  const counts = retrievalRepoCounts ?? new Map<string, number>()
 
   return (
     <section className="space-y-3 rounded-md border border-zinc-200 bg-zinc-50/50 p-5 dark:border-white/10 dark:bg-white/2">
@@ -130,9 +186,10 @@ export function SkillEvidenceLedgerPanel({ ledger }: { readonly ledger: SkillEvi
       <p className="text-xs text-zinc-500 dark:text-zinc-400">
         Each JD skill, grounded in your code where it exists and your career history where it doesn&apos;t.
       </p>
+      <StatusTally ledger={ledger} />
       <ul className="space-y-2">
         {rows.map((entry) => (
-          <LedgerRow key={entry.tool} entry={entry} />
+          <LedgerRow key={entry.tool} entry={entry} counts={counts} />
         ))}
       </ul>
     </section>
