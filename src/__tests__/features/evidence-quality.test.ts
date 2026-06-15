@@ -6,6 +6,7 @@ import {
   entryRetrievedRepos,
   correlationSummary,
   retrievalTone,
+  tallyLanes,
 } from '@/features/applications/stages/lib/evidence-quality'
 import type { KbRetrievalStats, SkillEvidenceEntry } from '@/lib/types/applications.types'
 
@@ -95,6 +96,24 @@ describe('correlationSummary', () => {
       counts,
     )
     expect(s).toEqual({ verifiedRetrieved: 1, verifiedWithRepos: 2 })
+  })
+})
+
+describe('tallyLanes', () => {
+  it('counts per lane (multi-lane entries count toward each) and flags presence', () => {
+    const r = tallyLanes([
+      entry({ sourceLanes: ['repo', 'project'] }),
+      entry({ sourceLanes: ['project'] }),
+      entry({ sourceLanes: ['career'] }),
+    ])
+    expect(r.hasLanes).toBe(true)
+    expect(r.counts).toEqual({ repo: 1, project: 2, career: 1 })
+  })
+
+  it('reports hasLanes=false when no entry carries lane data (older runs)', () => {
+    const r = tallyLanes([entry({}), entry({ sourceLanes: [] })])
+    expect(r.hasLanes).toBe(false)
+    expect(r.counts).toEqual({ repo: 0, project: 0, career: 0 })
   })
 })
 

@@ -1,6 +1,6 @@
-import { Link2 } from 'lucide-react'
-import type { EvidenceStatus, SkillEvidenceEntry } from '@/lib/types/applications.types'
-import { tallyLedger, entryRetrievedRepos } from '../lib/evidence-quality'
+import { Link2, GitBranch, FolderGit2, FileUser } from 'lucide-react'
+import type { EvidenceStatus, SkillEvidenceEntry, SkillEvidenceLane } from '@/lib/types/applications.types'
+import { tallyLedger, entryRetrievedRepos, LANE_LABEL, LANE_ORDER } from '../lib/evidence-quality'
 
 /**
  * Skill Evidence Ledger — per-JD-tool proof from the user's own repos. One row
@@ -116,6 +116,31 @@ function RetrievedChip({ entry, counts }: { readonly entry: SkillEvidenceEntry; 
   )
 }
 
+const LANE_ICON: Record<SkillEvidenceLane, React.ReactNode> = {
+  repo: <GitBranch className="size-3" aria-hidden />,
+  project: <FolderGit2 className="size-3" aria-hidden />,
+  career: <FileUser className="size-3" aria-hidden />,
+}
+
+/** Source-lane chips (Repos / Projects / Résumé) for one entry. */
+function LaneChips({ lanes }: { readonly lanes: readonly SkillEvidenceLane[] }) {
+  if (lanes.length === 0) return null
+  const ordered = LANE_ORDER.filter((l) => lanes.includes(l))
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {ordered.map((lane) => (
+        <span
+          key={lane}
+          className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-zinc-600 dark:border-white/10 dark:bg-white/5 dark:text-zinc-300"
+        >
+          {LANE_ICON[lane]}
+          {LANE_LABEL[lane]}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 function LedgerRow({ entry, counts }: { readonly entry: SkillEvidenceEntry; readonly counts: Map<string, number> }) {
   return (
     <li className="space-y-2 rounded-md border border-zinc-200 bg-white p-3 dark:border-white/10 dark:bg-white/2">
@@ -136,6 +161,8 @@ function LedgerRow({ entry, counts }: { readonly entry: SkillEvidenceEntry; read
       {entry.evidence ? (
         <p className="text-sm leading-relaxed text-zinc-600 dark:text-zinc-300">{entry.evidence}</p>
       ) : null}
+
+      {entry.sourceLanes && entry.sourceLanes.length > 0 ? <LaneChips lanes={entry.sourceLanes} /> : null}
 
       <EvidenceFiles files={entry.evidenceFiles} />
 

@@ -370,6 +370,13 @@ export interface DimensionMix {
 export type EvidenceStatus = 'verified' | 'transferable' | 'gap'
 
 /**
+ * Which source lane an evidence row was drawn from: a standalone code
+ * repository, a documented portfolio project (or its repos), or the
+ * candidate's résumé/career history. Set deterministically at assembly.
+ */
+export type SkillEvidenceLane = 'repo' | 'project' | 'career'
+
+/**
  * One JD-tool's evidence row: whether the user's repos prove the tool, the
  * supporting file citations, the evidence prose, and (for transferable) a bridge
  * narrative. Persisted on `pipeline_runs.metadata.research.skillEvidenceLedger`.
@@ -380,6 +387,11 @@ export interface SkillEvidenceEntry {
   readonly evidenceFiles: string[]
   readonly evidence: string
   readonly transferableBridge: string
+  /**
+   * Source lane(s) this evidence was drawn from (repo / project / career).
+   * Absent on runs produced before source-lane provenance shipped.
+   */
+  readonly sourceLanes?: SkillEvidenceLane[]
 }
 
 /** Research Agent output — part of ApplicationDetail */

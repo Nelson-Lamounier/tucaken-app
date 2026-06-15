@@ -16,6 +16,7 @@ import type {
   KbRetrievalStats,
   SkillEvidenceEntry,
   EvidenceStatus,
+  SkillEvidenceLane,
 } from '@/lib/types/applications.types'
 
 /** Per-status counts + total, for the coverage rollup. */
@@ -142,4 +143,33 @@ export const STATUS_LABEL: Record<EvidenceStatus, string> = {
   verified: 'Verified',
   transferable: 'Transferable',
   gap: 'Gap',
+}
+
+/** Human label per source lane. "career" surfaces as "Résumé" for the user. */
+export const LANE_LABEL: Record<SkillEvidenceLane, string> = {
+  repo: 'Repos',
+  project: 'Projects',
+  career: 'Résumé',
+}
+
+/** Stable display order for lanes. */
+export const LANE_ORDER: readonly SkillEvidenceLane[] = ['repo', 'project', 'career']
+
+/**
+ * Count how many ledger entries draw from each lane (an entry with multiple
+ * lanes counts toward each). Entries without `sourceLanes` (older runs) are
+ * skipped — `hasLanes` reports whether any entry carried lane data at all.
+ */
+export function tallyLanes(ledger: readonly SkillEvidenceEntry[]): {
+  readonly counts: Record<SkillEvidenceLane, number>
+  readonly hasLanes: boolean
+} {
+  const counts: Record<SkillEvidenceLane, number> = { repo: 0, project: 0, career: 0 }
+  let hasLanes = false
+  for (const e of ledger) {
+    if (!e.sourceLanes || e.sourceLanes.length === 0) continue
+    hasLanes = true
+    for (const lane of e.sourceLanes) counts[lane]++
+  }
+  return { counts, hasLanes }
 }

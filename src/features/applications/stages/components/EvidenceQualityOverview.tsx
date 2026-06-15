@@ -1,16 +1,25 @@
 'use client'
 
-import { ShieldCheck, Gauge, Link2 } from 'lucide-react'
-import type { KbRetrievalStats, SkillEvidenceEntry } from '@/lib/types/applications.types'
+import { ShieldCheck, Gauge, Link2, GitBranch, FolderGit2, FileUser } from 'lucide-react'
+import type { KbRetrievalStats, SkillEvidenceEntry, SkillEvidenceLane } from '@/lib/types/applications.types'
 import {
   tallyLedger,
   retrievalRepoCounts,
   correlationSummary,
   retrievalTone,
+  tallyLanes,
+  LANE_LABEL,
+  LANE_ORDER,
   type QualityTone,
 } from '../lib/evidence-quality'
 
 // ── Tone → colour ───────────────────────────────────────────────────────────
+
+const LANE_ICON: Record<SkillEvidenceLane, React.ReactNode> = {
+  repo: <GitBranch className="size-3.5" aria-hidden />,
+  project: <FolderGit2 className="size-3.5" aria-hidden />,
+  career: <FileUser className="size-3.5" aria-hidden />,
+}
 
 const TONE: Record<QualityTone, { label: string; text: string; dot: string }> = {
   strong:   { label: 'Strong match',  text: 'text-emerald-700 dark:text-emerald-300', dot: 'bg-emerald-500' },
@@ -73,6 +82,7 @@ export function EvidenceQualityOverview({ ledger, retrieval }: EvidenceQualityOv
   const tone = TONE[retrievalTone(retrieval)]
   const counts = retrievalRepoCounts(retrieval)
   const corr = correlationSummary(ledger, counts)
+  const lanes = tallyLanes(ledger)
 
   return (
     <section className="space-y-4 rounded-md border border-zinc-200 bg-zinc-50/50 p-5 dark:border-white/10 dark:bg-white/2">
@@ -118,6 +128,20 @@ export function EvidenceQualityOverview({ ledger, retrieval }: EvidenceQualityOv
           )}
         </div>
       </div>
+
+      {/* Source-lane provenance — where the evidence was drawn from. */}
+      {lanes.hasLanes && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-zinc-200 pt-3 text-xs dark:border-white/10">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Evidence from</span>
+          {LANE_ORDER.map((lane) => (
+            <span key={lane} className="inline-flex items-center gap-1.5 text-zinc-600 dark:text-zinc-300">
+              <span className="text-zinc-400">{LANE_ICON[lane]}</span>
+              <span className="font-semibold tabular-nums text-zinc-700 dark:text-zinc-200">{lanes.counts[lane]}</span>
+              {LANE_LABEL[lane]}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Correlation cross-check */}
       {corr.verifiedWithRepos > 0 && (
