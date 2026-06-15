@@ -567,7 +567,7 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
                     userId:       uid,
                     pipelineType: 'clustering',
                     referenceId:  null,
-                    metadata:     { triggeredBy: 'manual' },
+                    metadata:     { triggeredBy: 'manual', dispatchedImage: image },
                 });
             });
         } catch (err) {
@@ -709,7 +709,7 @@ async function dispatchCaseStudyJob(
                 userId,
                 pipelineType: 'case_study',
                 referenceId:  projectId,
-                metadata:     { projectId, triggeredBy },
+                metadata:     { projectId, triggeredBy, dispatchedImage: image },
             });
         });
     } catch (err) {

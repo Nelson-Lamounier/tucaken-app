@@ -223,7 +223,10 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
           userId,
           pipelineType: 'strategist',
           referenceId:  applicationId,
-          metadata:     { applicationSlug: applicationId, targetCompany, targetRole, mode },
+          // Stamp the exact job-strategist image this run will execute, so a run's
+          // code version is always queryable from its metadata — never inferred
+          // from deploy timelines (which led to a behaviour misattribution before).
+          metadata:     { applicationSlug: applicationId, targetCompany, targetRole, mode, dispatchedImage: strategistPipelineImage },
         });
       } catch (err: unknown) {
         console.error('[pipelines/strategist-job] failed to insert pipeline_run', err);
