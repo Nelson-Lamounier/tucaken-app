@@ -44,3 +44,25 @@ describe('loadConfig — coachModel', () => {
     });
   });
 });
+
+describe('loadConfig — strategistResearchModel', () => {
+  it('defaults to Claude Sonnet 4.6 when STRATEGIST_RESEARCH_MODEL is unset', () => {
+    withEnv({ STRATEGIST_RESEARCH_MODEL: undefined }, () => {
+      expect(loadConfig().strategistResearchModel).toBe('eu.anthropic.claude-sonnet-4-6');
+    });
+  });
+
+  it('respects an explicit STRATEGIST_RESEARCH_MODEL override', () => {
+    withEnv({ STRATEGIST_RESEARCH_MODEL: 'eu.anthropic.claude-haiku-4-5-20251001-v1:0' }, () => {
+      expect(loadConfig().strategistResearchModel).toBe('eu.anthropic.claude-haiku-4-5-20251001-v1:0');
+    });
+  });
+
+  it('is independent of RESEARCH_MODEL (article pipeline stays on its own value)', () => {
+    withEnv({ RESEARCH_MODEL: 'eu.anthropic.claude-haiku-4-5-20251001-v1:0', STRATEGIST_RESEARCH_MODEL: undefined }, () => {
+      const cfg = loadConfig();
+      expect(cfg.researchModel).toBe('eu.anthropic.claude-haiku-4-5-20251001-v1:0');
+      expect(cfg.strategistResearchModel).toBe('eu.anthropic.claude-sonnet-4-6');
+    });
+  });
+});
