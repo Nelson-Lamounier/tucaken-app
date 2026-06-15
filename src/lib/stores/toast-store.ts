@@ -17,12 +17,31 @@ import { create } from 'zustand'
 /** Toast severity levels */
 export type ToastType = 'success' | 'error' | 'info' | 'warning'
 
+/** An optional inline action rendered as a button on the toast (e.g. Retry). */
+export interface ToastAction {
+  readonly label: string
+  readonly onClick: () => void
+}
+
 /** Individual toast notification */
 export interface Toast {
   readonly id: string
   readonly type: ToastType
+  /** Optional bold headline shown above the message. */
+  readonly title?: string
   readonly message: string
+  /** Optional single action button (e.g. Retry). */
+  readonly action?: ToastAction
   readonly duration: number
+}
+
+/** Structured input for {@link ToastActions.notify}. */
+export interface NotifyInput {
+  readonly type: ToastType
+  readonly title?: string
+  readonly message: string
+  readonly action?: ToastAction
+  readonly duration?: number
 }
 
 /** Toast store state */
@@ -41,6 +60,12 @@ interface ToastActions {
    * @param duration - Auto-dismiss time in milliseconds (default: 4000)
    */
   addToast: (type: ToastType, message: string, duration?: number) => void
+
+  /**
+   * Adds a structured toast (title + message + optional action). Preferred for
+   * standardized errors/notifications — see `notifyError`.
+   */
+  notify: (input: NotifyInput) => void
 
   /** Removes a toast by ID */
   removeToast: (id: string) => void
@@ -81,24 +106,26 @@ const DEFAULT_TOAST_DURATION_MS = 4_000
 function createToastSlice(
   set: (fn: (state: ToastState) => Partial<ToastState>) => void,
 ): ToastState & ToastActions {
+  const dismiss = (id: string) => set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) }))
+
+  /** Append a toast and schedule its auto-dismiss. */
+  const push = (toast: Toast) => {
+    set((state) => ({ toasts: [...state.toasts, toast] }))
+    globalThis.setTimeout(() => dismiss(toast.id), toast.duration)
+  }
+
   return {
     toasts: [],
 
     addToast: (type, message, duration = DEFAULT_TOAST_DURATION_MS) => {
-      const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-      const toast: Toast = { id, type, message, duration }
-
-      set((state) => ({ toasts: [...state.toasts, toast] }))
-
-      // Auto-dismiss after the configured duration
-      globalThis.setTimeout(() => {
-        set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) }))
-      }, duration)
+      push({ id: crypto.randomUUID(), type, message, duration })
     },
 
-    removeToast: (id) => {
-      set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) }))
+    notify: ({ type, title, message, action, duration = DEFAULT_TOAST_DURATION_MS }) => {
+      push({ id: crypto.randomUUID(), type, title, message, action, duration })
     },
+
+    removeToast: dismiss,
 
     clearToasts: () => set(() => ({ toasts: [] })),
   }

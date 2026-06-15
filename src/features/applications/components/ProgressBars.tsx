@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { useApplicationDetail, usePipelineRunStatus } from '@/hooks/use-admin-applications'
 import { useApplicationRequeue } from '../hooks/use-application-requeue'
+import { notifyError } from '@/lib/errors/notify'
 
 // =============================================================================
 // Pipeline stage definitions
@@ -337,7 +338,12 @@ export function ProgressBars({
         {(isFailed || timedOut) ? (
           <button
             type="button"
-            onClick={() => requeue.mutate({ slug })}
+            onClick={() =>
+              requeue.mutate(
+                { slug },
+                { onError: (err) => notifyError(err, 'generic', { onRetry: () => requeue.mutate({ slug }) }) },
+              )
+            }
             disabled={requeue.isPending || requeue.isSuccess}
             className="inline-flex flex-none items-center gap-1.5 rounded-lg bg-rose-50 text-rose-700 ring-rose-600/20 hover:bg-rose-100 dark:bg-rose-500/10 dark:text-rose-400 dark:ring-rose-500/20 dark:hover:bg-rose-500/15 px-3 py-1.5 text-xs font-medium ring-1 ring-inset disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
@@ -358,13 +364,6 @@ export function ProgressBars({
           </Link>
         )}
       </div>
-
-      {/* DLQ error feedback */}
-      {requeue.isError && (
-        <p className="text-xs text-rose-600 dark:text-rose-400">
-          Requeue failed: {requeue.error instanceof Error ? requeue.error.message : 'Unknown error'}
-        </p>
-      )}
     </div>
   )
 }

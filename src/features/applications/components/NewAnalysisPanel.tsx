@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { AlertCircle, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { useForm } from '@tanstack/react-form'
+import { notifyError } from '@/lib/errors/notify'
 import { useApplicationsTrigger } from '../hooks/use-applications-trigger'
 import { usePipelineNotificationsStore } from '@/lib/stores/pipeline-notifications-store'
 import { useProgressModalStore } from '@/lib/stores/progress-modal-store'
@@ -121,6 +122,13 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
     window.addEventListener('application-retry', handleRetry)
     return () => window.removeEventListener('application-retry', handleRetry)
   }, [form])
+
+  // Surface trigger failures as a standardized error toast (server detail is
+  // stripped by notifyError) with a Retry that re-submits the form.
+  useEffect(() => {
+    if (!trigger.error) return
+    notifyError(trigger.error, 'analysis', { onRetry: () => void form.handleSubmit() })
+  }, [trigger.error, form])
 
   return (
     <div className="mb-8 overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-white/10 dark:bg-white/5 shadow-sm">
@@ -265,19 +273,7 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
             </div>
           </div>
 
-          {/* Error */}
-          {trigger.error && (
-            <div className="mt-4 flex flex-col gap-2 rounded-lg bg-red-50 text-red-700 border border-red-600/20 dark:bg-red-500/10 dark:text-red-500 dark:border-red-500/20 px-4 py-3 text-sm">
-              <div className="flex items-center gap-2 font-semibold">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                Couldn’t start the analysis
-              </div>
-              <p className="text-red-600 dark:text-red-400">
-                Check the job description and target details, then try again. If it keeps failing, the analysis service may be down.
-              </p>
-              <p className="text-red-600/80 dark:text-red-400/80 whitespace-pre-wrap wrap-break-word text-xs">{trigger.error.message}</p>
-            </div>
-          )}
+          {/* Errors surface as a standardized top-right toast (see notifyError). */}
 
           {/* Actions */}
           <form.Subscribe
