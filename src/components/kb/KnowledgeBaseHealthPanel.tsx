@@ -9,18 +9,22 @@ import type { KbRetrievalStats } from '@/lib/types/applications.types'
 
 type Verdict = { label: string; tone: string; dot: string }
 
-/** Map a run's max cosine + passage count to a health verdict. */
+/**
+ * Map a run's max cosine + passage count to a retrieval-relevance verdict.
+ * Labels are deliberately "Strong/Moderate/Weak relevance" — NOT "…match" —
+ * so they aren't read as candidate↔role fit; this is purely RAG passage quality.
+ */
 function retrievalVerdict(stats: KbRetrievalStats): Verdict {
   if (stats.passageCount === 0) {
-    return { label: 'No relevant evidence', tone: 'text-rose-700 dark:text-rose-300', dot: 'bg-rose-500' }
+    return { label: 'No relevant passages', tone: 'text-rose-700 dark:text-rose-300', dot: 'bg-rose-500' }
   }
   if (stats.maxCosine >= 0.4) {
-    return { label: 'Strong match', tone: 'text-emerald-700 dark:text-emerald-300', dot: 'bg-emerald-500' }
+    return { label: 'Strong relevance', tone: 'text-emerald-700 dark:text-emerald-300', dot: 'bg-emerald-500' }
   }
   if (stats.maxCosine >= 0.25) {
-    return { label: 'Moderate match', tone: 'text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' }
+    return { label: 'Moderate relevance', tone: 'text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' }
   }
-  return { label: 'Weak match', tone: 'text-rose-700 dark:text-rose-300', dot: 'bg-rose-500' }
+  return { label: 'Weak relevance', tone: 'text-rose-700 dark:text-rose-300', dot: 'bg-rose-500' }
 }
 
 // Visual full-scale for cosine bars — real portfolio↔JD cosine tops out ~0.5.
@@ -112,6 +116,32 @@ function RepoBars({ repos, total }: { readonly repos: readonly { repo: string; c
   )
 }
 
+/** Per-repo retrieved-passage bars (from kbRetrievalStats.repoBreakdown). */
+function RetrievalRepoBars({ repos }: { readonly repos: readonly { readonly repo: string; readonly count: number }[] }) {
+  const total = repos.reduce((n, r) => n + r.count, 0)
+  return (
+    <ul className="space-y-2">
+      {repos.map(r => (
+        <li key={r.repo}>
+          <div className="mb-0.5 flex items-baseline justify-between gap-2">
+            <span className="truncate text-xs font-medium text-zinc-700 dark:text-zinc-200">{r.repo}</span>
+            <span className="shrink-0 font-mono text-[11px] tabular-nums text-zinc-400">{r.count} passages</span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-zinc-100 dark:bg-white/10">
+            <motion.div
+              className="h-full rounded-full bg-accent/70"
+              initial={{ width: 0 }}
+              animate={{ width: `${total > 0 ? (r.count / total) * 100 : 0}%` }}
+              transition={{ type: 'spring', visualDuration: 0.5, bounce: 0.1 }}
+              style={{ willChange: 'transform' }}
+            />
+          </div>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 /** Retrieval-health block (per research run). */
 function RetrievalSection({ stats }: { readonly stats: KbRetrievalStats }) {
   const verdict = retrievalVerdict(stats)
@@ -143,6 +173,12 @@ function RetrievalSection({ stats }: { readonly stats: KbRetrievalStats }) {
             <CosineBar cosine={stats.maxCosine} floor={stats.floor} label="Best match (cosine)" />
             <CosineBar cosine={stats.medianCosine} floor={stats.floor} label="Median match (cosine)" />
           </div>
+          {stats.repoBreakdown.length > 0 && (
+            <div>
+              <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Retrieved from</div>
+              <RetrievalRepoBars repos={stats.repoBreakdown} />
+            </div>
+          )}
           {stats.topSources.length > 0 && (
             <div>
               <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Top sources</div>

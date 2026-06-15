@@ -12,6 +12,8 @@ import { EvidenceIndicator } from '../components/EvidenceIndicator'
 import { SummaryGroup, SummaryRow } from '../components/workspace-shell'
 import { CompanyProblemPanel } from '../components/CompanyProblemPanel'
 import { SkillEvidenceLedgerPanel } from '../components/SkillEvidenceLedgerPanel'
+import { EvidenceQualityOverview } from '../components/EvidenceQualityOverview'
+import { retrievalRepoCounts } from '../lib/evidence-quality'
 import { YearsGapRow } from '../components/YearsGapRow'
 import { RecruiterSnapshotPanel } from '../components/RecruiterSnapshotPanel'
 
@@ -245,6 +247,11 @@ export function AppliedWorkspace({ detail }: AppliedWorkspaceProps) {
 
       {yearsGap ? <YearsGapRow yearsGap={yearsGap} /> : null}
 
+      <EvidenceQualityOverview
+        ledger={detail.research?.skillEvidenceLedger}
+        retrieval={detail.research?.kbRetrievalStats}
+      />
+
       <KnowledgeBaseHealthPanel compact retrieval={detail.research?.kbRetrievalStats} />
 
       {detail.research?.companyProblem ? (
@@ -252,7 +259,10 @@ export function AppliedWorkspace({ detail }: AppliedWorkspaceProps) {
       ) : null}
 
       {detail.research?.skillEvidenceLedger?.length ? (
-        <SkillEvidenceLedgerPanel ledger={detail.research.skillEvidenceLedger} />
+        <SkillEvidenceLedgerPanel
+          ledger={detail.research.skillEvidenceLedger}
+          retrievalRepoCounts={retrievalRepoCounts(detail.research?.kbRetrievalStats)}
+        />
       ) : null}
 
       {recruiterSnapshot ? <RecruiterSnapshotPanel snapshot={recruiterSnapshot} /> : null}
