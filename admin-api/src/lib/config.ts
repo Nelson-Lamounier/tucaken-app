@@ -229,10 +229,24 @@ export interface AdminApiConfig {
   readonly techExtractorServiceAccount: string;
 
   /**
-   * Bedrock model ID forwarded to job-strategist K8s Jobs as RESEARCH_MODEL.
-   * Injected via admin-api ConfigMap (RESEARCH_MODEL key).
+   * Bedrock model ID forwarded to ARTICLE-pipeline K8s Jobs as RESEARCH_MODEL.
+   * Injected via admin-api ConfigMap (RESEARCH_MODEL key). The job-strategist
+   * matcher does NOT use this — see `strategistResearchModel`.
    */
   readonly researchModel: string;
+
+  /**
+   * Bedrock model ID forwarded to JOB-STRATEGIST K8s Jobs as RESEARCH_MODEL
+   * (the research-agent "matcher"). Defaults to Sonnet 4.6 — the matcher emits a
+   * nuanced multi-section brief (verified/partial/gap classification + fit
+   * rating + fitSummary, grounded to evidence). On Haiku the verdict was
+   * unstable across identical re-runs (STRONG FIT ↔ REACH) and it ignored the
+   * hard years bar, which is why the deterministic years-gap guard had to exist.
+   * Same reasoning the coach + profile-synthesis agents already default to
+   * Sonnet. Decoupled from `researchModel` so the article pipeline keeps Haiku.
+   * Overridable via STRATEGIST_RESEARCH_MODEL.
+   */
+  readonly strategistResearchModel: string;
 
   /**
    * Bedrock model ID forwarded to article-pipeline K8s Jobs as FOUNDATION_MODEL
@@ -353,6 +367,7 @@ export function loadConfig(): AdminApiConfig {
     techExtractorNamespace:          process.env['TECH_EXTRACTOR_NAMESPACE'] ?? 'tech-extractor',
     techExtractorServiceAccount:     process.env['TECH_EXTRACTOR_SERVICE_ACCOUNT'] ?? 'tech-extractor-sa',
     researchModel:                   required['RESEARCH_MODEL']!,
+    strategistResearchModel:         process.env['STRATEGIST_RESEARCH_MODEL'] ?? 'eu.anthropic.claude-sonnet-4-6',
     foundationModel:                 process.env['FOUNDATION_MODEL'] ?? 'eu.anthropic.claude-sonnet-4-6',
     coachModel:                      process.env['COACH_MODEL'] ?? 'eu.anthropic.claude-sonnet-4-6',
   };

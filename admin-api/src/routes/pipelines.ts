@@ -251,7 +251,10 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
           { name: 'TARGET_ROLE',        value: targetRole! },
           { name: 'JOB_DESCRIPTION',    value: truncatedJd },
           { name: 'MODE',               value: mode },
-          { name: 'RESEARCH_MODEL',     value: config.researchModel },
+          // Matcher runs on Sonnet (config.strategistResearchModel), NOT the
+          // shared article-pipeline Haiku — nuanced structured brief, unstable
+          // on Haiku. See AdminApiConfig.strategistResearchModel.
+          { name: 'RESEARCH_MODEL',     value: config.strategistResearchModel },
           // Filter-then-rank retrieval gate (Increment 2). Read by the strategist
           // pod at run-pipeline.ts; absent ⇒ pure-vector retrieval (fail-open).
           // Forwarded from the admin-api env so the ephemeral Job inherits the flag.

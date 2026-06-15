@@ -61,6 +61,8 @@ const testConfig = {
   articlePipelineServiceAccount: 'article-pipeline-sa',
   strategistPipelineNamespace: 'job-strategist',
   strategistPipelineServiceAccount: 'job-strategist-sa',
+  researchModel: 'eu.anthropic.claude-haiku-4-5-20251001-v1:0',
+  strategistResearchModel: 'eu.anthropic.claude-sonnet-4-6',
 };
 
 // ---------------------------------------------------------------------------
@@ -231,6 +233,9 @@ describe('POST /strategist-job — K8s Job strategist pipeline', () => {
     expect(envMap['TARGET_ROLE']).toBe('Senior Engineer');
     expect(envMap['JOB_DESCRIPTION']).toBe('Build cool stuff');
     expect(envMap['MODE']).toBe('standard');
+    // Matcher runs on Sonnet (strategistResearchModel), decoupled from the
+    // article pipeline's Haiku researchModel.
+    expect(envMap['RESEARCH_MODEL']).toBe('eu.anthropic.claude-sonnet-4-6');
     // Filter-then-rank flag forwarded from admin-api env; defaults to 'off' (fail-open).
     expect(envMap['RETRIEVAL_PREFILTER']).toBe('off');
   });
