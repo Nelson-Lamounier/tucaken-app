@@ -21,11 +21,13 @@ const LANE_ICON: Record<SkillEvidenceLane, React.ReactNode> = {
   career: <FileUser className="size-3.5" aria-hidden />,
 }
 
+// Retrieval-relevance verdict. Deliberately NOT "…match" — this measures how
+// relevant the RAG passages were (max cosine), NOT candidate↔role fit.
 const TONE: Record<QualityTone, { label: string; text: string; dot: string }> = {
-  strong:   { label: 'Strong match',  text: 'text-emerald-700 dark:text-emerald-300', dot: 'bg-emerald-500' },
-  moderate: { label: 'Moderate match', text: 'text-amber-700 dark:text-amber-300',    dot: 'bg-amber-500' },
-  weak:     { label: 'Weak match',     text: 'text-rose-700 dark:text-rose-300',       dot: 'bg-rose-500' },
-  none:     { label: 'No evidence',    text: 'text-rose-700 dark:text-rose-300',       dot: 'bg-rose-500' },
+  strong:   { label: 'Strong',  text: 'text-emerald-700 dark:text-emerald-300', dot: 'bg-emerald-500' },
+  moderate: { label: 'Moderate', text: 'text-amber-700 dark:text-amber-300',    dot: 'bg-amber-500' },
+  weak:     { label: 'Weak',     text: 'text-rose-700 dark:text-rose-300',       dot: 'bg-rose-500' },
+  none:     { label: 'None',     text: 'text-rose-700 dark:text-rose-300',       dot: 'bg-rose-500' },
 }
 
 // ── Coverage bar ─────────────────────────────────────────────────────────────
@@ -92,16 +94,21 @@ export function EvidenceQualityOverview({ ledger, retrieval }: EvidenceQualityOv
       </header>
 
       <div className="grid gap-5 sm:grid-cols-2">
-        {/* Coverage */}
+        {/* Evidence coverage — the JD's NAMED tools mapped to evidence. Distinct
+            from the "Skill coverage" donut, which is the matcher's broader
+            assessment (verified/partial/gaps over its own skill set). */}
         <div className="space-y-2">
           <div className="flex items-baseline justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Skill coverage</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Evidence coverage</span>
             <span className="text-xs text-zinc-500 dark:text-zinc-400">
               <span className="font-semibold tabular-nums text-zinc-700 dark:text-zinc-200">{t.withEvidence}</span>
-              {' / '}{t.total} with evidence
+              {' of '}{t.total} JD tools
             </span>
           </div>
           <CoverageBar ledger={ledger} />
+          <p className="text-[11px] leading-snug text-zinc-400">
+            Named JD tools with file/bridge evidence — distinct from the overall skill assessment.
+          </p>
         </div>
 
         {/* Retrieval verdict */}

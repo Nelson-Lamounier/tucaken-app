@@ -166,8 +166,13 @@ function LedgerRow({ entry, counts }: { readonly entry: SkillEvidenceEntry; read
 
       <EvidenceFiles files={entry.evidenceFiles} />
 
-      {entry.status === 'transferable' && entry.transferableBridge ? (
-        <p className="text-xs italic text-zinc-500 dark:text-zinc-400">{entry.transferableBridge}</p>
+      {entry.transferableBridge && (entry.status === 'transferable' || entry.status === 'gap') ? (
+        <p className="text-xs italic text-zinc-500 dark:text-zinc-400">
+          {entry.status === 'gap' ? (
+            <span className="not-italic font-medium text-zinc-400">Transferable foundation: </span>
+          ) : null}
+          {entry.transferableBridge}
+        </p>
       ) : null}
     </li>
   )

@@ -9,18 +9,22 @@ import type { KbRetrievalStats } from '@/lib/types/applications.types'
 
 type Verdict = { label: string; tone: string; dot: string }
 
-/** Map a run's max cosine + passage count to a health verdict. */
+/**
+ * Map a run's max cosine + passage count to a retrieval-relevance verdict.
+ * Labels are deliberately "Strong/Moderate/Weak relevance" — NOT "…match" —
+ * so they aren't read as candidate↔role fit; this is purely RAG passage quality.
+ */
 function retrievalVerdict(stats: KbRetrievalStats): Verdict {
   if (stats.passageCount === 0) {
-    return { label: 'No relevant evidence', tone: 'text-rose-700 dark:text-rose-300', dot: 'bg-rose-500' }
+    return { label: 'No relevant passages', tone: 'text-rose-700 dark:text-rose-300', dot: 'bg-rose-500' }
   }
   if (stats.maxCosine >= 0.4) {
-    return { label: 'Strong match', tone: 'text-emerald-700 dark:text-emerald-300', dot: 'bg-emerald-500' }
+    return { label: 'Strong relevance', tone: 'text-emerald-700 dark:text-emerald-300', dot: 'bg-emerald-500' }
   }
   if (stats.maxCosine >= 0.25) {
-    return { label: 'Moderate match', tone: 'text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' }
+    return { label: 'Moderate relevance', tone: 'text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' }
   }
-  return { label: 'Weak match', tone: 'text-rose-700 dark:text-rose-300', dot: 'bg-rose-500' }
+  return { label: 'Weak relevance', tone: 'text-rose-700 dark:text-rose-300', dot: 'bg-rose-500' }
 }
 
 // Visual full-scale for cosine bars — real portfolio↔JD cosine tops out ~0.5.
