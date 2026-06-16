@@ -118,7 +118,7 @@ post-push deployment
 - [Fail-fast on startup config, fail-soft on async-synced config](../decisions/0006-fail-soft-on-async-synced-config.md)
   — 502/503 guards for ESO-synced Job images vs CrashLoop on missing required env.
 - [Duplicate ingestion Jobs for the same repo](../troubleshooting/duplicate-ingestion-jobs.md)
-  — current read-then-mark dedup, its TOCTOU gap, and the atomic-claim hardening.
+  — the atomic `tryClaimSyncSlot` dedup wired into every dispatch site (PR #113).
 - [Cognito User Pool provisioning and updates](../runbooks/cognito-setup.md)
   — the provider/M2M/password-auth/prod-URL setup scripts.
 - [Run the strategist matcher on Sonnet, decoupled from the article model](../decisions/0009-sonnet-strategist-matcher.md)
