@@ -217,10 +217,18 @@ export function createFinopsRouter(config: AdminApiConfig): Hono {
           TimePeriod: { Start: startStr, End: endStr },
           Granularity: 'DAILY',
           Metrics: ['UnblendedCost'],
+          // Cost-allocation tag keys are case-sensitive; the resources are
+          // tagged with the lowercase 'project' key (see #168).
           Filter: {
-            Tags: { Key: 'Project', Values: ['bedrock'] },
+            Tags: { Key: 'project', Values: ['bedrock'] },
           },
-          GroupBy: [{ Type: 'TAG', Key: 'aws:bedrock:inference-profile' }],
+          // Group by inference profile (per-pipeline attribution) AND usage type
+          // (input/output tokens, embeddings, rerank). Cost Explorer allows two
+          // GroupBy dimensions; totals still sum correctly across the extra keys.
+          GroupBy: [
+            { Type: 'TAG', Key: 'aws:bedrock:inference-profile' },
+            { Type: 'DIMENSION', Key: 'USAGE_TYPE' },
+          ],
         }),
       );
       return ctx.json({ costs: (result.ResultsByTime ?? []) as ResultByTime[] });
