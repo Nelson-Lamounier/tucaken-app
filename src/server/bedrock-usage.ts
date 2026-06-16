@@ -46,6 +46,10 @@ export interface UserCostRow {
   inputTokens: number
   outputTokens: number
   invocations: number
+  lastInvokedAt: string | null
+  jdCents: number
+  tailoredResumes: number
+  importRuns: number
 }
 
 export interface RepoCostRow {
