@@ -6,6 +6,7 @@ sources:
   - admin-api/src/routes/finops.ts
   - admin-api/src/routes/bedrock-usage.ts
   - admin-api/src/lib/repositories/bedrock-usage.ts
+  - src/features/reports/components/BedrockCostTab.tsx
 created: 2026-06-16
 updated: 2026-06-16
 ---
@@ -69,18 +70,38 @@ degrades to an empty result rather than erroring the dashboard
 
 The Bedrock-usage routes
 ([bedrock-usage.ts](../../admin-api/src/routes/bedrock-usage.ts)) read the
-`prompt_invocations` table (migration 013) for the Cost tab. `GET /summary`
-returns invocation rows plus aggregates — total cents, and breakdowns
-`byPipeline` and `byModel` — optionally filtered by `userId` and `month`
+`prompt_invocations` table (migrations 013 + 082) for the Cost tab. `GET /summary`
+returns the most recent 500 invocation rows plus aggregates, optionally filtered
+by `userId` and `month`
 ([bedrock-usage.ts](../../admin-api/src/routes/bedrock-usage.ts#L32-L45),
-[bedrock-usage repo](../../admin-api/src/lib/repositories/bedrock-usage.ts#L31-L65)).
-Each row carries user, pipeline, agent, model id, input/output tokens, and
-`totalCostCents`
-([bedrock-usage repo](../../admin-api/src/lib/repositories/bedrock-usage.ts#L17-L29)).
-`GET`/`PUT /budget/:userId` read and upsert a per-user monthly limit
-(`monthlyLimitCents`, 0–100,000) and `alertThresholdPct` (1–100), validated as
-integers in range
+[bedrock-usage repo](../../admin-api/src/lib/repositories/bedrock-usage.ts)).
+Two of the aggregates are row-derived from those 500 rows (`byPipeline`,
+`byModel` — a recency-biased view); the rest are **accurate SQL roll-ups**
+computed with `GROUP BY` over the whole window, so they are not capped at 500:
+`byUser` (joined to `users.email`), `byRepo` (repo-sync spend per repository,
+split by `sync_kind`), `byApplication` (job-strategist spend per job application,
+joined to `job_applications.company`/`role`), and `byProject`
+(project-case-study spend, joined to `projects.name`). `totalCents` is the sum of
+`byUser`, so the headline figure stays accurate beyond 500 rows. Each detail row
+carries user, email, pipeline, agent, model id, input/output tokens, `repo_name`,
+`sync_kind`, and `totalCostCents`. `GET`/`PUT /budget/:userId` read and upsert a
+per-user monthly limit (`monthlyLimitCents`, 0–100,000) and `alertThresholdPct`
+(1–100), validated as integers in range
 ([bedrock-usage.ts](../../admin-api/src/routes/bedrock-usage.ts#L65-L96)).
+
+### Granular attribution columns (migration 082)
+
+`prompt_invocations` gained three nullable columns the worker populates only
+where the id is in scope at the call site: `application_id` (FK
+`job_applications`, set by the job-strategist pipeline from `env.applicationId`),
+`project_id` (FK `projects`, set by the project-case-study pipeline from
+`env.projectId`), and `sync_kind` (set by repo-sync rows to the `syncType`
+ingestion already computes: `initial` | `full_reindex` | `incremental`, surfaced
+in the UI as initial-sync vs resync). Both FKs use `ON DELETE SET NULL` so
+deleting a job application or project never deletes its audit-trail cost rows.
+**Attribution is forward-only**: the migration does not backfill, so rows written
+before it has no application/project/sync attribution and the Cost tab groups
+them under an "Unattributed"/"Unclassified" bucket.
 
 ## How the estimate is produced and reconciled
 
@@ -93,6 +114,10 @@ Direct `InvokeModel` rows store `system_prompt_tokens = 0` and
 `user_message_tokens = inputTokens`, and the summary query sums both so the
 "tokens in" figure is consistent across both write patterns
 ([bedrock-usage repo](../../admin-api/src/lib/repositories/bedrock-usage.ts#L9-L11)).
+The granular attribution travels the same write path: `recordInvocationToRds`
+takes an optional context (`applicationId`/`projectId`/`syncKind`) that the
+Converse pipelines pass at their entrypoint, and the repo-sync cost contexts
+(Titan embeddings + chunk enricher) carry `syncKind` through to each row.
 admin-api only **reads** these rows. The AWS-level `/costs` view is the
 reconciliation anchor: the application estimate (sum of `totalCostCents`) can be
 compared against Cost Explorer's billed `UnblendedCost` for the same window.
@@ -133,7 +158,13 @@ day-to-day signal.
 Evidence trail (auto-generated):
 - Source: admin-api/src/routes/finops.ts (read on 2026-06-16, full file 1-389)
 - Source: admin-api/src/routes/bedrock-usage.ts (read on 2026-06-16, full file 1-100)
-- Source: admin-api/src/lib/repositories/bedrock-usage.ts (read on 2026-06-16, lines 1-75)
-- Note: prompt_invocations writers (agent-runner.ts, bedrock-cost.ts) live in the
-  sibling ai-applications repo per the repository file header; not read here.
+- Source: admin-api/src/lib/repositories/bedrock-usage.ts (granular SQL roll-ups
+  byUser/byRepo/byApplication/byProject + email/join columns, updated 2026-06-16)
+- Source: src/features/reports/components/BedrockCostTab.tsx (user filter + four
+  breakdown tables, updated 2026-06-16)
+- Migration: ai-applications .../migrations/082_prompt_invocations_attribution.sql
+  (application_id, project_id, sync_kind + indexes)
+- Note: prompt_invocations writers (agent-runner.ts, bedrock-cost.ts,
+  recordInvocationToRds context) live in the sibling ai-applications repo;
+  application_id/project_id/sync_kind are populated there.
 -->
