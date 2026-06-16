@@ -127,17 +127,29 @@ export function ProgressBars({
   // block ran, kanban_status stays 'analysing' but pipeline_runs.status may have
   // been updated to 'failed' by an earlier successful DB write.
   const isFailed   = data?.status === 'failed' || pipelineRun?.status === 'failed'
-  const isFinished = data != null && !['analysing', 'coaching'].includes(data.status)
+  // Finished if the application left the active states OR the pipeline run itself
+  // completed. The pipeline-run poll runs on its own interval (not gated by the
+  // detail hook's timeout), so this is the recovery path: a run that finishes
+  // just after the UI "timed out" still resolves to "Resume ready" within a poll.
+  const isFinished =
+    (data != null && !['analysing', 'coaching'].includes(data.status)) ||
+    pipelineRun?.status === 'complete'
+  // Stalled = the run is no longer progressing: it failed, or the UI lost contact
+  // (timed out) and the run has NOT since completed. A timeout that the pipeline
+  // run later resolves to complete is therefore not stalled — it recovers to the
+  // success state. (A failed run stays stalled even though `isFinished` is true,
+  // because 'failed' is a terminal app status.)
+  const isStalled  = isFailed || (timedOut && !isFinished)
   // ── Elapsed wall-clock ────────────────────────────────────────────────────
   // Derived from the caller-supplied start time so the timer stays correct even
   // if this component unmounts (modal closed) and remounts (modal re-opened).
   const [elapsedMs, setElapsedMs] = useState(() => Date.now() - startedAt)
 
   useEffect(() => {
-    if (isFinished || isFailed) return
+    if (isFinished || isStalled) return
     const iv = setInterval(() => setElapsedMs(Date.now() - startedAt), 1_000)
     return () => clearInterval(iv)
-  }, [isFinished, isFailed, startedAt])
+  }, [isFinished, isStalled, startedAt])
 
   // ── Auto-advance to results when finished (only while this view is mounted) ──
   // The modal unmounts ProgressBars on close, so a dismissed run never navigates;
@@ -169,7 +181,10 @@ export function ProgressBars({
     : -1
 
   function getStageStatus(idx: number): StageStatus {
-    if (isFailed) {
+    // Failed OR timed out: nothing is running. Mark the stage it stalled on as
+    // failed, everything before it complete, everything after upcoming — never
+    // leave a stage spinning as 'current'.
+    if (isStalled) {
       const lastStarted = activeStageIdx >= 0
         ? activeStageIdx
         : stages.reduce((acc, s, i) => elapsedMs >= s.startMs ? i : acc, 0)
@@ -203,7 +218,7 @@ export function ProgressBars({
   const subheading = isFailed
     ? 'The run hit an error. Retry to run it again.'
     : timedOut
-    ? 'No update for 10 minutes. The run may have stalled. Retry to run it again.'
+    ? 'We’ve lost contact with this run — it may have stalled. Retry to run it again.'
     : isFinished
     ? 'Your tailored resume and analysis are ready.'
     : 'This usually takes 4–6 minutes. You can leave this page.'
@@ -239,7 +254,7 @@ export function ProgressBars({
           <p className="mt-1 text-xs text-zinc-500">{subheading}</p>
         </div>
 
-        {!isFinished && !isFailed && (
+        {!isFinished && !isStalled && (
           <div className="flex-none flex items-center gap-1.5 rounded-md bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 px-2.5 py-1.5 font-mono text-xs tabular-nums">
             <Clock className="w-3 h-3 shrink-0" />
             {formatElapsed(elapsedMs)}
@@ -331,11 +346,15 @@ export function ProgressBars({
 
       {/* Footer */}
       <div className="flex items-center justify-between gap-4">
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          You can leave this page. We'll notify you when it's ready.
-        </p>
+        {/* Reassurance only while the run is actually progressing — hidden once
+            it stalled, where the heading already explains what to do (Retry). */}
+        {!isStalled && (
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            You can leave this page. We'll notify you when it's ready.
+          </p>
+        )}
 
-        {(isFailed || timedOut) ? (
+        {isStalled ? (
           <button
             type="button"
             onClick={() =>
