@@ -11,11 +11,13 @@
 
 import { createMiddleware } from '@tanstack/react-start'
 import { setResponseHeader } from '@tanstack/react-start/server'
+import { SECURITY_HEADERS } from './security-header-values'
 
 /**
  * Content Security Policy directive.
  *
- * - `unsafe-inline`/`unsafe-eval` — required for Vite HMR and TanStack hydration
+ * - `unsafe-inline` — required for the inline anti-flash theme bootstrap and
+ *   TanStack hydration. `unsafe-eval` is intentionally not allowed.
  * - `connect-src` — wide to support Cognito OAuth, AWS services, and Faro RUM
  * - Stripe Embedded Checkout requires:
  *     · script-src  https://js.stripe.com   (loadStripe injects <script src>)
@@ -25,31 +27,6 @@ import { setResponseHeader } from '@tanstack/react-start/server'
  *     · img-src     https://*.stripe.com    (card brand icons; already covered
  *                                            by the wider `https:` allow)
  */
-const CSP_DIRECTIVES = [
-  "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: https:",
-  "font-src 'self' https:",
-  "connect-src 'self' https://*.nelsonlamounier.com https://*.amazonaws.com https://*.amazoncognito.com https://api.stripe.com",
-  "frame-src https://js.stripe.com https://hooks.stripe.com",
-  "frame-ancestors 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-].join('; ')
-
-/**
- * Security headers applied to every server response.
- */
-const SECURITY_HEADERS: ReadonlyArray<readonly [string, string]> = [
-  ['Strict-Transport-Security', 'max-age=31536000; includeSubDomains'],
-  ['X-Frame-Options', 'DENY'],
-  ['X-Content-Type-Options', 'nosniff'],
-  ['Referrer-Policy', 'strict-origin-when-cross-origin'],
-  ['Permissions-Policy', 'camera=(), microphone=(), geolocation=()'],
-  ['Content-Security-Policy', CSP_DIRECTIVES],
-] as const
-
 /**
  * TanStack Start server middleware that injects hardened security headers.
  *

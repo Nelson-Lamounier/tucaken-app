@@ -16,6 +16,7 @@ import {
 } from '../lib/repositories/prompt-observability.js';
 import { requireUserId } from '../lib/types.js';
 import type { AdminApiBindings } from '../lib/types.js';
+import { requireAdminGroup } from '../middleware/auth.js';
 
 export function createPromptFeedbackRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
   const router = new Hono<AdminApiBindings>();
@@ -65,12 +66,12 @@ export function createPromptFeedbackRouter(config: AdminApiConfig): Hono<AdminAp
   // Aggregated quality metrics grouped by (pipeline, agent).
   // Optional ?days= query param (default: 30).
   // ──────────────────────────────────────────────────────────────────────────
-  router.get('/stats', async (ctx) => {
+  router.get('/stats', requireAdminGroup(), async (ctx) => {
     const userId = requireUserId(ctx);
     if (!userId) return ctx.json({ error: 'Authenticated user not provisioned' }, 401);
 
-    const days = parseInt(ctx.req.query('days') ?? '30', 10);
-    if (isNaN(days) || days < 1 || days > 365) {
+    const days = Number.parseInt(ctx.req.query('days') ?? '30', 10);
+    if (Number.isNaN(days) || days < 1 || days > 365) {
       return ctx.json({ error: '"days" must be between 1 and 365' }, 400);
     }
 

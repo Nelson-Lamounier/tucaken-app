@@ -9,6 +9,7 @@
 
 import Stripe from 'stripe'
 import type { PlanId } from '@/features/account/types'
+import { getAppOrigin } from './app-origin'
 
 // -----------------------------------------------------------------------------
 // SDK
@@ -74,9 +75,5 @@ function required(name: string): string {
  * and Billing Portal return_url, which both require absolute URLs.
  */
 export function appOrigin(): string {
-  return (
-    process.env.APP_ORIGIN ??
-    process.env.VITE_APP_ORIGIN ??
-    'http://localhost:5001'
-  )
+  return getAppOrigin()
 }

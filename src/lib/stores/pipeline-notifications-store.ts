@@ -12,6 +12,17 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+let fallbackNotificationIdCounter = 0
+
+function createNotificationId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `notif-${crypto.randomUUID()}`
+  }
+
+  fallbackNotificationIdCounter += 1
+  return `notif-${Date.now()}-${fallbackNotificationIdCounter}`
+}
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -121,7 +132,7 @@ export const usePipelineNotificationsStore = create<
             }
           }
 
-          const id = `notif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+          const id = createNotificationId()
           const newNotification: PipelineNotification = {
             ...notification,
             id,

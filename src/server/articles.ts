@@ -6,8 +6,8 @@
  * authenticated `fetch()` requests. The frontend pod carries no AWS SDK
  * dependencies for this domain.
  *
- * The `requireAuth()` call acts as a fast-path guard — it rejects
- * unauthenticated requests at the edge before the network hop to admin-api.
+ * The `requireAdmin()` call acts as a fast-path guard — it rejects
+ * non-admin requests at the edge before the network hop to admin-api.
  * The raw JWT is then forwarded as `Authorization: Bearer <token>` so
  * admin-api can re-verify it with Cognito.
  *
@@ -16,7 +16,7 @@
 
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { requireAuth } from './auth-guard'
+import { requireAdmin } from './auth-guard'
 import { apiFetch } from './_api-client'
 
 // =============================================================================
@@ -119,7 +119,7 @@ const saveMetadataSchema = z.object({
 export const getArticlesFn = createServerFn({ method: 'GET' })
   .inputValidator(getArticlesSchema)
   .handler(async ({ data }) => {
-    await requireAuth()
+    await requireAdmin()
 
     const qs = data.status !== 'all' ? `?status=${encodeURIComponent(data.status)}` : ''
     const body = await apiFetch<{ articles: ArticleSummary[]; count: number }>(
@@ -142,7 +142,7 @@ export const getArticlesFn = createServerFn({ method: 'GET' })
 export const getArticleContentFn = createServerFn({ method: 'GET' })
   .inputValidator(slugSchema)
   .handler(async ({ data: slug }) => {
-    await requireAuth()
+    await requireAdmin()
 
     try {
       const body = await apiFetch<{ slug: string; contentRef: string; content: string }>(
@@ -168,7 +168,7 @@ export const getArticleContentFn = createServerFn({ method: 'GET' })
 export const publishArticleFn = createServerFn({ method: 'POST' })
   .inputValidator(slugSchema)
   .handler(async ({ data: slug }) => {
-    await requireAuth()
+    await requireAdmin()
 
     const body = await apiFetch<{ queued: boolean; slug: string }>(
       `/articles/${encodeURIComponent(slug)}/publish`,
@@ -186,7 +186,7 @@ export const publishArticleFn = createServerFn({ method: 'POST' })
 export const unpublishArticleFn = createServerFn({ method: 'POST' })
   .inputValidator(slugSchema)
   .handler(async ({ data: slug }) => {
-    await requireAuth()
+    await requireAdmin()
 
     await apiFetch<{ updated: boolean; slug: string }>(
       `/articles/${encodeURIComponent(slug)}`,
@@ -208,7 +208,7 @@ export const unpublishArticleFn = createServerFn({ method: 'POST' })
 export const deleteArticleFn = createServerFn({ method: 'POST' })
   .inputValidator(slugSchema)
   .handler(async ({ data: slug }) => {
-    await requireAuth()
+    await requireAdmin()
 
     await apiFetch<{ deleted: boolean; slug: string }>(
       `/articles/${encodeURIComponent(slug)}`,
@@ -231,7 +231,7 @@ export const deleteArticleFn = createServerFn({ method: 'POST' })
 export const saveArticleContentFn = createServerFn({ method: 'POST' })
   .inputValidator(saveContentSchema)
   .handler(async ({ data }) => {
-    await requireAuth()
+    await requireAdmin()
 
     await apiFetch<{ saved: boolean; slug: string; contentRef: string }>(
       `/content/${encodeURIComponent(data.id)}`,
@@ -253,7 +253,7 @@ export const saveArticleContentFn = createServerFn({ method: 'POST' })
 export const saveArticleMetadataFn = createServerFn({ method: 'POST' })
   .inputValidator(saveMetadataSchema)
   .handler(async ({ data }) => {
-    await requireAuth()
+    await requireAdmin()
 
     const { slug, ...updates } = data
 
@@ -279,7 +279,7 @@ export const saveArticleMetadataFn = createServerFn({ method: 'POST' })
 export const getArticleVersionsFn = createServerFn({ method: 'GET' })
   .inputValidator(slugSchema)
   .handler(async ({ data: slug }) => {
-    await requireAuth()
+    await requireAdmin()
 
     const body = await apiFetch<{
       success: boolean
@@ -303,7 +303,7 @@ export const getArticleVersionsFn = createServerFn({ method: 'GET' })
 export const getArticleMetadataFn = createServerFn({ method: 'GET' })
   .inputValidator(slugSchema)
   .handler(async ({ data: slug }) => {
-    await requireAuth()
+    await requireAdmin()
     try {
       const body = await apiFetch<{ article: ArticleMetadata }>(
         `/articles/${encodeURIComponent(slug)}`,

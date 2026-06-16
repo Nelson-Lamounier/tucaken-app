@@ -79,7 +79,7 @@ const COGNITO_CLIENT_ID = 'test-client-id-123'
 function setEnvVars(): void {
   process.env.AUTH_COGNITO_DOMAIN = COGNITO_DOMAIN
   process.env.AUTH_COGNITO_ID = COGNITO_CLIENT_ID
-  process.env.VITE_APP_URL = 'http://localhost:5001'
+  process.env.APP_ORIGIN = 'http://localhost:5001'
   ;(process.env as Record<string, string>).NODE_ENV = 'test'
 }
 

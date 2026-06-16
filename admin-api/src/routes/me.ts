@@ -110,10 +110,7 @@ export function createMeRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
           { event: 'cognito_disable_failed', userId, sub, err },
           'AdminDisableUser threw — refusing to proceed with DB soft-delete',
         );
-        return ctx.json(
-          { error: 'CognitoDisableFailed', detail: (err as Error).message },
-          502,
-        );
+        return ctx.json({ error: 'CognitoDisableFailed' }, 502);
       }
     }
 

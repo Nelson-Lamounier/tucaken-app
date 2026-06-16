@@ -5,7 +5,7 @@
 
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { requireAuth } from './auth-guard'
+import { requireAdmin, requireAuth } from './auth-guard'
 import { apiFetch } from './_api-client'
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
@@ -51,7 +51,7 @@ export const submitPromptFeedbackFn = createServerFn({ method: 'POST' })
 export const getPromptQualityStatsFn = createServerFn({ method: 'GET' })
   .inputValidator(statsSchema)
   .handler(async ({ data }) => {
-    await requireAuth()
+    await requireAdmin()
     const response = await apiFetch<{ stats: PromptQualityStats[] }>(
       `/prompt-feedback/stats?days=${data.days}`,
       { pathTemplate: '/prompt-feedback/stats' },

@@ -9,13 +9,13 @@
  * This avoids routing binary content through the Kubernetes pod, reducing
  * memory pressure and upload latency.
  *
- * Protected by JWT authentication via `requireAuth()`.
+ * Protected by JWT authentication and admin membership via `requireAdmin()`.
  *
  * @see admin-api/src/routes/assets.ts — upstream presign + delete implementation
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import { requireAuth } from './auth-guard'
+import { requireAdmin } from './auth-guard'
 import { apiFetch } from './_api-client'
 import { z } from 'zod'
 
@@ -33,7 +33,6 @@ const MIME_TO_EXTENSION: Readonly<Record<string, string>> = {
   'image/png': 'png',
   'image/webp': 'webp',
   'image/gif': 'gif',
-  'image/svg+xml': 'svg',
   'video/mp4': 'mp4',
   'video/webm': 'webm',
 }
@@ -90,7 +89,7 @@ const formDataSchema = z.instanceof(FormData)
 export const uploadMediaFn = createServerFn({ method: 'POST' })
   .inputValidator(formDataSchema)
   .handler(async ({ data: formData }) => {
-    await requireAuth()
+    await requireAdmin()
 
     const file = formData.get('file') as File | null
     const id = formData.get('id') as string | null

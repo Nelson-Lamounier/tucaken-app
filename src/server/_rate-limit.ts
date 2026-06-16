@@ -92,6 +92,11 @@ const AUTH_LIMITS: Record<string, { limit: number; windowMs: number }> = {
   resend_code:     { limit: 4,  windowMs: 15 * 60_000 },
 }
 
+const BILLING_LIMITS: Record<string, { limit: number; windowMs: number }> = {
+  checkout:       { limit: 20, windowMs: 15 * 60_000 },
+  billing_portal: { limit: 12, windowMs: 15 * 60_000 },
+}
+
 /** Best-effort caller IP from edge headers; 'unknown' groups un-attributable callers. */
 function callerIp(): string {
   try {
@@ -138,6 +143,35 @@ export function enforceAuthRateLimit(action: keyof typeof AUTH_LIMITS): void {
     )
     throw new Error(
       `Too many attempts. Try again in ${result.retryAfterSeconds} seconds.`,
+    )
+  }
+}
+
+export function enforceBillingRateLimit(action: keyof typeof BILLING_LIMITS): void {
+  if (process.env['VITEST']) return
+
+  const cfg = BILLING_LIMITS[action]
+  const ip = callerIp()
+  const result = checkRateLimit(`${action}:${ip}`, cfg.limit, cfg.windowMs)
+
+  if (!result.allowed) {
+    try {
+      setResponseHeader('Retry-After', String(result.retryAfterSeconds))
+    } catch {
+      /* header sink unavailable outside a request — limiter still throws */
+    }
+    process.stderr.write(
+      JSON.stringify({
+        level: 'warn',
+        service: 'tucaken-app',
+        event: 'billing_rate_limited',
+        action,
+        retry_after_s: result.retryAfterSeconds,
+        timestamp: new Date().toISOString(),
+      }) + '\n',
+    )
+    throw new Error(
+      `Too many billing requests. Try again in ${result.retryAfterSeconds} seconds.`,
     )
   }
 }

@@ -168,8 +168,11 @@ app.use('/api/admin/*', deletedUserGate(getPool(config)));
 
 // ── Staff-only gates ──────────────────────────────────────────────────────────
 app.use('/api/admin/bedrock-usage/*', requireAdminGroup());
+app.use('/api/admin/articles/*',      requireAdminGroup());
+app.use('/api/admin/assets/*',        requireAdminGroup());
 app.use('/api/admin/finops/*',        requireAdminGroup());
 app.use('/api/admin/ingestion/*',     requireAdminGroup());
+app.use('/api/admin/prompt-feedback/stats', requireAdminGroup());
 // `/api/admin/users/*` is the support tool surface — restore deleted users,
 // future ops actions. Locked behind the `admin` Cognito group.
 app.use('/api/admin/users/*',         requireAdminGroup());
