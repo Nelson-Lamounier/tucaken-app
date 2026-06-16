@@ -13,9 +13,9 @@ import { createReadStream, statSync } from 'fs';
 import { extname, join } from 'path';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
-import { randomUUID } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 import { logger } from '../lib/observability/logger';
-import { SECURITY_HEADERS } from './security-header-values';
+import { SECURITY_HEADERS, buildCsp } from './security-header-values';
 import {
   registry,
   ssrRequestsTotal,
@@ -301,12 +301,34 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
     webRes.headers.forEach((value: string, name: string) => res.appendHeader(name, value));
     applySecurityHeaders(res);
 
-    // SSR HTML embeds hashed asset URLs — caching the HTML shell causes stale
-    // asset references after deploys (browser requests old hash that no longer
-    // exists). Force no-store on HTML responses so browsers always get fresh HTML.
     const contentType = res.getHeader('content-type');
-    if (typeof contentType === 'string' && contentType.includes('text/html')) {
+    const isHtml = typeof contentType === 'string' && contentType.includes('text/html');
+
+    if (isHtml) {
+      // SSR HTML embeds hashed asset URLs — caching the HTML shell causes stale
+      // asset references after deploys. Force no-store so browsers get fresh HTML.
       res.setHeader('Cache-Control', 'no-store');
+
+      // Per-request CSP nonce. Buffer the document so the SAME nonce can be
+      // stamped onto every <script> (the inline anti-flash bootstrap AND
+      // TanStack Start's hydration scripts) and onto a strict Content-Security-
+      // Policy (no 'unsafe-inline' on script-src) for this response. Buffering
+      // trades streaming SSR for a coherent nonce; the shell is small. The regex
+      // skips tags that already carry a nonce and only matches a real <script>
+      // tag boundary (followed by whitespace or '>').
+      const rawHtml = webRes.body
+        ? Buffer.from(await new Response(webRes.body).arrayBuffer())
+        : Buffer.alloc(0);
+      const nonce = randomBytes(16).toString('base64');
+      const html = rawHtml
+        .toString('utf-8')
+        .replace(/<script(?=[\s>])(?![^>]*\bnonce=)/gi, `<script nonce="${nonce}"`);
+      res.setHeader('Content-Security-Policy', buildCsp(nonce));
+
+      const body = Buffer.from(html, 'utf-8');
+      res.setHeader('Content-Length', body.byteLength);
+      res.end(body);
+      return;
     }
 
     if (webRes.body) {
