@@ -6,15 +6,17 @@
  * and budget management. All operations delegate to the `admin-api` BFF service
  * via authenticated `fetch()` requests.
  *
- * The `requireAuth()` call acts as a fast-path guard — it rejects
- * unauthenticated requests at the edge before the network hop to admin-api.
+ * The `requireAdmin()` call acts as a fast-path guard — these endpoints expose
+ * cross-user cost data and accept an arbitrary `userId`, so they are admin-only.
+ * It rejects non-admin requests at the edge before the network hop to admin-api
+ * (which independently re-enforces the admin group via `requireAdminGroup`).
  * The raw JWT is forwarded as `Authorization: Bearer <token>` so admin-api
  * can re-verify it with Cognito.
  */
 
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { requireAuth } from './auth-guard'
+import { requireAdmin } from './auth-guard'
 import { apiFetch } from './_api-client'
 
 // =============================================================================
@@ -119,7 +121,7 @@ const setBudgetSchema = z.object({
 export const getUsageSummaryFn = createServerFn({ method: 'GET' })
   .inputValidator(usageSummarySchema)
   .handler(async ({ data }) => {
-    await requireAuth()
+    await requireAdmin()
     const params = new URLSearchParams()
     if (data.userId) params.set('userId', data.userId)
     if (data.month) params.set('month', data.month)
@@ -138,7 +140,7 @@ export const getUsageSummaryFn = createServerFn({ method: 'GET' })
 export const getUserBudgetFn = createServerFn({ method: 'GET' })
   .inputValidator(budgetSchema)
   .handler(async ({ data }) => {
-    await requireAuth()
+    await requireAdmin()
     return apiFetch<UserTokenBudget>(
       `/bedrock-usage/budget/${data.userId}`,
       { pathTemplate: '/bedrock-usage/budget/:userId' },
@@ -156,7 +158,7 @@ export const getUserBudgetFn = createServerFn({ method: 'GET' })
 export const setUserBudgetFn = createServerFn({ method: 'POST' })
   .inputValidator(setBudgetSchema)
   .handler(async ({ data }) => {
-    await requireAuth()
+    await requireAdmin()
     return apiFetch<{ ok: boolean }>(
       `/bedrock-usage/budget/${data.userId}`,
       {
