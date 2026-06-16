@@ -1,6 +1,19 @@
-# 🚀 Production Deployment Checklist
+---
+title: Pre-deployment checklist
+type: runbook
+tags: [operations, deployment, security, pre-deploy]
+sources:
+  - src/server/auth.ts
+created: 2026-05-16
+updated: 2026-06-16
+---
 
-Use this checklist before every production deployment. Each item must be explicitly verified — not assumed.
+## Purpose
+
+Use this checklist before every production deployment. Each item must be
+explicitly verified — not assumed. Items below are generic release gates; the one
+repo-specific architectural decision that lived here (the Cognito reset-code TTL)
+has been promoted to [ADR 0007](../decisions/0007-accept-cognito-reset-code-ttl.md).
 
 ---
 
@@ -99,7 +112,7 @@ Use this checklist before every production deployment. Each item must be explici
 ## ✅ Final Sign-Off
 
 | Area | Owner | Verified | Date |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Auth & Authorization | | ☐ | |
 | Password Reset Flow | (unassigned) | ☑ risk-accepted (see §2 note) | 2026-05-16 |
 | Input Sanitization / SQL Injection | | ☐ | |

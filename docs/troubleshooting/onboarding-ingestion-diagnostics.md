@@ -1,4 +1,29 @@
-# Ingestion Progress Review — "Indexing your repositories" stuck at 0%
+---
+title: Onboarding ingestion diagnostics — 0% progress and NULL profile synthesis
+type: troubleshooting
+tags: [ingestion, kubernetes, bedrock, onboarding, eks, rds]
+sources:
+  - admin-api/src/lib/ingestion-job.ts
+  - admin-api/src/lib/k8s-job-builder.ts
+  - src/features/onboarding/components/steps/ProcessingStep.tsx
+created: 2026-05-28
+updated: 2026-06-16
+---
+
+## Part 1 — "Indexing your repositories" stuck at 0%
+
+> **Status — historical case study (largely resolved since 2026-05-28).** Kept for
+> its investigation method (live EKS diagnosis + RDS verification), not as current
+> guidance. Two defects identified here have since been addressed in this repo:
+> Part 2's missing model-env injection is fixed — `ingestionModelEnv` now injects
+> all five Bedrock model ids into the ingestion Job
+> ([ingestion-job.ts](../../admin-api/src/lib/ingestion-job.ts#L102),
+> [k8s-job-builder.ts](../../admin-api/src/lib/k8s-job-builder.ts#L112-L120)); and
+> Part 1's onboarding progress now uses intra-repo `progressSum / total`
+> ([ProcessingStep.tsx](../../src/features/onboarding/components/steps/ProcessingStep.tsx#L243)),
+> not the binary `terminalCount / total` cited below. Embed-loop and synthesizer
+> internals referenced here live in the sibling **ai-applications** repo and were
+> not re-verified in this pass.
 
 **Date:** 2026-05-28
 **Cluster:** `arn:aws:eks:eu-west-1:771826808455:cluster/k8s-eks-development` (dev account)
@@ -117,7 +142,7 @@ Raise `activeDeadlineSeconds` above 900, and/or set `ENRICHMENT_DISABLED=1` for 
 
 ---
 
-# Part 2 — Profile synthesis sections stuck "still being generated"
+## Part 2 — Profile synthesis sections stuck "still being generated"
 
 **Date:** 2026-05-28
 **Same case:** user `a32fdb11-…`, repo `Nelson-Lamounier/cdk-monitoring`
