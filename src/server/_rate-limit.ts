@@ -26,6 +26,23 @@ interface Bucket {
 
 const buckets = new Map<string, Bucket>()
 
+// Idle-bucket eviction. All windows here are ≤ 15 min, and a bucket idle for at
+// least one window is fully refilled — so dropping it is behaviourally identical
+// to keeping it (a recreated bucket starts at full capacity). Sweeping bounds the
+// Map's size by active-IP count rather than all-IPs-ever. Lazy (no setInterval):
+// swept at most once per SWEEP_INTERVAL_MS on the next call.
+const IDLE_EVICT_MS = 15 * 60_000
+const SWEEP_INTERVAL_MS = 60_000
+let lastSweep = 0
+
+function sweepIdleBuckets(now: number): void {
+  if (now - lastSweep < SWEEP_INTERVAL_MS) return
+  lastSweep = now
+  for (const [key, bucket] of buckets) {
+    if (now - bucket.lastRefill >= IDLE_EVICT_MS) buckets.delete(key)
+  }
+}
+
 export interface RateLimitResult {
   allowed: boolean
   /** Seconds until the next whole token is available — 0 when allowed. */
@@ -49,6 +66,8 @@ export function checkRateLimit(
   now: number = Date.now(),
 ): RateLimitResult {
   const refillPerMs = limit / windowMs
+
+  sweepIdleBuckets(now)
 
   let bucket = buckets.get(key)
   if (!bucket) {
@@ -76,6 +95,7 @@ export function checkRateLimit(
 /** Test-only: clear all buckets so suites start from a known state. */
 export function _resetRateLimits(): void {
   buckets.clear()
+  lastSweep = 0
 }
 
 // ── Auth-endpoint enforcement ─────────────────────────────────────────────────

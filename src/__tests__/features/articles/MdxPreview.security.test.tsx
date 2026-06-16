@@ -37,4 +37,37 @@ describe('MdxPreview', () => {
     expect(globalThis.__mdxPreviewExecuted).not.toBe(true)
     expect(document.querySelector('script')).toBeNull()
   })
+
+  it('strips raw HTML event-handler injection (img onerror / svg onload)', async () => {
+    const source = `
+# Heading
+
+<img src="x" onerror="globalThis.__mdxPreviewExecuted = true" />
+
+<svg onload="globalThis.__mdxPreviewExecuted = true"></svg>
+`
+
+    render(<MdxPreview content={source} />)
+
+    await waitFor(() => {
+      expect(document.querySelector('h1')?.textContent).toBe('Heading')
+    })
+    // skipHtml drops raw HTML entirely — the dangerous nodes never reach the DOM.
+    expect(document.querySelector('img[onerror]')).toBeNull()
+    expect(document.querySelector('svg')).toBeNull()
+    expect(globalThis.__mdxPreviewExecuted).not.toBe(true)
+  })
+
+  it('does not emit javascript: URLs from markdown image syntax', async () => {
+    const source = '![alt](javascript:globalThis.__mdxPreviewExecuted=true)'
+
+    render(<MdxPreview content={source} />)
+
+    await waitFor(() => {
+      expect(document.querySelector('figure')).not.toBeNull()
+    })
+    const img = document.querySelector('img')
+    expect(img?.getAttribute('src') ?? '').not.toMatch(/^javascript:/i)
+    expect(globalThis.__mdxPreviewExecuted).not.toBe(true)
+  })
 })
