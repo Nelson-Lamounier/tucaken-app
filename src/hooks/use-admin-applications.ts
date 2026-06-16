@@ -8,7 +8,12 @@ import { getApplicationsFn, deleteApplicationFn, getApplicationDetailFn, updateA
 import { getPipelineRunStatusFn } from '../server/pipelines'
 
 const PIPELINE_POLL_INTERVAL = 5_000
-const POLL_TIMEOUT_MS = 10 * 60 * 1_000
+// Backstop: give up only after this long with NO observed progress. The timer
+// resets whenever the run advances (its updatedAt changes), so a long-but-active
+// run never trips it. Set well above the slowest successful run (~11 min) so a
+// healthy run is not mistaken for a stalled one — and even a trip recovers when
+// the pipeline run completes (see ProgressBars isFinished).
+const POLL_TIMEOUT_MS = 20 * 60 * 1_000
 
 const ACTIVE_PIPELINE_STATUSES: ReadonlySet<ApplicationStatus> = new Set([
   'analysing',
@@ -69,6 +74,9 @@ export function useApplications(status = 'all') {
 
 export function useApplicationDetail(slug: string) {
   const pollStartRef = useRef<number | null>(null)
+  // Last-seen updatedAt — when it advances, the run made progress and the stall
+  // timer resets, so a long-but-active run never times out.
+  const lastUpdatedRef = useRef<string | null>(null)
   const [timedOut, setTimedOut] = useState(false)
 
   const query = useQuery<ApplicationDetail>({
@@ -135,12 +143,19 @@ export function useApplicationDetail(slug: string) {
 
       if (!isActive && !hasQueuedStage) return false
 
-      // Start timeout timer on first active poll
+      // Progress reset: whenever the run advances (its updatedAt changes), restart
+      // the stall timer — so a long-but-active run is never mistaken for stalled.
+      if (detail?.updatedAt && lastUpdatedRef.current !== detail.updatedAt) {
+        lastUpdatedRef.current = detail.updatedAt
+        pollStartRef.current = Date.now()
+      }
+
+      // Start the stall timer on the first active poll.
       if (!pollStartRef.current) {
         pollStartRef.current = Date.now()
       }
 
-      // Check if we've exceeded the timeout
+      // Give up only after POLL_TIMEOUT_MS with no progress.
       const elapsed = Date.now() - pollStartRef.current
       if (elapsed > POLL_TIMEOUT_MS) {
         setTimedOut(true)
@@ -161,6 +176,7 @@ export function useApplicationDetail(slug: string) {
       Object.values(detail.stages).some((s) => s.prep_status === 'queued')
     if (!ACTIVE_PIPELINE_STATUSES.has(status) && !hasQueuedStage) {
       pollStartRef.current = null
+      lastUpdatedRef.current = null
       setTimedOut(false)
     }
   }, [query.data])

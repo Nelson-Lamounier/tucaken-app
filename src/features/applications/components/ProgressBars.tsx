@@ -127,11 +127,19 @@ export function ProgressBars({
   // block ran, kanban_status stays 'analysing' but pipeline_runs.status may have
   // been updated to 'failed' by an earlier successful DB write.
   const isFailed   = data?.status === 'failed' || pipelineRun?.status === 'failed'
-  const isFinished = data != null && !['analysing', 'coaching'].includes(data.status)
-  // Stalled = the run is no longer progressing: it failed, or it timed out with
-  // no update for 10 minutes. Either way nothing is "running", so the stepper,
-  // spinner, and elapsed timer must stop — only the failed stage + Retry remain.
-  const isStalled  = isFailed || timedOut
+  // Finished if the application left the active states OR the pipeline run itself
+  // completed. The pipeline-run poll runs on its own interval (not gated by the
+  // detail hook's timeout), so this is the recovery path: a run that finishes
+  // just after the UI "timed out" still resolves to "Resume ready" within a poll.
+  const isFinished =
+    (data != null && !['analysing', 'coaching'].includes(data.status)) ||
+    pipelineRun?.status === 'complete'
+  // Stalled = the run is no longer progressing: it failed, or the UI lost contact
+  // (timed out) and the run has NOT since completed. A timeout that the pipeline
+  // run later resolves to complete is therefore not stalled — it recovers to the
+  // success state. (A failed run stays stalled even though `isFinished` is true,
+  // because 'failed' is a terminal app status.)
+  const isStalled  = isFailed || (timedOut && !isFinished)
   // ── Elapsed wall-clock ────────────────────────────────────────────────────
   // Derived from the caller-supplied start time so the timer stays correct even
   // if this component unmounts (modal closed) and remounts (modal re-opened).
@@ -210,7 +218,7 @@ export function ProgressBars({
   const subheading = isFailed
     ? 'The run hit an error. Retry to run it again.'
     : timedOut
-    ? 'No update for 10 minutes. The run may have stalled. Retry to run it again.'
+    ? 'We’ve lost contact with this run — it may have stalled. Retry to run it again.'
     : isFinished
     ? 'Your tailored resume and analysis are ready.'
     : 'This usually takes 4–6 minutes. You can leave this page.'
