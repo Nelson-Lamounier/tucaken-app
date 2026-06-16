@@ -1,11 +1,12 @@
 # Tucaken — web app and BFF
 
-Tucaken turns a developer's real work into resumes and career insight that
-actually sound like them. It builds a Knowledge Base from a user's own GitHub
-repositories, resume imports, and career entries, then reads that data to produce
-tailored resumes, an interview-prep workspace, and a profile read of where the
-person is and where they are heading. It is for engineers whose real work lives in
-GitHub — work that generic resume tools cannot read and end up flattening into
+**Tucaken turns a developer's real code into a job-tailored, evidence-backed
+resume.** A job-seeker connects their GitHub account; Tucaken builds a Knowledge
+Base from their repositories, resume imports, and career entries, verifies which
+skills they can actually prove from that data, and — given a specific job
+description — generates a resume tailored to the role using only skills the
+candidate can defend in an interview. It is for engineers whose real work lives in
+GitHub, work that generic resume tools cannot read and end up flattening into
 something impersonal.
 
 This repository is the **user-facing web application and its Backend-for-Frontend
@@ -15,16 +16,40 @@ the heavy AI work. The Bedrock-driven pipelines themselves (ingestion, strategis
 coach) run as Kubernetes Jobs whose worker images live in the sibling
 **ai-applications** repository — this repo dispatches and consumes them.
 
-## What it does
+## Who it's for
 
-- Connects GitHub repositories and imports resumes to build a per-user Knowledge
-  Base, scored for readiness so the user can see whether it holds enough quality
-  data.
-- Generates tailored resumes and an interview-prep workspace organised by hiring
-  stage (phone screen, technical, system design, behavioural, bar raiser, final).
-- Presents a profile read — what the indexed data reflects, where it suggests the
-  user is heading, and where their resume diverges from their real work.
-- Handles authentication, billing, and onboarding for the product end to end.
+Software engineers and adjacent technical roles applying for jobs who want a
+resume that is both tailored to each posting and honest — grounded in what their
+code actually shows, not aspirational keyword stuffing.
+
+## The problem it solves
+
+- **Resumes claim skills the candidate can't prove.** ATS filters reward
+  keywords, so resumes drift toward unverifiable claims. Tucaken grounds every
+  skill in concrete repository evidence (files, commits, PRs) and is honest about
+  gaps.
+- **Tailoring to each job is slow and manual.** Tucaken reads a job description
+  once, maps its required skills to the candidate's verified evidence, and
+  produces a tailored draft automatically.
+- **Candidates can't see how they actually match a role.** Tucaken surfaces a
+  per-skill verdict (verified / partial / gap), an evidence-quality overview, and
+  interview coaching, so the user understands their real standing.
+
+## How it works (user flow)
+
+1. **Connect GitHub** — repositories are ingested and chunked into the Knowledge
+   Base.
+2. **Verify skills** — a deterministic + LLM pipeline extracts a per-skill
+   evidence ledger from the actual code, classified by source lane (repo code,
+   documented project, career history).
+3. **Add a job description** — the JD is read once into a canonical required-skill
+   list; a matcher assesses each required skill against the verified evidence.
+4. **Generate the tailored resume** — a multi-agent Bedrock pipeline writes a
+   resume tailored to the JD, grounded in verified skills, with honest framing of
+   partial matches and gaps.
+5. **Coach and iterate** — interview coaching (organised by hiring stage),
+   evidence-quality insight, and project case studies help present the work
+   credibly.
 
 ## Architecture
 
@@ -117,15 +142,20 @@ Tucaken is a multi-repo product:
 
 - **tucaken-app** (this repo) — user-facing web app and `admin-api` BFF: the
   product surface, auth, billing, and Job dispatch.
-- **ai-applications** — Bedrock worker images and pipelines (ingestion,
-  strategist, coach) that this repo dispatches as Kubernetes Jobs.
+- **ai-applications** — AI/ML backend: GitHub ingestion, skill-evidence
+  extraction, the JD-strategist pipeline, multi-agent resume synthesis, and
+  project case studies (the Bedrock worker images this repo dispatches).
+- **tucaken-infra** — AWS CDK infrastructure (EKS, EKS Pod Identity, observability,
+  delivery).
+- **kubernetes-bootstrap** — in-cluster GitOps manifests, Helm values, and Grafana
+  dashboards.
 
 ## Documentation
 
 The [docs/](docs/) tree holds the architecture overview
 ([admin-api project](docs/projects/admin-api.md)), ADRs, concept docs (K8s
 dispatch, distributed tracing, observability, Cognito auth), patterns, runbooks,
-and troubleshooting case studies.
+and troubleshooting case studies. Start at [docs/README.md](docs/README.md).
 
 ## Status
 
