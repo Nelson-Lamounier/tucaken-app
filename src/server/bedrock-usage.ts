@@ -24,6 +24,7 @@ import { apiFetch } from './_api-client'
 export interface PromptInvocationRow {
   id: string
   userId: string | null
+  email: string | null
   pipeline: string
   agent: string
   modelId: string
@@ -32,7 +33,39 @@ export interface PromptInvocationRow {
   totalCostCents: number
   importId: string | null
   repoName: string | null
+  syncKind: string | null
   invokedAt: string
+}
+
+export interface UserCostRow {
+  userId: string | null
+  email: string | null
+  totalCents: number
+  inputTokens: number
+  outputTokens: number
+  invocations: number
+}
+
+export interface RepoCostRow {
+  repoName: string
+  syncKind: string | null
+  totalCents: number
+  invocations: number
+}
+
+export interface ApplicationCostRow {
+  applicationId: string
+  company: string | null
+  role: string | null
+  totalCents: number
+  invocations: number
+}
+
+export interface ProjectCostRow {
+  projectId: string
+  name: string | null
+  totalCents: number
+  invocations: number
 }
 
 export interface UsageSummary {
@@ -40,6 +73,10 @@ export interface UsageSummary {
   totalCents: number
   byPipeline: Record<string, number>
   byModel: Record<string, number>
+  byUser: UserCostRow[]
+  byRepo: RepoCostRow[]
+  byApplication: ApplicationCostRow[]
+  byProject: ProjectCostRow[]
 }
 
 export interface UserTokenBudget {

@@ -51,10 +51,10 @@ export const promptQualityQueries = {
 }
 
 export const bedrockUsageQueries = {
-  summary: (month?: string) =>
+  summary: (month?: string, userId?: string) =>
     queryOptions({
-      queryKey: ['bedrockUsage', 'summary', month ?? 'current'],
-      queryFn: () => getUsageSummaryFn({ data: { month } }),
+      queryKey: ['bedrockUsage', 'summary', month ?? 'current', userId ?? 'all'],
+      queryFn: () => getUsageSummaryFn({ data: { month, userId } }),
       staleTime: 5 * 60 * 1000,
     }),
 }
