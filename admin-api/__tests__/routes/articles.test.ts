@@ -63,11 +63,11 @@ const testConfig = {
  *
  * @returns Configured Hono app with articles router mounted at /.
  */
-function buildApp() {
+function buildApp(groups: string[] = ['admin']) {
   const app = new Hono();
   app.use('*', async (ctx, next) => {
      
-    (ctx as any).set('jwtPayload', { sub: 'test-user-sub' });
+    (ctx as any).set('jwtPayload', { sub: 'test-user-sub', 'cognito:groups': groups });
      
     (ctx as any).set('userId', 'test-user-sub');
     await next();
@@ -93,6 +93,30 @@ const ARTICLE_ITEM = {
   publishedAt: null,
   coverImage: null,
 };
+
+// ---------------------------------------------------------------------------
+// Admin gate
+// ---------------------------------------------------------------------------
+
+describe('admin gate', () => {
+  it('forbids non-admin users before reading article management data', async () => {
+    const res = await buildApp([]).request('/');
+
+    expect(res.status).toBe(403);
+    expect(pgListAllArticlesMock).not.toHaveBeenCalled();
+  });
+
+  it('forbids non-admin users before mutating article management data', async () => {
+    const res = await buildApp([]).request('/my-slug', {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ title: 'Updated Title' }),
+    });
+
+    expect(res.status).toBe(403);
+    expect(pgUpsertMock).not.toHaveBeenCalled();
+  });
+});
 
 // ---------------------------------------------------------------------------
 // GET / — list articles

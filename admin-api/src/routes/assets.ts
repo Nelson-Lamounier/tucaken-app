@@ -23,6 +23,7 @@ import { Hono } from 'hono';
 
 import type { AdminApiConfig } from '../lib/config.js';
 import { isAssetsBucketConfigured } from '../lib/config.js';
+import { requireAdminGroup } from '../middleware/auth.js';
 
 /** S3 client singleton — credentials from IMDS, no explicit config. */
 const s3 = new S3Client({
@@ -35,7 +36,6 @@ const ALLOWED_CONTENT_TYPES = new Set([
   'image/png',
   'image/webp',
   'image/gif',
-  'image/svg+xml',
   'video/mp4',
   'video/webm',
 ]);
@@ -51,6 +51,8 @@ const MAX_CONTENT_LENGTH = 50 * 1024 * 1024;
  */
 export function createAssetsRouter(config: AdminApiConfig): Hono {
   const router = new Hono();
+
+  router.use('*', requireAdminGroup());
 
   // -----------------------------------------------------------------------
   // POST /api/admin/assets/presign

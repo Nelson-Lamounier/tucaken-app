@@ -29,6 +29,7 @@ import { apiFetch } from './_api-client'
 import { internalApiFetch } from './_internal-api-client'
 import { logger } from '@/lib/observability/logger'
 import type { PlanId } from '@/features/account/types'
+import { enforceBillingRateLimit } from './_rate-limit'
 
 // -----------------------------------------------------------------------------
 // Pre-checkout: ensure the authenticated user has a Stripe customer record
@@ -96,6 +97,7 @@ const CreateCheckoutInput = z.object({
 export const createCheckoutSessionFn = createServerFn({ method: 'POST' })
   .inputValidator(CreateCheckoutInput)
   .handler(async ({ data }) => {
+    enforceBillingRateLimit('checkout')
     const priceId = priceIdForTier(data.tier)
     const user    = await tryAuth()
 
@@ -197,15 +199,47 @@ export const getCheckoutSessionFn = createServerFn({ method: 'GET' })
 const CreatePortalInput = z.object({
   customerId: z.string().startsWith('cus_'),
   /** Where to send the user after they close the portal. */
-  returnPath: z.string().startsWith('/').default('/billing'),
+  returnPath: z.string().default('/billing'),
 })
+
+function safePortalReturnPath(returnPath: string): string {
+  if (
+    !returnPath.startsWith('/') ||
+    returnPath.startsWith('//') ||
+    /[\r\n]/.test(returnPath)
+  ) {
+    throw new Error('Invalid billing portal return path.')
+  }
+  return returnPath
+}
 
 export const createPortalSessionFn = createServerFn({ method: 'POST' })
   .inputValidator(CreatePortalInput)
   .handler(async ({ data }) => {
+    enforceBillingRateLimit('billing_portal')
+    const user = await requireAuth()
+    const returnPath = safePortalReturnPath(data.returnPath ?? '/billing')
+    const me = await apiFetch<{ plan: { stripeCustomerId: string | null } }>(
+      '/me',
+      { pathTemplate: '/me' },
+    )
+
+    if (!me.plan.stripeCustomerId || me.plan.stripeCustomerId !== data.customerId) {
+      logger.warn(
+        {
+          event: 'stripe_portal_ownership_mismatch',
+          userId: user.id,
+          attemptedCustomer: data.customerId,
+          ownedCustomer: me.plan.stripeCustomerId,
+        },
+        'billing portal ownership check failed — refusing to create session',
+      )
+      throw new Error('Stripe customer does not belong to the current user.')
+    }
+
     const portal = await stripe().billingPortal.sessions.create({
       customer: data.customerId,
-      return_url: `${appOrigin()}${data.returnPath}`,
+      return_url: `${appOrigin()}${returnPath}`,
     })
     return { url: portal.url }
   })

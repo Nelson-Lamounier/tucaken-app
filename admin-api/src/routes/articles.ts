@@ -23,6 +23,7 @@ import { Hono } from 'hono';
 
 import type { AdminApiConfig } from '../lib/config.js';
 import { getPool, withUser } from '../lib/pg.js';
+import { requireAdminGroup } from '../middleware/auth.js';
 import {
     upsertArticle,
     deleteArticle as pgDeleteArticle,
@@ -41,8 +42,11 @@ import type { AdminApiBindings } from '../lib/types.js';
 export function createArticlesRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
   const router = new Hono<AdminApiBindings>();
 
+  router.use('*', requireAdminGroup());
+
   /** Valid article statuses. */
   const ALL_STATUSES = ['draft', 'processing', 'review', 'published', 'rejected', 'flagged'] as const;
+  const ALL_STATUS_SET = new Set<string>(ALL_STATUSES);
 
   // -----------------------------------------------------------------------
   // GET /api/admin/articles
@@ -55,7 +59,7 @@ export function createArticlesRouter(config: AdminApiConfig): Hono<AdminApiBindi
 
     if (rawStatus === 'all') {
         articles = await listAllArticles(pool);
-    } else if ((ALL_STATUSES as readonly string[]).includes(rawStatus)) {
+    } else if (ALL_STATUS_SET.has(rawStatus)) {
         articles = await listArticlesByStatus(pool, rawStatus);
     } else {
         return ctx.json({ error: `Invalid status "${rawStatus}". Must be one of: all, ${ALL_STATUSES.join(', ')}` }, 400);
@@ -152,7 +156,7 @@ export function createArticlesRouter(config: AdminApiConfig): Hono<AdminApiBindi
 
     const slug = ctx.req.param('slug');
     const limitParam = ctx.req.query('limit');
-    const limit = limitParam ? Math.min(parseInt(limitParam, 10), 50) : 20;
+    const limit = limitParam ? Math.min(Number.parseInt(limitParam, 10), 50) : 20;
 
     return withUser(getPool(config), userId, async (db) => {
       const result = await db.query<{

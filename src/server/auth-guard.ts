@@ -29,6 +29,18 @@ export class AuthenticationError extends Error {
   }
 }
 
+/**
+ * Thrown when a valid session exists but the user lacks the required role.
+ */
+export class AuthorizationError extends Error {
+  public readonly code = 'FORBIDDEN' as const
+
+  constructor(message = 'Admin access required') {
+    super(message)
+    this.name = 'AuthorizationError'
+  }
+}
+
 // =============================================================================
 // Guard Helper
 // =============================================================================
@@ -60,6 +72,47 @@ export async function requireAuth(): Promise<AuthUser> {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('[auth-guard] JWT verification failed:', message)
+    throw new AuthenticationError('Session expired or invalid')
+  }
+}
+
+function hasAdminGroup(groups: unknown): boolean {
+  if (Array.isArray(groups)) {
+    return groups.some((group) => group === 'admin')
+  }
+  if (typeof groups === 'string') {
+    return groups.split(/\s+/).includes('admin')
+  }
+  return false
+}
+
+/**
+ * Verifies the current request is authenticated and belongs to the Cognito
+ * `admin` group. Use this at the top of server functions that back admin-only
+ * dashboard surfaces, even when the UI route is already admin-gated.
+ */
+export async function requireAdmin(): Promise<AuthUser> {
+  if (MOCK_AUTH) return MOCK_USER
+
+  const token = getCookie('__session')
+
+  if (!token) {
+    throw new AuthenticationError('No session cookie found')
+  }
+
+  try {
+    const payload = await verifyCognitoJwt(token)
+    if (!hasAdminGroup(payload['cognito:groups'])) {
+      throw new AuthorizationError()
+    }
+    return {
+      id: payload.sub as string,
+      email: payload.email as string,
+    }
+  } catch (err: unknown) {
+    if (err instanceof AuthorizationError) throw err
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[auth-guard] admin JWT verification failed:', message)
     throw new AuthenticationError('Session expired or invalid')
   }
 }

@@ -25,6 +25,7 @@ import {
 } from '@/lib/auth/tanstack-auth'
 import { MOCK_AUTH } from './_dev-mock'
 import { enforceAuthRateLimit } from './_rate-limit'
+import { getAppOrigin } from './app-origin'
 
 // Re-export types from session.ts so existing import paths keep working.
 export type { AuthUser, AuthState } from './session'
@@ -36,7 +37,7 @@ const ADMIN_API_URL =
 // set this to false or browsers reject/ignore the cookie.
 const SECURE_COOKIES =
   process.env.NODE_ENV === 'production' &&
-  (process.env['VITE_APP_URL']?.startsWith('https') ?? true)
+  getAppOrigin().startsWith('https')
 
 // ── Structured auth event logger ──────────────────────────────────────────────
 // Server functions run in Node; JSON stdout is scraped by Alloy → Loki.
@@ -117,7 +118,7 @@ export const getLoginUrlFn = createServerFn({ method: 'POST' })
     authUrl.searchParams.set('response_type', 'code')
     authUrl.searchParams.set('scope', 'email openid profile')
 
-    const appUrl = process.env.VITE_APP_URL || 'http://localhost:5001'
+    const appUrl = getAppOrigin()
     const scheme = appUrl.startsWith('https://') ? 'https' : 'http'
     const host = appUrl.replace(/^https?:\/\//, '')
     // Must match Cognito App Client → Allowed callback URLs exactly.
@@ -496,14 +497,14 @@ export const confirmForgotPasswordFn = createServerFn({ method: 'POST' })
 /** Logs the user out by clearing session cookies and returning logout URL. */
 export const logoutFn = createServerFn({ method: 'POST' })
   .inputValidator(z.object({ appOrigin: z.string().optional() }))
-  .handler(async ({ data }) => {
+  .handler(async () => {
     deleteCookie('__session', { path: '/' })
     deleteCookie('pkce_verifier', { path: '/' })
     deleteCookie('oauth_state', { path: '/' })
 
     const domain = process.env.AUTH_COGNITO_DOMAIN
     const clientId = process.env.AUTH_COGNITO_ID || process.env.AUTH_COGNITO_CLIENT_ID
-    const origin = data.appOrigin ?? process.env.VITE_APP_URL ?? 'http://localhost:5001'
+    const origin = getAppOrigin()
     // Must match Cognito App Client → Allowed sign-out URLs exactly.
     const logoutUri = `${origin}/sign-in`
 

@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef, useState, useMemo, isValidElement } from 'react'
-import { evaluate } from '@mdx-js/mdx'
-import * as _jsx_runtime from 'react/jsx-runtime'
+import { useCallback, useEffect, useId, useRef, useState, useMemo, isValidElement } from 'react'
+import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import DOMPurify from 'dompurify'
 
@@ -171,6 +170,7 @@ function extractText(node: React.ReactNode): string {
 }
 
 function Mermaid({ chart, children, caption }: MermaidProps) {
+  const diagramId = useId().replaceAll(':', '')
   const containerRef = useRef<HTMLDivElement>(null)
   const svgWrapperRef = useRef<HTMLDivElement>(null)
   const resolvedChart = (chart ?? extractText(children)).trim()
@@ -212,8 +212,7 @@ function Mermaid({ chart, children, caption }: MermaidProps) {
 
         if (!resolvedChart) throw new Error('Mermaid component requires a "chart" prop or mermaid syntax as children.')
 
-        const id = `mermaid-${Math.random().toString(36).slice(2, 9)}`
-        const { svg } = await mermaid.render(id, resolvedChart)
+        const { svg } = await mermaid.render(`mermaid-${diagramId}`, resolvedChart)
 
         if (!cancelled) {
           setSafeSvg(DOMPurify.sanitize(svg, {
@@ -229,7 +228,7 @@ function Mermaid({ chart, children, caption }: MermaidProps) {
 
     renderDiagram()
     return () => { cancelled = true }
-  }, [resolvedChart])
+  }, [diagramId, resolvedChart])
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const wrapper = svgWrapperRef.current
@@ -295,107 +294,6 @@ function Mermaid({ chart, children, caption }: MermaidProps) {
   )
 }
 
-// ─── ImageRequest ─────────────────────────────────────────────────────────────
-
-// Set VITE_IMAGES_CDN_URL in .env.local to load images from CloudFront.
-// Without it, ImageRequest shows the amber placeholder with the AI instruction.
-const CDN_URL = (import.meta.env.VITE_IMAGES_CDN_URL as string | undefined) ?? ''
-
-const IMAGE_EXTENSIONS = ['jpeg', 'png', 'webp'] as const
-
-interface ImageRequestProps {
-  readonly id: string
-  readonly instruction: string
-}
-
-function ImageRequest({ id, instruction }: ImageRequestProps) {
-  const [extIndex, setExtIndex] = useState(0)
-  const [imgError, setImgError] = useState(!CDN_URL)
-
-  const imageUrl = `${CDN_URL}/images/articles/${id}.${IMAGE_EXTENSIONS[extIndex]}`
-
-  function handleError() {
-    if (extIndex < IMAGE_EXTENSIONS.length - 1) {
-      setExtIndex((prev) => prev + 1)
-    } else {
-      setImgError(true)
-    }
-  }
-
-  if (imgError) {
-    return (
-      <figure className="not-prose my-8">
-        <div className="flex min-h-50 items-center justify-center rounded-xl border-2 border-dashed border-amber-600 bg-amber-950/20 p-6">
-          <div className="text-center">
-            <span className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-amber-900/40 px-3 py-1 text-xs font-semibold text-amber-300">
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z" />
-              </svg>
-              Screenshot Needed
-            </span>
-            <p className="mt-3 max-w-md text-sm font-medium text-amber-200">{instruction}</p>
-            <code className="mt-2 inline-block rounded bg-amber-900/30 px-2 py-0.5 text-xs text-amber-400">ID: {id}</code>
-          </div>
-        </div>
-      </figure>
-    )
-  }
-
-  return (
-    <figure className="not-prose my-8">
-      <div className="overflow-hidden rounded-xl border border-zinc-700/50 shadow-sm">
-        <img key={imageUrl} src={imageUrl} alt={instruction} loading="lazy" className="h-auto w-full" onError={handleError} />
-      </div>
-      <figcaption className="mt-3 text-center text-sm text-zinc-400">{instruction}</figcaption>
-    </figure>
-  )
-}
-
-// ─── VideoRequest ─────────────────────────────────────────────────────────────
-
-interface VideoRequestProps {
-  readonly id: string
-  readonly instruction: string
-}
-
-function VideoRequest({ id, instruction }: VideoRequestProps) {
-  const [videoError, setVideoError] = useState(!CDN_URL)
-  const mp4Url = `${CDN_URL}/videos/articles/${id}.mp4`
-  const webmUrl = `${CDN_URL}/videos/articles/${id}.webm`
-
-  if (videoError) {
-    return (
-      <figure className="not-prose my-8">
-        <div className="flex min-h-50 items-center justify-center rounded-xl border-2 border-dashed border-violet-600 bg-violet-950/20 p-6">
-          <div className="text-center">
-            <span className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-violet-900/40 px-3 py-1 text-xs font-semibold text-violet-300">
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
-              </svg>
-              Video Needed
-            </span>
-            <p className="mt-3 max-w-md text-sm font-medium text-violet-200">{instruction}</p>
-            <code className="mt-2 inline-block rounded bg-violet-900/30 px-2 py-0.5 text-xs text-violet-400">ID: {id}</code>
-          </div>
-        </div>
-      </figure>
-    )
-  }
-
-  return (
-    <figure className="not-prose my-8">
-      <div className="overflow-hidden rounded-3xl border border-zinc-700/50 shadow-sm">
-        <video autoPlay loop muted playsInline className="w-full" onError={() => setVideoError(true)}>
-          <source src={mp4Url} type="video/mp4" />
-          <source src={webmUrl} type="video/webm" />
-        </video>
-      </div>
-      <figcaption className="mt-3 text-center text-sm text-zinc-400">{instruction}</figcaption>
-    </figure>
-  )
-}
-
 // ─── SmartImage ───────────────────────────────────────────────────────────────
 
 interface SmartImageProps {
@@ -418,16 +316,6 @@ function SmartImage({ src, fallbackAlt, caption }: SmartImageProps) {
       )}
     </figure>
   )
-}
-
-// ─── ProcessTimeline ──────────────────────────────────────────────────────────
-
-interface ProcessTimelineProps {
-  readonly children: React.ReactNode
-}
-
-function ProcessTimeline({ children }: ProcessTimelineProps) {
-  return <div className="my-8 border-l-2 border-zinc-700 pl-6">{children}</div>
 }
 
 // ─── CodeBlock ────────────────────────────────────────────────────────────────
@@ -453,14 +341,7 @@ function CodeBlock({ children }: CodeBlockProps) {
 
 // ─── MDX component map ────────────────────────────────────────────────────────
 
-const components = {
-  Callout,
-  SmartImage,
-  ImageRequest,
-  VideoRequest,
-  ProcessTimeline,
-  Mermaid,
-  MermaidChart: Mermaid,
+const components: Components = {
   pre: CodeBlock,
   table: Table,
   thead: TableHead,
@@ -468,6 +349,16 @@ const components = {
   tr: TableRow,
   th: TableHeaderCell,
   td: TableCell,
+  img({ src, alt }) {
+    return <SmartImage src={src ?? ''} fallbackAlt={alt ?? ''} />
+  },
+  blockquote({ children }) {
+    return (
+      <Callout variant="info">
+        {children}
+      </Callout>
+    )
+  },
 }
 
 // ─── MdxPreview ───────────────────────────────────────────────────────────────
@@ -477,58 +368,22 @@ interface MdxPreviewProps {
 }
 
 export function MdxPreview({ content }: MdxPreviewProps) {
-  const [MDXContent, setMDXContent] = useState<React.ElementType | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  const sanitizedSource = useMemo(() => {
+  const previewSource = useMemo(() => {
     return content.replace(
       /<MermaidChart\s+chart=\{\s*`([\s\S]*?)`\s*\}\s*\/>/g,
       '```mermaid\n$1\n```'
     )
   }, [content])
 
-  useEffect(() => {
-    let active = true
-
-    evaluate(sanitizedSource, {
-      ..._jsx_runtime,
-      remarkPlugins: [remarkGfm],
-    })
-      .then((mod) => {
-        if (active) {
-          setMDXContent(() => mod.default)
-          setError(null)
-        }
-      })
-      .catch((err: unknown) => {
-        if (active) setError(err instanceof Error ? err.message : String(err))
-      })
-
-    return () => { active = false }
-  }, [sanitizedSource])
-
-  if (error) {
-    return (
-      <div className="rounded-xl border border-red-800 bg-red-900/20 p-4">
-        <h3 className="mb-2 font-semibold text-red-400">MDX Compilation Error</h3>
-        <pre className="overflow-auto font-mono text-xs text-red-300">{error}</pre>
-      </div>
-    )
-  }
-
-  if (!MDXContent) {
-    return (
-      <div className="animate-pulse space-y-4">
-        <div className="h-4 w-3/4 rounded bg-zinc-800" />
-        <div className="h-4 w-full rounded bg-zinc-800" />
-        <div className="h-4 w-5/6 rounded bg-zinc-800" />
-      </div>
-    )
-  }
-
   return (
     <div className="prose prose-invert max-w-none">
-      <MDXContent components={components} />
+      <ReactMarkdown
+        components={components}
+        remarkPlugins={[remarkGfm]}
+        skipHtml
+      >
+        {previewSource}
+      </ReactMarkdown>
     </div>
   )
 }

@@ -179,9 +179,9 @@ export function createInternalBillingRouter(
     logger.info(
       {
         event: 'stripe_pending_recorded',
-        email: parsed.email,
         customerId: parsed.stripeCustomerId,
         plan: parsed.plan,
+        hasEmail: parsed.email.length > 0,
       },
       'Pending subscription recorded for guest signup',
     );
