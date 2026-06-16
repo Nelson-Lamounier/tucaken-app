@@ -118,6 +118,18 @@ post-push deployment
   — current read-then-mark dedup, its TOCTOU gap, and the atomic-claim hardening.
 - [Cognito User Pool provisioning and updates](../runbooks/cognito-setup.md)
   — the provider/M2M/password-auth/prod-URL setup scripts.
+- [Run the strategist matcher on Sonnet, decoupled from the article model](../decisions/0009-sonnet-strategist-matcher.md)
+  — per-stage model selection.
+- [Stamp the dispatched Job image onto pipeline runs](../decisions/0010-pipeline-image-sha-stamping.md)
+  — provenance: which image produced which run.
+- [Redis cache invalidation](../patterns/redis-cache.md)
+  — fail-open project-cache invalidator (admin-api is the writer).
+- [Validate every server boundary](../patterns/server-boundary-validation.md)
+  — Zod in server fns; mixed Zod/manual guards in admin-api routes.
+- [Pyroscope continuous profiling](../tools/pyroscope-profiling.md)
+  — CPU/heap profiling config and enablement.
+- [FinOps /costs returns zero despite real Bedrock spend](../troubleshooting/finops-costs-empty-untagged-bedrock.md)
+  — live-verified `Project=bedrock` tag-filter gap.
 
 <!--
 Evidence trail (auto-generated):
