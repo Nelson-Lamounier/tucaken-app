@@ -73,7 +73,7 @@ child logger, so every structured log line for a request carries its trace id
 also emits a `Server-Timing` header so Grafana Faro RUM can correlate a browser
 interaction back to the server trace in Tempo
 ([observability.ts](../../admin-api/src/middleware/observability.ts#L1-L11),
-[#L63](../../admin-api/src/middleware/observability.ts#L63)). Together with the
+[#L62](../../admin-api/src/middleware/observability.ts#L62)). Together with the
 `TRACEPARENT` injection, this gives one correlation key — the trace id — from
 browser RUM through the API request down into the worker pod.
 

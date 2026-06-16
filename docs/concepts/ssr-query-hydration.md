@@ -125,7 +125,7 @@ edit/review routes also prefetch via `context.queryClient.ensureQueryData`.
   loader-warmed data appear in the client cache without an explicit
   dehydrate/rehydrate step. The repo does **not** import
   `@tanstack/react-router-ssr-query` anywhere in `src/`, despite it being a
-  dependency in [package.json](../../package.json#L48) — hydration here relies on
+  dependency in [package.json](../../package.json#L49) — hydration here relies on
   the shared instance plus `QueryClientProvider`, not that helper's automatic
   dehydration. A single server-side instance shared across concurrent requests
   is acceptable for this internal admin dashboard but would risk cross-request
