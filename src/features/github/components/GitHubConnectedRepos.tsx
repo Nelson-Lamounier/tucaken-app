@@ -16,15 +16,31 @@ export function GitHubConnectedRepos({ connectedRepos }: GitHubConnectedReposPro
   const queryClient = useQueryClient()
   const { addToast } = useToastStore()
 
+  // Incremental: only changed/added/removed files are re-embedded (hash-dedup
+  // skips unchanged chunks), so it is cheap and the default action.
   const resync = useMutation({
     mutationFn: (repoFullName: string) =>
-      triggerGitHubIngestionFn({ data: { repoFullName, forceReindex: true } }),
+      triggerGitHubIngestionFn({ data: { repoFullName, forceReindex: false } }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: adminKeys.github.connectedRepos() })
       addToast('success', 'Re-sync queued.')
     },
     onError: (err: Error) => {
       addToast('error', `Re-sync failed: ${err.message}`)
+    },
+  })
+
+  // Full rebuild: deletes every chunk for the repo and re-embeds from scratch
+  // (full Bedrock cost). Explicit + confirmed because it is destructive.
+  const rebuild = useMutation({
+    mutationFn: (repoFullName: string) =>
+      triggerGitHubIngestionFn({ data: { repoFullName, forceReindex: true } }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.github.connectedRepos() })
+      addToast('success', 'Full rebuild queued.')
+    },
+    onError: (err: Error) => {
+      addToast('error', `Rebuild failed: ${err.message}`)
     },
   })
 
@@ -101,6 +117,18 @@ export function GitHubConnectedRepos({ connectedRepos }: GitHubConnectedReposPro
                     className="py-1 px-2 text-[10px]"
                   >
                     ↺ Re-sync
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      if (window.confirm(`Full rebuild of ${repo.repoFullName}? This deletes every indexed chunk and re-embeds from scratch.`)) {
+                        rebuild.mutate(repo.repoFullName)
+                      }
+                    }}
+                    disabled={isSyncing || rebuild.isPending}
+                    className="py-1 px-2 text-[10px]"
+                  >
+                    ⟳ Rebuild
                   </Button>
                   <Button
                     variant="danger"
