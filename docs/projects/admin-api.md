@@ -102,6 +102,8 @@ post-push deployment
   — TRACEPARENT propagation across the async boundary.
 - [Four-pillar observability — traces, metrics, logs, profiles](../concepts/four-pillars-observability.md)
   — OTel/Prometheus/Loki/Pyroscope wiring and trace correlation.
+- [Bedrock cost observability — estimated vs billed](../concepts/bedrock-cost-observability.md)
+  — CloudWatch + Cost Explorer and per-invocation `prompt_invocations` cost.
 - [Single shared Job spec for multi-path dispatch](../patterns/shared-ingestion-job-spec.md)
   — the multi-trigger ingestion builder.
 - [No Job-level retry for model-invoking Kubernetes Jobs](../decisions/0005-no-retry-on-model-jobs.md)
