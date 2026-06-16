@@ -11,285 +11,249 @@ import type {
   UserCostRow,
 } from '../../../server/bedrock-usage'
 
+// ─── Formatting ─────────────────────────────────────────────────────────────
+
 function formatCents(cents: number): string {
-  return `$${(cents / 100).toFixed(4)}`
+  return `$${(cents / 100).toFixed(2)}`
+}
+
+function formatDateTime(iso: string | null): string {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString('en-GB', {
+    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  })
 }
 
 function pipelineBadgeClass(pipeline: string): string {
-  if (pipeline === 'resume-import') return 'bg-violet-500/15 text-violet-300 ring-violet-400/25'
-  if (pipeline === 'repo-sync')     return 'bg-sky-500/15 text-sky-300 ring-sky-400/25'
+  if (pipeline === 'resume-import')  return 'bg-violet-500/15 text-violet-300 ring-violet-400/25'
+  if (pipeline === 'repo-sync')      return 'bg-sky-500/15 text-sky-300 ring-sky-400/25'
   if (pipeline === 'job-strategist') return 'bg-amber-500/15 text-amber-300 ring-amber-400/25'
   return 'bg-zinc-500/15 text-zinc-300 ring-zinc-400/25'
 }
 
-// repo-sync rows carry the raw syncType the worker computed. 'initial' is a
-// repo's first ingest; everything else is a resync.
 function syncKindLabel(kind: string | null): string {
-  if (kind === 'initial') return 'Initial sync'
+  if (kind === 'initial')      return 'Initial sync'
   if (kind === 'full_reindex') return 'Resync (full)'
-  if (kind === 'incremental') return 'Resync (delta)'
+  if (kind === 'incremental')  return 'Resync (delta)'
   return 'Unclassified'
 }
 
 function userLabel(userId: string | null, email: string | null): string {
-  if (email) return email
-  if (userId) return userId
-  return 'Unattributed'
+  return email ?? userId ?? 'Unattributed'
 }
 
 function applicationLabel(row: ApplicationCostRow): string {
   if (row.company && row.role) return `${row.company} — ${row.role}`
-  if (row.company) return row.company
-  return row.applicationId
+  return row.company ?? row.applicationId
 }
 
-// ─── Shared card shell ────────────────────────────────────────────────────────
+// ─── Expanded per-user breakdown (lazy-fetched) ───────────────────────────────
 
-function SectionCard({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+function BreakdownSection({ title, children }: Readonly<{ title: string; children: React.ReactNode }>) {
   return (
-    <div className="rounded-md border border-white/10">
-      <div className="border-b border-white/10 px-4 py-3">
-        <p className="text-sm font-medium text-zinc-200">{title}</p>
-        {subtitle ? <p className="mt-0.5 text-xs text-zinc-500">{subtitle}</p> : null}
-      </div>
-      <div className="overflow-x-auto">{children}</div>
+    <div>
+      <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">{title}</p>
+      {children}
     </div>
   )
 }
 
-function EmptyRow({ colSpan, label }: { colSpan: number; label: string }) {
+function PipelineList({ byPipeline }: Readonly<{ byPipeline: Record<string, number> }>) {
+  const entries = Object.entries(byPipeline).sort((a, b) => b[1] - a[1])
+  if (entries.length === 0) return <p className="text-xs text-zinc-600">No spend</p>
   return (
-    <tr>
-      <td colSpan={colSpan} className="px-4 py-8 text-center text-zinc-600">{label}</td>
-    </tr>
+    <ul className="space-y-1">
+      {entries.map(([pipeline, cents]) => (
+        <li key={pipeline} className="flex items-center justify-between gap-3 text-xs">
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset ${pipelineBadgeClass(pipeline)}`}>
+            {pipeline}
+          </span>
+          <span className="tabular-nums text-emerald-300">{formatCents(cents)}</span>
+        </li>
+      ))}
+    </ul>
   )
 }
 
-// ─── Breakdown tables ─────────────────────────────────────────────────────────
-
-function UserCostTable({ rows, isLoading }: { rows: UserCostRow[]; isLoading: boolean }) {
+function RepoList({ rows }: Readonly<{ rows: RepoCostRow[] }>) {
+  if (rows.length === 0) return <p className="text-xs text-zinc-600">No repository syncs</p>
   return (
-    <SectionCard title="Cost by user" subtitle="Accurate monthly spend per user (SQL aggregate).">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b border-white/10 text-left text-zinc-500">
-            <th className="px-4 py-3 font-medium">User</th>
-            <th className="px-4 py-3 font-medium text-right">Tokens In</th>
-            <th className="px-4 py-3 font-medium text-right">Tokens Out</th>
-            <th className="px-4 py-3 font-medium text-right">Calls</th>
-            <th className="px-4 py-3 font-medium text-right">Cost</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-white/6">
-          {isLoading && <EmptyRow colSpan={5} label="Loading…" />}
-          {!isLoading && rows.length === 0 && <EmptyRow colSpan={5} label="No spend recorded yet" />}
-          {rows.map((r) => (
-            <tr key={r.userId ?? r.email ?? 'unattributed'} className="text-zinc-300 hover:bg-white/2">
-              <td className="max-w-64 truncate px-4 py-2">{userLabel(r.userId, r.email)}</td>
-              <td className="px-4 py-2 text-right tabular-nums">{r.inputTokens.toLocaleString()}</td>
-              <td className="px-4 py-2 text-right tabular-nums">{r.outputTokens.toLocaleString()}</td>
-              <td className="px-4 py-2 text-right tabular-nums text-zinc-500">{r.invocations.toLocaleString()}</td>
-              <td className="px-4 py-2 text-right tabular-nums text-emerald-300">{formatCents(r.totalCents)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </SectionCard>
+    <ul className="space-y-1">
+      {rows.map((r) => (
+        <li key={`${r.repoName}:${r.syncKind ?? 'none'}`} className="flex items-center justify-between gap-3 text-xs">
+          <span className="truncate font-mono text-[10px] text-zinc-400">{r.repoName}</span>
+          <span className="shrink-0 text-zinc-500">{syncKindLabel(r.syncKind)}</span>
+          <span className="shrink-0 tabular-nums text-emerald-300">{formatCents(r.totalCents)}</span>
+        </li>
+      ))}
+    </ul>
   )
 }
 
-function RepoCostTable({ rows, isLoading }: { rows: RepoCostRow[]; isLoading: boolean }) {
+function NamedCostList({ rows, emptyLabel }: Readonly<{ rows: Array<{ key: string; label: string; totalCents: number }>; emptyLabel: string }>) {
+  if (rows.length === 0) return <p className="text-xs text-zinc-600">{emptyLabel}</p>
   return (
-    <SectionCard title="Repository sync cost" subtitle="repo-sync spend per repository, split by initial sync vs resync.">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b border-white/10 text-left text-zinc-500">
-            <th className="px-4 py-3 font-medium">Repository</th>
-            <th className="px-4 py-3 font-medium">Sync kind</th>
-            <th className="px-4 py-3 font-medium text-right">Calls</th>
-            <th className="px-4 py-3 font-medium text-right">Cost</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-white/6">
-          {isLoading && <EmptyRow colSpan={4} label="Loading…" />}
-          {!isLoading && rows.length === 0 && <EmptyRow colSpan={4} label="No repository syncs recorded yet" />}
-          {rows.map((r) => (
-            <tr key={`${r.repoName}:${r.syncKind ?? 'none'}`} className="text-zinc-300 hover:bg-white/2">
-              <td className="max-w-64 truncate px-4 py-2 font-mono text-[10px] text-zinc-400">{r.repoName}</td>
-              <td className="px-4 py-2 text-zinc-400">{syncKindLabel(r.syncKind)}</td>
-              <td className="px-4 py-2 text-right tabular-nums text-zinc-500">{r.invocations.toLocaleString()}</td>
-              <td className="px-4 py-2 text-right tabular-nums text-emerald-300">{formatCents(r.totalCents)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </SectionCard>
+    <ul className="space-y-1">
+      {rows.map((r) => (
+        <li key={r.key} className="flex items-center justify-between gap-3 text-xs">
+          <span className="truncate text-zinc-300">{r.label}</span>
+          <span className="shrink-0 tabular-nums text-emerald-300">{formatCents(r.totalCents)}</span>
+        </li>
+      ))}
+    </ul>
   )
 }
 
-function ApplicationCostTable({ rows, isLoading }: { rows: ApplicationCostRow[]; isLoading: boolean }) {
+function RecentInvocations({ rows }: Readonly<{ rows: PromptInvocationRow[] }>) {
+  const recent = rows.slice(0, 10)
+  if (recent.length === 0) return <p className="text-xs text-zinc-600">No invocations</p>
   return (
-    <SectionCard title="Cost by job application" subtitle="job-strategist spend per application.">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b border-white/10 text-left text-zinc-500">
-            <th className="px-4 py-3 font-medium">Application</th>
-            <th className="px-4 py-3 font-medium text-right">Calls</th>
-            <th className="px-4 py-3 font-medium text-right">Cost</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-white/6">
-          {isLoading && <EmptyRow colSpan={3} label="Loading…" />}
-          {!isLoading && rows.length === 0 && <EmptyRow colSpan={3} label="No application spend recorded yet" />}
-          {rows.map((r) => (
-            <tr key={r.applicationId} className="text-zinc-300 hover:bg-white/2">
-              <td className="max-w-72 truncate px-4 py-2">{applicationLabel(r)}</td>
-              <td className="px-4 py-2 text-right tabular-nums text-zinc-500">{r.invocations.toLocaleString()}</td>
-              <td className="px-4 py-2 text-right tabular-nums text-emerald-300">{formatCents(r.totalCents)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </SectionCard>
+    <ul className="space-y-1">
+      {recent.map((row) => (
+        <li key={row.id} className="flex items-center justify-between gap-3 text-xs">
+          <span className="flex items-center gap-2 truncate">
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset ${pipelineBadgeClass(row.pipeline)}`}>
+              {row.pipeline}
+            </span>
+            <span className="truncate font-mono text-[10px] text-zinc-500">{row.modelId.split('/').pop() ?? row.modelId}</span>
+          </span>
+          <span className="shrink-0 text-zinc-600">{formatDateTime(row.invokedAt)}</span>
+          <span className="shrink-0 tabular-nums text-emerald-300">{formatCents(row.totalCostCents)}</span>
+        </li>
+      ))}
+    </ul>
   )
 }
 
-function ProjectCostTable({ rows, isLoading }: { rows: ProjectCostRow[]; isLoading: boolean }) {
+function UserBreakdown({ userId }: Readonly<{ userId: string }>) {
+  const { data, isLoading } = useQuery(bedrockUsageQueries.summary(undefined, userId))
+
+  if (isLoading) return <p className="px-4 py-3 text-xs text-zinc-600">Loading breakdown…</p>
+
+  const byPipeline = data?.byPipeline ?? {}
+  const byRepo = data?.byRepo ?? []
+  const projectRows = (data?.byProject ?? []).map((p: ProjectCostRow) => ({
+    key: p.projectId, label: p.name ?? p.projectId, totalCents: p.totalCents,
+  }))
+  const applicationRows = (data?.byApplication ?? []).map((a) => ({
+    key: a.applicationId, label: applicationLabel(a), totalCents: a.totalCents,
+  }))
+
   return (
-    <SectionCard title="Cost by project" subtitle="project-case-study spend per project.">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b border-white/10 text-left text-zinc-500">
-            <th className="px-4 py-3 font-medium">Project</th>
-            <th className="px-4 py-3 font-medium text-right">Calls</th>
-            <th className="px-4 py-3 font-medium text-right">Cost</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-white/6">
-          {isLoading && <EmptyRow colSpan={3} label="Loading…" />}
-          {!isLoading && rows.length === 0 && <EmptyRow colSpan={3} label="No project spend recorded yet" />}
-          {rows.map((r) => (
-            <tr key={r.projectId} className="text-zinc-300 hover:bg-white/2">
-              <td className="max-w-72 truncate px-4 py-2">{r.name ?? r.projectId}</td>
-              <td className="px-4 py-2 text-right tabular-nums text-zinc-500">{r.invocations.toLocaleString()}</td>
-              <td className="px-4 py-2 text-right tabular-nums text-emerald-300">{formatCents(r.totalCents)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </SectionCard>
+    <div className="grid grid-cols-1 gap-5 bg-white/2 px-4 py-4 md:grid-cols-2 lg:grid-cols-3">
+      <BreakdownSection title="By pipeline"><PipelineList byPipeline={byPipeline} /></BreakdownSection>
+      <BreakdownSection title="Repository sync"><RepoList rows={byRepo} /></BreakdownSection>
+      <BreakdownSection title="Job applications"><NamedCostList rows={applicationRows} emptyLabel="No JD executions yet" /></BreakdownSection>
+      <BreakdownSection title="Projects"><NamedCostList rows={projectRows} emptyLabel="No project case studies yet" /></BreakdownSection>
+      <BreakdownSection title="Recent invocations"><RecentInvocations rows={data?.rows ?? []} /></BreakdownSection>
+    </div>
   )
 }
 
-function DetailTable({ rows, isLoading }: { rows: PromptInvocationRow[]; isLoading: boolean }) {
+// ─── User row ─────────────────────────────────────────────────────────────────
+
+function UserRow({ user, expanded, onToggle }: Readonly<{ user: UserCostRow; expanded: boolean; onToggle: () => void }>) {
+  const id = user.userId ?? 'unattributed'
   return (
-    <SectionCard title="Invocations" subtitle="Most recent 500 calls in the window.">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b border-white/10 text-left text-zinc-500">
-            <th className="px-4 py-3 font-medium">User</th>
-            <th className="px-4 py-3 font-medium">Pipeline</th>
-            <th className="px-4 py-3 font-medium">Model</th>
-            <th className="px-4 py-3 font-medium text-right">Tokens In</th>
-            <th className="px-4 py-3 font-medium text-right">Tokens Out</th>
-            <th className="px-4 py-3 font-medium text-right">Cost</th>
-            <th className="px-4 py-3 font-medium">Source</th>
-            <th className="px-4 py-3 font-medium">Date</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-white/6">
-          {isLoading && <EmptyRow colSpan={8} label="Loading…" />}
-          {!isLoading && rows.length === 0 && <EmptyRow colSpan={8} label="No invocations recorded yet" />}
-          {rows.map((row) => (
-            <tr key={row.id} className="text-zinc-300 hover:bg-white/2">
-              <td className="max-w-40 truncate px-4 py-2 text-zinc-400">{userLabel(row.userId, row.email)}</td>
-              <td className="px-4 py-2">
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset ${pipelineBadgeClass(row.pipeline)}`}>
-                  {row.pipeline}
-                </span>
-              </td>
-              <td className="px-4 py-2 font-mono text-[10px] text-zinc-400">{row.modelId.split('/').pop() ?? row.modelId}</td>
-              <td className="px-4 py-2 text-right tabular-nums">{row.inputTokens.toLocaleString()}</td>
-              <td className="px-4 py-2 text-right tabular-nums">{row.outputTokens.toLocaleString()}</td>
-              <td className="px-4 py-2 text-right tabular-nums text-emerald-300">{formatCents(row.totalCostCents)}</td>
-              <td className="max-w-32 truncate px-4 py-2 text-zinc-500">{row.importId ?? row.repoName ?? '—'}</td>
-              <td className="px-4 py-2 text-zinc-500">
-                {new Date(row.invokedAt).toLocaleString('en-GB', {
-                  day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-                })}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </SectionCard>
+    <tbody className="border-b border-white/6">
+      <tr className="text-zinc-300 hover:bg-white/2">
+        <td className="px-4 py-2">
+          <button
+            type="button"
+            onClick={onToggle}
+            className="flex items-center gap-2 text-left"
+            aria-expanded={expanded}
+          >
+            <span className={`text-zinc-500 transition-transform ${expanded ? 'rotate-90' : ''}`}>▶</span>
+            <span className="max-w-64 truncate">{userLabel(user.userId, user.email)}</span>
+          </button>
+        </td>
+        <td className="px-4 py-2 text-zinc-500">{formatDateTime(user.lastInvokedAt)}</td>
+        <td className="px-4 py-2 text-right tabular-nums text-zinc-500">{user.invocations.toLocaleString()}</td>
+        <td className="px-4 py-2 text-right tabular-nums text-amber-300">{formatCents(user.jdCents)}</td>
+        <td className="px-4 py-2 text-right tabular-nums text-zinc-400">
+          {user.tailoredResumes} <span className="text-zinc-600">/ {user.importRuns}</span>
+        </td>
+        <td className="px-4 py-2 text-right tabular-nums font-medium text-emerald-300">{formatCents(user.totalCents)}</td>
+      </tr>
+      {expanded && (
+        <tr>
+          <td colSpan={6} className="p-0"><UserBreakdown userId={id} /></td>
+        </tr>
+      )}
+    </tbody>
   )
 }
 
 // ─── Tab ──────────────────────────────────────────────────────────────────────
 
 export function BedrockCostTab() {
-  // Unfiltered query: populates the user picker so its options never vanish
-  // when a filter narrows the rest of the view.
-  const allUsers = useQuery(bedrockUsageQueries.summary())
-  const [userId, setUserId] = useState('')
-
-  // When userId is '' this resolves to the same query key as allUsers above,
-  // so TanStack Query dedupes them into a single request.
-  const view = useQuery(bedrockUsageQueries.summary(undefined, userId || undefined))
-
-  const isLoading = view.isLoading
-  const data = view.data
+  const { data, isLoading } = useQuery(bedrockUsageQueries.summary())
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null)
 
   const totalCents = data?.totalCents ?? 0
   const byPipeline = data?.byPipeline ?? {}
+  const users = data?.byUser ?? []
+
   const importCents = byPipeline['resume-import'] ?? 0
   const syncCents = byPipeline['repo-sync'] ?? 0
 
-  const userOptions = allUsers.data?.byUser ?? []
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="grid grow grid-cols-1 gap-4 sm:grid-cols-3">
-          {[
-            { name: 'Total Spend (MTD)',   value: isLoading ? '…' : formatCents(totalCents) },
-            { name: 'Resume Import (MTD)', value: isLoading ? '…' : formatCents(importCents) },
-            { name: 'Repo Sync (MTD)',     value: isLoading ? '…' : formatCents(syncCents) },
-          ].map((s) => (
-            <div key={s.name} className="rounded-md border border-white/10 bg-white/4 p-4">
-              <p className="text-xs text-zinc-500">{s.name}</p>
-              <p className="mt-1 text-2xl font-semibold text-zinc-100">{s.value}</p>
-            </div>
-          ))}
+      {/* Combined totals across all users */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {[
+          { name: 'Total Spend (MTD)',   value: isLoading ? '…' : formatCents(totalCents) },
+          { name: 'Resume Import (MTD)', value: isLoading ? '…' : formatCents(importCents) },
+          { name: 'Repo Sync (MTD)',     value: isLoading ? '…' : formatCents(syncCents) },
+        ].map((s) => (
+          <div key={s.name} className="rounded-md border border-white/10 bg-white/4 p-4">
+            <p className="text-xs text-zinc-500">{s.name}</p>
+            <p className="mt-1 text-2xl font-semibold text-zinc-100">{s.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-md border border-white/10">
+        <div className="border-b border-white/10 px-4 py-3">
+          <p className="text-sm font-medium text-zinc-200">Cost by user</p>
+          <p className="mt-0.5 text-xs text-zinc-500">
+            Click a user to expand: last execution, charges, and the per-pipeline / repo / project / application breakdown.
+            Resumes column = tailored / imports.
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-white/10 text-left text-zinc-500">
+                <th className="px-4 py-3 font-medium">User</th>
+                <th className="px-4 py-3 font-medium">Last execution</th>
+                <th className="px-4 py-3 font-medium text-right">Calls</th>
+                <th className="px-4 py-3 font-medium text-right">JD spend</th>
+                <th className="px-4 py-3 font-medium text-right">Resumes</th>
+                <th className="px-4 py-3 font-medium text-right">Total</th>
+              </tr>
+            </thead>
+            {isLoading && (
+              <tbody><tr><td colSpan={6} className="px-4 py-8 text-center text-zinc-600">Loading…</td></tr></tbody>
+            )}
+            {!isLoading && users.length === 0 && (
+              <tbody><tr><td colSpan={6} className="px-4 py-8 text-center text-zinc-600">No spend recorded yet</td></tr></tbody>
+            )}
+            {users.map((user) => {
+              const id = user.userId ?? 'unattributed'
+              return (
+                <UserRow
+                  key={id}
+                  user={user}
+                  expanded={expandedUserId === id}
+                  onToggle={() => setExpandedUserId((cur) => (cur === id ? null : id))}
+                />
+              )
+            })}
+          </table>
         </div>
       </div>
-
-      <div className="flex items-center gap-2">
-        <label htmlFor="cost-user-filter" className="text-xs text-zinc-500">Filter by user</label>
-        <select
-          id="cost-user-filter"
-          value={userId}
-          onChange={(e) => setUserId(e.target.value)}
-          className="rounded-md border border-white/10 bg-white/4 px-3 py-1.5 text-xs text-zinc-200"
-        >
-          <option value="">All users</option>
-          {userOptions
-            .filter((u) => u.userId)
-            .map((u) => (
-              <option key={u.userId} value={u.userId ?? ''}>{userLabel(u.userId, u.email)}</option>
-            ))}
-        </select>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <UserCostTable rows={data?.byUser ?? []} isLoading={isLoading} />
-        <RepoCostTable rows={data?.byRepo ?? []} isLoading={isLoading} />
-        <ApplicationCostTable rows={data?.byApplication ?? []} isLoading={isLoading} />
-        <ProjectCostTable rows={data?.byProject ?? []} isLoading={isLoading} />
-      </div>
-
-      <DetailTable rows={data?.rows ?? []} isLoading={isLoading} />
     </div>
   )
 }

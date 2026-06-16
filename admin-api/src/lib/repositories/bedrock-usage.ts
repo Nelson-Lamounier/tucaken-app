@@ -32,12 +32,20 @@ export interface PromptInvocationRow {
 
 /** Per-user spend roll-up (accurate — aggregated in SQL, not capped at 500 rows). */
 export interface UserCostRow {
-  userId:       string | null;
-  email:        string | null;
-  totalCents:   number;
-  inputTokens:  number;
-  outputTokens: number;
-  invocations:  number;
+  userId:        string | null;
+  email:         string | null;
+  totalCents:    number;
+  inputTokens:   number;
+  outputTokens:  number;
+  invocations:   number;
+  /** Most recent invocation in the window (ISO) — null if none. */
+  lastInvokedAt: string | null;
+  /** Spend on the job-strategist (JD execution) pipeline. */
+  jdCents:       number;
+  /** Tailored resume documents generated in the window (resumes table). */
+  tailoredResumes: number;
+  /** Distinct resume-import runs in the window (by import_id). */
+  importRuns:    number;
 }
 
 /** Per-repo spend on the repo-sync pipeline, split by sync kind (initial vs resync). */
@@ -148,7 +156,11 @@ async function queryByUser(pool: Pool, where: string, params: string[]): Promise
        SUM(pi.total_cost_cents)::float8                        AS "totalCents",
        SUM(pi.system_prompt_tokens + pi.user_message_tokens)::int AS "inputTokens",
        SUM(pi.output_tokens)::int                              AS "outputTokens",
-       COUNT(*)::int                                           AS "invocations"
+       COUNT(*)::int                                           AS "invocations",
+       MAX(pi.invoked_at)                                      AS "lastInvokedAt",
+       COALESCE(SUM(pi.total_cost_cents) FILTER (WHERE pi.pipeline = 'job-strategist'), 0)::float8 AS "jdCents",
+       COUNT(DISTINCT pi.import_id) FILTER (WHERE pi.pipeline = 'resume-import')::int AS "importRuns",
+       0                                                       AS "tailoredResumes"
      FROM prompt_invocations pi
      LEFT JOIN users u ON u.id = pi.user_id
      WHERE ${where}
@@ -157,6 +169,35 @@ async function queryByUser(pool: Pool, where: string, params: string[]): Promise
     params,
   );
   return rows;
+}
+
+/**
+ * Tailored resumes generated per user in the same month window, from the
+ * `resumes` table (not prompt_invocations). Returned as a map so the caller can
+ * merge counts into the byUser rows. Admin pool bypasses RLS, so this sees all
+ * users (the bedrock-usage routes are admin-only).
+ */
+async function queryTailoredResumesPerUser(pool: Pool, month?: string): Promise<Map<string, number>> {
+  const params: string[] = [];
+  let clause: string;
+  if (month) {
+    params.push(month);
+    clause =
+      `generated_at >= DATE_TRUNC('month', $1::date) ` +
+      `AND generated_at < DATE_TRUNC('month', $1::date) + INTERVAL '1 month'`;
+  } else {
+    clause =
+      `generated_at >= DATE_TRUNC('month', now()) ` +
+      `AND generated_at < DATE_TRUNC('month', now()) + INTERVAL '1 month'`;
+  }
+  const { rows } = await pool.query<{ userId: string; count: number }>(
+    `SELECT user_id AS "userId", COUNT(*)::int AS "count"
+       FROM resumes
+      WHERE ${clause}
+      GROUP BY user_id`,
+    params,
+  );
+  return new Map(rows.map((r) => [r.userId, r.count]));
 }
 
 async function queryByRepo(pool: Pool, where: string, params: string[]): Promise<RepoCostRow[]> {
@@ -217,13 +258,20 @@ export async function getUsageSummary(
 ): Promise<UsageSummary> {
   const { where, params } = buildWindow(userId, month);
 
-  const [rows, byUser, byRepo, byApplication, byProject] = await Promise.all([
+  const [rows, byUserRaw, byRepo, byApplication, byProject, resumesByUser] = await Promise.all([
     queryDetailRows(pool, where, params),
     queryByUser(pool, where, params),
     queryByRepo(pool, where, params),
     queryByApplication(pool, where, params),
     queryByProject(pool, where, params),
+    queryTailoredResumesPerUser(pool, month),
   ]);
+
+  // Merge tailored-resume counts (from the resumes table) into each user row.
+  const byUser = byUserRaw.map((u) => ({
+    ...u,
+    tailoredResumes: u.userId ? (resumesByUser.get(u.userId) ?? 0) : 0,
+  }));
 
   // Total is the accurate per-user sum (SQL aggregate, not capped). byPipeline
   // and byModel remain row-derived (last 500) — a finer, recency-biased view.
