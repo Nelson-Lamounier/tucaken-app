@@ -19,6 +19,7 @@ or the root [README](../README.md) for the product and architecture.
 - [SSR query hydration](concepts/ssr-query-hydration.md) — `createServerFn` + `queryOptions` + shared `QueryClient`.
 - [Application stage workspaces](concepts/application-stage-workspaces.md) — per-stage interview-prep surfaces and stage state.
 - [Evidence-quality and source-lane provenance](concepts/evidence-quality-provenance.md) — what the Applications UI presents (scoring is in ai-applications).
+- [Usage quota enforcement](concepts/usage-quota-enforcement.md) — atomic, race-free monthly quotas (`usage_quotas`) with `429` + Retry-After.
 
 ## Patterns
 
