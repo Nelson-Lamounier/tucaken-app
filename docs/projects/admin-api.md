@@ -47,8 +47,11 @@ Configuration is validated at startup by `loadConfig()`, which throws
 immediately if any required env var is absent — misconfiguration surfaces as a
 CrashLoopBackOff visible in ArgoCD rather than a runtime error on the first
 request ([index.ts](../../admin-api/src/index.ts#L55-L60)). AWS SDK credentials
-come from the EC2 Instance Profile (IMDS), so no AWS secrets live in the pod
-([index.ts](../../admin-api/src/index.ts#L6-L16)). It listens on port 3002,
+come from **EKS Pod Identity** — the `admin-api` service account is mapped to a
+dedicated IAM role, so no AWS secrets live in the pod
+([verified via `aws eks list-pod-identity-associations` on 2026-06-16]; note the
+`index.ts` comment at L6-L16 still says "EC2 Instance Profile (IMDS)", which is
+stale — the pod does not use the node instance profile). It listens on port 3002,
 talks to Postgres (`pg`), Redis (`ioredis`), the Kubernetes BatchV1 API
 (`@kubernetes/client-node`), Cognito, S3, CloudWatch, and Cost Explorer
 ([admin-api/package.json](../../admin-api/package.json#L19-L40)). Uncaught
