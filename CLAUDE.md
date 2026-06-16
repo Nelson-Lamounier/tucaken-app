@@ -219,6 +219,60 @@ the repo** — it strips load-bearing casts and cascades into hundreds of errors
 - Commits: follow `git-commit` skill. Never include `Co-Authored-By` trailer.
 - Don't edit `routeTree.gen.ts`, `yarn.lock` (regenerate via yarn), or files under `dist/`.
 
+## Documentation & README authoring
+
+This repo is part of the multi-repo **Tucaken** product (the sibling
+**ai-applications** repo holds the Bedrock worker images/pipelines). The project
+case-study generator reads each repo's **root `README.md`** as ground-truth
+`productContext` (`ai-applications/applications/shared/src/projects/case-study-loader.ts`),
+taking only the **first ~1,400 characters per repo, top-down** (ordered by chunk
+index, no section search) for the case study's tagline + first pitch paragraph.
+Position beats completeness — write the root README for that.
+
+- **Lead with the product, above the fold.** The first ~800 characters must
+  answer: **what** the product is, **who** it's for, **the problem** it solves,
+  and **this repo's role** in the product. Everything a recruiter needs to grasp
+  the product belongs here, before any stack or architecture detail.
+- **This repo's role, stated explicitly.** Heads are concatenated across repos, so
+  the head must say what *this* repo is: the user-facing web app and `admin-api`
+  BFF — product surface, auth, billing, and Job dispatch. The AI pipelines run in
+  the sibling ai-applications repo.
+- **Tech depth goes below the fold.** Stack, decisions, challenges, and
+  architecture sit lower for human readers; they don't shape the pitch.
+- **Verify every claim** against the code and, for infrastructure claims (deploy
+  flow, cluster, region, resource names), the live account/workflows before
+  writing it. A README that misstates the stack poisons the generated case study.
+  Do not copy forward stale claims from existing docs.
+- **KB docs** (created via the `kb-doc` skill) live under `docs/` by type:
+  `docs/concepts/`, `docs/decisions/` (ADRs, `NNNN-title.md`), `docs/patterns/`,
+  `docs/runbooks/`, `docs/troubleshooting/`, `docs/projects/`, `docs/tools/`.
+  Decision records use `docs/decisions/`, **not** `docs/adr/`.
+
+## Language & user-facing copy
+
+- Write **all** prose in **English (UK)** — docs, README, code comments, commit
+  bodies, PR descriptions, user-facing copy. UK spelling: `-ise`/`-isation`
+  (organise, optimise), `-our` (colour, behaviour), `-re` (centre), doubled
+  `-ll-` (modelled, labelled). Not US forms.
+- **No non-ASCII diacritics** in prose or identifiers. Write `resume`, not
+  `résumé`; `cafe`, not `café`. The codebase term for the generated job document
+  is **`resume`** (matches `resumeBullets`, `tailoredResumeData`,
+  `resume-import-processor`) — keep docs consistent with it.
+- **Product name is "Tucaken".** In user-facing copy, refer to the product as
+  **Tucaken**, never "the agent". Internal glossaries (e.g. `CONTEXT.md`) may use
+  "agent"/"résumé" as domain terms — that is existing internal copy, out of scope
+  for new user-facing prose, which follows the rules above.
+
+## ESLint — always run (mandatory)
+
+**Always run `yarn lint` after any code change, before claiming a task done.** No
+exceptions. Lint must pass (zero errors) before commit or PR.
+
+- Config: `eslint.config.js` (flat config, ESLint + typescript-eslint).
+- Cyclomatic complexity capped at **10** via the core `complexity` rule
+  (`complexity: ['error', { max: 10 }]`). Functions above 10 fail lint — refactor
+  (extract helpers, early returns, lookup tables) rather than raise the limit.
+
 ## Quick checks before "done"
 
 ```
