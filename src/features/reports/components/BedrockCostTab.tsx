@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { bedrockUsageQueries } from '../queries'
+import { formatCents, formatDateTime } from '../cost-format'
 import type {
   ApplicationCostRow,
   ProjectCostRow,
@@ -12,17 +13,6 @@ import type {
 } from '../../../server/bedrock-usage'
 
 // ─── Formatting ─────────────────────────────────────────────────────────────
-
-function formatCents(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`
-}
-
-function formatDateTime(iso: string | null): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString('en-GB', {
-    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
-  })
-}
 
 function pipelineBadgeClass(pipeline: string): string {
   if (pipeline === 'resume-import')  return 'bg-violet-500/15 text-violet-300 ring-violet-400/25'
