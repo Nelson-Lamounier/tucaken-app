@@ -100,8 +100,9 @@ jest.unstable_mockModule('../../src/lib/config.js', () => ({
 // Dynamic imports (after mocks)
 // ---------------------------------------------------------------------------
 
+const { createHmac } = await import('node:crypto');
 const { Hono }               = await import('hono');
-const { createGitHubRouter } = await import('../../src/routes/github.js');
+const { createGitHubRouter, createGitHubWebhookRouter } = await import('../../src/routes/github.js');
 
 // ---------------------------------------------------------------------------
 // Test config
@@ -896,5 +897,78 @@ describe('DELETE /connected-repos/:fullName', () => {
     it('returns 400 for an invalid encoded repo name', async () => {
         const res = await buildApp().request('/connected-repos/not-valid', { method: 'DELETE' });
         expect(res.status).toBe(400);
+    });
+});
+
+// ===========================================================================
+// POST /webhook — repository.renamed / transferred
+// ===========================================================================
+
+describe('POST /webhook — repository.renamed', () => {
+    const WEBHOOK_SECRET = 'whsec_test';
+
+    const webhookConfig = { ...testConfig, githubWebhookSecret: WEBHOOK_SECRET } as const;
+
+    function buildWebhookApp() {
+        const app = new Hono();
+
+        app.route('/', createGitHubWebhookRouter(webhookConfig as any));
+        return app;
+    }
+
+    function postEvent(eventType: string, payload: object) {
+        const body = JSON.stringify(payload);
+        const signature = 'sha256=' + createHmac('sha256', WEBHOOK_SECRET).update(body).digest('hex');
+        return buildWebhookApp().request('/webhook', {
+            method:  'POST',
+            headers: {
+                'Content-Type':         'application/json',
+                'X-GitHub-Event':       eventType,
+                'X-Hub-Signature-256':  signature,
+            },
+            body,
+        });
+    }
+
+    it('reconciles the repo label: 200 + UPDATE repositories carries the new name', async () => {
+        // 1. lookupUserByInstallation → known user.
+        seedQuery([{ user_id: TEST_USER_UUID, plan: 'free' }]);
+        // 2. reconcileRepoName anchor SELECT → stored OLD name (so a rename is needed).
+        seedQuery([{ full_name: 'Nelson-Lamounier/old-name' }]);
+        // The transaction (BEGIN/UPDATEs/COMMIT) runs on the txClient via pool.connect().
+
+        const res = await postEvent('repository', {
+            action:       'renamed',
+            installation: { id: 12345 },
+            repository:   { id: 555, full_name: 'Nelson-Lamounier/new-name' },
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json() as { ok: boolean };
+        expect(body.ok).toBe(true);
+
+        // The anchor UPDATE ran on the transaction client carrying the new name.
+        const txCalls = txClient.query.mock.calls.map(c => String(c[0]));
+        const anchorIdx = txCalls.findIndex(s => /UPDATE repositories SET full_name/.test(s));
+        expect(anchorIdx).toBeGreaterThanOrEqual(0);
+        const anchorParams = txClient.query.mock.calls[anchorIdx]![1] as unknown[];
+        expect(anchorParams).toEqual(['Nelson-Lamounier/new-name', TEST_USER_UUID, 555]);
+
+        // At least one denormalised label-table UPDATE also carried the new name.
+        expect(txCalls.some(s => /UPDATE \w+ SET repo_full_name = \$1/.test(s))).toBe(true);
+    });
+
+    it('rejects an invalid signature with 401 and does no reconcile', async () => {
+        const res = await buildWebhookApp().request('/webhook', {
+            method:  'POST',
+            headers: {
+                'Content-Type':        'application/json',
+                'X-GitHub-Event':      'repository',
+                'X-Hub-Signature-256': 'sha256=deadbeef',
+            },
+            body: JSON.stringify({ action: 'renamed', installation: { id: 12345 }, repository: { id: 555, full_name: 'o/new' } }),
+        });
+        expect(res.status).toBe(401);
+        expect(poolQueryMock).not.toHaveBeenCalled();
     });
 });

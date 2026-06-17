@@ -51,6 +51,7 @@ import { getBatchApi } from '../lib/k8s.js';
 import { traceParentEnv, observabilityEnv, MODEL_JOB_BACKOFF_LIMIT } from '../lib/k8s-job-builder.js';
 import { buildIngestionJobSpec } from '../lib/ingestion-job.js';
 import { getPool } from '../lib/pg.js';
+import { reconcileRepoName } from '../lib/reconcile-repo-name.js';
 import { isSyncInFlight, tryClaimSyncSlot } from '../lib/sync-state.js';
 import { ensureDefaultProject } from '../lib/repositories/projects.js';
 import { secondsUntilNextMonthUTC } from '../lib/retry-after.js';
@@ -1390,7 +1391,37 @@ export function createGitHubWebhookRouter(config: AdminApiConfig): Hono {
             return ctx.json({ ok: true });
         }
 
-        // ── 7. All other events — acknowledge without processing ──────────────
+        // ── 7. repository.renamed / transferred — refresh the display label ───
+        // GitHub renames/transfers are metadata-only: the immutable numeric repo
+        // id is unchanged, only `full_name` moves. Re-stamp the denormalised
+        // label everywhere via the idempotent reconcileRepoName routine, keyed on
+        // github_repo_id, instead of re-ingesting.
+        if (eventType === 'repository' && (action === 'renamed' || action === 'transferred')) {
+            const inst = payload['installation'] as Record<string, unknown> | undefined;
+            const repo = payload['repository']   as Record<string, unknown> | undefined;
+            const installationId = String(inst?.['id'] ?? '');
+            const rawId          = repo?.['id'];
+            const githubRepoId   = typeof rawId === 'number' ? rawId : Number(rawId);
+            const newFullName    = typeof repo?.['full_name'] === 'string' ? repo['full_name'] : '';
+
+            if (!installationId || !Number.isFinite(githubRepoId) || !newFullName) {
+                return ctx.json({ ok: true });
+            }
+
+            const pool = getPool(config);
+            const user = await lookupUserByInstallation(pool, installationId);
+            if (!user) return ctx.json({ ok: true });
+
+            try {
+                await reconcileRepoName(pool, user.userId, githubRepoId, newFullName);
+                console.log(`[github/webhook] repository.${action}: reconciled repo ${githubRepoId} -> ${newFullName} for user ${user.userId}`);
+            } catch (err) {
+                console.error(`[github/webhook] reconcile failed for repo ${githubRepoId}`, (err as Error).message);
+            }
+            return ctx.json({ ok: true });
+        }
+
+        // ── 8. All other events — acknowledge without processing ──────────────
         return ctx.json({ ok: true });
     });
 
