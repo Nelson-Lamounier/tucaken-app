@@ -1503,13 +1503,19 @@ export function createGitHubWebhookRouter(config: AdminApiConfig): Hono {
             const user = await lookupUserByInstallation(pool, installationId);
             if (!user) return ctx.json({ ok: true });
 
-            try {
-                await reconcileRepoName(pool, user.userId, githubRepoId, newFullName);
-                console.log(`[github/webhook] repository.${action}: reconciled repo ${githubRepoId} -> ${newFullName} for user ${user.userId}`);
-            } catch (err) {
-                const msg = err instanceof Error ? err.message : String(err);
-                console.error(`[github/webhook] reconcile failed for repo ${githubRepoId}`, msg);
-            }
+            // Acknowledge GitHub immediately (its delivery timeout is ~10s); the
+            // reconcile touches a denormalised label across ~19 tables incl. the
+            // vector-indexed document_embeddings and can exceed that. It is
+            // idempotent and also covered by the worker's sync-time self-heal, so
+            // running it in the background after the 200 is safe.
+            void reconcileRepoName(pool, user.userId, githubRepoId, newFullName)
+                .then(() => {
+                    console.log(`[github/webhook] repository.${action}: reconciled repo ${githubRepoId} -> ${newFullName} for user ${user.userId}`);
+                })
+                .catch((err) => {
+                    const msg = err instanceof Error ? err.message : String(err);
+                    console.error(`[github/webhook] reconcile failed for repo ${githubRepoId}`, msg);
+                });
             return ctx.json({ ok: true });
         }
 
