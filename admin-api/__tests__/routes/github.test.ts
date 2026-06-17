@@ -22,8 +22,8 @@ import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 // ---------------------------------------------------------------------------
 
 const mockGenerateInstallationToken = jest.fn<() => Promise<string>>().mockResolvedValue('ghs_test_token');
-const mockGetInstallationInfo       = jest.fn<() => Promise<{ accountLogin: string; accountAvatarUrl: string }>>()
-    .mockResolvedValue({ accountLogin: 'nelson-lamounier', accountAvatarUrl: 'https://avatars.github.com/u/1' });
+const mockGetInstallationInfo       = jest.fn<() => Promise<{ accountId: string; accountLogin: string; accountAvatarUrl: string }>>()
+    .mockResolvedValue({ accountId: 'u_1', accountLogin: 'nelson-lamounier', accountAvatarUrl: 'https://avatars.github.com/u/1' });
 const mockListInstallationRepos     = jest.fn<() => Promise<object[]>>().mockResolvedValue([
     { id: 1, full_name: 'Nelson-Lamounier/cdk-monitoring',        owner: { login: 'Nelson-Lamounier' }, name: 'cdk-monitoring',        default_branch: 'develop', private: false, updated_at: '2026-04-29T00:00:00Z' },
     { id: 2, full_name: 'Nelson-Lamounier/kubernetes-bootstrap',   owner: { login: 'Nelson-Lamounier' }, name: 'kubernetes-bootstrap',  default_branch: 'develop', private: false, updated_at: '2026-04-29T00:00:00Z' },
@@ -194,7 +194,7 @@ beforeEach(() => {
     jest.clearAllMocks();
     poolQueryMock.mockResolvedValue({ rows: [] });
     mockGenerateInstallationToken.mockResolvedValue('ghs_test_token');
-    mockGetInstallationInfo.mockResolvedValue({ accountLogin: 'nelson-lamounier', accountAvatarUrl: 'https://avatars.github.com/u/1' });
+    mockGetInstallationInfo.mockResolvedValue({ accountId: 'u_1', accountLogin: 'nelson-lamounier', accountAvatarUrl: 'https://avatars.github.com/u/1' });
     mockListInstallationRepos.mockResolvedValue([
         { id: 1, full_name: 'Nelson-Lamounier/cdk-monitoring',       owner: { login: 'Nelson-Lamounier' }, name: 'cdk-monitoring',       default_branch: 'develop', private: false, updated_at: '2026-04-29T00:00:00Z' },
         { id: 2, full_name: 'Nelson-Lamounier/kubernetes-bootstrap',  owner: { login: 'Nelson-Lamounier' }, name: 'kubernetes-bootstrap', default_branch: 'develop', private: false, updated_at: '2026-04-29T00:00:00Z' },
@@ -968,6 +968,48 @@ describe('POST /webhook — repository.renamed', () => {
 
         // At least one denormalised label-table UPDATE also carried the new name.
         expect(txCalls.some(s => /UPDATE \w+ SET repo_full_name = \$1/.test(s))).toBe(true);
+    });
+
+    it('handles transferred: 200 + UPDATE repositories carries the new owner name', async () => {
+        // 1. lookupUserByInstallation → known user.
+        seedQuery([{ user_id: TEST_USER_UUID, plan: 'free' }]);
+        // 2. reconcileRepoName anchor SELECT → stored OLD name (so a rename is needed).
+        seedQuery([{ full_name: 'old-owner/repo' }]);
+
+        const res = await postEvent('repository', {
+            action:       'transferred',
+            installation: { id: 12345 },
+            repository:   { id: 555, full_name: 'new-owner/repo' },
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json() as { ok: boolean };
+        expect(body.ok).toBe(true);
+
+        const txCalls = txClient.query.mock.calls.map(c => String(c[0]));
+        const anchorIdx = txCalls.findIndex(s => /UPDATE repositories SET full_name/.test(s));
+        expect(anchorIdx).toBeGreaterThanOrEqual(0);
+        const anchorParams = txClient.query.mock.calls[anchorIdx]![1] as unknown[];
+        expect(anchorParams).toEqual(['new-owner/repo', TEST_USER_UUID, 555]);
+    });
+
+    it('unknown installation: 200 and no reconcile (no UPDATE, no transaction)', async () => {
+        // lookupUserByInstallation → no rows: reconcile must not run.
+        seedQuery([]);
+
+        const res = await postEvent('repository', {
+            action:       'renamed',
+            installation: { id: 99999 },
+            repository:   { id: 777, full_name: 'someone/renamed' },
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json() as { ok: boolean };
+        expect(body.ok).toBe(true);
+
+        const txCalls = txClient.query.mock.calls.map(c => String(c[0]));
+        expect(txCalls.some(s => /BEGIN/i.test(s))).toBe(false);
+        expect(txCalls.some(s => /UPDATE repositories/.test(s))).toBe(false);
     });
 
     it('rejects an invalid signature with 401 and does no reconcile', async () => {

@@ -1456,7 +1456,8 @@ export function createGitHubWebhookRouter(config: AdminApiConfig): Hono {
                 await reconcileRepoName(pool, user.userId, githubRepoId, newFullName);
                 console.log(`[github/webhook] repository.${action}: reconciled repo ${githubRepoId} -> ${newFullName} for user ${user.userId}`);
             } catch (err) {
-                console.error(`[github/webhook] reconcile failed for repo ${githubRepoId}`, (err as Error).message);
+                const msg = err instanceof Error ? err.message : String(err);
+                console.error(`[github/webhook] reconcile failed for repo ${githubRepoId}`, msg);
             }
             return ctx.json({ ok: true });
         }
