@@ -201,28 +201,29 @@ async function listConnectedRepos(pool: Pool, userId: string): Promise<Connected
  * transaction. Fatal-by-design: if project creation fails, the repo insert
  * rolls back too (a repo with no project is the bug we're preventing).
  * Uses the superuser pool (these tables are written without RLS today).
+ *
+ * Conflict is keyed on the immutable (user_id, github_repo_id) — the post-085
+ * unique index uq_repositories_user_ghid. github_repo_id is NOT NULL after 085,
+ * so every caller MUST resolve a real numeric id before connecting; a NULL would
+ * be rejected by the DB. On a reconnect after a GitHub rename (same id, new
+ * full_name) this correctly updates the stored full_name. github_repo_id itself
+ * is never updated here — it IS the conflict key.
  */
 export async function connectRepoWithDefaultProject(
     pool: Pool,
     userId: string,
     fullName: string,
     defaultBranch: string,
-    githubRepoId: number | null,
+    githubRepoId: number,
 ): Promise<void> {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        // Dual-write the immutable github_repo_id alongside the mutable full_name
-        // so a later rename can be reconciled by id (see reconcile-repo-name.ts).
-        // It is nullable: paths without the numeric id to hand (e.g. deferred
-        // connect, which avoids fetching an installation token) write NULL and
-        // the id is backfilled on the next id-bearing connect or rename event.
         const r = await client.query<{ id: string }>(
             `INSERT INTO repositories (user_id, provider, full_name, default_branch, index_status, github_repo_id)
              VALUES ($1::uuid, 'github', $2, $3, 'pending', $4)
-             ON CONFLICT (user_id, provider, full_name)
-             DO UPDATE SET full_name = EXCLUDED.full_name,
-                           github_repo_id = COALESCE(EXCLUDED.github_repo_id, repositories.github_repo_id)
+             ON CONFLICT (user_id, github_repo_id)
+             DO UPDATE SET full_name = EXCLUDED.full_name
              RETURNING id`,
             [userId, fullName, defaultBranch, githubRepoId],
         );
@@ -371,15 +372,25 @@ async function autoDispatchRepos(
 ): Promise<string[]> {
     const limit   = getPlanLimit(plan);
     const queued: string[] = [];
+    // github_repo_id is NOT NULL post-085, so we must resolve a real id for every
+    // repo. Build the installation name->id map once and fall back to it whenever
+    // the row's id is absent.
+    const idMap = await buildRepoIdMap(token);
 
     for (const repo of repos) {
+        const id = repo.github_repo_id ?? idMap.get(repo.full_name);
+        if (id === null || id === undefined) {
+            console.warn(`[github/auto-dispatch] no github_repo_id for ${repo.full_name} — skipping`);
+            continue;
+        }
+
         const allowed = await checkAndIncrementQuota(pool, userId, limit);
         if (!allowed) {
             console.log(`[github/auto-dispatch] quota reached for user ${userId} — stopping`);
             break;
         }
 
-        await connectRepoWithDefaultProject(pool, userId, repo.full_name, repo.default_branch ?? 'main', repo.github_repo_id ?? null);
+        await connectRepoWithDefaultProject(pool, userId, repo.full_name, repo.default_branch ?? 'main', id);
         await markRepoPending(pool, userId, repo.full_name);
         await markSyncTriggered(pool, userId, repo.full_name);
 
@@ -970,11 +981,17 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         // no quota consumed, no Job dispatched. POST /connected-repos/sync
         // dispatches the actual ingestion for every queued repo later.
         if (body.deferSync === true) {
-            // Deferred connect deliberately avoids generating an installation
-            // token, so the numeric id is unknown here — write NULL. It is
-            // backfilled on the first id-bearing sync (POST /connected-repos/sync
-            // resolves the id) or on a rename event.
-            await connectRepoWithDefaultProject(pool, uid, repoFullName, defaultBranch, null);
+            // github_repo_id is NOT NULL post-085, so the deferred connect must
+            // resolve the numeric id too — one installation token, one repo list.
+            // A repo not in the installation is rejected rather than inserted.
+            const [deferAppId, deferKey] = requireGitHubConfig(config);
+            const deferToken = await generateInstallationToken(deferAppId, deferKey, conn.installation_id);
+            const deferIdMap = await buildRepoIdMap(deferToken);
+            const deferId = deferIdMap.get(repoFullName);
+            if (deferId === undefined) {
+                return ctx.json({ error: 'Repository not found in your GitHub installation' }, 404);
+            }
+            await connectRepoWithDefaultProject(pool, uid, repoFullName, defaultBranch, deferId);
             await markRepoPending(pool, uid, repoFullName);
             return ctx.json({ status: 'queued', repoFullName, jobName: null }, 202);
         }
@@ -1010,10 +1027,16 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
             // Reused for the id lookup and the Job dispatch below.
             const githubToken = await generateInstallationToken(appId, key, conn.installation_id);
 
-            // Resolve the immutable github_repo_id so a later rename can be
-            // reconciled by id. Null if the repo is not in the installation list.
+            // Resolve the immutable github_repo_id (the conflict key post-085).
+            // A repo not in the installation list cannot be inserted — refund the
+            // quota we just incremented and report 404 instead of writing a NULL.
             const idMap = await buildRepoIdMap(githubToken);
-            await connectRepoWithDefaultProject(pool, uid, repoFullName, defaultBranch, idMap.get(repoFullName) ?? null);
+            const id = idMap.get(repoFullName);
+            if (id === undefined) {
+                await decrementQuota(pool, uid).catch(() => {});
+                return ctx.json({ error: 'Repository not found in your GitHub installation' }, 404);
+            }
+            await connectRepoWithDefaultProject(pool, uid, repoFullName, defaultBranch, id);
 
             // Race-free backstop: lost the atomic claim → a concurrent request
             // already dispatched between the fast-path read and here. Refund the

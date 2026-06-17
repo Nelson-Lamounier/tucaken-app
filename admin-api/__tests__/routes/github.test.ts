@@ -685,7 +685,7 @@ describe('POST /connected-repos', () => {
         expect(jobArg.body.metadata.annotations['ingestion.tucaken.io/repo-full-name']).toBe('Nelson-Lamounier/cdk-monitoring');
     });
 
-    it('deferSync:true connects as pending without quota or Job dispatch', async () => {
+    it('deferSync:true connects as pending (resolving the id) without quota or Job dispatch', async () => {
         seedQuery([connectedRow]);   // 1. getConnection
         // The repo INSERT runs on the transaction client (connectRepoWithDefaultProject),
         // not poolQueryMock. 2. markRepoPending → default { rows: [] }.
@@ -707,8 +707,72 @@ describe('POST /connected-repos', () => {
         expect(calls.some(s => /usage_quotas/.test(s))).toBe(false);
         expect(calls.some(s => /last_sync_triggered_at/.test(s))).toBe(false);
 
-        // No token, no Job — sync is deferred to POST /connected-repos/sync.
-        expect(mockGenerateInstallationToken).not.toHaveBeenCalled();
+        // Post-085 the defer path MUST resolve a non-null github_repo_id, so it now
+        // generates one installation token + lists installation repos once. The repo
+        // INSERT carries the resolved id (cdk-monitoring → 1) as the 4th param.
+        expect(mockGenerateInstallationToken).toHaveBeenCalledTimes(1);
+        expect(mockListInstallationRepos).toHaveBeenCalledTimes(1);
+        const insertCall = txClient.query.mock.calls.find(
+            c => typeof c[0] === 'string' && /INSERT INTO repositories/i.test(c[0]),
+        );
+        expect((insertCall?.[1] as unknown[])?.[3]).toBe(1);
+
+        // Still no Job — sync is deferred to POST /connected-repos/sync.
+        expect(createNamespacedJobMock).not.toHaveBeenCalled();
+    });
+
+    it('deferSync:true returns 404 when the repo is not in the installation (no insert)', async () => {
+        seedQuery([connectedRow]);   // 1. getConnection
+        mockListInstallationRepos.mockResolvedValueOnce([
+            { id: 1, full_name: 'Nelson-Lamounier/cdk-monitoring', owner: { login: 'Nelson-Lamounier' }, name: 'cdk-monitoring', default_branch: 'develop', private: false, updated_at: '2026-04-29T00:00:00Z' },
+        ]);
+
+        const res = await buildApp().request('/connected-repos', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ repoFullName: 'Nelson-Lamounier/ghost-repo', defaultBranch: 'develop', deferSync: true }),
+        });
+        const body = await res.json() as { error: string };
+
+        expect(res.status).toBe(404);
+        expect(body.error).toMatch(/not found in your GitHub installation/i);
+        // No repo INSERT — a NULL github_repo_id would be rejected by the DB post-085.
+        const insertCall = txClient.query.mock.calls.find(
+            c => typeof c[0] === 'string' && /INSERT INTO repositories/i.test(c[0]),
+        );
+        expect(insertCall).toBeUndefined();
+    });
+
+    it('non-defer returns 404 + refunds quota when the repo is not in the installation (no insert)', async () => {
+        seedQuery([connectedRow]);       // 1. getConnection
+        seedQuery([]);                   // 2. isSyncInFlight → not in flight
+        seedQuery([]);                   // 3. plan SELECT → free
+        seedQuery([{ count: 1 }]);       // 4. quota INSERT…RETURNING → allowed
+        // 5. decrementQuota (refund) → default { rows: [] }
+        mockListInstallationRepos.mockResolvedValueOnce([
+            { id: 1, full_name: 'Nelson-Lamounier/cdk-monitoring', owner: { login: 'Nelson-Lamounier' }, name: 'cdk-monitoring', default_branch: 'develop', private: false, updated_at: '2026-04-29T00:00:00Z' },
+        ]);
+
+        const res = await buildApp().request('/connected-repos', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ repoFullName: 'Nelson-Lamounier/ghost-repo', defaultBranch: 'develop' }),
+        });
+        const body = await res.json() as { error: string };
+
+        expect(res.status).toBe(404);
+        expect(body.error).toMatch(/not found in your GitHub installation/i);
+
+        // Quota was incremented (INSERT) then refunded (decrement) — assert the
+        // decrement ran so the user keeps their monthly credit.
+        const calls = poolQueryMock.mock.calls.map(c => String(c[0]));
+        expect(calls.some(s => /usage_quotas/i.test(s) && /count\s*-\s*1|GREATEST/i.test(s))).toBe(true);
+
+        // No repo INSERT.
+        const insertCall = txClient.query.mock.calls.find(
+            c => typeof c[0] === 'string' && /INSERT INTO repositories/i.test(c[0]),
+        );
+        expect(insertCall).toBeUndefined();
         expect(createNamespacedJobMock).not.toHaveBeenCalled();
     });
 });
