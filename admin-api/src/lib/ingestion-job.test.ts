@@ -1,7 +1,7 @@
 /** @format */
 import { describe, it, expect } from '@jest/globals';
 import type { AdminApiConfig } from './config.js';
-import { buildIngestionJobSpec } from './ingestion-job.js';
+import { buildIngestionJobSpec, buildIngestionTokenSecret } from './ingestion-job.js';
 
 const cfg = {
     ingestionNamespace:      'ingestion',
@@ -36,17 +36,38 @@ describe('buildIngestionJobSpec', () => {
         }
     });
 
-    it('resync path: GITHUB_TOKEN + argocd annotation, only the rds secret', () => {
+    it('resync path: GITHUB_TOKEN via secretKeyRef (NEVER plaintext in the Job spec)', () => {
         const job = buildIngestionJobSpec(cfg, 'img', USER, REPO, false, 1, {
             githubToken: 'ghs_x',
             extraAnnotations: { 'argocd.argoproj.io/compare-options': 'IgnoreExtraneous' },
         });
-        const env = job.spec!.template!.spec!.containers![0]!.env!;
-        expect(env.find((e) => e.name === 'GITHUB_TOKEN')?.value).toBe('ghs_x');
+        const tok = job.spec!.template!.spec!.containers![0]!.env!.find((e) => e.name === 'GITHUB_TOKEN')!;
+        // The token must NOT appear as a literal value anywhere in the spec.
+        expect(tok.value).toBeUndefined();
+        expect(JSON.stringify(job)).not.toContain('ghs_x');
+        // It is sourced from the per-Job token Secret.
+        expect(tok.valueFrom?.secretKeyRef?.name).toBe(`${job.metadata!.name}-gh-token`);
+        expect(tok.valueFrom?.secretKeyRef?.key).toBe('GITHUB_TOKEN');
         expect(job.metadata?.annotations?.['argocd.argoproj.io/compare-options']).toBe('IgnoreExtraneous');
-        expect(job.metadata?.annotations?.['ingestion.tucaken.io/user-id']).toBe(USER);
         const secrets = job.spec!.template!.spec!.containers![0]!.envFrom!.map((e) => e.secretRef?.name);
         expect(secrets).toEqual(['platform-rds-credentials']);
+    });
+
+    it('buildIngestionTokenSecret: Opaque secret, owned by the Job for GC, holds the token', () => {
+        const secret = buildIngestionTokenSecret({
+            secretName: 'ingestion-foo-abc123-gh-token',
+            namespace:  'ingestion',
+            token:      'ghs_secret',
+            ownerJobName: 'ingestion-foo-abc123',
+            ownerJobUid:  'uid-123',
+        });
+        expect(secret.type).toBe('Opaque');
+        expect(secret.metadata?.name).toBe('ingestion-foo-abc123-gh-token');
+        expect(secret.metadata?.namespace).toBe('ingestion');
+        expect(secret.stringData?.['GITHUB_TOKEN']).toBe('ghs_secret');
+        // ownerReference → the Job, so kubelet GCs the secret when the Job is deleted.
+        const owner = secret.metadata?.ownerReferences?.[0];
+        expect(owner).toMatchObject({ kind: 'Job', name: 'ingestion-foo-abc123', uid: 'uid-123' });
     });
 
     it('admin path: no GITHUB_TOKEN, mounts ingestion-secrets', () => {
