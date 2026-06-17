@@ -711,7 +711,7 @@ async function reconcileStuckRepos(
 
         const result = await pool.query(
             `UPDATE repo_sync_state
-                SET sync_status = 'error', error_message = $3, updated_at = NOW()
+                SET sync_status = 'error', error_message = $3
               WHERE user_id = $1::uuid AND repo_full_name = $2
                 AND sync_status IN ('pending', 'syncing')`,
             [userId, repo.fullName, errorMessage],
@@ -1153,8 +1153,7 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         const result = await pool.query(
             `UPDATE repo_sync_state
              SET sync_status   = 'error',
-                 error_message = $3,
-                 updated_at    = NOW()
+                 error_message = $3
              WHERE user_id = $1::uuid
                AND repo_full_name = ANY($2::text[])
                AND sync_status IN ('pending', 'syncing')`,
