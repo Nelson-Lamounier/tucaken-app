@@ -1033,6 +1033,10 @@ describe('POST /webhook — repository.renamed', () => {
         const body = await res.json() as { ok: boolean };
         expect(body.ok).toBe(true);
 
+        // The handler acks before the background reconcile's awaited queries run;
+        // flush pending microtasks/timers so the tx-client assertions are stable.
+        await new Promise((r) => setImmediate(r));
+
         // The anchor UPDATE ran on the transaction client carrying the new name.
         const txCalls = txClient.query.mock.calls.map(c => String(c[0]));
         const anchorIdx = txCalls.findIndex(s => /UPDATE repositories SET full_name/.test(s));
@@ -1059,6 +1063,10 @@ describe('POST /webhook — repository.renamed', () => {
         expect(res.status).toBe(200);
         const body = await res.json() as { ok: boolean };
         expect(body.ok).toBe(true);
+
+        // The handler acks before the background reconcile's awaited queries run;
+        // flush pending microtasks/timers so the tx-client assertions are stable.
+        await new Promise((r) => setImmediate(r));
 
         const txCalls = txClient.query.mock.calls.map(c => String(c[0]));
         const anchorIdx = txCalls.findIndex(s => /UPDATE repositories SET full_name/.test(s));
