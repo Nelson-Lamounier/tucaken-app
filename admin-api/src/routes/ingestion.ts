@@ -14,6 +14,7 @@
 import { createHash } from 'node:crypto';
 
 import type { V1Job } from '@kubernetes/client-node';
+import type { Pool } from 'pg';
 import { Hono } from 'hono';
 
 import type { AdminApiBindings } from '../lib/types.js';
@@ -44,12 +45,35 @@ function buildJobSpec(
     repoFullName: string,
     forceReindex: boolean,
     timestamp: number,
+    githubRepoId: number | null,
 ): V1Job {
     // Delegates to the shared builder (single source of truth). The admin path
     // additionally mounts `ingestion-secrets`.
     return buildIngestionJobSpec(cfg, image, userId, repoFullName, forceReindex, timestamp, {
         extraSecretRefs: ['ingestion-secrets'],
+        githubRepoId,
     });
+}
+
+/**
+ * Resolve the immutable numeric GitHub repo id from the repositories row (PR4
+ * dual-writes it). Returns null pre-backfill — the builder then omits the env.
+ */
+async function lookupGithubRepoId(
+    pool: Pool,
+    userId: string,
+    repoFullName: string,
+): Promise<number | null> {
+    const r = await pool.query<{ github_repo_id: string | null }>(
+        `SELECT github_repo_id FROM repositories
+         WHERE user_id = $1::uuid AND provider = 'github' AND full_name = $2`,
+        [userId, repoFullName],
+    );
+    const raw = r.rows[0]?.github_repo_id;
+    if (raw === null || raw === undefined) return null;
+    // pg returns bigint columns as strings; coerce and guard.
+    const id = Number.parseInt(raw, 10);
+    return Number.isFinite(id) ? id : null;
 }
 
 /**
@@ -176,7 +200,8 @@ export function createIngestionRouter(config: AdminApiConfig): Hono<AdminApiBind
             return ctx.json({ status: 'already_running', userId, repoFullName }, 200);
         }
 
-        const job = buildJobSpec(config, ingestionImage, userId, repoFullName, forceReindex, Date.now());
+        const githubRepoId = await lookupGithubRepoId(pool, userId, repoFullName);
+        const job = buildJobSpec(config, ingestionImage, userId, repoFullName, forceReindex, Date.now(), githubRepoId);
 
         try {
             // @kubernetes/client-node v1.x switched to options-object API.
