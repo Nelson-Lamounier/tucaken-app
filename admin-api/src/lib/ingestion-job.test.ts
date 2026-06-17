@@ -57,6 +57,16 @@ describe('buildIngestionJobSpec', () => {
         expect(secrets).toEqual(['platform-rds-credentials', 'ingestion-secrets']);
     });
 
+    it('emits GITHUB_REPO_ID when a finite numeric id is supplied', () => {
+        const env = envOf({ githubRepoId: 555 });
+        expect(env.get('GITHUB_REPO_ID')).toBe('555');
+    });
+
+    it('omits GITHUB_REPO_ID when the id is null or absent', () => {
+        expect(envOf({ githubRepoId: null }).has('GITHUB_REPO_ID')).toBe(false);
+        expect(envOf().has('GITHUB_REPO_ID')).toBe(false);
+    });
+
     it('job name is deterministic + within the 63-char k8s limit', () => {
         const a = buildIngestionJobSpec(cfg, 'img', USER, REPO, true, 42).metadata?.name ?? '';
         const b = buildIngestionJobSpec(cfg, 'img', USER, REPO, true, 42).metadata?.name ?? '';

@@ -19,6 +19,14 @@ export interface IngestionJobOptions {
     readonly extraSecretRefs?: readonly string[];
     /** Extra Job-metadata annotations merged in (e.g. argocd compare-options). */
     readonly extraAnnotations?: Readonly<Record<string, string>>;
+    /**
+     * Immutable numeric GitHub repo id (repositories.github_repo_id). When a
+     * finite number, it is passed as GITHUB_REPO_ID so the worker can self-heal
+     * and dual-write by id across a repository rename. Null/undefined (e.g.
+     * pre-backfill) omits the env var entirely — the worker treats absence as
+     * "no id known yet".
+     */
+    readonly githubRepoId?: number | null;
 }
 
 /**
@@ -48,6 +56,8 @@ export function buildIngestionJobSpec(
     const slugPart = sanitizeIngestionLabel(`${safeUser}-${repoSlug}`).slice(0, 43);
     const jobName  = `ingestion-${slugPart}-${suffix}`.slice(0, MAX_NAME_LEN);
     const tp = traceParentEnv();
+    const repoId = opts.githubRepoId;
+    const hasRepoId = typeof repoId === 'number' && Number.isFinite(repoId);
 
     return {
         apiVersion: 'batch/v1',
@@ -87,6 +97,9 @@ export function buildIngestionJobSpec(
                             // Per-user GitHub installation token (resync path) — explicit env
                             // overrides any static token in a mounted secret.
                             ...(opts.githubToken ? [{ name: 'GITHUB_TOKEN', value: opts.githubToken }] : []),
+                            // Immutable numeric GitHub repo id — lets the worker re-key by id
+                            // across a rename. Omitted entirely when unknown (pre-backfill).
+                            ...(hasRepoId ? [{ name: 'GITHUB_REPO_ID', value: String(repoId) }] : []),
                             // Fast scan = production default: defer per-chunk enrichment to the
                             // in-job background pass (searchable in minutes, no quality loss).
                             // INGESTION_DEFER_ENRICHMENT=0 → inline.

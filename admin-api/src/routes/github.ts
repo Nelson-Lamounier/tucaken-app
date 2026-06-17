@@ -411,6 +411,29 @@ function sanitizeLabel(v: string): string {
     return v.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '').slice(0, MAX_NAME_LEN);
 }
 
+/**
+ * Look up the immutable numeric GitHub repo id persisted on the repositories row
+ * (PR4 dual-writes it). Returns null when not yet backfilled — callers then omit
+ * the GITHUB_REPO_ID env var entirely.
+ */
+async function lookupGithubRepoId(
+    config: AdminApiConfig,
+    userId: string,
+    repoFullName: string,
+): Promise<number | null> {
+    const pool = getPool(config);
+    const r = await pool.query<{ github_repo_id: string | null }>(
+        `SELECT github_repo_id FROM repositories
+         WHERE user_id = $1::uuid AND provider = 'github' AND full_name = $2`,
+        [userId, repoFullName],
+    );
+    const raw = r.rows[0]?.github_repo_id;
+    if (raw === null || raw === undefined) return null;
+    // pg returns bigint/int8 columns as strings; coerce and guard.
+    const id = Number.parseInt(raw, 10);
+    return Number.isFinite(id) ? id : null;
+}
+
 async function dispatchIngestionJob(
     config: AdminApiConfig,
     userId: string,
@@ -423,10 +446,15 @@ async function dispatchIngestionJob(
         throw Object.assign(new Error('Ingestion image not yet configured'), { status: 502 });
     }
 
+    // Resolve the immutable numeric repo id so the worker can re-key by id across
+    // a rename. May be NULL pre-backfill — the builder then omits the env var.
+    const githubRepoId = await lookupGithubRepoId(config, userId, repoFullName);
+
     // Shared builder = single source of truth (same spec as the admin trigger).
     // Resync path adds the per-user GITHUB_TOKEN + argocd compare-options.
     const job = buildIngestionJobSpec(config, image, userId, repoFullName, forceReindex, Date.now(), {
         githubToken,
+        githubRepoId,
         extraAnnotations: { 'argocd.argoproj.io/compare-options': 'IgnoreExtraneous' },
     });
     const jobName = job.metadata?.name ?? '';

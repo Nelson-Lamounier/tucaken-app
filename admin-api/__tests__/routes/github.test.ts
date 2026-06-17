@@ -609,7 +609,9 @@ describe('POST /connected-repos', () => {
         seedQuery([{ repo_full_name: 'Nelson-Lamounier/cdk-monitoring' }]); // 5. tryClaimSyncSlot → claim won
         // The repo INSERT now runs inside connectRepoWithDefaultProject on a
         // dedicated transaction client (BEGIN/INSERT…RETURNING/guard/COMMIT) — it
-        // does NOT go through poolQueryMock. 6. markSyncTriggered.
+        // does NOT go through poolQueryMock.
+        seedQuery([]);                          // 6. markSyncTriggered
+        seedQuery([{ github_repo_id: '555' }]); // 7. dispatchIngestionJob → github_repo_id lookup
 
         const res  = await buildApp().request('/connected-repos', {
             method:  'POST',
@@ -626,9 +628,9 @@ describe('POST /connected-repos', () => {
 
         // getConnection (1) + isSyncInFlight SELECT (1) + plan SELECT (1)
         // + quota INSERT…RETURNING (1, atomic) + tryClaimSyncSlot (1)
-        // + markSyncTriggered (1). The repo INSERT runs on the transaction
-        // client (pool.connect()), not poolQueryMock.
-        expect(poolQueryMock).toHaveBeenCalledTimes(6);
+        // + markSyncTriggered (1) + github_repo_id lookup (1). The repo INSERT
+        // runs on the transaction client (pool.connect()), not poolQueryMock.
+        expect(poolQueryMock).toHaveBeenCalledTimes(7);
 
         // Installation token generated for this user's installation
         expect(mockGenerateInstallationToken).toHaveBeenCalledWith('999999', testConfig.githubPrivateKey, '12345');
@@ -642,6 +644,9 @@ describe('POST /connected-repos', () => {
             jobArg.body.spec.template.spec.containers[0]!.env.map(e => [e.name, e.value]),
         );
         expect(envMap['GITHUB_TOKEN']).toBe('ghs_test_token');
+        // The immutable repo id resolved from the repositories row is threaded
+        // into the Job so the worker can re-key by id across a rename.
+        expect(envMap['GITHUB_REPO_ID']).toBe('555');
         // USER_ID is now the resolved users.id UUID (set by userProvisionMiddleware),
         // not the Cognito sub. All DB FK constraints use users.id.
         expect(envMap['USER_ID']).toBe(TEST_USER_UUID);
@@ -666,6 +671,8 @@ describe('POST /connected-repos', () => {
         seedQuery([]);                   // plan SELECT → 'free'
         seedQuery([{ count: 1 }]);       // quota INSERT…RETURNING → allowed
         seedQuery([{ repo_full_name: 'Nelson-Lamounier/cdk-monitoring' }]); // tryClaimSyncSlot → claim won
+        seedQuery([]);                          // markSyncTriggered
+        seedQuery([{ github_repo_id: '555' }]); // dispatchIngestionJob → github_repo_id lookup
 
         await buildApp().request('/connected-repos', {
             method:  'POST',
@@ -742,8 +749,10 @@ describe('POST /connected-repos/sync', () => {
         seedQuery([]);                 // 3. plan SELECT → free
         seedQuery([{ count: 1 }]);     // 4. quota INSERT…RETURNING repo 1 → allowed
         seedQuery([]); seedQuery([]);  // 5-6 markPending/markTriggered repo 1 (repo INSERT is on the tx client)
-        seedQuery([{ count: 2 }]);     // 7. quota INSERT…RETURNING repo 2 → allowed
-        seedQuery([]); seedQuery([]);  // 8-9 markPending/markTriggered repo 2 (repo INSERT is on the tx client)
+        seedQuery([{ github_repo_id: '1' }]); // 7. dispatchIngestionJob repo 1 → github_repo_id lookup
+        seedQuery([{ count: 2 }]);     // 8. quota INSERT…RETURNING repo 2 → allowed
+        seedQuery([]); seedQuery([]);  // 9-10 markPending/markTriggered repo 2 (repo INSERT is on the tx client)
+        seedQuery([{ github_repo_id: '2' }]); // 11. dispatchIngestionJob repo 2 → github_repo_id lookup
 
         const res  = await buildApp().request('/connected-repos/sync', { method: 'POST' });
         const body = await res.json() as { started: number };
@@ -789,7 +798,8 @@ describe('POST /connected-repos/:fullName/retry', () => {
         seedQuery([connectedRow]);                       // 1. getConnection
         seedQuery([{ full_name: 'octo/app' }]);          // 2. ownership SELECT
         seedQuery([{ repo_full_name: 'octo/app' }]);     // 3. tryClaimSyncSlot → claim won
-        // 4. markSyncTriggered → default { rows: [] }
+        seedQuery([]);                                   // 4. markSyncTriggered
+        seedQuery([{ github_repo_id: '555' }]);          // 5. dispatchIngestionJob → github_repo_id lookup
 
         const res  = await buildApp().request('/connected-repos/octo%2Fapp/retry', { method: 'POST' });
         const body = await res.json() as { status: string; repoFullName: string; jobName: string };
