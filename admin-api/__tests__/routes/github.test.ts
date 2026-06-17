@@ -75,12 +75,16 @@ jest.unstable_mockModule('../../src/lib/pg.js', () => ({
 // K8s BatchApi mock
 // ---------------------------------------------------------------------------
 
-const createNamespacedJobMock = jest.fn<() => Promise<object>>().mockResolvedValue({});
+const createNamespacedJobMock = jest.fn<() => Promise<object>>().mockResolvedValue({ metadata: { uid: 'job-uid' } });
 const listNamespacedJobMock   = jest.fn<() => Promise<{ items: object[] }>>().mockResolvedValue({ items: [] });
+const deleteNamespacedJobMock = jest.fn<() => Promise<object>>().mockResolvedValue({});
+const createNamespacedSecretMock = jest.fn<() => Promise<object>>().mockResolvedValue({});
 
 jest.unstable_mockModule('../../src/lib/k8s.js', () => ({
-    getBatchApi:    () => ({ createNamespacedJob: createNamespacedJobMock, listNamespacedJob: listNamespacedJobMock }),
+    getBatchApi:    () => ({ createNamespacedJob: createNamespacedJobMock, listNamespacedJob: listNamespacedJobMock, deleteNamespacedJob: deleteNamespacedJobMock }),
+    getCoreApi:     () => ({ createNamespacedSecret: createNamespacedSecretMock }),
     _resetBatchApi: () => {},
+    _resetCoreApi:  () => {},
 }));
 
 // ---------------------------------------------------------------------------
@@ -199,7 +203,8 @@ beforeEach(() => {
         { id: 1, full_name: 'Nelson-Lamounier/cdk-monitoring',       owner: { login: 'Nelson-Lamounier' }, name: 'cdk-monitoring',       default_branch: 'develop', private: false, updated_at: '2026-04-29T00:00:00Z' },
         { id: 2, full_name: 'Nelson-Lamounier/kubernetes-bootstrap',  owner: { login: 'Nelson-Lamounier' }, name: 'kubernetes-bootstrap', default_branch: 'develop', private: false, updated_at: '2026-04-29T00:00:00Z' },
     ]);
-    createNamespacedJobMock.mockResolvedValue({});
+    createNamespacedJobMock.mockResolvedValue({ metadata: { uid: 'job-uid' } });
+    createNamespacedSecretMock.mockResolvedValue({});
     listNamespacedJobMock.mockResolvedValue({ items: [] });
 });
 
@@ -638,12 +643,18 @@ describe('POST /connected-repos', () => {
         // K8s Jobs created: 1 ingestion + 1 tech-extract (shadow-mode, additive)
         expect(createNamespacedJobMock).toHaveBeenCalledTimes(2);
 
-        // Job spec must inject per-user GITHUB_TOKEN (not rely on ingestion-secrets static token)
-        const jobArg = (createNamespacedJobMock.mock.calls[0] as unknown as [{ body: { spec: { template: { spec: { containers: Array<{ env: Array<{ name: string; value: string }> }> } } } } }])[0];
+        // Job spec must inject per-user GITHUB_TOKEN — via secretKeyRef, NEVER plaintext.
+        const jobArg = (createNamespacedJobMock.mock.calls[0] as unknown as [{ body: { spec: { template: { spec: { containers: Array<{ env: Array<{ name: string; value?: string; valueFrom?: { secretKeyRef?: { name: string; key: string } } }> }> } } } } }])[0];
+        const tokenEnv = jobArg.body.spec.template.spec.containers[0]!.env.find(e => e.name === 'GITHUB_TOKEN')!;
+        expect(tokenEnv.value).toBeUndefined();                       // no plaintext in the Job spec
+        expect(tokenEnv.valueFrom?.secretKeyRef?.key).toBe('GITHUB_TOKEN');
+        // The token flows into a per-Job Secret instead.
+        const secretArg = (createNamespacedSecretMock.mock.calls[0] as unknown as [{ body: { stringData: Record<string, string>; metadata: { ownerReferences: Array<{ kind: string }> } } }])[0];
+        expect(secretArg.body.stringData['GITHUB_TOKEN']).toBe('ghs_test_token');
+        expect(secretArg.body.metadata.ownerReferences[0]!.kind).toBe('Job');
         const envMap = Object.fromEntries(
             jobArg.body.spec.template.spec.containers[0]!.env.map(e => [e.name, e.value]),
         );
-        expect(envMap['GITHUB_TOKEN']).toBe('ghs_test_token');
         // The immutable repo id resolved from the repositories row is threaded
         // into the Job so the worker can re-key by id across a rename.
         expect(envMap['GITHUB_REPO_ID']).toBe('555');

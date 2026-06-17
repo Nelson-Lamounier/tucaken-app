@@ -46,10 +46,10 @@ import {
     listInstallationRepos,
     resolveHeadSha,
 } from '../lib/github-app.js';
-import type { V1Job } from '@kubernetes/client-node';
-import { getBatchApi } from '../lib/k8s.js';
+import type { V1EnvVar, V1Job } from '@kubernetes/client-node';
+import { getBatchApi, getCoreApi } from '../lib/k8s.js';
 import { traceParentEnv, observabilityEnv, MODEL_JOB_BACKOFF_LIMIT } from '../lib/k8s-job-builder.js';
-import { buildIngestionJobSpec } from '../lib/ingestion-job.js';
+import { buildIngestionJobSpec, buildIngestionTokenSecret, ingestionTokenSecretName } from '../lib/ingestion-job.js';
 import { getPool } from '../lib/pg.js';
 import { reconcileRepoName } from '../lib/reconcile-repo-name.js';
 import { isSyncInFlight, tryClaimSyncSlot } from '../lib/sync-state.js';
@@ -470,7 +470,29 @@ async function dispatchIngestionJob(
     });
     const jobName = job.metadata?.name ?? '';
 
-    await getBatchApi().createNamespacedJob({ namespace: config.ingestionNamespace, body: job });
+    // Create the Job first, then its token Secret owned by the Job (for GC). The
+    // pod can't start until the secret exists, but image pull (seconds) outlasts
+    // the secret create (ms), so there's no real start delay. If the secret fails,
+    // delete the now-unstartable Job so we never leak a stuck Job.
+    const created = await getBatchApi().createNamespacedJob({ namespace: config.ingestionNamespace, body: job });
+    const jobUid = created.metadata?.uid ?? '';
+    try {
+        await getCoreApi().createNamespacedSecret({
+            namespace: config.ingestionNamespace,
+            body: buildIngestionTokenSecret({
+                secretName:   ingestionTokenSecretName(jobName),
+                namespace:    config.ingestionNamespace,
+                token:        githubToken,
+                ownerJobName: jobName,
+                ownerJobUid:  jobUid,
+            }),
+        });
+    } catch (err) {
+        await getBatchApi()
+            .deleteNamespacedJob({ namespace: config.ingestionNamespace, name: jobName, propagationPolicy: 'Background' })
+            .catch(() => { /* best-effort cleanup */ });
+        throw err;
+    }
     return { jobName };
 }
 
@@ -495,7 +517,7 @@ export async function buildTechExtractJobSpec(
     const slugPart  = sanitizeLabel(`${safeUser}-${repoSlug}`).slice(0, 41);
     const jobName   = `tech-extract-${slugPart}-${suffix}`.slice(0, MAX_NAME_LEN);
 
-    const env: Array<{ name: string; value: string }> = [
+    const env: V1EnvVar[] = [
         ...observabilityEnv('tech-extractor', `${userId}:${repoFullName}:${timestamp}`),
         { name: 'USER_ID',        value: userId },
         { name: 'REPO_FULL_NAME', value: repoFullName },

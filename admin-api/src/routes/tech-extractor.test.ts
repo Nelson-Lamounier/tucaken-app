@@ -48,7 +48,8 @@ jest.unstable_mockModule('../lib/config.js', () => ({
 }));
 
 jest.unstable_mockModule('../lib/k8s.js', () => ({
-    getBatchApi: () => ({ createNamespacedJob: jest.fn(async () => ({})) }),
+    getBatchApi: () => ({ createNamespacedJob: jest.fn(async () => ({ metadata: { uid: 'u' } })), deleteNamespacedJob: jest.fn(async () => ({})) }),
+    getCoreApi:  () => ({ createNamespacedSecret: jest.fn(async () => ({})) }),
 }));
 
 jest.unstable_mockModule('../lib/k8s-job-builder.js', () => ({

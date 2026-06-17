@@ -1,6 +1,6 @@
 /** @format */
 import { createHash } from 'node:crypto';
-import type { V1Job } from '@kubernetes/client-node';
+import type { V1Job, V1Secret } from '@kubernetes/client-node';
 
 import type { AdminApiConfig } from './config.js';
 import { traceParentEnv, observabilityEnv, ingestionModelEnv, MODEL_JOB_BACKOFF_LIMIT } from './k8s-job-builder.js';
@@ -27,6 +27,50 @@ export interface IngestionJobOptions {
      * "no id known yet".
      */
     readonly githubRepoId?: number | null;
+}
+
+/** Deterministic name of the per-Job token Secret for a given ingestion Job. */
+export function ingestionTokenSecretName(jobName: string): string {
+    return `${jobName}-gh-token`;
+}
+
+export interface IngestionTokenSecretInput {
+    readonly secretName:   string;
+    readonly namespace:    string;
+    readonly token:        string;
+    readonly ownerJobName: string;
+    readonly ownerJobUid:  string;
+}
+
+/**
+ * Build the per-Job Secret that holds the short-lived GitHub installation token,
+ * referenced by the Job via secretKeyRef. The Secret is owned by the Job
+ * (ownerReference), so Kubernetes garbage-collects it when the Job is deleted
+ * (ttlSecondsAfterFinished) — the token never outlives the run and never appears
+ * in the Job spec. The dispatcher creates the Job first, then this Secret with
+ * the Job's uid, so GC linkage is exact.
+ */
+export function buildIngestionTokenSecret(input: IngestionTokenSecretInput): V1Secret {
+    return {
+        apiVersion: 'v1',
+        kind:       'Secret',
+        type:       'Opaque',
+        metadata: {
+            name:      input.secretName,
+            namespace: input.namespace,
+            labels:    { app: 'ingestion-worker', 'tucaken.io/job': input.ownerJobName },
+            ownerReferences: [{
+                apiVersion:         'batch/v1',
+                kind:               'Job',
+                name:               input.ownerJobName,
+                uid:                input.ownerJobUid,
+                controller:         false,
+                blockOwnerDeletion: false,
+            }],
+        },
+        // stringData → kube-apiserver base64-encodes; never logged in our path.
+        stringData: { GITHUB_TOKEN: input.token },
+    };
 }
 
 /**
@@ -94,9 +138,14 @@ export function buildIngestionJobSpec(
                             { name: 'USER_ID',        value: userId },
                             { name: 'REPO_FULL_NAME', value: repoFullName },
                             { name: 'FORCE_REINDEX',  value: String(forceReindex) },
-                            // Per-user GitHub installation token (resync path) — explicit env
-                            // overrides any static token in a mounted secret.
-                            ...(opts.githubToken ? [{ name: 'GITHUB_TOKEN', value: opts.githubToken }] : []),
+                            // Per-user GitHub installation token (resync path). Sourced from a
+                            // per-Job Secret via secretKeyRef — NEVER a plaintext env value, so
+                            // the short-lived token never appears in the Job manifest. The
+                            // dispatcher creates `${jobName}-gh-token` (owned by this Job for GC)
+                            // with buildIngestionTokenSecret BEFORE the pod can start.
+                            ...(opts.githubToken
+                                ? [{ name: 'GITHUB_TOKEN', valueFrom: { secretKeyRef: { name: ingestionTokenSecretName(jobName), key: 'GITHUB_TOKEN' } } }]
+                                : []),
                             // Immutable numeric GitHub repo id — lets the worker re-key by id
                             // across a rename. Omitted entirely when unknown (pre-backfill).
                             ...(hasRepoId ? [{ name: 'GITHUB_REPO_ID', value: String(repoId) }] : []),
