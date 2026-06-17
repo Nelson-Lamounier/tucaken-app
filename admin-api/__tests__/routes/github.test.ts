@@ -646,6 +646,18 @@ describe('POST /connected-repos', () => {
         // not the Cognito sub. All DB FK constraints use users.id.
         expect(envMap['USER_ID']).toBe(TEST_USER_UUID);
         expect(envMap['REPO_FULL_NAME']).toBe('Nelson-Lamounier/cdk-monitoring');
+
+        // Dual-write: the repositories INSERT (on the transaction client) carries
+        // the immutable github_repo_id resolved from listInstallationRepos
+        // (cdk-monitoring → id 1) as the 4th param.
+        const insertCall = txClient.query.mock.calls.find(
+            c => typeof c[0] === 'string' && /INSERT INTO repositories/i.test(c[0]),
+        );
+        expect(insertCall).toBeDefined();
+        const insertParams = insertCall?.[1] as unknown[];
+        expect(insertParams[0]).toBe(TEST_USER_UUID);
+        expect(insertParams[1]).toBe('Nelson-Lamounier/cdk-monitoring');
+        expect(insertParams[3]).toBe(1);
     });
 
     it('stamps unsanitized user-id + repo-full-name annotations for reconciliation', async () => {

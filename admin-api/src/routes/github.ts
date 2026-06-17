@@ -207,16 +207,24 @@ export async function connectRepoWithDefaultProject(
     userId: string,
     fullName: string,
     defaultBranch: string,
+    githubRepoId: number | null,
 ): Promise<void> {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
+        // Dual-write the immutable github_repo_id alongside the mutable full_name
+        // so a later rename can be reconciled by id (see reconcile-repo-name.ts).
+        // It is nullable: paths without the numeric id to hand (e.g. deferred
+        // connect, which avoids fetching an installation token) write NULL and
+        // the id is backfilled on the next id-bearing connect or rename event.
         const r = await client.query<{ id: string }>(
-            `INSERT INTO repositories (user_id, provider, full_name, default_branch, index_status)
-             VALUES ($1::uuid, 'github', $2, $3, 'pending')
-             ON CONFLICT (user_id, provider, full_name) DO UPDATE SET full_name = EXCLUDED.full_name
+            `INSERT INTO repositories (user_id, provider, full_name, default_branch, index_status, github_repo_id)
+             VALUES ($1::uuid, 'github', $2, $3, 'pending', $4)
+             ON CONFLICT (user_id, provider, full_name)
+             DO UPDATE SET full_name = EXCLUDED.full_name,
+                           github_repo_id = COALESCE(EXCLUDED.github_repo_id, repositories.github_repo_id)
              RETURNING id`,
-            [userId, fullName, defaultBranch],
+            [userId, fullName, defaultBranch, githubRepoId],
         );
         const repoId = r.rows[0]!.id;
         await ensureDefaultProject(client, userId, repoId, fullName);
@@ -357,7 +365,7 @@ async function autoDispatchRepos(
     pool:         Pool,
     userId:       string,
     plan:         string,
-    repos:        Array<{ full_name: string; default_branch: string }>,
+    repos:        Array<{ full_name: string; default_branch: string; github_repo_id?: number | null }>,
     token:        string,
     forceReindex: boolean,
 ): Promise<string[]> {
@@ -371,7 +379,7 @@ async function autoDispatchRepos(
             break;
         }
 
-        await connectRepoWithDefaultProject(pool, userId, repo.full_name, repo.default_branch ?? 'main');
+        await connectRepoWithDefaultProject(pool, userId, repo.full_name, repo.default_branch ?? 'main', repo.github_repo_id ?? null);
         await markRepoPending(pool, userId, repo.full_name);
         await markSyncTriggered(pool, userId, repo.full_name);
 
@@ -668,6 +676,22 @@ function requireGitHubConfig(config: AdminApiConfig): [string, string] {
     return [githubAppId, githubPrivateKey];
 }
 
+/**
+ * Build a `full_name -> immutable github_repo_id` lookup from the installation's
+ * accessible repos. Used to dual-write the numeric id when (re-)connecting repos
+ * whose only handle in scope is the mutable full name (DB rows / request body).
+ */
+async function buildRepoIdMap(token: string): Promise<Map<string, number>> {
+    const raw = await listInstallationRepos(token);
+    const map = new Map<string, number>();
+    for (const r of raw) {
+        if (typeof r.full_name === 'string' && typeof r.id === 'number') {
+            map.set(r.full_name, r.id);
+        }
+    }
+    return map;
+}
+
 export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
     const router = new Hono<AdminApiBindings>();
 
@@ -758,9 +782,10 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         );
         const plan = planRows[0]?.plan ?? 'free';
 
+        const idMap = await buildRepoIdMap(token);
         const queued = await autoDispatchRepos(
             config, pool, uid, plan,
-            connected.map(r => ({ full_name: r.full_name, default_branch: r.default_branch })),
+            connected.map(r => ({ full_name: r.full_name, default_branch: r.default_branch, github_repo_id: idMap.get(r.full_name) ?? null })),
             token,
             true, // forceReindex
         );
@@ -917,7 +942,11 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         // no quota consumed, no Job dispatched. POST /connected-repos/sync
         // dispatches the actual ingestion for every queued repo later.
         if (body.deferSync === true) {
-            await connectRepoWithDefaultProject(pool, uid, repoFullName, defaultBranch);
+            // Deferred connect deliberately avoids generating an installation
+            // token, so the numeric id is unknown here — write NULL. It is
+            // backfilled on the first id-bearing sync (POST /connected-repos/sync
+            // resolves the id) or on a rename event.
+            await connectRepoWithDefaultProject(pool, uid, repoFullName, defaultBranch, null);
             await markRepoPending(pool, uid, repoFullName);
             return ctx.json({ status: 'queued', repoFullName, jobName: null }, 202);
         }
@@ -949,7 +978,14 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         // Wrapped in try/catch: if anything after the quota increment fails,
         // decrement the counter so the user doesn't lose a monthly credit.
         try {
-            await connectRepoWithDefaultProject(pool, uid, repoFullName, defaultBranch);
+            // Generate a fresh installation token scoped to this user's repos.
+            // Reused for the id lookup and the Job dispatch below.
+            const githubToken = await generateInstallationToken(appId, key, conn.installation_id);
+
+            // Resolve the immutable github_repo_id so a later rename can be
+            // reconciled by id. Null if the repo is not in the installation list.
+            const idMap = await buildRepoIdMap(githubToken);
+            await connectRepoWithDefaultProject(pool, uid, repoFullName, defaultBranch, idMap.get(repoFullName) ?? null);
 
             // Race-free backstop: lost the atomic claim → a concurrent request
             // already dispatched between the fast-path read and here. Refund the
@@ -960,8 +996,6 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
             }
             await markSyncTriggered(pool, uid, repoFullName);
 
-            // Generate a fresh installation token scoped to this user's repos.
-            const githubToken = await generateInstallationToken(appId, key, conn.installation_id);
             const { jobName } = await dispatchIngestionJob(config, uid, repoFullName, githubToken, forceReindex);
 
             try {
@@ -1008,7 +1042,12 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         );
         const plan  = planRows[0]?.plan ?? 'free';
         const token = await generateInstallationToken(appId, key, conn.installation_id);
-        const queued = await autoDispatchRepos(config, pool, uid, plan, pending, token, false);
+        const idMap = await buildRepoIdMap(token);
+        const queued = await autoDispatchRepos(
+            config, pool, uid, plan,
+            pending.map(r => ({ full_name: r.full_name, default_branch: r.default_branch, github_repo_id: idMap.get(r.full_name) ?? null })),
+            token, false,
+        );
 
         return ctx.json({ started: queued.length });
     });
@@ -1282,9 +1321,10 @@ export function createGitHubWebhookRouter(config: AdminApiConfig): Hono {
                     if (connected.length > 0) {
                         const [appId, key] = requireGitHubConfig(config);
                         const token = await generateInstallationToken(appId, key, installationId);
+                        const idMap = await buildRepoIdMap(token);
                         const queued = await autoDispatchRepos(
                             config, pool, user.userId, user.plan,
-                            connected.map(r => ({ full_name: r.full_name, default_branch: r.default_branch })),
+                            connected.map(r => ({ full_name: r.full_name, default_branch: r.default_branch, github_repo_id: idMap.get(r.full_name) ?? null })),
                             token,
                             false,
                         );
