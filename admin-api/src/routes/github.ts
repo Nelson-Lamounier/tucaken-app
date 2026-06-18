@@ -929,12 +929,25 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         // Reconcile any repo still showing as active against the live K8s Job
         // state, so a crashed pod surfaces as 'error' rather than spinning
         // forever. Re-read only when something actually changed.
+        //
+        // Reconciliation is strictly best-effort: it must never break listing.
+        // A throw here (DB error, K8s API failure, schema drift) would otherwise
+        // 500 the whole endpoint and blank the UI — hiding every healthy repo
+        // because one is stuck. Degrade to the un-reconciled rows instead; the
+        // server-side platform-job-watcher sweep is the backstop.
         const stuck = rows
             .filter(r => ACTIVE_SYNC_STATUSES.has(r.sync_status ?? r.index_status))
             .map(r => ({ fullName: r.full_name, lastSyncTriggeredAt: r.last_sync_triggered_at }));
         if (stuck.length > 0) {
-            const transitioned = await reconcileStuckRepos(config, pool, uid, stuck);
-            if (transitioned.size > 0) rows = await listConnectedRepos(pool, uid);
+            try {
+                const transitioned = await reconcileStuckRepos(config, pool, uid, stuck);
+                if (transitioned.size > 0) rows = await listConnectedRepos(pool, uid);
+            } catch (err) {
+                console.error(
+                    '[github/connected-repos] reconcile failed — serving un-reconciled list',
+                    err instanceof Error ? err.message : String(err),
+                );
+            }
         }
 
         const repos = rows.map(r => {
