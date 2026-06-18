@@ -52,6 +52,7 @@ import { traceParentEnv, observabilityEnv, MODEL_JOB_BACKOFF_LIMIT } from '../li
 import { buildIngestionJobSpec, buildIngestionTokenSecret, ingestionTokenSecretName } from '../lib/ingestion-job.js';
 import { getPool } from '../lib/pg.js';
 import { bomFromEvidenceRows } from '../lib/sbom.js';
+import { croissantFromAggregate, type CroissantAggregateRow } from '../lib/croissant.js';
 import { reconcileRepoName } from '../lib/reconcile-repo-name.js';
 import { isSyncInFlight, tryClaimSyncSlot } from '../lib/sync-state.js';
 import { ensureDefaultProject } from '../lib/repositories/projects.js';
@@ -1237,6 +1238,42 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
             );
 
         return ctx.json(bomFromEvidenceRows(repoFullName, rows));
+    });
+
+    // -------------------------------------------------------------------------
+    // GET /connected-repos/:fullName/croissant — MLCommons Croissant 1.0 data
+    // card for a repo's RAG knowledge base (the document_embeddings chunk
+    // corpus). The RAG-domain counterpart to /sbom. RLS-scoped; rename-safe via
+    // github_repo_id with repo_full_name fallback. :fullName is "owner%2Frepo".
+    // -------------------------------------------------------------------------
+    router.get('/connected-repos/:fullName/croissant', async (ctx) => {
+        const pool = getPool(config);
+        const uid  = requireUserId(ctx);
+        if (!uid) return ctx.json({ error: 'Authenticated subject missing' }, 401);
+
+        const repoFullName = decodeURIComponent(ctx.req.param('fullName'));
+        if (!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(repoFullName)) {
+            return ctx.json({ error: 'Invalid repo name' }, 400);
+        }
+
+        // Rename-safe key: prefer immutable github_repo_id, fall back to name.
+        const githubRepoId = await lookupGithubRepoId(config, uid, repoFullName);
+        const scopeCol = githubRepoId !== null ? 'github_repo_id' : 'repo_full_name';
+        const scopeVal: number | string = githubRepoId !== null ? githubRepoId : repoFullName;
+        const { rows } = await pool.query<CroissantAggregateRow>(
+            `SELECT
+                (SELECT count(*) FROM document_embeddings
+                  WHERE user_id = $1::uuid AND ${scopeCol} = $2)::int AS record_count,
+                (SELECT array_agg(DISTINCT sk) FROM document_embeddings d, unnest(d.skills) sk
+                  WHERE d.user_id = $1::uuid AND d.${scopeCol} = $2) AS skills,
+                (SELECT metadata->>'commit_sha' FROM document_embeddings
+                  WHERE user_id = $1::uuid AND ${scopeCol} = $2 AND metadata ? 'commit_sha' LIMIT 1) AS commit_sha,
+                (SELECT metadata->'lineage' FROM document_embeddings
+                  WHERE user_id = $1::uuid AND ${scopeCol} = $2 AND metadata ? 'lineage' LIMIT 1) AS lineage`,
+            [uid, scopeVal],
+        );
+
+        return ctx.json(croissantFromAggregate(repoFullName, rows[0]));
     });
 
     // -------------------------------------------------------------------------
