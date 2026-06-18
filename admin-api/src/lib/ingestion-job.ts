@@ -138,6 +138,11 @@ export function buildIngestionJobSpec(
                             { name: 'USER_ID',        value: userId },
                             { name: 'REPO_FULL_NAME', value: repoFullName },
                             { name: 'FORCE_REINDEX',  value: String(forceReindex) },
+                            // Surface the Job name to the worker via the downward API so the
+                            // terminal `ingestion.complete` log can be correlated to its Job/pod
+                            // in Loki (previously logged `job_name: "unknown"`). The pod carries
+                            // the `job-name` label, injected by the Job controller.
+                            { name: 'JOB_NAME', valueFrom: { fieldRef: { fieldPath: "metadata.labels['job-name']" } } },
                             // Per-user GitHub installation token (resync path). Sourced from a
                             // per-Job Secret via secretKeyRef — NEVER a plaintext env value, so
                             // the short-lived token never appears in the Job manifest. The
