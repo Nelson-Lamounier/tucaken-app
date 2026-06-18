@@ -509,6 +509,7 @@ export async function buildTechExtractJobSpec(
     repoFullName:  string,
     timestamp:     number,
     commitSha?:    string,
+    githubRepoId?: number | null,
 ): Promise<V1Job> {
     const { createHash } = await import('node:crypto');
     const safeUser  = sanitizeLabel(userId);
@@ -526,6 +527,12 @@ export async function buildTechExtractJobSpec(
         { name: 'GITHUB_TOKEN',   value: '' }, // overwritten by caller; placeholder keeps shape
         ...(() => { const tp = traceParentEnv(); return tp ? [tp] : []; })(),
     ];
+    if (typeof githubRepoId === 'number' && Number.isFinite(githubRepoId)) {
+        // Immutable rename-safe key — parity with the ingestion Job so
+        // technology_evidence rows are written with github_repo_id, not just
+        // backfilled. Omitted when not yet resolved (the worker writes null).
+        env.push({ name: 'GITHUB_REPO_ID', value: String(githubRepoId) });
+    }
     if (commitSha) {
         env.push({ name: 'COMMIT_SHA', value: commitSha });
     }
@@ -598,7 +605,10 @@ async function dispatchTechExtractJob(
         console.warn('[tech-extractor] resolveHeadSha failed — omitting COMMIT_SHA', (err as Error).message);
     }
 
-    const job = await buildTechExtractJobSpec(config, image, userId, repoFullName, timestamp, commitSha);
+    // Resolve the immutable repo id so the worker writes github_repo_id (parity
+    // with ingestion). Best-effort — null when not yet backfilled.
+    const githubRepoId = await lookupGithubRepoId(config, userId, repoFullName);
+    const job = await buildTechExtractJobSpec(config, image, userId, repoFullName, timestamp, commitSha, githubRepoId);
 
     // Stamp the real GITHUB_TOKEN into the env (buildTechExtractJobSpec uses a placeholder).
     const container = job.spec!.template.spec!.containers[0]!;
@@ -1185,6 +1195,7 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
     // from its deterministic technology_evidence (the tech-extractor lane).
     // RLS-scoped via withUser; :fullName is URL-encoded "owner%2Frepo".
     // -------------------------------------------------------------------------
+    interface EvidenceSbomRow { raw_name: string; ecosystem: string | null; version: string | null; commit_sha: string }
     router.get('/connected-repos/:fullName/sbom', async (ctx) => {
         const pool = getPool(config);
         const uid  = requireUserId(ctx);
@@ -1195,14 +1206,23 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
             return ctx.json({ error: 'Invalid repo name' }, 400);
         }
 
-        const { rows } = await pool.query<{
-            raw_name: string; ecosystem: string | null; version: string | null; commit_sha: string;
-        }>(
-            `SELECT DISTINCT raw_name, ecosystem, version, commit_sha
-               FROM technology_evidence
-              WHERE user_id = $1::uuid AND repo_full_name = $2`,
-            [uid, repoFullName],
-        );
+        // Prefer the immutable github_repo_id (rename-safe) so a renamed repo's
+        // evidence — written under its old full_name — is still found; fall back
+        // to repo_full_name when the id isn't resolved yet.
+        const githubRepoId = await lookupGithubRepoId(config, uid, repoFullName);
+        const { rows } = githubRepoId !== null
+            ? await pool.query<EvidenceSbomRow>(
+                `SELECT DISTINCT raw_name, ecosystem, version, commit_sha
+                   FROM technology_evidence
+                  WHERE user_id = $1::uuid AND github_repo_id = $2`,
+                [uid, githubRepoId],
+            )
+            : await pool.query<EvidenceSbomRow>(
+                `SELECT DISTINCT raw_name, ecosystem, version, commit_sha
+                   FROM technology_evidence
+                  WHERE user_id = $1::uuid AND repo_full_name = $2`,
+                [uid, repoFullName],
+            );
 
         return ctx.json(bomFromEvidenceRows(repoFullName, rows));
     });
