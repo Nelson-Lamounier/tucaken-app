@@ -36,6 +36,17 @@ describe('buildIngestionJobSpec', () => {
         }
     });
 
+    it('injects JOB_NAME via the downward API on BOTH paths (Loki correlation)', () => {
+        for (const opts of [{ githubToken: 't' }, { extraSecretRefs: ['ingestion-secrets'] }]) {
+            const job = buildIngestionJobSpec(cfg, 'img:tag', USER, REPO, false, 1700000000000, opts);
+            const jobName = job.spec!.template!.spec!.containers![0]!.env!
+                .find((e) => e.name === 'JOB_NAME')!;
+            // Sourced from the pod's job-name label — never a hardcoded value.
+            expect(jobName.value).toBeUndefined();
+            expect(jobName.valueFrom?.fieldRef?.fieldPath).toBe("metadata.labels['job-name']");
+        }
+    });
+
     it('resync path: GITHUB_TOKEN via secretKeyRef (NEVER plaintext in the Job spec)', () => {
         const job = buildIngestionJobSpec(cfg, 'img', USER, REPO, false, 1, {
             githubToken: 'ghs_x',
