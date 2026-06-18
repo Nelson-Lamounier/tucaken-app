@@ -12,6 +12,8 @@ import {
 } from '../../../server/projects'
 import type { ProjectDecision, ProjectDetail, ProjectListResponse } from '../lib/types'
 import { projectsQueries } from './queries'
+import { useCaseStudyProgressStore } from '@/lib/stores/case-study-progress-store'
+import { usePipelineNotificationsStore } from '@/lib/stores/pipeline-notifications-store'
 
 type ProjectPatch = Parameters<typeof patchProjectFn>[0]['data']['patch']
 type DecisionPatch = Parameters<typeof patchDecisionFn>[0]['data']['patch']
@@ -113,6 +115,48 @@ export function useRegenerateProject(projectId: string) {
       void queryClient.invalidateQueries({
         queryKey: projectsQueries.detail(projectId).queryKey,
       })
+    },
+  })
+}
+
+/**
+ * Update an already-confirmed project from the latest synced repository data.
+ *
+ * Covers the case where a repo already belongs to a curated project and the
+ * user has just resynced it with more data: dispatching `regenerate` re-runs the
+ * case study as an incremental refine (preserve prior + fold in the new repo
+ * content). Unlike `useRegenerateProject`, this surfaces the app-global progress
+ * modal + a Pipeline Notification so the run can be watched (and reopened from
+ * the bell) from anywhere — the same UX as the integrate-repo flow. The project
+ * name is a call-time argument so a single hook instance can drive any card in
+ * the grid.
+ */
+export function useUpdateProjectFromSync() {
+  const queryClient = useQueryClient()
+  const openCaseStudyProgress = useCaseStudyProgressStore((s) => s.openProgress)
+  const addNotification = usePipelineNotificationsStore((s) => s.addNotification)
+
+  return useMutation({
+    mutationFn: ({ projectId }: { projectId: string; projectName: string }) =>
+      regenerateProjectFn({ data: projectId }),
+    onSuccess: (run, { projectName }) => {
+      const startedAt = Date.now()
+      openCaseStudyProgress({
+        projectId: run.projectId,
+        projectName,
+        pipelineRunId: run.pipelineRunId,
+        startedAt,
+      })
+      addNotification({
+        type: 'case_study',
+        slug: run.projectId,
+        label: projectName,
+        status: 'running',
+        link: `/projects/${encodeURIComponent(run.projectId)}`,
+        pipelineRunId: run.pipelineRunId,
+      })
+      void queryClient.invalidateQueries({ queryKey: projectsQueries.detail(run.projectId).queryKey })
+      void queryClient.invalidateQueries({ queryKey: ['projects', 'list'] })
     },
   })
 }
