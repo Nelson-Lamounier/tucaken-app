@@ -533,6 +533,11 @@ export async function buildTechExtractJobSpec(
         // backfilled. Omitted when not yet resolved (the worker writes null).
         env.push({ name: 'GITHUB_REPO_ID', value: String(githubRepoId) });
     }
+    if (config.githubSbomEnabled) {
+        // Opt-out flag: enables the worker's GitHub dependency-graph SBOM
+        // cross-check lane (best-effort, capped, timeout-guarded).
+        env.push({ name: 'GITHUB_SBOM_ENABLED', value: '1' });
+    }
     if (commitSha) {
         env.push({ name: 'COMMIT_SHA', value: commitSha });
     }
