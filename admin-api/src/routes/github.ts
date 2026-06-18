@@ -510,6 +510,7 @@ export async function buildTechExtractJobSpec(
     timestamp:     number,
     commitSha?:    string,
     githubRepoId?: number | null,
+    forceReindex   = false,
 ): Promise<V1Job> {
     const { createHash } = await import('node:crypto');
     const safeUser  = sanitizeLabel(userId);
@@ -537,6 +538,11 @@ export async function buildTechExtractJobSpec(
         // Opt-out flag: enables the worker's GitHub dependency-graph SBOM
         // cross-check lane (best-effort, capped, timeout-guarded).
         env.push({ name: 'GITHUB_SBOM_ENABLED', value: '1' });
+    }
+    if (forceReindex) {
+        // Skip the worker's commit-SHA short-circuit so a re-sync re-extracts
+        // (lets new lanes backfill a commit already covered by older lanes).
+        env.push({ name: 'FORCE_REINDEX', value: '1' });
     }
     if (commitSha) {
         env.push({ name: 'COMMIT_SHA', value: commitSha });
@@ -592,6 +598,7 @@ async function dispatchTechExtractJob(
     repoFullName:  string,
     githubToken:   string,
     defaultBranch?: string,
+    forceReindex   = false,
 ): Promise<{ jobName: string } | null> {
     const image = getJobImage('tech-extractor');
     if (!isImageConfigured(image)) {
@@ -613,7 +620,7 @@ async function dispatchTechExtractJob(
     // Resolve the immutable repo id so the worker writes github_repo_id (parity
     // with ingestion). Best-effort — null when not yet backfilled.
     const githubRepoId = await lookupGithubRepoId(config, userId, repoFullName);
-    const job = await buildTechExtractJobSpec(config, image, userId, repoFullName, timestamp, commitSha, githubRepoId);
+    const job = await buildTechExtractJobSpec(config, image, userId, repoFullName, timestamp, commitSha, githubRepoId, forceReindex);
 
     // Stamp the real GITHUB_TOKEN into the env (buildTechExtractJobSpec uses a placeholder).
     const container = job.spec!.template.spec!.containers[0]!;
@@ -1272,7 +1279,9 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         const { jobName } = await dispatchIngestionJob(config, uid, repoFullName, token, true);
 
         try {
-            await dispatchTechExtractJob(config, uid, repoFullName, token);
+            // A user-initiated retry/re-sync force-re-extracts (parity with the
+            // ingestion force above), so new lanes backfill the current commit.
+            await dispatchTechExtractJob(config, uid, repoFullName, token, undefined, true);
         } catch (err) {
             console.error('[tech-extractor] dispatch failed (non-fatal)', (err as Error).message);
         }
