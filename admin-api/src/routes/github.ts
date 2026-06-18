@@ -51,6 +51,7 @@ import { getBatchApi, getCoreApi } from '../lib/k8s.js';
 import { traceParentEnv, observabilityEnv, MODEL_JOB_BACKOFF_LIMIT } from '../lib/k8s-job-builder.js';
 import { buildIngestionJobSpec, buildIngestionTokenSecret, ingestionTokenSecretName } from '../lib/ingestion-job.js';
 import { getPool } from '../lib/pg.js';
+import { bomFromEvidenceRows } from '../lib/sbom.js';
 import { reconcileRepoName } from '../lib/reconcile-repo-name.js';
 import { isSyncInFlight, tryClaimSyncSlot } from '../lib/sync-state.js';
 import { ensureDefaultProject } from '../lib/repositories/projects.js';
@@ -508,6 +509,7 @@ export async function buildTechExtractJobSpec(
     repoFullName:  string,
     timestamp:     number,
     commitSha?:    string,
+    githubRepoId?: number | null,
 ): Promise<V1Job> {
     const { createHash } = await import('node:crypto');
     const safeUser  = sanitizeLabel(userId);
@@ -525,6 +527,17 @@ export async function buildTechExtractJobSpec(
         { name: 'GITHUB_TOKEN',   value: '' }, // overwritten by caller; placeholder keeps shape
         ...(() => { const tp = traceParentEnv(); return tp ? [tp] : []; })(),
     ];
+    if (typeof githubRepoId === 'number' && Number.isFinite(githubRepoId)) {
+        // Immutable rename-safe key — parity with the ingestion Job so
+        // technology_evidence rows are written with github_repo_id, not just
+        // backfilled. Omitted when not yet resolved (the worker writes null).
+        env.push({ name: 'GITHUB_REPO_ID', value: String(githubRepoId) });
+    }
+    if (config.githubSbomEnabled) {
+        // Opt-out flag: enables the worker's GitHub dependency-graph SBOM
+        // cross-check lane (best-effort, capped, timeout-guarded).
+        env.push({ name: 'GITHUB_SBOM_ENABLED', value: '1' });
+    }
     if (commitSha) {
         env.push({ name: 'COMMIT_SHA', value: commitSha });
     }
@@ -597,7 +610,10 @@ async function dispatchTechExtractJob(
         console.warn('[tech-extractor] resolveHeadSha failed — omitting COMMIT_SHA', (err as Error).message);
     }
 
-    const job = await buildTechExtractJobSpec(config, image, userId, repoFullName, timestamp, commitSha);
+    // Resolve the immutable repo id so the worker writes github_repo_id (parity
+    // with ingestion). Best-effort — null when not yet backfilled.
+    const githubRepoId = await lookupGithubRepoId(config, userId, repoFullName);
+    const job = await buildTechExtractJobSpec(config, image, userId, repoFullName, timestamp, commitSha, githubRepoId);
 
     // Stamp the real GITHUB_TOKEN into the env (buildTechExtractJobSpec uses a placeholder).
     const container = job.spec!.template.spec!.containers[0]!;
@@ -1179,6 +1195,44 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
     // -------------------------------------------------------------------------
     // POST /connected-repos/:fullName/retry — re-dispatch a failed repo.
     // Re-running after a crashed/timed-out ingestion does NOT consume a new
+    // -------------------------------------------------------------------------
+    // GET /connected-repos/:fullName/sbom — CycloneDX 1.6 SBOM for a repo, built
+    // from its deterministic technology_evidence (the tech-extractor lane).
+    // RLS-scoped via withUser; :fullName is URL-encoded "owner%2Frepo".
+    // -------------------------------------------------------------------------
+    interface EvidenceSbomRow { raw_name: string; ecosystem: string | null; version: string | null; commit_sha: string }
+    router.get('/connected-repos/:fullName/sbom', async (ctx) => {
+        const pool = getPool(config);
+        const uid  = requireUserId(ctx);
+        if (!uid) return ctx.json({ error: 'Authenticated subject missing' }, 401);
+
+        const repoFullName = decodeURIComponent(ctx.req.param('fullName'));
+        if (!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(repoFullName)) {
+            return ctx.json({ error: 'Invalid repo name' }, 400);
+        }
+
+        // Prefer the immutable github_repo_id (rename-safe) so a renamed repo's
+        // evidence — written under its old full_name — is still found; fall back
+        // to repo_full_name when the id isn't resolved yet.
+        const githubRepoId = await lookupGithubRepoId(config, uid, repoFullName);
+        const { rows } = githubRepoId !== null
+            ? await pool.query<EvidenceSbomRow>(
+                `SELECT DISTINCT raw_name, ecosystem, version, commit_sha
+                   FROM technology_evidence
+                  WHERE user_id = $1::uuid AND github_repo_id = $2`,
+                [uid, githubRepoId],
+            )
+            : await pool.query<EvidenceSbomRow>(
+                `SELECT DISTINCT raw_name, ecosystem, version, commit_sha
+                   FROM technology_evidence
+                  WHERE user_id = $1::uuid AND repo_full_name = $2`,
+                [uid, repoFullName],
+            );
+
+        return ctx.json(bomFromEvidenceRows(repoFullName, rows));
+    });
+
+    // -------------------------------------------------------------------------
     // monthly quota credit: the original dispatch already charged one, and the
     // pod failing is an infra event, not a user action. Resets the repo to
     // 'pending' and dispatches a fresh (force-reindex) Job.

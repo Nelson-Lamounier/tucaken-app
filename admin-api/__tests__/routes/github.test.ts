@@ -617,6 +617,7 @@ describe('POST /connected-repos', () => {
         // does NOT go through poolQueryMock.
         seedQuery([]);                          // 6. markSyncTriggered
         seedQuery([{ github_repo_id: '555' }]); // 7. dispatchIngestionJob → github_repo_id lookup
+        seedQuery([{ github_repo_id: '555' }]); // 8. dispatchTechExtractJob → github_repo_id lookup
 
         const res  = await buildApp().request('/connected-repos', {
             method:  'POST',
@@ -633,9 +634,10 @@ describe('POST /connected-repos', () => {
 
         // getConnection (1) + isSyncInFlight SELECT (1) + plan SELECT (1)
         // + quota INSERT…RETURNING (1, atomic) + tryClaimSyncSlot (1)
-        // + markSyncTriggered (1) + github_repo_id lookup (1). The repo INSERT
-        // runs on the transaction client (pool.connect()), not poolQueryMock.
-        expect(poolQueryMock).toHaveBeenCalledTimes(7);
+        // + markSyncTriggered (1) + github_repo_id lookup ×2 (ingestion +
+        // tech-extract dispatch). The repo INSERT runs on the transaction
+        // client (pool.connect()), not poolQueryMock.
+        expect(poolQueryMock).toHaveBeenCalledTimes(8);
 
         // Installation token generated for this user's installation
         expect(mockGenerateInstallationToken).toHaveBeenCalledWith('999999', testConfig.githubPrivateKey, '12345');
@@ -825,9 +827,11 @@ describe('POST /connected-repos/sync', () => {
         seedQuery([{ count: 1 }]);     // 4. quota INSERT…RETURNING repo 1 → allowed
         seedQuery([]); seedQuery([]);  // 5-6 markPending/markTriggered repo 1 (repo INSERT is on the tx client)
         seedQuery([{ github_repo_id: '1' }]); // 7. dispatchIngestionJob repo 1 → github_repo_id lookup
-        seedQuery([{ count: 2 }]);     // 8. quota INSERT…RETURNING repo 2 → allowed
-        seedQuery([]); seedQuery([]);  // 9-10 markPending/markTriggered repo 2 (repo INSERT is on the tx client)
-        seedQuery([{ github_repo_id: '2' }]); // 11. dispatchIngestionJob repo 2 → github_repo_id lookup
+        seedQuery([{ github_repo_id: '1' }]); // 8. dispatchTechExtractJob repo 1 → github_repo_id lookup
+        seedQuery([{ count: 2 }]);     // 9. quota INSERT…RETURNING repo 2 → allowed
+        seedQuery([]); seedQuery([]);  // 10-11 markPending/markTriggered repo 2 (repo INSERT is on the tx client)
+        seedQuery([{ github_repo_id: '2' }]); // 12. dispatchIngestionJob repo 2 → github_repo_id lookup
+        seedQuery([{ github_repo_id: '2' }]); // 13. dispatchTechExtractJob repo 2 → github_repo_id lookup
 
         const res  = await buildApp().request('/connected-repos/sync', { method: 'POST' });
         const body = await res.json() as { started: number };
@@ -875,6 +879,7 @@ describe('POST /connected-repos/:fullName/retry', () => {
         seedQuery([{ repo_full_name: 'octo/app' }]);     // 3. tryClaimSyncSlot → claim won
         seedQuery([]);                                   // 4. markSyncTriggered
         seedQuery([{ github_repo_id: '555' }]);          // 5. dispatchIngestionJob → github_repo_id lookup
+        seedQuery([{ github_repo_id: '555' }]);          // 6. dispatchTechExtractJob → github_repo_id lookup
 
         const res  = await buildApp().request('/connected-repos/octo%2Fapp/retry', { method: 'POST' });
         const body = await res.json() as { status: string; repoFullName: string; jobName: string };
