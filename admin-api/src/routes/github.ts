@@ -51,6 +51,7 @@ import { getBatchApi, getCoreApi } from '../lib/k8s.js';
 import { traceParentEnv, observabilityEnv, MODEL_JOB_BACKOFF_LIMIT } from '../lib/k8s-job-builder.js';
 import { buildIngestionJobSpec, buildIngestionTokenSecret, ingestionTokenSecretName } from '../lib/ingestion-job.js';
 import { getPool } from '../lib/pg.js';
+import { bomFromEvidenceRows } from '../lib/sbom.js';
 import { reconcileRepoName } from '../lib/reconcile-repo-name.js';
 import { isSyncInFlight, tryClaimSyncSlot } from '../lib/sync-state.js';
 import { ensureDefaultProject } from '../lib/repositories/projects.js';
@@ -1179,6 +1180,34 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
     // -------------------------------------------------------------------------
     // POST /connected-repos/:fullName/retry — re-dispatch a failed repo.
     // Re-running after a crashed/timed-out ingestion does NOT consume a new
+    // -------------------------------------------------------------------------
+    // GET /connected-repos/:fullName/sbom — CycloneDX 1.6 SBOM for a repo, built
+    // from its deterministic technology_evidence (the tech-extractor lane).
+    // RLS-scoped via withUser; :fullName is URL-encoded "owner%2Frepo".
+    // -------------------------------------------------------------------------
+    router.get('/connected-repos/:fullName/sbom', async (ctx) => {
+        const pool = getPool(config);
+        const uid  = requireUserId(ctx);
+        if (!uid) return ctx.json({ error: 'Authenticated subject missing' }, 401);
+
+        const repoFullName = decodeURIComponent(ctx.req.param('fullName'));
+        if (!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(repoFullName)) {
+            return ctx.json({ error: 'Invalid repo name' }, 400);
+        }
+
+        const { rows } = await pool.query<{
+            raw_name: string; ecosystem: string | null; version: string | null; commit_sha: string;
+        }>(
+            `SELECT DISTINCT raw_name, ecosystem, version, commit_sha
+               FROM technology_evidence
+              WHERE user_id = $1::uuid AND repo_full_name = $2`,
+            [uid, repoFullName],
+        );
+
+        return ctx.json(bomFromEvidenceRows(repoFullName, rows));
+    });
+
+    // -------------------------------------------------------------------------
     // monthly quota credit: the original dispatch already charged one, and the
     // pod failing is an infra event, not a user action. Resets the repo to
     // 'pending' and dispatches a fresh (force-reindex) Job.
