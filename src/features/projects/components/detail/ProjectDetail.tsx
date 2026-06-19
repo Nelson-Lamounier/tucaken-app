@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { projectsQueries } from '../../server/queries'
 import { Hero } from './Hero'
 import { Pitch } from './Pitch'
+import { Repositories } from './Repositories'
 import { Architecture } from './Architecture'
 import { StackMap } from './StackMap'
 import { DecisionLog } from './DecisionLog'
@@ -37,6 +38,11 @@ export function ProjectDetail({ projectId }: { readonly projectId: string }) {
     <div className="space-y-5">
       <Hero project={project} />
       <Pitch projectId={project.id} pitch={project.pitch} />
+      <Repositories
+        repositories={project.repositories}
+        components={project.components}
+        caseStudyGeneratedAt={project.case_study_generated_at}
+      />
       <Architecture architecture={project.architecture} />
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <StackMap items={project.stack_items} />

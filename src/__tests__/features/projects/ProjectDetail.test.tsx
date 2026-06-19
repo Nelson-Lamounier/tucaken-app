@@ -61,6 +61,8 @@ function makeDetail(overrides: Partial<ProjectDetailType> = {}): ProjectDetailTy
     created_at:               now,
     updated_at:               now,
     repository_count:         3,
+    latest_repo_sync_at:      null,
+    case_study_stale:         false,
     proposal_reasoning:       null,
     proposal_confidence:      null,
     proposal_pipeline_run_id: null,

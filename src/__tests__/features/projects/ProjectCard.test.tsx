@@ -48,6 +48,8 @@ function makeProject(overrides: Partial<ProjectSummary> = {}): ProjectSummary {
     created_at:              new Date().toISOString(),
     updated_at:              new Date().toISOString(),
     repository_count:        3,
+    latest_repo_sync_at:     null,
+    case_study_stale:        false,
     ...overrides,
   }
 }
