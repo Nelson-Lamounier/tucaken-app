@@ -71,6 +71,14 @@ export function ProjectCard({ project }: ProjectCardProps) {
                 <GitBranch className="size-3" />
                 {project.repository_count} repo{project.repository_count === 1 ? '' : 's'}
               </span>
+              {project.case_study_stale && (
+                <span
+                  className="rounded-full bg-amber-400/10 px-2 py-0.5 text-[10px] font-medium text-amber-300 inset-ring inset-ring-amber-400/30"
+                  title="A repository changed since the case study was generated — update to refresh"
+                >
+                  repo changed
+                </span>
+              )}
             </span>
             <span className="flex items-center gap-1">
               {formatRelativeTime(project.last_activity_at)}
@@ -87,7 +95,11 @@ export function ProjectCard({ project }: ProjectCardProps) {
           disabled={update.isPending}
           title="Update this project from the latest synced repository data"
           aria-label={`Update ${project.name} from the latest synced data`}
-          className="absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-white/5 px-2 py-1 text-[11px] font-medium text-zinc-200 inset-ring inset-ring-white/10 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+          className={`absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium inset-ring transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+            project.case_study_stale
+              ? 'bg-amber-400/15 text-amber-200 inset-ring-amber-400/30 hover:bg-amber-400/25'
+              : 'bg-white/5 text-zinc-200 inset-ring-white/10 hover:bg-white/10'
+          }`}
         >
           <RefreshCw className={`size-3 ${update.isPending ? 'animate-spin' : ''}`} />
           {update.isPending ? 'Queuing…' : 'Update'}

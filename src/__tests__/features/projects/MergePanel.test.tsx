@@ -28,6 +28,7 @@ function summary(id: string, name: string): ProjectSummary {
     case_study_status: 'complete', case_study_generated_at: now,
     last_activity_at: now, started_at: null, ended_at: null,
     created_at: now, updated_at: now, repository_count: 1,
+    latest_repo_sync_at: null, case_study_stale: false,
   }
 }
 

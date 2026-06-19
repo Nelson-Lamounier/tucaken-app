@@ -51,6 +51,7 @@ function proposal(id: string, name: string): ProjectSummary {
     case_study_status: null, case_study_generated_at: null,
     last_activity_at: now, started_at: null, ended_at: null,
     created_at: now, updated_at: now, repository_count: 2,
+    latest_repo_sync_at: null, case_study_stale: false,
   }
 }
 

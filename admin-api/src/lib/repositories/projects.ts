@@ -96,6 +96,14 @@ export interface ProjectSummary {
     created_at:               string;
     updated_at:               string;
     repository_count:         number;
+    /** Newest successful sync across the project's member repos (null if none). */
+    latest_repo_sync_at:      string | null;
+    /**
+     * True when a member repo synced after the case study was generated — the
+     * case study no longer reflects the code and the user should regenerate.
+     * Derived (not stored): see `isCaseStudyStale`.
+     */
+    case_study_stale:         boolean;
 }
 
 export interface ProjectDetail extends ProjectSummary {
@@ -128,6 +136,10 @@ export interface RepositoryLinkRow {
     repository_id:   string;
     repository_name: string;
     subpath:         string;
+    /** Last successful ingestion of this repo (repo_sync_state). Null = never. */
+    last_synced_at:  string | null;
+    /** Current sync state: 'pending' | 'syncing' | 'complete' | 'error' | null. */
+    sync_status:     string | null;
 }
 
 export interface DecisionRow {
@@ -204,6 +216,21 @@ export interface ResumeBulletRow {
  */
 const VISIBLE_STATUSES = `('active','stable','dormant')`;
 
+/**
+ * A case study is stale when a member repo synced AFTER it was generated — the
+ * generated narrative no longer reflects the code. Pure + null-safe:
+ *   - never generated (no timestamp) → not "stale", it's "not generated yet"
+ *   - no repo has ever synced → not stale
+ * Both timestamps are ISO strings (or null) straight off the row.
+ */
+export function isCaseStudyStale(
+    latestRepoSyncAt: string | null,
+    caseStudyGeneratedAt: string | null,
+): boolean {
+    if (!latestRepoSyncAt || !caseStudyGeneratedAt) return false;
+    return new Date(latestRepoSyncAt).getTime() > new Date(caseStudyGeneratedAt).getTime();
+}
+
 export interface ListProjectsOptions {
     limit:           number;
     offset:          number;
@@ -225,7 +252,7 @@ export async function listProjects(db: Queryable, options: ListProjectsOptions):
     );
     const total = Number.parseInt(totalResult.rows[0]?.count ?? '0', 10);
 
-    const result = await db.query<ProjectSummary>(
+    const result = await db.query<Omit<ProjectSummary, 'case_study_stale'>>(
         `SELECT
             p.id, p.slug, p.name, p.tagline, p.type, p.shape, p.status,
             p.role_exhibited, p.visibility,
@@ -239,18 +266,29 @@ export async function listProjects(db: Queryable, options: ListProjectsOptions):
             p.updated_at,
             (SELECT COUNT(*)::int FROM project_repositories pr
               JOIN project_components pc ON pc.id = pr.project_component_id
-              WHERE pc.project_id = p.id) AS repository_count
+              WHERE pc.project_id = p.id) AS repository_count,
+            (SELECT MAX(s.last_synced_at)
+               FROM project_repositories pr
+               JOIN project_components pc ON pc.id = pr.project_component_id
+               JOIN repositories r ON r.id = pr.repository_id
+               LEFT JOIN repo_sync_state s
+                 ON s.user_id = r.user_id AND s.repo_full_name = r.full_name
+              WHERE pc.project_id = p.id) AS latest_repo_sync_at
            FROM projects p
            ${where}
            ORDER BY COALESCE(p.last_activity_at, p.created_at) DESC
            LIMIT $1 OFFSET $2`,
         [options.limit, options.offset],
     );
-    return { total, rows: result.rows };
+    const rows = result.rows.map((r) => ({
+        ...r,
+        case_study_stale: isCaseStudyStale(r.latest_repo_sync_at, r.case_study_generated_at),
+    }));
+    return { total, rows };
 }
 
 export async function getProjectDetail(db: Queryable, id: string): Promise<ProjectDetail | null> {
-    const project = await db.query<ProjectSummary & {
+    const project = await db.query<Omit<ProjectSummary, 'case_study_stale' | 'latest_repo_sync_at'> & {
         pitch:                    string | null;
         proposal_reasoning:       string | null;
         proposal_confidence:      string | null;
@@ -284,10 +322,14 @@ export async function getProjectDetail(db: Queryable, id: string): Promise<Proje
                 [id],
             ),
             db.query<RepositoryLinkRow>(
-                `SELECT pr.project_component_id AS component_id, pr.repository_id, r.full_name AS repository_name, pr.subpath
+                `SELECT pr.project_component_id AS component_id, pr.repository_id,
+                        r.full_name AS repository_name, pr.subpath,
+                        s.last_synced_at, s.sync_status
                  FROM project_repositories pr
                  JOIN project_components pc ON pc.id = pr.project_component_id
                  JOIN repositories r ON r.id = pr.repository_id
+                 LEFT JOIN repo_sync_state s
+                   ON s.user_id = r.user_id AND s.repo_full_name = r.full_name
                  WHERE pc.project_id = $1
                  ORDER BY pc.order_index, r.full_name`,
                 [id],
@@ -336,8 +378,20 @@ export async function getProjectDetail(db: Queryable, id: string): Promise<Proje
             ),
         ]);
 
+    // Newest member-repo sync drives the stale flag — derived from the rows we
+    // already fetched (no extra query). Numeric compare so it is robust whether
+    // pg hands back ISO strings or Date objects. A repo never synced is null.
+    const latest_repo_sync_at = repositories.rows.reduce<string | null>((acc, row) => {
+        const t = row.last_synced_at;
+        if (!t) return acc;
+        if (!acc) return t;
+        return new Date(t).getTime() > new Date(acc).getTime() ? t : acc;
+    }, null);
+
     return {
         ...p,
+        latest_repo_sync_at,
+        case_study_stale: isCaseStudyStale(latest_repo_sync_at, p.case_study_generated_at),
         user_overrides: p.user_overrides ?? {},
         components:    components.rows,
         repositories:  repositories.rows,

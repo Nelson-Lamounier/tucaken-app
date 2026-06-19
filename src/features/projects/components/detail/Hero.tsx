@@ -101,6 +101,24 @@ export function Hero({ project }: HeroProps) {
           </button>
         </div>
       </div>
+      {project.case_study_stale && canRegenerate && (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-amber-400/20 bg-amber-400/5 px-6 py-2.5">
+          <p className="text-xs text-amber-300">
+            A repository changed since this case study was generated
+            {project.latest_repo_sync_at ? ` (${formatRelativeTime(project.latest_repo_sync_at)})` : ''}.
+            Regenerate to reflect the latest code.
+          </p>
+          <button
+            type="button"
+            onClick={() => regenerate.mutate()}
+            disabled={regenerate.isPending}
+            className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/15 px-3 py-1 text-xs font-medium text-amber-200 inset-ring inset-ring-amber-400/30 transition-colors hover:bg-amber-400/25 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <RefreshCw className={`size-3.5 ${regenerate.isPending ? 'animate-spin' : ''}`} />
+            {regenerate.isPending ? 'Queuing…' : 'Regenerate now'}
+          </button>
+        </div>
+      )}
       {regenerate.isError && (
         <p className="border-t border-rose-400/20 bg-rose-400/5 px-6 py-2 text-xs text-rose-300">
           {regenerate.error instanceof Error ? regenerate.error.message : 'Regenerate failed'}
