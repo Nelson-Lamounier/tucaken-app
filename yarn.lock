@@ -4680,7 +4680,7 @@ __metadata:
     "@types/jest": "npm:^29.5.11"
     "@types/node": "npm:^22.0.0"
     "@types/pg": "npm:^8.20.0"
-    hono: "npm:^4.6.14"
+    hono: "npm:^4.12.25"
     ioredis: "npm:^5.4.1"
     jest: "npm:^29.7.0"
     jose: "npm:^5.9.6"
@@ -11420,10 +11420,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"hono@npm:^4.6.14":
-  version: 4.12.18
-  resolution: "hono@npm:4.12.18"
-  checksum: 10c0/b0b9688fd9e41a1847b077d579dc0e92a28b67c247c6ee7d1e751c0bae269824c30c7773feff1a2874e40ea36a3d2f9d1fc5ba618a28ecdf2ca1b33ed2473864
+"hono@npm:^4.12.25":
+  version: 4.12.26
+  resolution: "hono@npm:4.12.26"
+  checksum: 10c0/c7c4d1e1b093e6a3ca1920b45b8c93359d68a5666670acef486f9d3e4952aeaaab05b643e45455f4930b0bd0c1af9354278010fcd461aa8c0e71d17388864d1a
   languageName: node
   linkType: hard
 
