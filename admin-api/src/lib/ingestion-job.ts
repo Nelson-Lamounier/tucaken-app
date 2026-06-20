@@ -7,6 +7,13 @@ import { traceParentEnv, observabilityEnv, ingestionModelEnv, MODEL_JOB_BACKOFF_
 
 const MAX_NAME_LEN = 63;
 
+// Pod wall-clock budget. Raised 900 -> 1800s so a large repo's canonical
+// enrichment finishes in ONE pass instead of hitting the deadline and leaving a
+// `pending` tail (canonical enrichment is ~2.4x slower/call than free-text). The
+// worker derives its enrichment cut-off from INGESTION_DEADLINE_SECONDS minus a
+// margin, so both the pod deadline AND that env must use this value to align.
+const INGESTION_DEADLINE_SECONDS = Number(process.env['INGESTION_ACTIVE_DEADLINE_SECONDS'] ?? 1800);
+
 /** Lowercase, hyphenate, trim to a valid k8s label/name fragment. */
 export function sanitizeIngestionLabel(value: string): string {
     return value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '').slice(0, MAX_NAME_LEN);
@@ -123,7 +130,7 @@ export function buildIngestionJobSpec(
         spec: {
             ttlSecondsAfterFinished: 3600,
             backoffLimit:            MODEL_JOB_BACKOFF_LIMIT,
-            activeDeadlineSeconds:   900,
+            activeDeadlineSeconds:   INGESTION_DEADLINE_SECONDS,
             template: {
                 metadata: { labels: { app: 'ingestion-worker', userId: safeUser, repoSlug } },
                 spec: {
@@ -158,6 +165,10 @@ export function buildIngestionJobSpec(
                             // in-job background pass (searchable in minutes, no quality loss).
                             // INGESTION_DEFER_ENRICHMENT=0 → inline.
                             { name: 'DEFER_ENRICHMENT', value: process.env['INGESTION_DEFER_ENRICHMENT'] ?? '1' },
+                            // Enrichment cut-off (enrichmentDeadlineMs) = this minus a margin.
+                            // Must match the pod activeDeadlineSeconds above so the worker stops
+                            // enriching ~3 min before K8s would SIGKILL it.
+                            { name: 'INGESTION_DEADLINE_SECONDS', value: String(INGESTION_DEADLINE_SECONDS) },
                             // Controlled-vocabulary enrichment: the enricher emits ONLY
                             // canonical skill_ontology terms (shared with the JD extractor)
                             // so corpus + query speak one language and d.skills && jd.skills
