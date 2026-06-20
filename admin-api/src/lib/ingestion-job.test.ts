@@ -31,6 +31,7 @@ describe('buildIngestionJobSpec', () => {
             expect(env.get('FORCE_REINDEX')).toBe('true');
             expect(env.get('DEFER_ENRICHMENT')).toBe('1');          // fast-scan default
             expect(env.get('ENRICH_CANONICAL')).toBe('1');          // controlled-vocab enrichment on by default
+            expect(env.get('INGESTION_DEADLINE_SECONDS')).toBe('1800'); // matches the pod deadline so enrichment budget extends
             expect(env.get('ENRICHMENT_MODEL_ID')).toMatch(/^eu\./);
             expect(env.get('RETRIEVAL_PROBE_MODEL_ID')).toMatch(/^eu\./); // was missing on resync path
             expect(env.get('PROFILE_EXTRACTOR_MODEL_ID')).toBe('m-profile');
