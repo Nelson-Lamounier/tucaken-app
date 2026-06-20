@@ -183,3 +183,63 @@ export function buildIngestionJobSpec(
         },
     };
 }
+
+/**
+ * Job spec for run-rollup.js — recomputes a user's profile rollup + synthesis
+ * WITHOUT re-ingesting any repo. Trimmed twin of buildIngestionJobSpec: same
+ * ingestion image, no GitHub token / repo / enrichment env. Dispatched after a
+ * repo delete so the user-level profile drops the removed repo immediately
+ * (otherwise the rollup is stale until the next sync of any repo).
+ */
+export function buildRollupJobSpec(
+    cfg: AdminApiConfig,
+    image: string,
+    userId: string,
+    timestamp: number,
+): V1Job {
+    const safeUser = sanitizeIngestionLabel(userId);
+    const suffix   = createHash('sha1').update(`rollup:${userId}:${timestamp}`).digest('hex').slice(0, 8);
+    const jobName  = `rollup-${safeUser}-${suffix}`.slice(0, MAX_NAME_LEN);
+    const tp = traceParentEnv();
+
+    return {
+        apiVersion: 'batch/v1',
+        kind:       'Job',
+        metadata: {
+            name:      jobName,
+            namespace: cfg.ingestionNamespace,
+            labels:      { app: 'rollup-refresh', userId: safeUser },
+            annotations: { 'ingestion.tucaken.io/user-id': userId },
+        },
+        spec: {
+            ttlSecondsAfterFinished: 3600,
+            backoffLimit:            MODEL_JOB_BACKOFF_LIMIT,
+            activeDeadlineSeconds:   900,
+            template: {
+                metadata: { labels: { app: 'rollup-refresh', userId: safeUser } },
+                spec: {
+                    restartPolicy:      'Never',
+                    serviceAccountName: cfg.ingestionServiceAccount,
+                    containers: [{
+                        name:    'rollup',
+                        image,
+                        command: ['node', 'dist/run-rollup.js'],
+                        env: [
+                            ...observabilityEnv('rollup-refresh', `${userId}:${timestamp}`),
+                            { name: 'USER_ID', value: userId },
+                            // Synthesis model ids — without these run-rollup re-stamps
+                            // the rollup but the synthesizers silently disable.
+                            ...ingestionModelEnv(cfg),
+                            ...(tp ? [tp] : []),
+                        ],
+                        envFrom: [{ secretRef: { name: 'platform-rds-credentials' } }],
+                        resources: {
+                            requests: { memory: '512Mi', cpu: '250m' },
+                            limits:   { memory: '1Gi',   cpu: '500m' },
+                        },
+                    }],
+                },
+            },
+        },
+    };
+}
