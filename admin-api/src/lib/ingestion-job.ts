@@ -158,6 +158,12 @@ export function buildIngestionJobSpec(
                             // in-job background pass (searchable in minutes, no quality loss).
                             // INGESTION_DEFER_ENRICHMENT=0 → inline.
                             { name: 'DEFER_ENRICHMENT', value: process.env['INGESTION_DEFER_ENRICHMENT'] ?? '1' },
+                            // Controlled-vocabulary enrichment: the enricher emits ONLY
+                            // canonical skill_ontology terms (shared with the JD extractor)
+                            // so corpus + query speak one language and d.skills && jd.skills
+                            // overlaps. Default on; INGESTION_ENRICH_CANONICAL=0 reverts to
+                            // free-text. Method-scoped dedup cache (ai-app) keeps the switch safe.
+                            { name: 'ENRICH_CANONICAL', value: process.env['INGESTION_ENRICH_CANONICAL'] ?? '1' },
                             // eu.* cross-region inference profile for BedrockChunkEnricher
                             // (on-demand Claude unsupported in eu-west-1).
                             { name: 'ENRICHMENT_MODEL_ID', value: process.env['ENRICHMENT_MODEL_ID'] ?? 'eu.anthropic.claude-haiku-4-5-20251001-v1:0' },
