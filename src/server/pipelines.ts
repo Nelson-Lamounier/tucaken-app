@@ -98,6 +98,7 @@ const analyseTriggerSchema = z.object({
     .optional(),
   resumeId: z.string().optional(),
   includeCoverLetter: z.boolean().optional(),
+  mode: z.enum(['free', 'standard']).optional(),
 })
 
 // =============================================================================
@@ -354,6 +355,7 @@ export const triggerApplicationsAnalysisFn = createServerFn({ method: 'POST' })
           targetRole: data.targetRole,
           ...(data.interviewStage ? { interviewStage: data.interviewStage } : {}),
           ...(data.resumeId ? { resumeId: data.resumeId } : {}),
+          ...(data.mode ? { mode: data.mode } : {}),
         }),
       },
     )

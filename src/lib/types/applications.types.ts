@@ -114,6 +114,8 @@ export interface AnalyseTriggerBody {
   readonly resumeId?: string
   /** Whether to generate a cover letter — defaults to true */
   readonly includeCoverLetter?: boolean
+  /** A/B harness: 'free' or 'standard' pipeline variant. Omitted → 'standard'. */
+  readonly mode?: 'free' | 'standard'
 }
 
 /**

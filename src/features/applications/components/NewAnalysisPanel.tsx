@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
-import { Loader2 } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
 import { useForm } from '@tanstack/react-form'
+import { useQuery } from '@tanstack/react-query'
 import { notifyError } from '@/lib/errors/notify'
 import { useApplicationsTrigger } from '../hooks/use-applications-trigger'
 import { usePipelineNotificationsStore } from '@/lib/stores/pipeline-notifications-store'
@@ -10,6 +10,9 @@ import { MIN_JD_LENGTH } from './ApplicationTypes'
 import { FormInput } from '@/components/ui/Field'
 import { Button } from '@/components/ui/Button'
 import { ResumeMenuSelect } from './ResumeMenuSelect'
+import { TierActions } from './TierActions'
+import { adminKeys } from '@/lib/api/query-keys'
+import { getMeFn } from '@/server/me'
 
 function DraftSaver({ values }: { readonly values: Record<string, unknown> }) {
   useEffect(() => {
@@ -34,6 +37,10 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
   const trigger = useApplicationsTrigger()
   const addNotification = usePipelineNotificationsStore((s) => s.addNotification)
   const openProgress = useProgressModalStore((s) => s.openProgress)
+
+  const { data: me } = useQuery({ queryKey: adminKeys.me.detail(), queryFn: getMeFn })
+  const abFreeTier = me?.abFreeTier ?? false
+  const pendingMode = useRef<'free' | 'standard' | undefined>(undefined)
 
   const [initialDraft] = useState(() => {
     if (typeof window === 'undefined') return null
@@ -78,6 +85,9 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
       const company = value.targetCompany.trim()
       const role = value.targetRole.trim()
 
+      const mode = pendingMode.current
+      pendingMode.current = undefined
+
       trigger.mutate(
         {
           jobDescription: value.jobDescription,
@@ -86,6 +96,7 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
           interviewStage: value.interviewStage,
           resumeId: resumeId ?? '',
           includeCoverLetter: value.includeCoverLetter,
+          ...(mode ? { mode } : {}),
         },
         {
           onSuccess: (data) => {
@@ -303,15 +314,15 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
                     >
                       Clear
                     </Button>
-                    <Button
-                      variant="primary"
-                      type="submit"
-                      disabled={!isValid || trigger.isPending}
-                      className="gap-2"
-                    >
-                      {trigger.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                      {trigger.isPending ? 'Analysing…' : 'Start Analysis'}
-                    </Button>
+                    <TierActions
+                      abFreeTier={abFreeTier}
+                      isValid={isValid}
+                      isPending={trigger.isPending}
+                      onSubmit={(mode) => {
+                        pendingMode.current = mode
+                        form.handleSubmit()
+                      }}
+                    />
                   </div>
                 </div>
               )

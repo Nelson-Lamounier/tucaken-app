@@ -141,6 +141,7 @@ const mockMe = {
   name: 'Dev User',
   avatarUrl: undefined,
   isNew: false,
+  abFreeTier: false,
   plan: {
     plan: 'free',
     effectivePlan: 'free' as const,
