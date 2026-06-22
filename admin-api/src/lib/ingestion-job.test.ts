@@ -1,7 +1,7 @@
 /** @format */
 import { describe, it, expect } from '@jest/globals';
 import type { AdminApiConfig } from './config.js';
-import { buildIngestionJobSpec, buildIngestionTokenSecret } from './ingestion-job.js';
+import { buildIngestionJobSpec, buildIngestionTokenSecret, buildRollupJobSpec } from './ingestion-job.js';
 
 const cfg = {
     ingestionNamespace:      'ingestion',
@@ -107,5 +107,20 @@ describe('buildIngestionJobSpec', () => {
         expect(a).toBe(b);
         expect(a.startsWith('ingestion-')).toBe(true);
         expect(a.length).toBeLessThanOrEqual(63);
+    });
+});
+
+describe('buildRollupJobSpec', () => {
+    it('runs run-rollup.js with USER_ID only — no repo, no token', () => {
+        const job = buildRollupJobSpec(cfg, 'img:tag', USER, 1700000000000);
+        const c = job.spec?.template?.spec?.containers?.[0];
+        expect(c?.command).toEqual(['node', 'dist/run-rollup.js']);
+        const env = new Map((c?.env ?? []).map((e) => [e.name, e.value ?? '']));
+        expect(env.get('USER_ID')).toBe(USER);
+        expect(env.has('REPO_FULL_NAME')).toBe(false);   // not a per-repo job
+        expect(env.has('GITHUB_TOKEN')).toBe(false);     // no GitHub access needed
+        expect(c?.envFrom?.[0]?.secretRef?.name).toBe('platform-rds-credentials');
+        expect(job.metadata?.name?.startsWith('rollup-')).toBe(true);
+        expect((job.metadata?.name ?? '').length).toBeLessThanOrEqual(63);
     });
 });
