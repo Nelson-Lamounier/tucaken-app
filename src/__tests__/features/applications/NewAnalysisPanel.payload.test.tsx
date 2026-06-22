@@ -4,12 +4,15 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { NewAnalysisPanel } from '@/features/applications/components/NewAnalysisPanel'
 
 const mutateMock = vi.fn()
 vi.mock('@/features/applications/hooks/use-applications-trigger', () => ({
   useApplicationsTrigger: () => ({ mutate: mutateMock, isPending: false, error: null }),
 }))
+
+vi.mock('@/server/me', () => ({ getMeFn: vi.fn(async () => ({ abFreeTier: false })) }))
 
 // Render the selector as a no-op so this test focuses on payload wiring.
 vi.mock('@/features/applications/components/ResumeMenuSelect', () => ({
@@ -21,6 +24,15 @@ vi.mock('@/lib/stores/pipeline-notifications-store', () => ({
     selector({ addNotification: vi.fn() }),
 }))
 
+function renderPanel(props: React.ComponentProps<typeof NewAnalysisPanel>) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={client}>
+      <NewAnalysisPanel {...props} />
+    </QueryClientProvider>,
+  )
+}
+
 describe('NewAnalysisPanel payload', () => {
   beforeEach(() => {
     mutateMock.mockReset()
@@ -28,7 +40,7 @@ describe('NewAnalysisPanel payload', () => {
   })
 
   it('submits the selected resumeId in the trigger payload', async () => {
-    render(<NewAnalysisPanel resumeId="resume-xyz" onResumeChange={vi.fn()} />)
+    renderPanel({ resumeId: 'resume-xyz', onResumeChange: vi.fn() })
 
     fireEvent.change(screen.getByPlaceholderText('e.g. Revolut'), {
       target: { value: 'Revolut' },
@@ -52,7 +64,7 @@ describe('NewAnalysisPanel payload', () => {
   })
 
   it('disables submit while the resume default is unresolved (resumeId null)', () => {
-    render(<NewAnalysisPanel resumeId={null} onResumeChange={vi.fn()} />)
+    renderPanel({ resumeId: null, onResumeChange: vi.fn() })
 
     fireEvent.change(screen.getByPlaceholderText('e.g. Revolut'), {
       target: { value: 'Revolut' },

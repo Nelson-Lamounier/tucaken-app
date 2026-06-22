@@ -4,12 +4,15 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { NewAnalysisPanel } from '@/features/applications/components/NewAnalysisPanel'
 import { MIN_JD_LENGTH } from '@/features/applications/components/ApplicationTypes'
 
 vi.mock('@/features/applications/hooks/use-applications-trigger', () => ({
   useApplicationsTrigger: () => ({ mutate: vi.fn(), isPending: false, error: null }),
 }))
+
+vi.mock('@/server/me', () => ({ getMeFn: vi.fn(async () => ({ abFreeTier: false })) }))
 
 vi.mock('@/features/applications/components/ResumeMenuSelect', () => ({
   ResumeMenuSelect: () => <div data-testid="resume-menu" />,
@@ -26,6 +29,15 @@ vi.mock('@/lib/stores/progress-modal-store', () => ({
   useProgressModalStore: (selector: (s: unknown) => unknown) =>
     selector({ openProgress: openProgressMock, closeProgress: vi.fn() }),
 }))
+
+function renderPanel(props: React.ComponentProps<typeof NewAnalysisPanel>) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={client}>
+      <NewAnalysisPanel {...props} />
+    </QueryClientProvider>,
+  )
+}
 
 function fillAndTestSubmit() {
   fireEvent.change(screen.getByPlaceholderText('e.g. Revolut'), {
@@ -48,7 +60,7 @@ describe('NewAnalysisPanel progress modal', () => {
   })
 
   it('opens the global progress modal on submit', async () => {
-    render(<NewAnalysisPanel resumeId="resume-1" onResumeChange={vi.fn()} />)
+    renderPanel({ resumeId: 'resume-1', onResumeChange: vi.fn() })
 
     fillAndTestSubmit()
 
