@@ -8,7 +8,6 @@ import { PROJECT_TYPE_LABELS, type ProjectSummary } from '../../lib/types'
 import { partitionProjects } from '../../lib/classify'
 import { ProjectCard } from './ProjectCard'
 import { ProjectFilterBar, type ProjectFilterValue } from './ProjectFilterBar'
-import { IntegrateRepoDialog } from './IntegrateRepoDialog'
 
 const DEFAULT_FILTERS: ProjectFilterValue = { type: 'all', status: 'all' }
 
@@ -16,7 +15,6 @@ export function ProjectsIndex() {
   const navigate = useNavigate()
   const [filters, setFilters] = useState<ProjectFilterValue>(DEFAULT_FILTERS)
   const [palleteOpen, setPalleteOpen] = useState(false)
-  const [integrateOpen, setIntegrateOpen] = useState(false)
 
   const { data, isPending, isError, error } = useQuery(
     projectsQueries.list({ limit: 100, offset: 0, includeArchived: false }),
@@ -75,19 +73,6 @@ export function ProjectsIndex() {
         onSearchClick={() => setPalleteOpen(true)}
       />
 
-      {defaults.length > 0 && (
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => setIntegrateOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-3 py-1.5 text-xs font-medium text-zinc-200 inset-ring inset-ring-white/10 transition-colors hover:bg-white/10"
-          >
-            <FolderPlus className="size-3.5" />
-            Add a repository to a project
-          </button>
-        </div>
-      )}
-
       {filtered.length === 0 ? (
         <FilteredEmptyState onReset={() => setFilters(DEFAULT_FILTERS)} />
       ) : (
@@ -97,13 +82,6 @@ export function ProjectsIndex() {
           ))}
         </ul>
       )}
-
-      <IntegrateRepoDialog
-        open={integrateOpen}
-        onClose={() => setIntegrateOpen(false)}
-        targets={curated}
-        repoDefaults={defaults}
-      />
     </div>
   )
 }
