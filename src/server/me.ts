@@ -18,6 +18,8 @@ export interface MeResponse {
   avatarUrl?: string
   /** True only on the first-ever sign-in — authoritative signal from the DB insert. */
   isNew:     boolean
+  /** A/B harness: true when this user may pick the free-tier resume pipeline. */
+  abFreeTier: boolean
   plan: {
     plan:                 string
     effectivePlan:        'pro' | 'trial' | 'free'
