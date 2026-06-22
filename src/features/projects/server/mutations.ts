@@ -106,32 +106,18 @@ export function useDeleteDecision(projectId: string) {
   })
 }
 
-export function useRegenerateProject(projectId: string) {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: () => regenerateProjectFn({ data: projectId }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: projectsQueries.detail(projectId).queryKey,
-      })
-    },
-  })
-}
-
 /**
- * Update an already-confirmed project from the latest synced repository data.
+ * Dispatch a case-study regenerate and surface the app-global progress modal +
+ * a Pipeline Notification, so the run can be watched (and reopened from the
+ * bell) from anywhere — the same UX as the Resume Builder analysis flow.
  *
- * Covers the case where a repo already belongs to a curated project and the
- * user has just resynced it with more data: dispatching `regenerate` re-runs the
- * case study as an incremental refine (preserve prior + fold in the new repo
- * content). Unlike `useRegenerateProject`, this surfaces the app-global progress
- * modal + a Pipeline Notification so the run can be watched (and reopened from
- * the bell) from anywhere — the same UX as the integrate-repo flow. The project
- * name is a call-time argument so a single hook instance can drive any card in
- * the grid.
+ * Covers every manual regenerate: the project detail "Regenerate" CTA, and the
+ * grid card's "Update from latest sync" (which re-runs the case study as an
+ * incremental refine — preserve prior + fold in the resynced repo content).
+ * `projectId`/`projectName` are call-time arguments so a single hook instance
+ * can drive any card in the grid.
  */
-export function useUpdateProjectFromSync() {
+export function useRegenerateCaseStudy() {
   const queryClient = useQueryClient()
   const openCaseStudyProgress = useCaseStudyProgressStore((s) => s.openProgress)
   const addNotification = usePipelineNotificationsStore((s) => s.addNotification)

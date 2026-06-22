@@ -63,7 +63,7 @@ function CaseStudyProgress({ projectId, projectName, pipelineRunId, startedAt, o
         <div>
           <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Case study updated</h3>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            “{projectName}” now reflects the repository you added.
+            “{projectName}” has been regenerated from your latest code.
           </p>
         </div>
         <Link
@@ -117,7 +117,7 @@ function CaseStudyProgress({ projectId, projectName, pipelineRunId, startedAt, o
         </h3>
         <p className="mt-1 flex items-center justify-center gap-1.5 text-sm text-zinc-500 dark:text-zinc-400">
           <FolderGit2 className="size-3.5 shrink-0 text-teal-500 dark:text-teal-400" />
-          Folding the new repo into “{projectName}” — usually 4–6 minutes.
+          Regenerating the case study for “{projectName}” — usually 4–6 minutes.
         </p>
       </div>
       <p className="text-xs text-zinc-400 dark:text-zinc-500">
@@ -129,8 +129,10 @@ function CaseStudyProgress({ projectId, projectName, pipelineRunId, startedAt, o
 
 /**
  * App-global mount for the case-study regenerate progress modal. Driven by
- * `useCaseStudyProgressStore`, so it can be opened from the integrate-repo flow
- * or from a running Pipeline Notification on any page. Mount once in the
+ * `useCaseStudyProgressStore`, so it can be opened from any regenerate entry
+ * point — the project detail "Regenerate" CTA, the grid card's "Update from
+ * sync", the integrate-repo flow, or a running Pipeline Notification on any
+ * page. Mount once in the
  * dashboard layout. Closing only hides it — the pipeline keeps running and is
  * tracked via the Pipeline Notifications bell.
  */

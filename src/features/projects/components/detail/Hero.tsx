@@ -9,7 +9,7 @@ import {
   type ProjectStatus,
 } from '../../lib/types'
 import { formatRelativeTime } from '../../lib/format'
-import { usePatchProject, useRegenerateProject } from '../../server/mutations'
+import { usePatchProject, useRegenerateCaseStudy } from '../../server/mutations'
 import { InlineText } from './InlineText'
 import { InlineSelect } from './InlineSelect'
 
@@ -33,8 +33,10 @@ export function Hero({ project }: HeroProps) {
   const ShapeIcon = SHAPE_ICON[project.shape] ?? FolderGit
 
   const patch       = usePatchProject(project.id)
-  const regenerate  = useRegenerateProject(project.id)
+  const regenerate  = useRegenerateCaseStudy()
   const canRegenerate = project.is_user_confirmed && project.status !== 'archived'
+  const runRegenerate = () =>
+    regenerate.mutate({ projectId: project.id, projectName: project.name })
 
   return (
     <section className="overflow-hidden rounded-md bg-white/2 inset-ring inset-ring-white/10">
@@ -87,7 +89,7 @@ export function Hero({ project }: HeroProps) {
           </Link>
           <button
             type="button"
-            onClick={() => regenerate.mutate()}
+            onClick={runRegenerate}
             disabled={!canRegenerate || regenerate.isPending}
             title={
               canRegenerate
@@ -110,7 +112,7 @@ export function Hero({ project }: HeroProps) {
           </p>
           <button
             type="button"
-            onClick={() => regenerate.mutate()}
+            onClick={runRegenerate}
             disabled={regenerate.isPending}
             className="inline-flex items-center gap-1.5 rounded-full bg-amber-400/15 px-3 py-1 text-xs font-medium text-amber-200 inset-ring inset-ring-amber-400/30 transition-colors hover:bg-amber-400/25 disabled:cursor-not-allowed disabled:opacity-50"
           >
