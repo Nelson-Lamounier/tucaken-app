@@ -8,7 +8,7 @@ import {
   type ProjectSummary,
 } from '../../lib/types'
 import { formatRelativeTime } from '../../lib/format'
-import { useUpdateProjectFromSync } from '../../server/mutations'
+import { useRegenerateCaseStudy } from '../../server/mutations'
 
 const SHAPE_ICON: Readonly<Record<ProjectShape, React.ComponentType<{ className?: string }>>> = {
   single_repo:     FolderGit,
@@ -34,7 +34,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
   // "Update from latest sync" re-runs the case study as an incremental refine,
   // for when a repo already in this project was resynced with more data. Only
   // meaningful for confirmed, non-archived projects (mirrors the detail Hero).
-  const update = useUpdateProjectFromSync()
+  const update = useRegenerateCaseStudy()
   const canUpdate = project.is_user_confirmed && project.status !== 'archived'
 
   return (
