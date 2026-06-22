@@ -85,6 +85,9 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
       const company = value.targetCompany.trim()
       const role = value.targetRole.trim()
 
+      const mode = pendingMode.current
+      pendingMode.current = undefined
+
       trigger.mutate(
         {
           jobDescription: value.jobDescription,
@@ -93,7 +96,7 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
           interviewStage: value.interviewStage,
           resumeId: resumeId ?? '',
           includeCoverLetter: value.includeCoverLetter,
-          ...(pendingMode.current ? { mode: pendingMode.current } : {}),
+          ...(mode ? { mode } : {}),
         },
         {
           onSuccess: (data) => {
