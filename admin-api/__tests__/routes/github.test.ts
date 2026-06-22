@@ -22,8 +22,8 @@ import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 // ---------------------------------------------------------------------------
 
 const mockGenerateInstallationToken = jest.fn<() => Promise<string>>().mockResolvedValue('ghs_test_token');
-const mockGetInstallationInfo       = jest.fn<() => Promise<{ accountLogin: string; accountAvatarUrl: string }>>()
-    .mockResolvedValue({ accountLogin: 'nelson-lamounier', accountAvatarUrl: 'https://avatars.github.com/u/1' });
+const mockGetInstallationInfo       = jest.fn<() => Promise<{ accountId: string; accountLogin: string; accountAvatarUrl: string }>>()
+    .mockResolvedValue({ accountId: 'u_1', accountLogin: 'nelson-lamounier', accountAvatarUrl: 'https://avatars.github.com/u/1' });
 const mockListInstallationRepos     = jest.fn<() => Promise<object[]>>().mockResolvedValue([
     { id: 1, full_name: 'Nelson-Lamounier/cdk-monitoring',        owner: { login: 'Nelson-Lamounier' }, name: 'cdk-monitoring',        default_branch: 'develop', private: false, updated_at: '2026-04-29T00:00:00Z' },
     { id: 2, full_name: 'Nelson-Lamounier/kubernetes-bootstrap',   owner: { login: 'Nelson-Lamounier' }, name: 'kubernetes-bootstrap',  default_branch: 'develop', private: false, updated_at: '2026-04-29T00:00:00Z' },
@@ -75,12 +75,16 @@ jest.unstable_mockModule('../../src/lib/pg.js', () => ({
 // K8s BatchApi mock
 // ---------------------------------------------------------------------------
 
-const createNamespacedJobMock = jest.fn<() => Promise<object>>().mockResolvedValue({});
+const createNamespacedJobMock = jest.fn<() => Promise<object>>().mockResolvedValue({ metadata: { uid: 'job-uid' } });
 const listNamespacedJobMock   = jest.fn<() => Promise<{ items: object[] }>>().mockResolvedValue({ items: [] });
+const deleteNamespacedJobMock = jest.fn<() => Promise<object>>().mockResolvedValue({});
+const createNamespacedSecretMock = jest.fn<() => Promise<object>>().mockResolvedValue({});
 
 jest.unstable_mockModule('../../src/lib/k8s.js', () => ({
-    getBatchApi:    () => ({ createNamespacedJob: createNamespacedJobMock, listNamespacedJob: listNamespacedJobMock }),
+    getBatchApi:    () => ({ createNamespacedJob: createNamespacedJobMock, listNamespacedJob: listNamespacedJobMock, deleteNamespacedJob: deleteNamespacedJobMock }),
+    getCoreApi:     () => ({ createNamespacedSecret: createNamespacedSecretMock }),
     _resetBatchApi: () => {},
+    _resetCoreApi:  () => {},
 }));
 
 // ---------------------------------------------------------------------------
@@ -100,8 +104,9 @@ jest.unstable_mockModule('../../src/lib/config.js', () => ({
 // Dynamic imports (after mocks)
 // ---------------------------------------------------------------------------
 
+const { createHmac } = await import('node:crypto');
 const { Hono }               = await import('hono');
-const { createGitHubRouter } = await import('../../src/routes/github.js');
+const { createGitHubRouter, createGitHubWebhookRouter } = await import('../../src/routes/github.js');
 
 // ---------------------------------------------------------------------------
 // Test config
@@ -193,12 +198,13 @@ beforeEach(() => {
     jest.clearAllMocks();
     poolQueryMock.mockResolvedValue({ rows: [] });
     mockGenerateInstallationToken.mockResolvedValue('ghs_test_token');
-    mockGetInstallationInfo.mockResolvedValue({ accountLogin: 'nelson-lamounier', accountAvatarUrl: 'https://avatars.github.com/u/1' });
+    mockGetInstallationInfo.mockResolvedValue({ accountId: 'u_1', accountLogin: 'nelson-lamounier', accountAvatarUrl: 'https://avatars.github.com/u/1' });
     mockListInstallationRepos.mockResolvedValue([
         { id: 1, full_name: 'Nelson-Lamounier/cdk-monitoring',       owner: { login: 'Nelson-Lamounier' }, name: 'cdk-monitoring',       default_branch: 'develop', private: false, updated_at: '2026-04-29T00:00:00Z' },
         { id: 2, full_name: 'Nelson-Lamounier/kubernetes-bootstrap',  owner: { login: 'Nelson-Lamounier' }, name: 'kubernetes-bootstrap', default_branch: 'develop', private: false, updated_at: '2026-04-29T00:00:00Z' },
     ]);
-    createNamespacedJobMock.mockResolvedValue({});
+    createNamespacedJobMock.mockResolvedValue({ metadata: { uid: 'job-uid' } });
+    createNamespacedSecretMock.mockResolvedValue({});
     listNamespacedJobMock.mockResolvedValue({ items: [] });
 });
 
@@ -608,7 +614,10 @@ describe('POST /connected-repos', () => {
         seedQuery([{ repo_full_name: 'Nelson-Lamounier/cdk-monitoring' }]); // 5. tryClaimSyncSlot → claim won
         // The repo INSERT now runs inside connectRepoWithDefaultProject on a
         // dedicated transaction client (BEGIN/INSERT…RETURNING/guard/COMMIT) — it
-        // does NOT go through poolQueryMock. 6. markSyncTriggered.
+        // does NOT go through poolQueryMock.
+        seedQuery([]);                          // 6. markSyncTriggered
+        seedQuery([{ github_repo_id: '555' }]); // 7. dispatchIngestionJob → github_repo_id lookup
+        seedQuery([{ github_repo_id: '555' }]); // 8. dispatchTechExtractJob → github_repo_id lookup
 
         const res  = await buildApp().request('/connected-repos', {
             method:  'POST',
@@ -625,9 +634,10 @@ describe('POST /connected-repos', () => {
 
         // getConnection (1) + isSyncInFlight SELECT (1) + plan SELECT (1)
         // + quota INSERT…RETURNING (1, atomic) + tryClaimSyncSlot (1)
-        // + markSyncTriggered (1). The repo INSERT runs on the transaction
+        // + markSyncTriggered (1) + github_repo_id lookup ×2 (ingestion +
+        // tech-extract dispatch). The repo INSERT runs on the transaction
         // client (pool.connect()), not poolQueryMock.
-        expect(poolQueryMock).toHaveBeenCalledTimes(6);
+        expect(poolQueryMock).toHaveBeenCalledTimes(8);
 
         // Installation token generated for this user's installation
         expect(mockGenerateInstallationToken).toHaveBeenCalledWith('999999', testConfig.githubPrivateKey, '12345');
@@ -635,16 +645,37 @@ describe('POST /connected-repos', () => {
         // K8s Jobs created: 1 ingestion + 1 tech-extract (shadow-mode, additive)
         expect(createNamespacedJobMock).toHaveBeenCalledTimes(2);
 
-        // Job spec must inject per-user GITHUB_TOKEN (not rely on ingestion-secrets static token)
-        const jobArg = (createNamespacedJobMock.mock.calls[0] as unknown as [{ body: { spec: { template: { spec: { containers: Array<{ env: Array<{ name: string; value: string }> }> } } } } }])[0];
+        // Job spec must inject per-user GITHUB_TOKEN — via secretKeyRef, NEVER plaintext.
+        const jobArg = (createNamespacedJobMock.mock.calls[0] as unknown as [{ body: { spec: { template: { spec: { containers: Array<{ env: Array<{ name: string; value?: string; valueFrom?: { secretKeyRef?: { name: string; key: string } } }> }> } } } } }])[0];
+        const tokenEnv = jobArg.body.spec.template.spec.containers[0]!.env.find(e => e.name === 'GITHUB_TOKEN')!;
+        expect(tokenEnv.value).toBeUndefined();                       // no plaintext in the Job spec
+        expect(tokenEnv.valueFrom?.secretKeyRef?.key).toBe('GITHUB_TOKEN');
+        // The token flows into a per-Job Secret instead.
+        const secretArg = (createNamespacedSecretMock.mock.calls[0] as unknown as [{ body: { stringData: Record<string, string>; metadata: { ownerReferences: Array<{ kind: string }> } } }])[0];
+        expect(secretArg.body.stringData['GITHUB_TOKEN']).toBe('ghs_test_token');
+        expect(secretArg.body.metadata.ownerReferences[0]!.kind).toBe('Job');
         const envMap = Object.fromEntries(
             jobArg.body.spec.template.spec.containers[0]!.env.map(e => [e.name, e.value]),
         );
-        expect(envMap['GITHUB_TOKEN']).toBe('ghs_test_token');
+        // The immutable repo id resolved from the repositories row is threaded
+        // into the Job so the worker can re-key by id across a rename.
+        expect(envMap['GITHUB_REPO_ID']).toBe('555');
         // USER_ID is now the resolved users.id UUID (set by userProvisionMiddleware),
         // not the Cognito sub. All DB FK constraints use users.id.
         expect(envMap['USER_ID']).toBe(TEST_USER_UUID);
         expect(envMap['REPO_FULL_NAME']).toBe('Nelson-Lamounier/cdk-monitoring');
+
+        // Dual-write: the repositories INSERT (on the transaction client) carries
+        // the immutable github_repo_id resolved from listInstallationRepos
+        // (cdk-monitoring → id 1) as the 4th param.
+        const insertCall = txClient.query.mock.calls.find(
+            c => typeof c[0] === 'string' && /INSERT INTO repositories/i.test(c[0]),
+        );
+        expect(insertCall).toBeDefined();
+        const insertParams = insertCall?.[1] as unknown[];
+        expect(insertParams[0]).toBe(TEST_USER_UUID);
+        expect(insertParams[1]).toBe('Nelson-Lamounier/cdk-monitoring');
+        expect(insertParams[3]).toBe(1);
     });
 
     it('stamps unsanitized user-id + repo-full-name annotations for reconciliation', async () => {
@@ -653,6 +684,8 @@ describe('POST /connected-repos', () => {
         seedQuery([]);                   // plan SELECT → 'free'
         seedQuery([{ count: 1 }]);       // quota INSERT…RETURNING → allowed
         seedQuery([{ repo_full_name: 'Nelson-Lamounier/cdk-monitoring' }]); // tryClaimSyncSlot → claim won
+        seedQuery([]);                          // markSyncTriggered
+        seedQuery([{ github_repo_id: '555' }]); // dispatchIngestionJob → github_repo_id lookup
 
         await buildApp().request('/connected-repos', {
             method:  'POST',
@@ -665,7 +698,7 @@ describe('POST /connected-repos', () => {
         expect(jobArg.body.metadata.annotations['ingestion.tucaken.io/repo-full-name']).toBe('Nelson-Lamounier/cdk-monitoring');
     });
 
-    it('deferSync:true connects as pending without quota or Job dispatch', async () => {
+    it('deferSync:true connects as pending (resolving the id) without quota or Job dispatch', async () => {
         seedQuery([connectedRow]);   // 1. getConnection
         // The repo INSERT runs on the transaction client (connectRepoWithDefaultProject),
         // not poolQueryMock. 2. markRepoPending → default { rows: [] }.
@@ -687,8 +720,72 @@ describe('POST /connected-repos', () => {
         expect(calls.some(s => /usage_quotas/.test(s))).toBe(false);
         expect(calls.some(s => /last_sync_triggered_at/.test(s))).toBe(false);
 
-        // No token, no Job — sync is deferred to POST /connected-repos/sync.
-        expect(mockGenerateInstallationToken).not.toHaveBeenCalled();
+        // Post-085 the defer path MUST resolve a non-null github_repo_id, so it now
+        // generates one installation token + lists installation repos once. The repo
+        // INSERT carries the resolved id (cdk-monitoring → 1) as the 4th param.
+        expect(mockGenerateInstallationToken).toHaveBeenCalledTimes(1);
+        expect(mockListInstallationRepos).toHaveBeenCalledTimes(1);
+        const insertCall = txClient.query.mock.calls.find(
+            c => typeof c[0] === 'string' && /INSERT INTO repositories/i.test(c[0]),
+        );
+        expect((insertCall?.[1] as unknown[])?.[3]).toBe(1);
+
+        // Still no Job — sync is deferred to POST /connected-repos/sync.
+        expect(createNamespacedJobMock).not.toHaveBeenCalled();
+    });
+
+    it('deferSync:true returns 404 when the repo is not in the installation (no insert)', async () => {
+        seedQuery([connectedRow]);   // 1. getConnection
+        mockListInstallationRepos.mockResolvedValueOnce([
+            { id: 1, full_name: 'Nelson-Lamounier/cdk-monitoring', owner: { login: 'Nelson-Lamounier' }, name: 'cdk-monitoring', default_branch: 'develop', private: false, updated_at: '2026-04-29T00:00:00Z' },
+        ]);
+
+        const res = await buildApp().request('/connected-repos', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ repoFullName: 'Nelson-Lamounier/ghost-repo', defaultBranch: 'develop', deferSync: true }),
+        });
+        const body = await res.json() as { error: string };
+
+        expect(res.status).toBe(404);
+        expect(body.error).toMatch(/not found in your GitHub installation/i);
+        // No repo INSERT — a NULL github_repo_id would be rejected by the DB post-085.
+        const insertCall = txClient.query.mock.calls.find(
+            c => typeof c[0] === 'string' && /INSERT INTO repositories/i.test(c[0]),
+        );
+        expect(insertCall).toBeUndefined();
+    });
+
+    it('non-defer returns 404 + refunds quota when the repo is not in the installation (no insert)', async () => {
+        seedQuery([connectedRow]);       // 1. getConnection
+        seedQuery([]);                   // 2. isSyncInFlight → not in flight
+        seedQuery([]);                   // 3. plan SELECT → free
+        seedQuery([{ count: 1 }]);       // 4. quota INSERT…RETURNING → allowed
+        // 5. decrementQuota (refund) → default { rows: [] }
+        mockListInstallationRepos.mockResolvedValueOnce([
+            { id: 1, full_name: 'Nelson-Lamounier/cdk-monitoring', owner: { login: 'Nelson-Lamounier' }, name: 'cdk-monitoring', default_branch: 'develop', private: false, updated_at: '2026-04-29T00:00:00Z' },
+        ]);
+
+        const res = await buildApp().request('/connected-repos', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ repoFullName: 'Nelson-Lamounier/ghost-repo', defaultBranch: 'develop' }),
+        });
+        const body = await res.json() as { error: string };
+
+        expect(res.status).toBe(404);
+        expect(body.error).toMatch(/not found in your GitHub installation/i);
+
+        // Quota was incremented (INSERT) then refunded (decrement) — assert the
+        // decrement ran so the user keeps their monthly credit.
+        const calls = poolQueryMock.mock.calls.map(c => String(c[0]));
+        expect(calls.some(s => /usage_quotas/i.test(s) && /count\s*-\s*1|GREATEST/i.test(s))).toBe(true);
+
+        // No repo INSERT.
+        const insertCall = txClient.query.mock.calls.find(
+            c => typeof c[0] === 'string' && /INSERT INTO repositories/i.test(c[0]),
+        );
+        expect(insertCall).toBeUndefined();
         expect(createNamespacedJobMock).not.toHaveBeenCalled();
     });
 });
@@ -729,8 +826,12 @@ describe('POST /connected-repos/sync', () => {
         seedQuery([]);                 // 3. plan SELECT → free
         seedQuery([{ count: 1 }]);     // 4. quota INSERT…RETURNING repo 1 → allowed
         seedQuery([]); seedQuery([]);  // 5-6 markPending/markTriggered repo 1 (repo INSERT is on the tx client)
-        seedQuery([{ count: 2 }]);     // 7. quota INSERT…RETURNING repo 2 → allowed
-        seedQuery([]); seedQuery([]);  // 8-9 markPending/markTriggered repo 2 (repo INSERT is on the tx client)
+        seedQuery([{ github_repo_id: '1' }]); // 7. dispatchIngestionJob repo 1 → github_repo_id lookup
+        seedQuery([{ github_repo_id: '1' }]); // 8. dispatchTechExtractJob repo 1 → github_repo_id lookup
+        seedQuery([{ count: 2 }]);     // 9. quota INSERT…RETURNING repo 2 → allowed
+        seedQuery([]); seedQuery([]);  // 10-11 markPending/markTriggered repo 2 (repo INSERT is on the tx client)
+        seedQuery([{ github_repo_id: '2' }]); // 12. dispatchIngestionJob repo 2 → github_repo_id lookup
+        seedQuery([{ github_repo_id: '2' }]); // 13. dispatchTechExtractJob repo 2 → github_repo_id lookup
 
         const res  = await buildApp().request('/connected-repos/sync', { method: 'POST' });
         const body = await res.json() as { started: number };
@@ -776,7 +877,9 @@ describe('POST /connected-repos/:fullName/retry', () => {
         seedQuery([connectedRow]);                       // 1. getConnection
         seedQuery([{ full_name: 'octo/app' }]);          // 2. ownership SELECT
         seedQuery([{ repo_full_name: 'octo/app' }]);     // 3. tryClaimSyncSlot → claim won
-        // 4. markSyncTriggered → default { rows: [] }
+        seedQuery([]);                                   // 4. markSyncTriggered
+        seedQuery([{ github_repo_id: '555' }]);          // 5. dispatchIngestionJob → github_repo_id lookup
+        seedQuery([{ github_repo_id: '555' }]);          // 6. dispatchTechExtractJob → github_repo_id lookup
 
         const res  = await buildApp().request('/connected-repos/octo%2Fapp/retry', { method: 'POST' });
         const body = await res.json() as { status: string; repoFullName: string; jobName: string };
@@ -896,5 +999,128 @@ describe('DELETE /connected-repos/:fullName', () => {
     it('returns 400 for an invalid encoded repo name', async () => {
         const res = await buildApp().request('/connected-repos/not-valid', { method: 'DELETE' });
         expect(res.status).toBe(400);
+    });
+});
+
+// ===========================================================================
+// POST /webhook — repository.renamed / transferred
+// ===========================================================================
+
+describe('POST /webhook — repository.renamed', () => {
+    const WEBHOOK_SECRET = 'whsec_test';
+
+    const webhookConfig = { ...testConfig, githubWebhookSecret: WEBHOOK_SECRET } as const;
+
+    function buildWebhookApp() {
+        const app = new Hono();
+
+        app.route('/', createGitHubWebhookRouter(webhookConfig as any));
+        return app;
+    }
+
+    function postEvent(eventType: string, payload: object) {
+        const body = JSON.stringify(payload);
+        const signature = 'sha256=' + createHmac('sha256', WEBHOOK_SECRET).update(body).digest('hex');
+        return buildWebhookApp().request('/webhook', {
+            method:  'POST',
+            headers: {
+                'Content-Type':         'application/json',
+                'X-GitHub-Event':       eventType,
+                'X-Hub-Signature-256':  signature,
+            },
+            body,
+        });
+    }
+
+    it('reconciles the repo label: 200 + UPDATE repositories carries the new name', async () => {
+        // 1. lookupUserByInstallation → known user.
+        seedQuery([{ user_id: TEST_USER_UUID, plan: 'free' }]);
+        // 2. reconcileRepoName anchor SELECT → stored OLD name (so a rename is needed).
+        seedQuery([{ full_name: 'Nelson-Lamounier/old-name' }]);
+        // The transaction (BEGIN/UPDATEs/COMMIT) runs on the txClient via pool.connect().
+
+        const res = await postEvent('repository', {
+            action:       'renamed',
+            installation: { id: 12345 },
+            repository:   { id: 555, full_name: 'Nelson-Lamounier/new-name' },
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json() as { ok: boolean };
+        expect(body.ok).toBe(true);
+
+        // The handler acks before the background reconcile's awaited queries run;
+        // flush pending microtasks/timers so the tx-client assertions are stable.
+        await new Promise((r) => setImmediate(r));
+
+        // The anchor UPDATE ran on the transaction client carrying the new name.
+        const txCalls = txClient.query.mock.calls.map(c => String(c[0]));
+        const anchorIdx = txCalls.findIndex(s => /UPDATE repositories SET full_name/.test(s));
+        expect(anchorIdx).toBeGreaterThanOrEqual(0);
+        const anchorParams = txClient.query.mock.calls[anchorIdx]![1] as unknown[];
+        expect(anchorParams).toEqual(['Nelson-Lamounier/new-name', TEST_USER_UUID, 555]);
+
+        // At least one denormalised label-table UPDATE also carried the new name.
+        expect(txCalls.some(s => /UPDATE \w+ SET repo_full_name = \$1/.test(s))).toBe(true);
+    });
+
+    it('handles transferred: 200 + UPDATE repositories carries the new owner name', async () => {
+        // 1. lookupUserByInstallation → known user.
+        seedQuery([{ user_id: TEST_USER_UUID, plan: 'free' }]);
+        // 2. reconcileRepoName anchor SELECT → stored OLD name (so a rename is needed).
+        seedQuery([{ full_name: 'old-owner/repo' }]);
+
+        const res = await postEvent('repository', {
+            action:       'transferred',
+            installation: { id: 12345 },
+            repository:   { id: 555, full_name: 'new-owner/repo' },
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json() as { ok: boolean };
+        expect(body.ok).toBe(true);
+
+        // The handler acks before the background reconcile's awaited queries run;
+        // flush pending microtasks/timers so the tx-client assertions are stable.
+        await new Promise((r) => setImmediate(r));
+
+        const txCalls = txClient.query.mock.calls.map(c => String(c[0]));
+        const anchorIdx = txCalls.findIndex(s => /UPDATE repositories SET full_name/.test(s));
+        expect(anchorIdx).toBeGreaterThanOrEqual(0);
+        const anchorParams = txClient.query.mock.calls[anchorIdx]![1] as unknown[];
+        expect(anchorParams).toEqual(['new-owner/repo', TEST_USER_UUID, 555]);
+    });
+
+    it('unknown installation: 200 and no reconcile (no UPDATE, no transaction)', async () => {
+        // lookupUserByInstallation → no rows: reconcile must not run.
+        seedQuery([]);
+
+        const res = await postEvent('repository', {
+            action:       'renamed',
+            installation: { id: 99999 },
+            repository:   { id: 777, full_name: 'someone/renamed' },
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json() as { ok: boolean };
+        expect(body.ok).toBe(true);
+
+        const txCalls = txClient.query.mock.calls.map(c => String(c[0]));
+        expect(txCalls.some(s => /BEGIN/i.test(s))).toBe(false);
+        expect(txCalls.some(s => /UPDATE repositories/.test(s))).toBe(false);
+    });
+
+    it('rejects an invalid signature with 401 and does no reconcile', async () => {
+        const res = await buildWebhookApp().request('/webhook', {
+            method:  'POST',
+            headers: {
+                'Content-Type':        'application/json',
+                'X-GitHub-Event':      'repository',
+                'X-Hub-Signature-256': 'sha256=deadbeef',
+            },
+            body: JSON.stringify({ action: 'renamed', installation: { id: 12345 }, repository: { id: 555, full_name: 'o/new' } }),
+        });
+        expect(res.status).toBe(401);
+        expect(poolQueryMock).not.toHaveBeenCalled();
     });
 });

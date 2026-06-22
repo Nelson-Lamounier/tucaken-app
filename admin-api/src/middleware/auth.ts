@@ -70,10 +70,9 @@ export function cognitoJwtAuth(
         audience: clientId,
       });
       payload = result.payload as JWTPayload;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Token validation failed';
+    } catch {
       ctx.res = new Response(
-        JSON.stringify({ error: 'Unauthorised', detail: message }),
+        JSON.stringify({ error: 'Unauthorised' }),
         { status: 401, headers: { 'Content-Type': 'application/json' } },
       );
       return;
@@ -95,7 +94,7 @@ export function requireAdminGroup(): MiddlewareHandler {
     const groups  = (payload?.['cognito:groups'] as string[] | undefined) ?? [];
     if (!groups.includes('admin')) {
       ctx.res = new Response(
-        JSON.stringify({ error: 'Forbidden', detail: "Requires 'admin' group membership" }),
+        JSON.stringify({ error: 'Forbidden' }),
         { status: 403, headers: { 'Content-Type': 'application/json' } },
       );
       return;

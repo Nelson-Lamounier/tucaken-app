@@ -227,6 +227,8 @@ export interface AdminApiConfig {
 
   /** ServiceAccount the tech-extractor Job pod runs as. */
   readonly techExtractorServiceAccount: string;
+  /** Enable the GitHub dependency-graph SBOM cross-check lane in tech-extract. */
+  readonly githubSbomEnabled: boolean;
 
   /**
    * Bedrock model ID forwarded to ARTICLE-pipeline K8s Jobs as RESEARCH_MODEL.
@@ -366,6 +368,9 @@ export function loadConfig(): AdminApiConfig {
     resumeImportServiceAccount:      process.env['RESUME_IMPORT_SERVICE_ACCOUNT'] ?? 'resume-import-sa',
     techExtractorNamespace:          process.env['TECH_EXTRACTOR_NAMESPACE'] ?? 'tech-extractor',
     techExtractorServiceAccount:     process.env['TECH_EXTRACTOR_SERVICE_ACCOUNT'] ?? 'tech-extractor-sa',
+    // On by default (best-effort, capped, timeout-guarded lane); set
+    // TECH_EXTRACT_GITHUB_SBOM_ENABLED=0 to disable without a code change.
+    githubSbomEnabled:               process.env['TECH_EXTRACT_GITHUB_SBOM_ENABLED'] !== '0',
     researchModel:                   required['RESEARCH_MODEL']!,
     strategistResearchModel:         process.env['STRATEGIST_RESEARCH_MODEL'] ?? 'eu.anthropic.claude-sonnet-4-6',
     foundationModel:                 process.env['FOUNDATION_MODEL'] ?? 'eu.anthropic.claude-sonnet-4-6',

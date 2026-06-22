@@ -6,15 +6,17 @@
  * and budget management. All operations delegate to the `admin-api` BFF service
  * via authenticated `fetch()` requests.
  *
- * The `requireAuth()` call acts as a fast-path guard — it rejects
- * unauthenticated requests at the edge before the network hop to admin-api.
+ * The `requireAdmin()` call acts as a fast-path guard — these endpoints expose
+ * cross-user cost data and accept an arbitrary `userId`, so they are admin-only.
+ * It rejects non-admin requests at the edge before the network hop to admin-api
+ * (which independently re-enforces the admin group via `requireAdminGroup`).
  * The raw JWT is forwarded as `Authorization: Bearer <token>` so admin-api
  * can re-verify it with Cognito.
  */
 
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { requireAuth } from './auth-guard'
+import { requireAdmin } from './auth-guard'
 import { apiFetch } from './_api-client'
 
 // =============================================================================
@@ -24,6 +26,7 @@ import { apiFetch } from './_api-client'
 export interface PromptInvocationRow {
   id: string
   userId: string | null
+  email: string | null
   pipeline: string
   agent: string
   modelId: string
@@ -32,7 +35,43 @@ export interface PromptInvocationRow {
   totalCostCents: number
   importId: string | null
   repoName: string | null
+  syncKind: string | null
   invokedAt: string
+}
+
+export interface UserCostRow {
+  userId: string | null
+  email: string | null
+  totalCents: number
+  inputTokens: number
+  outputTokens: number
+  invocations: number
+  lastInvokedAt: string | null
+  jdCents: number
+  tailoredResumes: number
+  importRuns: number
+}
+
+export interface RepoCostRow {
+  repoName: string
+  syncKind: string | null
+  totalCents: number
+  invocations: number
+}
+
+export interface ApplicationCostRow {
+  applicationId: string
+  company: string | null
+  role: string | null
+  totalCents: number
+  invocations: number
+}
+
+export interface ProjectCostRow {
+  projectId: string
+  name: string | null
+  totalCents: number
+  invocations: number
 }
 
 export interface UsageSummary {
@@ -40,6 +79,10 @@ export interface UsageSummary {
   totalCents: number
   byPipeline: Record<string, number>
   byModel: Record<string, number>
+  byUser: UserCostRow[]
+  byRepo: RepoCostRow[]
+  byApplication: ApplicationCostRow[]
+  byProject: ProjectCostRow[]
 }
 
 export interface UserTokenBudget {
@@ -82,7 +125,7 @@ const setBudgetSchema = z.object({
 export const getUsageSummaryFn = createServerFn({ method: 'GET' })
   .inputValidator(usageSummarySchema)
   .handler(async ({ data }) => {
-    await requireAuth()
+    await requireAdmin()
     const params = new URLSearchParams()
     if (data.userId) params.set('userId', data.userId)
     if (data.month) params.set('month', data.month)
@@ -101,7 +144,7 @@ export const getUsageSummaryFn = createServerFn({ method: 'GET' })
 export const getUserBudgetFn = createServerFn({ method: 'GET' })
   .inputValidator(budgetSchema)
   .handler(async ({ data }) => {
-    await requireAuth()
+    await requireAdmin()
     return apiFetch<UserTokenBudget>(
       `/bedrock-usage/budget/${data.userId}`,
       { pathTemplate: '/bedrock-usage/budget/:userId' },
@@ -119,7 +162,7 @@ export const getUserBudgetFn = createServerFn({ method: 'GET' })
 export const setUserBudgetFn = createServerFn({ method: 'POST' })
   .inputValidator(setBudgetSchema)
   .handler(async ({ data }) => {
-    await requireAuth()
+    await requireAdmin()
     return apiFetch<{ ok: boolean }>(
       `/bedrock-usage/budget/${data.userId}`,
       {

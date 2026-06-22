@@ -17,7 +17,9 @@ describe('connectRepoWithDefaultProject', () => {
   it('creates the repo and its default project in one transaction', async () => {
     const { connectRepoWithDefaultProject } = await import('../../src/routes/github.js');
     const fakePool = { connect: async () => client } as never;
-    await connectRepoWithDefaultProject(fakePool, 'user-1', 'Owner/repo', 'main');
+    await connectRepoWithDefaultProject(fakePool, 'user-1', 'Owner/repo', 'main', 555);
+    const repoSql = sqls.find(s => /INSERT INTO repositories/i.test(s));
+    expect(repoSql).toMatch(/ON CONFLICT \(user_id, github_repo_id\)/i);
     const order = sqls.map(s =>
       /^\s*BEGIN/i.test(s) ? 'BEGIN'
       : /INSERT INTO repositories/i.test(s) ? 'REPO'

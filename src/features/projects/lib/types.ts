@@ -31,6 +31,13 @@ export interface ProjectSummary {
   created_at: string
   updated_at: string
   repository_count: number
+  /** Newest successful sync across the project's member repos (null if none). */
+  latest_repo_sync_at: string | null
+  /**
+   * True when a member repo synced after the case study was generated — the
+   * case study no longer reflects the code; prompt the user to regenerate.
+   */
+  case_study_stale: boolean
 }
 
 export type ProjectType =
@@ -100,11 +107,17 @@ export interface ProjectComponent {
   order_index: number
 }
 
+export type RepoSyncStatus = 'pending' | 'syncing' | 'complete' | 'error'
+
 export interface ProjectRepositoryLink {
   component_id:    string
   repository_id:   string
   repository_name: string
   subpath:         string
+  /** Last successful ingestion of this repo (null = never synced). */
+  last_synced_at:  string | null
+  /** Current sync state of this repo, if tracked. */
+  sync_status:     RepoSyncStatus | null
 }
 
 export type DecisionConfidence = 'high' | 'medium' | 'low'
@@ -149,6 +162,41 @@ export interface ProjectStackItem {
   used_in_component_id: string | null
   source_signals:       JsonValue
   order_index:          number
+}
+
+/**
+ * SBOM-grounded dependency identity, stamped server-side into a stack item's
+ * `source_signals.verifiedTech[]` (ai-applications case-study pipeline). Lets
+ * the UI show the real version + a purl link instead of a bare tech name.
+ */
+export interface VerifiedTech {
+  name:    string
+  version: string | null
+  purl:    string | null
+  path:    string | null
+  line:    number | null
+}
+
+/**
+ * Read the verifiedTech array off an untyped `source_signals` blob, defensively
+ * (the field is optional and only present on SBOM-grounded stack items).
+ */
+export function readVerifiedTech(signals: JsonValue): VerifiedTech[] {
+  if (typeof signals !== 'object' || signals === null || Array.isArray(signals)) return []
+  const raw = (signals as Record<string, JsonValue>)['verifiedTech']
+  if (!Array.isArray(raw)) return []
+  return raw.flatMap((entry) => {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return []
+    const e = entry as Record<string, JsonValue>
+    if (typeof e['name'] !== 'string') return []
+    return [{
+      name:    e['name'],
+      version: typeof e['version'] === 'string' ? e['version'] : null,
+      purl:    typeof e['purl'] === 'string' ? e['purl'] : null,
+      path:    typeof e['path'] === 'string' ? e['path'] : null,
+      line:    typeof e['line'] === 'number' ? e['line'] : null,
+    }]
+  })
 }
 
 export type TestCoverageSignal    = 'none' | 'light' | 'moderate' | 'strong'

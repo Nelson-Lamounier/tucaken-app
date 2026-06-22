@@ -77,7 +77,7 @@ export async function internalApiFetch<T>(
   const text = await response.text()
   if (!response.ok) {
     logger.warn(
-      { event: 'internal_api_error', path, status: response.status, body: text.slice(0, 500) },
+      { event: 'internal_api_error', path, status: response.status },
       'internalApiFetch non-2xx',
     )
     throw new InternalApiError(

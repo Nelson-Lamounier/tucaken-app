@@ -28,6 +28,8 @@ function project(p: Partial<ProjectSummary> & { id: string }): ProjectSummary {
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
     repository_count: 1,
+    latest_repo_sync_at: null,
+    case_study_stale: false,
     ...p,
   }
 }

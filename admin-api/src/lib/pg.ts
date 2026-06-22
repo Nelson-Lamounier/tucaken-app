@@ -24,6 +24,8 @@ export type Queryable = Pick<Pool, 'query'>;
 
 let _pool: Pool | undefined;
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export function getPool(config: AdminApiConfig): Pool {
     if (!_pool) {
         _pool = new Pool({
@@ -57,6 +59,10 @@ export async function withUser<T>(
     userId: string,
     fn: (db: PoolClient) => Promise<T>,
 ): Promise<T> {
+    if (!UUID_RE.test(userId)) {
+        throw new Error('Invalid user id for RLS context.');
+    }
+
     const client = await pool.connect();
     try {
         await client.query('BEGIN');

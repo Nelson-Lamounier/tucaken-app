@@ -4,6 +4,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 vi.mock('@tanstack/react-router', () => ({
   Link: ({ children, ...rest }: { children: React.ReactNode } & Record<string, unknown>) => (
@@ -13,6 +14,18 @@ vi.mock('@tanstack/react-router', () => ({
 
 import { ProjectCard } from '@/features/projects/components/index/ProjectCard'
 import type { ProjectSummary } from '@/features/projects/lib/types'
+
+/** Render a card inside a QueryClientProvider — the Update CTA uses a mutation. */
+function renderCard(project: ProjectSummary) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  return render(
+    <QueryClientProvider client={client}>
+      <ul>
+        <ProjectCard project={project} />
+      </ul>
+    </QueryClientProvider>,
+  )
+}
 
 function makeProject(overrides: Partial<ProjectSummary> = {}): ProjectSummary {
   return {
@@ -35,13 +48,15 @@ function makeProject(overrides: Partial<ProjectSummary> = {}): ProjectSummary {
     created_at:              new Date().toISOString(),
     updated_at:              new Date().toISOString(),
     repository_count:        3,
+    latest_repo_sync_at:     null,
+    case_study_stale:        false,
     ...overrides,
   }
 }
 
 describe('ProjectCard', () => {
   it('renders name, tagline, status, and repo count', () => {
-    render(<ul>{ProjectCard({ project: makeProject() })}</ul>)
+    renderCard(makeProject())
     expect(screen.getByText('Demo Project')).toBeTruthy()
     expect(screen.getByText('A sample portfolio project')).toBeTruthy()
     expect(screen.getByText('Active')).toBeTruthy()
@@ -49,12 +64,22 @@ describe('ProjectCard', () => {
   })
 
   it('falls back to project type label when tagline is null', () => {
-    render(<ul>{ProjectCard({ project: makeProject({ tagline: null }) })}</ul>)
+    renderCard(makeProject({ tagline: null }))
     expect(screen.getByText('Production SaaS')).toBeTruthy()
   })
 
   it('uses singular "repo" for repository_count = 1', () => {
-    render(<ul>{ProjectCard({ project: makeProject({ repository_count: 1 }) })}</ul>)
+    renderCard(makeProject({ repository_count: 1 }))
     expect(screen.getByText(/1 repo$/)).toBeTruthy()
+  })
+
+  it('shows the Update CTA for a confirmed, non-archived project', () => {
+    renderCard(makeProject())
+    expect(screen.getByRole('button', { name: /Update Demo Project/ })).toBeTruthy()
+  })
+
+  it('hides the Update CTA for an archived project', () => {
+    renderCard(makeProject({ status: 'archived' }))
+    expect(screen.queryByRole('button', { name: /Update/ })).toBeNull()
   })
 })

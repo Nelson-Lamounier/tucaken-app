@@ -101,6 +101,30 @@ jobs:
       # "Auth — Sign-In / Sign-Up Workflow" dashboard.
       - run: yarn workspace @repo/admin-api test
 
+  admin-api-typecheck:
+    name: Admin API Type Check
+    needs: [setup]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node-yarn
+        with:
+          node-version: ${{ needs.setup.outputs.node-version }}
+      - run: yarn workspace @repo/admin-api typecheck
+
+  admin-api-lint:
+    name: Admin API Lint
+    needs: [setup]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node-yarn
+        with:
+          node-version: ${{ needs.setup.outputs.node-version }}
+      - run: yarn workspace @repo/admin-api lint
+
   build:
     name: Build
     needs: [setup]
@@ -168,20 +192,26 @@ jobs:
 
   ci-success:
     name: CI Complete
-    needs: [audit, lint, typecheck, test, build, docker-build]
+    needs: [audit, lint, typecheck, test, admin-api-typecheck, admin-api-lint, admin-api-test, build, docker-build]
     runs-on: ubuntu-latest
     if: always()
     env:
+      AUDIT_RESULT: ${{ needs.audit.result }}
       LINT_RESULT: ${{ needs.lint.result }}
       TYPECHECK_RESULT: ${{ needs.typecheck.result }}
       TEST_RESULT: ${{ needs.test.result }}
+      ADMIN_API_TYPECHECK_RESULT: ${{ needs.admin-api-typecheck.result }}
+      ADMIN_API_LINT_RESULT: ${{ needs.admin-api-lint.result }}
+      ADMIN_API_TEST_RESULT: ${{ needs.admin-api-test.result }}
       BUILD_RESULT: ${{ needs.build.result }}
+      DOCKER_BUILD_RESULT: ${{ needs.docker-build.result }}
     steps:
       - name: Check Results
         run: |
           FAILED=false
-          for R in "$LINT_RESULT" "$TYPECHECK_RESULT" "$TEST_RESULT" "$BUILD_RESULT"; do
+          for R in "$AUDIT_RESULT" "$LINT_RESULT" "$TYPECHECK_RESULT" "$TEST_RESULT" "$ADMIN_API_TYPECHECK_RESULT" "$ADMIN_API_LINT_RESULT" "$ADMIN_API_TEST_RESULT" "$BUILD_RESULT" "$DOCKER_BUILD_RESULT"; do
             if [ "$R" = "failure" ]; then FAILED=true; fi
+            if [ "$R" = "cancelled" ]; then FAILED=true; fi
           done
           if [ "$FAILED" = "true" ]; then
             echo "CI failed"

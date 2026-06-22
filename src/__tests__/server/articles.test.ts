@@ -38,10 +38,13 @@ import { getCookie } from '@tanstack/react-start/server'
 const mockGetCookie = getCookie as unknown as ReturnType<typeof vi.fn>
 
 // ---------------------------------------------------------------------------
-// Mock: auth-guard — always allow
+// Mock: auth-guard — always allow unless a test overrides the admin gate
 // ---------------------------------------------------------------------------
+const mockRequireAdmin = vi.fn()
+
 vi.mock('../../server/auth-guard', () => ({
   requireAuth: vi.fn().mockResolvedValue({ id: 'user-1', email: 'test@example.com' }),
+  requireAdmin: (...args: unknown[]) => mockRequireAdmin(...args),
   AuthenticationError: class AuthenticationError extends Error {
     code = 'UNAUTHENTICATED' as const
     constructor(message = 'Authentication required') {
@@ -112,6 +115,7 @@ describe('articles server functions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockGetCookie.mockReturnValue('mock-jwt-token')
+    mockRequireAdmin.mockResolvedValue({ id: 'admin-1', email: 'admin@example.com' })
   })
 
   afterEach(() => {
@@ -119,6 +123,17 @@ describe('articles server functions', () => {
   })
 
   describe('getArticlesFn', () => {
+    it('requires admin membership before listing article management data', async () => {
+      mockRequireAdmin.mockRejectedValue(new Error('Admin access required'))
+
+      const handler = getArticlesFn as (i: { data: { status: string } }) => Promise<unknown[]>
+
+      await expect(handler({ data: { status: 'all' } }))
+        .rejects
+        .toThrow(/Admin access required/)
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+
     it('should list all articles without a status filter', async () => {
       mockResponse({ articles: [DRAFT_ARTICLE], count: 1 })
 
@@ -172,6 +187,17 @@ describe('articles server functions', () => {
   })
 
   describe('publishArticleFn', () => {
+    it('requires admin membership before publishing an article', async () => {
+      mockRequireAdmin.mockRejectedValue(new Error('Admin access required'))
+
+      const handler = publishArticleFn as (i: { data: string }) => Promise<{ success: boolean }>
+
+      await expect(handler({ data: 'my-draft' }))
+        .rejects
+        .toThrow(/Admin access required/)
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+
     it('should call POST /:slug/publish and return success', async () => {
       mockResponse({ queued: true, slug: 'my-draft' })
 

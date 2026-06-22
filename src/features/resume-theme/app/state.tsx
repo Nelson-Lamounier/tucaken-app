@@ -85,7 +85,16 @@ export type AppState = {
   margins: number;
 };
 
-export const uid = () => Math.random().toString(36).slice(2, 9);
+let fallbackUidCounter = 0;
+
+export const uid = () => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID().replaceAll("-", "").slice(0, 9);
+  }
+
+  fallbackUidCounter += 1;
+  return `id${Date.now().toString(36)}${fallbackUidCounter.toString(36)}`;
+};
 
 const DEFAULT_RESUME: ResumeData = {
   profile: {

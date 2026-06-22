@@ -46,11 +46,14 @@ import {
     listInstallationRepos,
     resolveHeadSha,
 } from '../lib/github-app.js';
-import type { V1Job } from '@kubernetes/client-node';
-import { getBatchApi } from '../lib/k8s.js';
+import type { V1EnvVar, V1Job } from '@kubernetes/client-node';
+import { getBatchApi, getCoreApi } from '../lib/k8s.js';
 import { traceParentEnv, observabilityEnv, MODEL_JOB_BACKOFF_LIMIT } from '../lib/k8s-job-builder.js';
-import { buildIngestionJobSpec } from '../lib/ingestion-job.js';
+import { buildIngestionJobSpec, buildIngestionTokenSecret, ingestionTokenSecretName, buildRollupJobSpec } from '../lib/ingestion-job.js';
 import { getPool } from '../lib/pg.js';
+import { bomFromEvidenceRows } from '../lib/sbom.js';
+import { croissantFromAggregate, type CroissantAggregateRow } from '../lib/croissant.js';
+import { reconcileRepoName } from '../lib/reconcile-repo-name.js';
 import { isSyncInFlight, tryClaimSyncSlot } from '../lib/sync-state.js';
 import { ensureDefaultProject } from '../lib/repositories/projects.js';
 import { secondsUntilNextMonthUTC } from '../lib/retry-after.js';
@@ -200,22 +203,31 @@ async function listConnectedRepos(pool: Pool, userId: string): Promise<Connected
  * transaction. Fatal-by-design: if project creation fails, the repo insert
  * rolls back too (a repo with no project is the bug we're preventing).
  * Uses the superuser pool (these tables are written without RLS today).
+ *
+ * Conflict is keyed on the immutable (user_id, github_repo_id) — the post-085
+ * unique index uq_repositories_user_ghid. github_repo_id is NOT NULL after 085,
+ * so every caller MUST resolve a real numeric id before connecting; a NULL would
+ * be rejected by the DB. On a reconnect after a GitHub rename (same id, new
+ * full_name) this correctly updates the stored full_name. github_repo_id itself
+ * is never updated here — it IS the conflict key.
  */
 export async function connectRepoWithDefaultProject(
     pool: Pool,
     userId: string,
     fullName: string,
     defaultBranch: string,
+    githubRepoId: number,
 ): Promise<void> {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
         const r = await client.query<{ id: string }>(
-            `INSERT INTO repositories (user_id, provider, full_name, default_branch, index_status)
-             VALUES ($1::uuid, 'github', $2, $3, 'pending')
-             ON CONFLICT (user_id, provider, full_name) DO UPDATE SET full_name = EXCLUDED.full_name
+            `INSERT INTO repositories (user_id, provider, full_name, default_branch, index_status, github_repo_id)
+             VALUES ($1::uuid, 'github', $2, $3, 'pending', $4)
+             ON CONFLICT (user_id, github_repo_id)
+             DO UPDATE SET full_name = EXCLUDED.full_name
              RETURNING id`,
-            [userId, fullName, defaultBranch],
+            [userId, fullName, defaultBranch, githubRepoId],
         );
         const repoId = r.rows[0]!.id;
         await ensureDefaultProject(client, userId, repoId, fullName);
@@ -356,21 +368,31 @@ async function autoDispatchRepos(
     pool:         Pool,
     userId:       string,
     plan:         string,
-    repos:        Array<{ full_name: string; default_branch: string }>,
+    repos:        Array<{ full_name: string; default_branch: string; github_repo_id?: number | null }>,
     token:        string,
     forceReindex: boolean,
 ): Promise<string[]> {
     const limit   = getPlanLimit(plan);
     const queued: string[] = [];
+    // github_repo_id is NOT NULL post-085, so we must resolve a real id for every
+    // repo. Build the installation name->id map once and fall back to it whenever
+    // the row's id is absent.
+    const idMap = await buildRepoIdMap(token);
 
     for (const repo of repos) {
+        const id = repo.github_repo_id ?? idMap.get(repo.full_name);
+        if (id === null || id === undefined) {
+            console.warn(`[github/auto-dispatch] no github_repo_id for ${repo.full_name} — skipping`);
+            continue;
+        }
+
         const allowed = await checkAndIncrementQuota(pool, userId, limit);
         if (!allowed) {
             console.log(`[github/auto-dispatch] quota reached for user ${userId} — stopping`);
             break;
         }
 
-        await connectRepoWithDefaultProject(pool, userId, repo.full_name, repo.default_branch ?? 'main');
+        await connectRepoWithDefaultProject(pool, userId, repo.full_name, repo.default_branch ?? 'main', id);
         await markRepoPending(pool, userId, repo.full_name);
         await markSyncTriggered(pool, userId, repo.full_name);
 
@@ -402,6 +424,29 @@ function sanitizeLabel(v: string): string {
     return v.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/^-+|-+$/g, '').slice(0, MAX_NAME_LEN);
 }
 
+/**
+ * Look up the immutable numeric GitHub repo id persisted on the repositories row
+ * (PR4 dual-writes it). Returns null when not yet backfilled — callers then omit
+ * the GITHUB_REPO_ID env var entirely.
+ */
+async function lookupGithubRepoId(
+    config: AdminApiConfig,
+    userId: string,
+    repoFullName: string,
+): Promise<number | null> {
+    const pool = getPool(config);
+    const r = await pool.query<{ github_repo_id: string | null }>(
+        `SELECT github_repo_id FROM repositories
+         WHERE user_id = $1::uuid AND provider = 'github' AND full_name = $2`,
+        [userId, repoFullName],
+    );
+    const raw = r.rows[0]?.github_repo_id;
+    if (raw === null || raw === undefined) return null;
+    // pg returns bigint/int8 columns as strings; coerce and guard.
+    const id = Number.parseInt(raw, 10);
+    return Number.isFinite(id) ? id : null;
+}
+
 async function dispatchIngestionJob(
     config: AdminApiConfig,
     userId: string,
@@ -414,16 +459,60 @@ async function dispatchIngestionJob(
         throw Object.assign(new Error('Ingestion image not yet configured'), { status: 502 });
     }
 
+    // Resolve the immutable numeric repo id so the worker can re-key by id across
+    // a rename. May be NULL pre-backfill — the builder then omits the env var.
+    const githubRepoId = await lookupGithubRepoId(config, userId, repoFullName);
+
     // Shared builder = single source of truth (same spec as the admin trigger).
     // Resync path adds the per-user GITHUB_TOKEN + argocd compare-options.
     const job = buildIngestionJobSpec(config, image, userId, repoFullName, forceReindex, Date.now(), {
         githubToken,
+        githubRepoId,
         extraAnnotations: { 'argocd.argoproj.io/compare-options': 'IgnoreExtraneous' },
     });
     const jobName = job.metadata?.name ?? '';
 
-    await getBatchApi().createNamespacedJob({ namespace: config.ingestionNamespace, body: job });
+    // Create the Job first, then its token Secret owned by the Job (for GC). The
+    // pod can't start until the secret exists, but image pull (seconds) outlasts
+    // the secret create (ms), so there's no real start delay. If the secret fails,
+    // delete the now-unstartable Job so we never leak a stuck Job.
+    const created = await getBatchApi().createNamespacedJob({ namespace: config.ingestionNamespace, body: job });
+    const jobUid = created.metadata?.uid ?? '';
+    try {
+        await getCoreApi().createNamespacedSecret({
+            namespace: config.ingestionNamespace,
+            body: buildIngestionTokenSecret({
+                secretName:   ingestionTokenSecretName(jobName),
+                namespace:    config.ingestionNamespace,
+                token:        githubToken,
+                ownerJobName: jobName,
+                ownerJobUid:  jobUid,
+            }),
+        });
+    } catch (err) {
+        await getBatchApi()
+            .deleteNamespacedJob({ namespace: config.ingestionNamespace, name: jobName, propagationPolicy: 'Background' })
+            .catch(() => { /* best-effort cleanup */ });
+        throw err;
+    }
     return { jobName };
+}
+
+/**
+ * Dispatch a run-rollup Job to refresh the user's profile rollup after a repo is
+ * removed (so the deleted repo drops out of the aggregate immediately rather than
+ * lazily on the next sync). Best-effort: a missing image or API error MUST NOT
+ * fail the delete — the rollup self-heals on the next sync regardless.
+ */
+async function dispatchRollupJob(config: AdminApiConfig, userId: string): Promise<void> {
+    try {
+        const image = getJobImage('ingestion');
+        if (!isImageConfigured(image)) return;
+        const job = buildRollupJobSpec(config, image, userId, Date.now());
+        await getBatchApi().createNamespacedJob({ namespace: config.ingestionNamespace, body: job });
+    } catch (err) {
+        console.warn('[github] rollup refresh dispatch failed after repo delete (non-fatal)', err);
+    }
 }
 
 /**
@@ -438,6 +527,8 @@ export async function buildTechExtractJobSpec(
     repoFullName:  string,
     timestamp:     number,
     commitSha?:    string,
+    githubRepoId?: number | null,
+    forceReindex   = false,
 ): Promise<V1Job> {
     const { createHash } = await import('node:crypto');
     const safeUser  = sanitizeLabel(userId);
@@ -447,7 +538,7 @@ export async function buildTechExtractJobSpec(
     const slugPart  = sanitizeLabel(`${safeUser}-${repoSlug}`).slice(0, 41);
     const jobName   = `tech-extract-${slugPart}-${suffix}`.slice(0, MAX_NAME_LEN);
 
-    const env: Array<{ name: string; value: string }> = [
+    const env: V1EnvVar[] = [
         ...observabilityEnv('tech-extractor', `${userId}:${repoFullName}:${timestamp}`),
         { name: 'USER_ID',        value: userId },
         { name: 'REPO_FULL_NAME', value: repoFullName },
@@ -455,6 +546,22 @@ export async function buildTechExtractJobSpec(
         { name: 'GITHUB_TOKEN',   value: '' }, // overwritten by caller; placeholder keeps shape
         ...(() => { const tp = traceParentEnv(); return tp ? [tp] : []; })(),
     ];
+    if (typeof githubRepoId === 'number' && Number.isFinite(githubRepoId)) {
+        // Immutable rename-safe key — parity with the ingestion Job so
+        // technology_evidence rows are written with github_repo_id, not just
+        // backfilled. Omitted when not yet resolved (the worker writes null).
+        env.push({ name: 'GITHUB_REPO_ID', value: String(githubRepoId) });
+    }
+    if (config.githubSbomEnabled) {
+        // Opt-out flag: enables the worker's GitHub dependency-graph SBOM
+        // cross-check lane (best-effort, capped, timeout-guarded).
+        env.push({ name: 'GITHUB_SBOM_ENABLED', value: '1' });
+    }
+    if (forceReindex) {
+        // Skip the worker's commit-SHA short-circuit so a re-sync re-extracts
+        // (lets new lanes backfill a commit already covered by older lanes).
+        env.push({ name: 'FORCE_REINDEX', value: '1' });
+    }
     if (commitSha) {
         env.push({ name: 'COMMIT_SHA', value: commitSha });
     }
@@ -509,6 +616,7 @@ async function dispatchTechExtractJob(
     repoFullName:  string,
     githubToken:   string,
     defaultBranch?: string,
+    forceReindex   = false,
 ): Promise<{ jobName: string } | null> {
     const image = getJobImage('tech-extractor');
     if (!isImageConfigured(image)) {
@@ -527,7 +635,10 @@ async function dispatchTechExtractJob(
         console.warn('[tech-extractor] resolveHeadSha failed — omitting COMMIT_SHA', (err as Error).message);
     }
 
-    const job = await buildTechExtractJobSpec(config, image, userId, repoFullName, timestamp, commitSha);
+    // Resolve the immutable repo id so the worker writes github_repo_id (parity
+    // with ingestion). Best-effort — null when not yet backfilled.
+    const githubRepoId = await lookupGithubRepoId(config, userId, repoFullName);
+    const job = await buildTechExtractJobSpec(config, image, userId, repoFullName, timestamp, commitSha, githubRepoId, forceReindex);
 
     // Stamp the real GITHUB_TOKEN into the env (buildTechExtractJobSpec uses a placeholder).
     const container = job.spec!.template.spec!.containers[0]!;
@@ -641,7 +752,7 @@ async function reconcileStuckRepos(
 
         const result = await pool.query(
             `UPDATE repo_sync_state
-                SET sync_status = 'error', error_message = $3, updated_at = NOW()
+                SET sync_status = 'error', error_message = $3
               WHERE user_id = $1::uuid AND repo_full_name = $2
                 AND sync_status IN ('pending', 'syncing')`,
             [userId, repo.fullName, errorMessage],
@@ -665,6 +776,22 @@ function requireGitHubConfig(config: AdminApiConfig): [string, string] {
         );
     }
     return [githubAppId, githubPrivateKey];
+}
+
+/**
+ * Build a `full_name -> immutable github_repo_id` lookup from the installation's
+ * accessible repos. Used to dual-write the numeric id when (re-)connecting repos
+ * whose only handle in scope is the mutable full name (DB rows / request body).
+ */
+async function buildRepoIdMap(token: string): Promise<Map<string, number>> {
+    const raw = await listInstallationRepos(token);
+    const map = new Map<string, number>();
+    for (const r of raw) {
+        if (typeof r.full_name === 'string' && typeof r.id === 'number') {
+            map.set(r.full_name, r.id);
+        }
+    }
+    return map;
 }
 
 export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
@@ -757,9 +884,10 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         );
         const plan = planRows[0]?.plan ?? 'free';
 
+        const idMap = await buildRepoIdMap(token);
         const queued = await autoDispatchRepos(
             config, pool, uid, plan,
-            connected.map(r => ({ full_name: r.full_name, default_branch: r.default_branch })),
+            connected.map(r => ({ full_name: r.full_name, default_branch: r.default_branch, github_repo_id: idMap.get(r.full_name) ?? null })),
             token,
             true, // forceReindex
         );
@@ -842,12 +970,25 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         // Reconcile any repo still showing as active against the live K8s Job
         // state, so a crashed pod surfaces as 'error' rather than spinning
         // forever. Re-read only when something actually changed.
+        //
+        // Reconciliation is strictly best-effort: it must never break listing.
+        // A throw here (DB error, K8s API failure, schema drift) would otherwise
+        // 500 the whole endpoint and blank the UI — hiding every healthy repo
+        // because one is stuck. Degrade to the un-reconciled rows instead; the
+        // server-side platform-job-watcher sweep is the backstop.
         const stuck = rows
             .filter(r => ACTIVE_SYNC_STATUSES.has(r.sync_status ?? r.index_status))
             .map(r => ({ fullName: r.full_name, lastSyncTriggeredAt: r.last_sync_triggered_at }));
         if (stuck.length > 0) {
-            const transitioned = await reconcileStuckRepos(config, pool, uid, stuck);
-            if (transitioned.size > 0) rows = await listConnectedRepos(pool, uid);
+            try {
+                const transitioned = await reconcileStuckRepos(config, pool, uid, stuck);
+                if (transitioned.size > 0) rows = await listConnectedRepos(pool, uid);
+            } catch (err) {
+                console.error(
+                    '[github/connected-repos] reconcile failed — serving un-reconciled list',
+                    err instanceof Error ? err.message : String(err),
+                );
+            }
         }
 
         const repos = rows.map(r => {
@@ -916,7 +1057,17 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         // no quota consumed, no Job dispatched. POST /connected-repos/sync
         // dispatches the actual ingestion for every queued repo later.
         if (body.deferSync === true) {
-            await connectRepoWithDefaultProject(pool, uid, repoFullName, defaultBranch);
+            // github_repo_id is NOT NULL post-085, so the deferred connect must
+            // resolve the numeric id too — one installation token, one repo list.
+            // A repo not in the installation is rejected rather than inserted.
+            const [deferAppId, deferKey] = requireGitHubConfig(config);
+            const deferToken = await generateInstallationToken(deferAppId, deferKey, conn.installation_id);
+            const deferIdMap = await buildRepoIdMap(deferToken);
+            const deferId = deferIdMap.get(repoFullName);
+            if (deferId === undefined) {
+                return ctx.json({ error: 'Repository not found in your GitHub installation' }, 404);
+            }
+            await connectRepoWithDefaultProject(pool, uid, repoFullName, defaultBranch, deferId);
             await markRepoPending(pool, uid, repoFullName);
             return ctx.json({ status: 'queued', repoFullName, jobName: null }, 202);
         }
@@ -948,7 +1099,20 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         // Wrapped in try/catch: if anything after the quota increment fails,
         // decrement the counter so the user doesn't lose a monthly credit.
         try {
-            await connectRepoWithDefaultProject(pool, uid, repoFullName, defaultBranch);
+            // Generate a fresh installation token scoped to this user's repos.
+            // Reused for the id lookup and the Job dispatch below.
+            const githubToken = await generateInstallationToken(appId, key, conn.installation_id);
+
+            // Resolve the immutable github_repo_id (the conflict key post-085).
+            // A repo not in the installation list cannot be inserted — refund the
+            // quota we just incremented and report 404 instead of writing a NULL.
+            const idMap = await buildRepoIdMap(githubToken);
+            const id = idMap.get(repoFullName);
+            if (id === undefined) {
+                await decrementQuota(pool, uid).catch(() => {});
+                return ctx.json({ error: 'Repository not found in your GitHub installation' }, 404);
+            }
+            await connectRepoWithDefaultProject(pool, uid, repoFullName, defaultBranch, id);
 
             // Race-free backstop: lost the atomic claim → a concurrent request
             // already dispatched between the fast-path read and here. Refund the
@@ -959,8 +1123,6 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
             }
             await markSyncTriggered(pool, uid, repoFullName);
 
-            // Generate a fresh installation token scoped to this user's repos.
-            const githubToken = await generateInstallationToken(appId, key, conn.installation_id);
             const { jobName } = await dispatchIngestionJob(config, uid, repoFullName, githubToken, forceReindex);
 
             try {
@@ -1007,7 +1169,12 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         );
         const plan  = planRows[0]?.plan ?? 'free';
         const token = await generateInstallationToken(appId, key, conn.installation_id);
-        const queued = await autoDispatchRepos(config, pool, uid, plan, pending, token, false);
+        const idMap = await buildRepoIdMap(token);
+        const queued = await autoDispatchRepos(
+            config, pool, uid, plan,
+            pending.map(r => ({ full_name: r.full_name, default_branch: r.default_branch, github_repo_id: idMap.get(r.full_name) ?? null })),
+            token, false,
+        );
 
         return ctx.json({ started: queued.length });
     });
@@ -1040,8 +1207,7 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         const result = await pool.query(
             `UPDATE repo_sync_state
              SET sync_status   = 'error',
-                 error_message = $3,
-                 updated_at    = NOW()
+                 error_message = $3
              WHERE user_id = $1::uuid
                AND repo_full_name = ANY($2::text[])
                AND sync_status IN ('pending', 'syncing')`,
@@ -1054,6 +1220,80 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
     // -------------------------------------------------------------------------
     // POST /connected-repos/:fullName/retry — re-dispatch a failed repo.
     // Re-running after a crashed/timed-out ingestion does NOT consume a new
+    // -------------------------------------------------------------------------
+    // GET /connected-repos/:fullName/sbom — CycloneDX 1.6 SBOM for a repo, built
+    // from its deterministic technology_evidence (the tech-extractor lane).
+    // RLS-scoped via withUser; :fullName is URL-encoded "owner%2Frepo".
+    // -------------------------------------------------------------------------
+    interface EvidenceSbomRow { raw_name: string; ecosystem: string | null; version: string | null; commit_sha: string }
+    router.get('/connected-repos/:fullName/sbom', async (ctx) => {
+        const pool = getPool(config);
+        const uid  = requireUserId(ctx);
+        if (!uid) return ctx.json({ error: 'Authenticated subject missing' }, 401);
+
+        const repoFullName = decodeURIComponent(ctx.req.param('fullName'));
+        if (!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(repoFullName)) {
+            return ctx.json({ error: 'Invalid repo name' }, 400);
+        }
+
+        // Prefer the immutable github_repo_id (rename-safe) so a renamed repo's
+        // evidence — written under its old full_name — is still found; fall back
+        // to repo_full_name when the id isn't resolved yet.
+        const githubRepoId = await lookupGithubRepoId(config, uid, repoFullName);
+        const { rows } = githubRepoId !== null
+            ? await pool.query<EvidenceSbomRow>(
+                `SELECT DISTINCT raw_name, ecosystem, version, commit_sha
+                   FROM technology_evidence
+                  WHERE user_id = $1::uuid AND github_repo_id = $2`,
+                [uid, githubRepoId],
+            )
+            : await pool.query<EvidenceSbomRow>(
+                `SELECT DISTINCT raw_name, ecosystem, version, commit_sha
+                   FROM technology_evidence
+                  WHERE user_id = $1::uuid AND repo_full_name = $2`,
+                [uid, repoFullName],
+            );
+
+        return ctx.json(bomFromEvidenceRows(repoFullName, rows));
+    });
+
+    // -------------------------------------------------------------------------
+    // GET /connected-repos/:fullName/croissant — MLCommons Croissant 1.0 data
+    // card for a repo's RAG knowledge base (the document_embeddings chunk
+    // corpus). The RAG-domain counterpart to /sbom. RLS-scoped; rename-safe via
+    // github_repo_id with repo_full_name fallback. :fullName is "owner%2Frepo".
+    // -------------------------------------------------------------------------
+    router.get('/connected-repos/:fullName/croissant', async (ctx) => {
+        const pool = getPool(config);
+        const uid  = requireUserId(ctx);
+        if (!uid) return ctx.json({ error: 'Authenticated subject missing' }, 401);
+
+        const repoFullName = decodeURIComponent(ctx.req.param('fullName'));
+        if (!/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(repoFullName)) {
+            return ctx.json({ error: 'Invalid repo name' }, 400);
+        }
+
+        // Rename-safe key: prefer immutable github_repo_id, fall back to name.
+        const githubRepoId = await lookupGithubRepoId(config, uid, repoFullName);
+        const scopeCol = githubRepoId !== null ? 'github_repo_id' : 'repo_full_name';
+        const scopeVal: number | string = githubRepoId !== null ? githubRepoId : repoFullName;
+        const { rows } = await pool.query<CroissantAggregateRow>(
+            `SELECT
+                (SELECT count(*) FROM document_embeddings
+                  WHERE user_id = $1::uuid AND ${scopeCol} = $2)::int AS record_count,
+                (SELECT array_agg(DISTINCT sk) FROM document_embeddings d, unnest(d.skills) sk
+                  WHERE d.user_id = $1::uuid AND d.${scopeCol} = $2) AS skills,
+                (SELECT metadata->>'commit_sha' FROM document_embeddings
+                  WHERE user_id = $1::uuid AND ${scopeCol} = $2 AND metadata ? 'commit_sha' LIMIT 1) AS commit_sha,
+                (SELECT metadata->'lineage' FROM document_embeddings
+                  WHERE user_id = $1::uuid AND ${scopeCol} = $2 AND metadata ? 'lineage' LIMIT 1) AS lineage`,
+            [uid, scopeVal],
+        );
+
+        return ctx.json(croissantFromAggregate(repoFullName, rows[0]));
+    });
+
+    // -------------------------------------------------------------------------
     // monthly quota credit: the original dispatch already charged one, and the
     // pod failing is an infra event, not a user action. Resets the repo to
     // 'pending' and dispatches a fresh (force-reindex) Job.
@@ -1093,7 +1333,9 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         const { jobName } = await dispatchIngestionJob(config, uid, repoFullName, token, true);
 
         try {
-            await dispatchTechExtractJob(config, uid, repoFullName, token);
+            // A user-initiated retry/re-sync force-re-extracts (parity with the
+            // ingestion force above), so new lanes backfill the current commit.
+            await dispatchTechExtractJob(config, uid, repoFullName, token, undefined, true);
         } catch (err) {
             console.error('[tech-extractor] dispatch failed (non-fatal)', (err as Error).message);
         }
@@ -1163,6 +1405,9 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         }
 
         await deleteRepository(pool, uid, repoFullName);
+        // Refresh the profile rollup so the removed repo drops out of the
+        // aggregate now, not lazily on the next sync. Best-effort, non-blocking.
+        void dispatchRollupJob(config, uid);
         return ctx.json({ success: true });
     });
 
@@ -1281,9 +1526,10 @@ export function createGitHubWebhookRouter(config: AdminApiConfig): Hono {
                     if (connected.length > 0) {
                         const [appId, key] = requireGitHubConfig(config);
                         const token = await generateInstallationToken(appId, key, installationId);
+                        const idMap = await buildRepoIdMap(token);
                         const queued = await autoDispatchRepos(
                             config, pool, user.userId, user.plan,
-                            connected.map(r => ({ full_name: r.full_name, default_branch: r.default_branch })),
+                            connected.map(r => ({ full_name: r.full_name, default_branch: r.default_branch, github_repo_id: idMap.get(r.full_name) ?? null })),
                             token,
                             false,
                         );
@@ -1390,7 +1636,44 @@ export function createGitHubWebhookRouter(config: AdminApiConfig): Hono {
             return ctx.json({ ok: true });
         }
 
-        // ── 7. All other events — acknowledge without processing ──────────────
+        // ── 7. repository.renamed / transferred — refresh the display label ───
+        // GitHub renames/transfers are metadata-only: the immutable numeric repo
+        // id is unchanged, only `full_name` moves. Re-stamp the denormalised
+        // label everywhere via the idempotent reconcileRepoName routine, keyed on
+        // github_repo_id, instead of re-ingesting.
+        if (eventType === 'repository' && (action === 'renamed' || action === 'transferred')) {
+            const inst = payload['installation'] as Record<string, unknown> | undefined;
+            const repo = payload['repository']   as Record<string, unknown> | undefined;
+            const installationId = String(inst?.['id'] ?? '');
+            const rawId          = repo?.['id'];
+            const githubRepoId   = typeof rawId === 'number' ? rawId : Number(rawId);
+            const newFullName    = typeof repo?.['full_name'] === 'string' ? repo['full_name'] : '';
+
+            if (!installationId || !Number.isFinite(githubRepoId) || !newFullName) {
+                return ctx.json({ ok: true });
+            }
+
+            const pool = getPool(config);
+            const user = await lookupUserByInstallation(pool, installationId);
+            if (!user) return ctx.json({ ok: true });
+
+            // Acknowledge GitHub immediately (its delivery timeout is ~10s); the
+            // reconcile touches a denormalised label across ~19 tables incl. the
+            // vector-indexed document_embeddings and can exceed that. It is
+            // idempotent and also covered by the worker's sync-time self-heal, so
+            // running it in the background after the 200 is safe.
+            void reconcileRepoName(pool, user.userId, githubRepoId, newFullName)
+                .then(() => {
+                    console.log(`[github/webhook] repository.${action}: reconciled repo ${githubRepoId} -> ${newFullName} for user ${user.userId}`);
+                })
+                .catch((err) => {
+                    const msg = err instanceof Error ? err.message : String(err);
+                    console.error(`[github/webhook] reconcile failed for repo ${githubRepoId}`, msg);
+                });
+            return ctx.json({ ok: true });
+        }
+
+        // ── 8. All other events — acknowledge without processing ──────────────
         return ctx.json({ ok: true });
     });
 

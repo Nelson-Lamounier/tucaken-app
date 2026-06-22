@@ -12,13 +12,14 @@
 import { createServerFn } from '@tanstack/react-start'
 import { getCookie, setCookie, deleteCookie } from '@tanstack/react-start/server'
 import { z } from 'zod'
+import { getAppOrigin } from './app-origin'
 
 const ADMIN_API_URL =
   process.env['ADMIN_API_URL'] ?? 'http://admin-api.admin-api:3002'
 
 const SECURE_COOKIES =
   process.env.NODE_ENV === 'production' &&
-  (process.env['VITE_APP_URL']?.startsWith('https') ?? true)
+  getAppOrigin().startsWith('https')
 
 const authCallbackSchema = z.object({
   code: z.string().min(1, 'Authorisation code is required'),
@@ -49,7 +50,7 @@ export const handleAuthCallbackFn = createServerFn({ method: 'POST' })
       throw new Error('OAuth state mismatch — potential CSRF attack')
     }
 
-    const appUrl = process.env.VITE_APP_URL || 'http://localhost:5001'
+    const appUrl = getAppOrigin()
     const scheme = appUrl.startsWith('https://') ? 'https' : 'http'
     const host = appUrl.replace(/^https?:\/\//, '')
     // Must match Cognito App Client → Allowed callback URLs exactly.

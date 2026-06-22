@@ -167,7 +167,7 @@ async function onCheckoutCompleted(session: Stripe.Checkout.Session): Promise<vo
     subscriptionStatus: 'active',
   })
   logger.info(
-    { event: 'stripe_checkout_guest_parked', email, customerId, tier },
+    { event: 'stripe_checkout_guest_parked', customerId, tier, hasEmail: true },
     'guest subscription parked pending signup',
   )
 }

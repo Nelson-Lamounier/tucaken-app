@@ -78,10 +78,9 @@ export function cognitoM2MAuth(opts: M2MAuthOptions): MiddlewareHandler {
       // which varies per environment.
       const result = await jwtVerify(token, jwks, { issuer: opts.issuerUrl });
       payload = result.payload as JWTPayload;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Token validation failed';
+    } catch {
       ctx.res = new Response(
-        JSON.stringify({ error: 'Unauthorised', detail: message }),
+        JSON.stringify({ error: 'Unauthorised' }),
         { status: 401, headers: { 'Content-Type': 'application/json' } },
       );
       return;
@@ -89,10 +88,7 @@ export function cognitoM2MAuth(opts: M2MAuthOptions): MiddlewareHandler {
 
     if (payload['token_use'] !== 'access') {
       ctx.res = new Response(
-        JSON.stringify({
-          error: 'Unauthorised',
-          detail: "token_use must be 'access' (service tokens only)",
-        }),
+        JSON.stringify({ error: 'Unauthorised' }),
         { status: 401, headers: { 'Content-Type': 'application/json' } },
       );
       return;
@@ -102,10 +98,7 @@ export function cognitoM2MAuth(opts: M2MAuthOptions): MiddlewareHandler {
     const scopes = String(payload['scope'] ?? '').split(' ').filter(Boolean);
     if (!scopes.includes(opts.requiredScope)) {
       ctx.res = new Response(
-        JSON.stringify({
-          error:  'Forbidden',
-          detail: `Token missing required scope '${opts.requiredScope}'`,
-        }),
+        JSON.stringify({ error: 'Forbidden' }),
         { status: 403, headers: { 'Content-Type': 'application/json' } },
       );
       return;
