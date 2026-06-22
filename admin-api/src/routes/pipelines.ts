@@ -16,6 +16,7 @@ import { randomUUID } from 'node:crypto';
 
 import { Hono } from 'hono';
 
+import { resolveDispatchMode } from '../lib/ab-free-tier.js';
 import type { AdminApiConfig } from '../lib/config.js';
 import { getJobImage, isImageConfigured, isAssetsBucketConfigured } from '../lib/config.js';
 import { buildPipelineJob, sanitizeLabel } from '../lib/k8s-job-builder.js';
@@ -154,7 +155,12 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
     for (const [k, v] of Object.entries({ targetCompany, targetRole, jobDescription })) {
       if (!v) return ctx.json({ error: `"${k}" is required` }, 400);
     }
-    const mode = body.mode?.trim() || 'standard';
+    const requestedMode = body.mode?.trim() || 'standard';
+    const email = ctx.get('jwtPayload')?.['email'] as string | undefined;
+    const { mode, downgraded } = resolveDispatchMode(requestedMode, email);
+    if (downgraded) {
+      console.warn('[pipelines/strategist-job] free-tier dispatch downgraded — not allowlisted', { userId });
+    }
 
     const resumeId = body.resumeId?.trim() || '';
 
