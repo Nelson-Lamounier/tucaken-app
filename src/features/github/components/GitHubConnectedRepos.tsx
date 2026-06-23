@@ -44,6 +44,15 @@ function EnrichmentModal({
             Select the enrichment level for this sync run.
           </p>
 
+          {pending?.forceReindex && (
+            <p
+              data-testid="rebuild-destructive-warning"
+              className="mt-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400"
+            >
+              Full rebuild — re-indexes the entire repository from scratch, replacing all existing chunks.
+            </p>
+          )}
+
           <div className="mt-5 flex flex-col gap-3">
             {/* Premium option */}
             <button

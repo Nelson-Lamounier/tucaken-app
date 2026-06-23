@@ -137,6 +137,33 @@ describe('GitHubConnectedRepos enrichment modal', () => {
     expect(triggerMock.mock.calls[0][0].data.forceReindex).toBe(false)
   })
 
+  it('shows the destructive-rebuild warning when the modal is opened via Rebuild', async () => {
+    renderComponent(true)
+    await screen.findByTestId('enrichment-toggle-active')
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /⟳ Rebuild/i }))
+    })
+
+    expect(screen.getByTestId('rebuild-destructive-warning')).toBeTruthy()
+    expect(screen.getByText(/Full rebuild — re-indexes the entire repository from scratch/i)).toBeTruthy()
+    // The tier choice is still present.
+    expect(screen.getByText('Choose enrichment tier')).toBeTruthy()
+    expect(triggerMock).not.toHaveBeenCalled()
+  })
+
+  it('does NOT show the destructive-rebuild warning when the modal is opened via Re-sync', async () => {
+    renderComponent(true)
+    await screen.findByTestId('enrichment-toggle-active')
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /↺ Re-sync/i }))
+    })
+
+    expect(screen.getByText('Choose enrichment tier')).toBeTruthy()
+    expect(screen.queryByTestId('rebuild-destructive-warning')).toBeNull()
+  })
+
   it('closes the modal without dispatching when Cancel is clicked', async () => {
     renderComponent(true)
     await screen.findByTestId('enrichment-toggle-active')

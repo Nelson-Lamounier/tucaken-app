@@ -65,7 +65,7 @@ export const triggerGitHubIngestionFn = createServerFn({ method: 'POST' })
           repoFullName:  data.repoFullName,
           defaultBranch: data.defaultBranch,
           forceReindex:  data.forceReindex,
-          enrichment:    data.enrichment,
+          ...(data.enrichment ? { enrichment: data.enrichment } : {}),
         }),
       },
     )
