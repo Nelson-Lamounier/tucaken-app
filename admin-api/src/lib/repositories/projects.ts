@@ -45,12 +45,15 @@ export async function ensureDefaultProject(
   );
   if ((guard.rowCount ?? 0) > 0) return;
 
-  const projectId   = randomUUID();
-  const componentId = randomUUID();
-  const slug        = deriveRepoSlug(repoFullName);
-  const name        = repoFullName.split('/')[1] || repoFullName;
+  const slug = deriveRepoSlug(repoFullName);
+  const name = repoFullName.split('/')[1] || repoFullName;
 
-  await db.query(
+  // Upsert the project and ALWAYS read back the real id. A repo removed earlier
+  // can leave a project row behind (the repo link is gone, but the project +
+  // slug remain), so a fresh randomUUID() + DO NOTHING would skip the insert and
+  // then the component insert would reference a non-existent project id (FK
+  // violation). DO UPDATE ... RETURNING id yields the existing OR new id.
+  const projectRes = await db.query<{ id: string }>(
     `INSERT INTO projects (
         id, user_id, slug, name, shape, is_ai_suggested, is_user_confirmed,
         status, role_exhibited, visibility
@@ -58,20 +61,84 @@ export async function ensureDefaultProject(
         $1::uuid, $2::uuid, $3, $4, 'single_repo', FALSE, FALSE,
         'active', 'sole_builder', 'private'
      )
-     ON CONFLICT (user_id, slug) DO NOTHING`,
-    [projectId, userId, slug, name],
+     ON CONFLICT (user_id, slug) DO UPDATE SET name = EXCLUDED.name
+     RETURNING id`,
+    [randomUUID(), userId, slug, name],
   );
-  await db.query(
-    `INSERT INTO project_components (id, user_id, project_id, name, kind, order_index)
-     VALUES ($1::uuid, $2::uuid, $3::uuid, 'Main', 'shared', 0)`,
-    [componentId, userId, projectId],
+  const projectId = projectRes.rows[0]?.id;
+  if (!projectId) throw new Error('ensureDefaultProject: project upsert returned no id');
+
+  // Reuse the project's existing default component if it already has one
+  // (orphan case); otherwise create it. Avoids a duplicate 'Main' component.
+  const compRes = await db.query<{ id: string }>(
+    `SELECT id FROM project_components WHERE project_id = $1::uuid ORDER BY order_index LIMIT 1`,
+    [projectId],
   );
+  const existingComponent = compRes.rows[0];
+  let componentId: string;
+  if (existingComponent) {
+    componentId = existingComponent.id;
+  } else {
+    componentId = randomUUID();
+    await db.query(
+      `INSERT INTO project_components (id, user_id, project_id, name, kind, order_index)
+       VALUES ($1::uuid, $2::uuid, $3::uuid, 'Main', 'shared', 0)`,
+      [componentId, userId, projectId],
+    );
+  }
+
   await db.query(
     `INSERT INTO project_repositories (user_id, project_component_id, repository_id, subpath)
      VALUES ($1::uuid, $2::uuid, $3::uuid, '')
      ON CONFLICT (project_component_id, repository_id, subpath) DO NOTHING`,
     [userId, componentId, repositoryId],
   );
+}
+
+/**
+ * Remove pristine single-repo DEFAULT projects that are left without any repo
+ * after a repo is deleted. Scope is deliberately narrow so curated work is never
+ * touched: only `shape='single_repo'`, `is_user_confirmed=FALSE`, no case study,
+ * and zero remaining repo links. Pass the project ids the deleted repo seeded
+ * (captured before the repo row is removed). Idempotent: deleting already-gone
+ * rows is a no-op, so it is safe to call on every repo removal.
+ *
+ * Without this, removing a repo leaves its auto-created project behind — it
+ * clutters the project list and gets reused on re-add (so the next add does not
+ * start from a clean single-repo project). Returns the ids actually deleted.
+ */
+export async function cleanupOrphanedDefaultProjects(
+  db: Queryable,
+  userId: string,
+  projectIds: readonly string[],
+): Promise<string[]> {
+  if (projectIds.length === 0) return [];
+
+  // The shared predicate: a pristine single-repo default with no repo links.
+  const pristineOrphan = `
+        p.user_id = $1::uuid
+    AND p.id = ANY($2::uuid[])
+    AND p.shape = 'single_repo'
+    AND p.is_user_confirmed = FALSE
+    AND p.case_study_status IS NULL
+    AND NOT EXISTS (
+          SELECT 1 FROM project_repositories pr
+            JOIN project_components c2 ON pr.project_component_id = c2.id
+           WHERE c2.project_id = p.id
+        )`;
+
+  // Components first (no ON DELETE CASCADE is assumed on the FK).
+  await db.query(
+    `DELETE FROM project_components pc
+      WHERE pc.user_id = $1::uuid
+        AND pc.project_id IN (SELECT p.id FROM projects p WHERE ${pristineOrphan})`,
+    [userId, projectIds],
+  );
+  const deleted = await db.query<{ id: string }>(
+    `DELETE FROM projects p WHERE ${pristineOrphan} RETURNING p.id`,
+    [userId, projectIds],
+  );
+  return deleted.rows.map((r) => r.id);
 }
 
 // ─── Types ─────────────────────────────────────────────────────────────────

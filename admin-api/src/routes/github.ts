@@ -55,7 +55,7 @@ import { bomFromEvidenceRows } from '../lib/sbom.js';
 import { croissantFromAggregate, type CroissantAggregateRow } from '../lib/croissant.js';
 import { reconcileRepoName } from '../lib/reconcile-repo-name.js';
 import { isSyncInFlight, tryClaimSyncSlot } from '../lib/sync-state.js';
-import { ensureDefaultProject } from '../lib/repositories/projects.js';
+import { ensureDefaultProject, cleanupOrphanedDefaultProjects } from '../lib/repositories/projects.js';
 import { secondsUntilNextMonthUTC } from '../lib/retry-after.js';
 import { AdminApiBindings, requireUserId } from '../lib/types.js';
 
@@ -251,6 +251,20 @@ async function markRepoPending(pool: Pool, userId: string, fullName: string): Pr
 }
 
 async function deleteRepository(pool: Pool, userId: string, fullName: string): Promise<void> {
+    // Capture the projects this repo seeds BEFORE removing it, so we can clean up
+    // a single-repo default left orphaned by the removal. Multi-repo clusters are
+    // NOT affected: cleanupOrphanedDefaultProjects only deletes pristine
+    // single_repo, unconfirmed, no-case-study projects with zero remaining repos.
+    const { rows: projRows } = await pool.query<{ project_id: string }>(
+        `SELECT DISTINCT pc.project_id
+           FROM repositories r
+           JOIN project_repositories pr ON pr.repository_id = r.id
+           JOIN project_components   pc ON pr.project_component_id = pc.id
+          WHERE r.user_id = $1::uuid AND r.full_name = $2`,
+        [userId, fullName],
+    );
+    const seededProjectIds = projRows.map((r) => r.project_id);
+
     await pool.query(
         `DELETE FROM document_embeddings WHERE user_id = $1::uuid AND repo_full_name = $2`,
         [userId, fullName],
@@ -264,6 +278,11 @@ async function deleteRepository(pool: Pool, userId: string, fullName: string): P
          WHERE user_id = $1::uuid AND provider = 'github' AND full_name = $2`,
         [userId, fullName],
     );
+
+    const removedProjects = await cleanupOrphanedDefaultProjects(pool, userId, seededProjectIds);
+    if (removedProjects.length > 0) {
+        console.log(`[github] removed ${removedProjects.length} orphaned single-repo default project(s) after deleting ${fullName}`);
+    }
 }
 
 // =============================================================================

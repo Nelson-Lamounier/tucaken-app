@@ -8,6 +8,8 @@ interface IngestionVariables {
   readonly repoFullName:  string
   readonly defaultBranch?: string
   readonly forceReindex?: boolean
+  /** Enrichment tier for allowlisted test users; omitted otherwise. */
+  readonly enrichment?: 'premium' | 'free'
 }
 
 export function useGitHubIngestion() {

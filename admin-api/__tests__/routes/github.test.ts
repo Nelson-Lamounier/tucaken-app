@@ -985,14 +985,16 @@ describe('DELETE /connected-repos/:fullName', () => {
         expect(res.status).toBe(200);
         expect(body.success).toBe(true);
 
-        // 3 deletes: document_embeddings, repo_sync_state, repositories
-        expect(poolQueryMock).toHaveBeenCalledTimes(3);
+        // Capture the repo's seeded projects, then 3 deletes. With no seeded
+        // projects (mock returns []), the orphan cleanup is skipped, so 4 calls.
+        expect(poolQueryMock).toHaveBeenCalledTimes(4);
         const calls = poolQueryMock.mock.calls.map(c => (c[0] as string).trim());
-        expect(calls[0]).toMatch(/DELETE FROM document_embeddings/);
-        expect(calls[1]).toMatch(/DELETE FROM repo_sync_state/);
-        expect(calls[2]).toMatch(/DELETE FROM repositories/);
+        expect(calls[0]).toMatch(/SELECT DISTINCT pc\.project_id/);
+        expect(calls[1]).toMatch(/DELETE FROM document_embeddings/);
+        expect(calls[2]).toMatch(/DELETE FROM repo_sync_state/);
+        expect(calls[3]).toMatch(/DELETE FROM repositories/);
 
-        // All deletes scoped to authenticated user
+        // All queries scoped to the authenticated user
         calls.forEach(sql => expect(sql).toMatch(/user_id/));
     });
 
