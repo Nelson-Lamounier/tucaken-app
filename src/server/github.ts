@@ -48,6 +48,7 @@ const ingestionSchema = z.object({
   repoFullName:  z.string().min(1),
   defaultBranch: z.string().optional(),
   forceReindex:  z.boolean().optional(),
+  enrichment:    z.enum(['premium', 'free']).optional(),
 })
 
 export const triggerGitHubIngestionFn = createServerFn({ method: 'POST' })
@@ -64,6 +65,7 @@ export const triggerGitHubIngestionFn = createServerFn({ method: 'POST' })
           repoFullName:  data.repoFullName,
           defaultBranch: data.defaultBranch,
           forceReindex:  data.forceReindex,
+          ...(data.enrichment ? { enrichment: data.enrichment } : {}),
         }),
       },
     )

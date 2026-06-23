@@ -9,6 +9,7 @@
 import { Hono } from 'hono';
 
 import { isFreeTierAllowed } from '../lib/ab-free-tier.js';
+import { isEnrichmentToggleAllowed } from '../lib/enrichment-toggle.js';
 import { adminDisableUser } from '../lib/cognito-admin.js';
 import type { AdminApiConfig } from '../lib/config.js';
 import { revokeGitHubInstallationForUser } from '../lib/github-uninstall.js';
@@ -48,7 +49,8 @@ export function createMeRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
     return ctx.json({
       id:        userId,
       email:     payload['email']   as string,
-      abFreeTier: isFreeTierAllowed(payload['email'] as string | undefined),
+      abFreeTier:        isFreeTierAllowed(payload['email'] as string | undefined),
+      enrichmentToggle:  isEnrichmentToggleAllowed(payload['email'] as string),
       name:      payload['name']    as string | undefined,
       avatarUrl: payload['picture'] as string | undefined,
       isNew:     isNewUser,

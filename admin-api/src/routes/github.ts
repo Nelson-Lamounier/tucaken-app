@@ -453,6 +453,8 @@ async function dispatchIngestionJob(
     repoFullName: string,
     githubToken: string,
     forceReindex = false,
+    email?: string,
+    enrichment?: 'premium' | 'free',
 ): Promise<{ jobName: string }> {
     const image = getJobImage('ingestion');
     if (!isImageConfigured(image)) {
@@ -469,6 +471,8 @@ async function dispatchIngestionJob(
         githubToken,
         githubRepoId,
         extraAnnotations: { 'argocd.argoproj.io/compare-options': 'IgnoreExtraneous' },
+        ...(email      !== undefined ? { email }      : {}),
+        ...(enrichment !== undefined ? { enrichment } : {}),
     });
     const jobName = job.metadata?.name ?? '';
 
@@ -1042,7 +1046,7 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         const conn = await getConnection(pool, uid);
         if (!conn?.installation_id) return ctx.json({ error: 'GitHub not connected' }, 400);
 
-        let body: { repoFullName?: string; defaultBranch?: string; forceReindex?: boolean; deferSync?: boolean };
+        let body: { repoFullName?: string; defaultBranch?: string; forceReindex?: boolean; deferSync?: boolean; enrichment?: 'premium' | 'free' };
         try { body = await ctx.req.json(); }
         catch { return ctx.json({ error: 'Body must be valid JSON' }, 400); }
 
@@ -1052,10 +1056,18 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         }
         const defaultBranch = body.defaultBranch?.trim() || 'main';
         const forceReindex  = body.forceReindex === true;
+        const enrichment    = body.enrichment === 'premium' || body.enrichment === 'free' ? body.enrichment : undefined;
+        // Email from verified Cognito JWT claim — used server-side to gate the enrichment toggle.
+        const callerEmail   = ctx.get('jwtPayload')?.['email'] as string | undefined;
 
         // deferSync (onboarding queue): connect the repo as 'pending' only —
         // no quota consumed, no Job dispatched. POST /connected-repos/sync
         // dispatches the actual ingestion for every queued repo later.
+        // NOTE: the `enrichment` toggle choice is honoured ONLY on the direct
+        // (deferSync=false) dispatch below — the UI toggle uses that path. The
+        // deferred drain (and bulk resyncs) carry no per-repo choice and fall to
+        // the default; thread `enrichment` through them only if the toggle is
+        // ever extended to the onboarding queue.
         if (body.deferSync === true) {
             // github_repo_id is NOT NULL post-085, so the deferred connect must
             // resolve the numeric id too — one installation token, one repo list.
@@ -1123,7 +1135,7 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
             }
             await markSyncTriggered(pool, uid, repoFullName);
 
-            const { jobName } = await dispatchIngestionJob(config, uid, repoFullName, githubToken, forceReindex);
+            const { jobName } = await dispatchIngestionJob(config, uid, repoFullName, githubToken, forceReindex, callerEmail, enrichment);
 
             try {
                 await dispatchTechExtractJob(config, uid, repoFullName, githubToken, defaultBranch);
