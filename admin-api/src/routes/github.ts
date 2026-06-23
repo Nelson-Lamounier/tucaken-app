@@ -1063,6 +1063,11 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         // deferSync (onboarding queue): connect the repo as 'pending' only —
         // no quota consumed, no Job dispatched. POST /connected-repos/sync
         // dispatches the actual ingestion for every queued repo later.
+        // NOTE: the `enrichment` toggle choice is honoured ONLY on the direct
+        // (deferSync=false) dispatch below — the UI toggle uses that path. The
+        // deferred drain (and bulk resyncs) carry no per-repo choice and fall to
+        // the default; thread `enrichment` through them only if the toggle is
+        // ever extended to the onboarding queue.
         if (body.deferSync === true) {
             // github_repo_id is NOT NULL post-085, so the deferred connect must
             // resolve the numeric id too — one installation token, one repo list.
