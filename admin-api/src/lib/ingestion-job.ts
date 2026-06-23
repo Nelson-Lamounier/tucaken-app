@@ -17,9 +17,10 @@ const MAX_NAME_LEN = 63;
  *               (skips the enricher entirely; ENRICH_TIER1 signals the worker
  *               that Tier 1 canonical extraction has already run deterministically)
  * - `premium` → `{ ENRICH_TIER1: '1', ENRICH_PER_FILE: '1' }`
- *               (full per-file enrichment; ENRICHMENT_DISABLED is absent so the
- *               enricher runs normally; takes precedence over DEFER_ENRICHMENT
- *               via the worker's own env read order)
+ *               (full enrichment; ENRICHMENT_DISABLED is absent so the enricher
+ *               runs. ENRICH_PER_FILE batches enrichment per file in BOTH the
+ *               inline and the deferred (DEFER_ENRICHMENT=1) paths — it is
+ *               independent of DEFER_ENRICHMENT, not a precedence over it.)
  * - otherwise → `{}`  (current default — no new env vars injected)
  */
 export function resolveEnrichmentEnv(
