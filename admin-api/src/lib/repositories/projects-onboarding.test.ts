@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { deriveRepoSlug, ensureDefaultProject, archiveSupersededDefaults } from './projects.js';
+import { deriveRepoSlug, ensureDefaultProject, archiveSupersededDefaults, cleanupOrphanedDefaultProjects } from './projects.js';
 import type { Queryable } from '../pg.js';
 
 describe('deriveRepoSlug', () => {
@@ -70,6 +70,43 @@ describe('ensureDefaultProject', () => {
     // The repo link is attached to the reused component id.
     const link = calls.find(c => /INSERT INTO project_repositories/i.test(c.sql))!;
     expect(link.params).toContain('existing-comp');
+  });
+});
+
+describe('cleanupOrphanedDefaultProjects', () => {
+  function fakeDelDb() {
+    const calls: { sql: string; params: readonly unknown[] }[] = [];
+    const db = {
+      query: async (sql: string, params: readonly unknown[] = []) => {
+        calls.push({ sql, params });
+        // The final project DELETE returns the ids it removed.
+        if (/DELETE FROM projects/i.test(sql)) {
+          return { rows: [{ id: 'orphan-1' }], rowCount: 1 };
+        }
+        return { rows: [], rowCount: 0 };
+      },
+    } as unknown as Queryable;
+    return { db, calls };
+  }
+
+  it('no-ops (no queries) when there are no seeded project ids', async () => {
+    const { db, calls } = fakeDelDb();
+    const removed = await cleanupOrphanedDefaultProjects(db, 'user-1', []);
+    expect(removed).toEqual([]);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('only ever targets pristine single_repo orphans (cluster-safe predicate)', async () => {
+    const { db, calls } = fakeDelDb();
+    const removed = await cleanupOrphanedDefaultProjects(db, 'user-1', ['p-1']);
+    expect(removed).toEqual(['orphan-1']);
+    const del = calls.find(c => /DELETE FROM projects/i.test(c.sql))!;
+    // Every guard that protects a curated cluster must be present.
+    expect(del.sql).toMatch(/shape\s*=\s*'single_repo'/i);
+    expect(del.sql).toMatch(/is_user_confirmed\s*=\s*FALSE/i);
+    expect(del.sql).toMatch(/case_study_status\s+IS\s+NULL/i);
+    expect(del.sql).toMatch(/NOT EXISTS/i);
+    expect(del.params).toEqual(['user-1', ['p-1']]);
   });
 });
 

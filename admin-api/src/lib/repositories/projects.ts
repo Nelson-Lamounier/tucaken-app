@@ -95,6 +95,52 @@ export async function ensureDefaultProject(
   );
 }
 
+/**
+ * Remove pristine single-repo DEFAULT projects that are left without any repo
+ * after a repo is deleted. Scope is deliberately narrow so curated work is never
+ * touched: only `shape='single_repo'`, `is_user_confirmed=FALSE`, no case study,
+ * and zero remaining repo links. Pass the project ids the deleted repo seeded
+ * (captured before the repo row is removed). Idempotent: deleting already-gone
+ * rows is a no-op, so it is safe to call on every repo removal.
+ *
+ * Without this, removing a repo leaves its auto-created project behind — it
+ * clutters the project list and gets reused on re-add (so the next add does not
+ * start from a clean single-repo project). Returns the ids actually deleted.
+ */
+export async function cleanupOrphanedDefaultProjects(
+  db: Queryable,
+  userId: string,
+  projectIds: readonly string[],
+): Promise<string[]> {
+  if (projectIds.length === 0) return [];
+
+  // The shared predicate: a pristine single-repo default with no repo links.
+  const pristineOrphan = `
+        p.user_id = $1::uuid
+    AND p.id = ANY($2::uuid[])
+    AND p.shape = 'single_repo'
+    AND p.is_user_confirmed = FALSE
+    AND p.case_study_status IS NULL
+    AND NOT EXISTS (
+          SELECT 1 FROM project_repositories pr
+            JOIN project_components c2 ON pr.project_component_id = c2.id
+           WHERE c2.project_id = p.id
+        )`;
+
+  // Components first (no ON DELETE CASCADE is assumed on the FK).
+  await db.query(
+    `DELETE FROM project_components pc
+      WHERE pc.user_id = $1::uuid
+        AND pc.project_id IN (SELECT p.id FROM projects p WHERE ${pristineOrphan})`,
+    [userId, projectIds],
+  );
+  const deleted = await db.query<{ id: string }>(
+    `DELETE FROM projects p WHERE ${pristineOrphan} RETURNING p.id`,
+    [userId, projectIds],
+  );
+  return deleted.rows.map((r) => r.id);
+}
+
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 export interface ProjectSummary {
