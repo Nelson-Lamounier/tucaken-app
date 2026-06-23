@@ -16,12 +16,12 @@ const MAX_NAME_LEN = 63;
  * - `free`    → `{ ENRICHMENT_DISABLED: '1', ENRICH_TIER1: '1' }`
  *               (skips the enricher entirely; ENRICH_TIER1 signals the worker
  *               that Tier 1 canonical extraction has already run deterministically)
- * - `premium` → `{ ENRICH_TIER1: '1', ENRICH_PER_FILE: '1' }`
- *               (full enrichment; ENRICHMENT_DISABLED is absent so the enricher
- *               runs. ENRICH_PER_FILE batches enrichment per file in BOTH the
- *               inline and the deferred (DEFER_ENRICHMENT=1) paths — it is
- *               independent of DEFER_ENRICHMENT, not a precedence over it.)
- * - otherwise → `{}`  (current default — no new env vars injected)
+ * - `premium` → `{ ENRICH_TIER1: '1' }`
+ *               (full enrichment; ENRICHMENT_DISABLED absent so the enricher
+ *               runs per-chunk. ENRICH_PER_FILE is withheld until the
+ *               embedding-evidence fan-back proves recall >= 0.97 -- see the
+ *               ai-applications eval sweep -- then it is re-added here.)
+ * - otherwise → `{}`  (current default -- no new env vars injected)
  */
 export function resolveEnrichmentEnv(
     email: string | undefined,
@@ -29,7 +29,7 @@ export function resolveEnrichmentEnv(
 ): Record<string, string> {
     if (!isEnrichmentToggleAllowed(email)) return {};
     if (choice === 'free')    return { ENRICHMENT_DISABLED: '1', ENRICH_TIER1: '1' };
-    if (choice === 'premium') return { ENRICH_TIER1: '1', ENRICH_PER_FILE: '1' };
+    if (choice === 'premium') return { ENRICH_TIER1: '1' };
     return {};
 }
 
@@ -70,7 +70,7 @@ export interface IngestionJobOptions {
      * Enrichment mode requested by the client. Honoured ONLY for allowlisted
      * emails; non-allowlisted callers always get the default env (empty object).
      * `free`    → skip enricher (ENRICHMENT_DISABLED=1) + Tier 1 only.
-     * `premium` → full per-file enrichment (ENRICH_TIER1=1 + ENRICH_PER_FILE=1).
+     * `premium` → full per-chunk enrichment (ENRICH_TIER1=1).
      */
     readonly enrichment?: 'premium' | 'free';
 }
@@ -216,8 +216,8 @@ export function buildIngestionJobSpec(
                             { name: 'ENRICH_CANONICAL', value: process.env['INGESTION_ENRICH_CANONICAL'] ?? '1' },
                             // Enrichment-toggle: allowlisted users may elect 'free' (skip
                             // enricher: ENRICHMENT_DISABLED=1 + ENRICH_TIER1=1) or 'premium'
-                            // (full per-file: ENRICH_TIER1=1 + ENRICH_PER_FILE=1). Non-
-                            // allowlisted emails always resolve to {} — no env vars added.
+                            // (full per-chunk: ENRICH_TIER1=1). Non-allowlisted emails always
+                            // resolve to {} -- no env vars added.
                             // Note: ENRICHMENT_DISABLED=1 from the free path takes precedence
                             // over DEFER_ENRICHMENT above because the worker checks
                             // ENRICHMENT_DISABLED first and exits the enricher early.

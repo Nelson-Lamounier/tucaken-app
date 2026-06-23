@@ -151,11 +151,12 @@ describe('resolveEnrichmentEnv', () => {
         });
     });
 
-    it('allowlisted + premium → ENRICH_TIER1=1 + ENRICH_PER_FILE=1, no ENRICHMENT_DISABLED', () => {
+    it('allowlisted + premium → ENRICH_TIER1=1 only (ENRICH_PER_FILE withheld until recall proven)', () => {
         process.env['ENRICHMENT_TOGGLE_EMAILS'] = ALLOWLISTED;
         const env = resolveEnrichmentEnv(ALLOWLISTED, 'premium');
         expect(env['ENRICHMENT_DISABLED']).toBeUndefined();
-        expect(env).toMatchObject({ ENRICH_TIER1: '1', ENRICH_PER_FILE: '1' });
+        expect(env['ENRICH_PER_FILE']).toBeUndefined();
+        expect(env).toEqual({ ENRICH_TIER1: '1' });
     });
 
     it('non-allowlisted email → default ({}) regardless of requested choice', () => {
@@ -174,11 +175,11 @@ describe('resolveEnrichmentEnv', () => {
         expect(resolveEnrichmentEnv(undefined, 'premium')).toEqual({});
     });
 
-    it('premium dispatch: Job env contains ENRICH_TIER1 + ENRICH_PER_FILE entries', () => {
+    it('premium dispatch: Job env contains ENRICH_TIER1 only (no ENRICH_PER_FILE until recall proven)', () => {
         process.env['ENRICHMENT_TOGGLE_EMAILS'] = ALLOWLISTED;
         const env = envOf({ email: ALLOWLISTED, enrichment: 'premium' });
         expect(env.get('ENRICH_TIER1')).toBe('1');
-        expect(env.get('ENRICH_PER_FILE')).toBe('1');
+        expect(env.has('ENRICH_PER_FILE')).toBe(false);
         expect(env.has('ENRICHMENT_DISABLED')).toBe(false);
     });
 
