@@ -4,8 +4,33 @@ import type { V1Job, V1Secret } from '@kubernetes/client-node';
 
 import type { AdminApiConfig } from './config.js';
 import { traceParentEnv, observabilityEnv, ingestionModelEnv, MODEL_JOB_BACKOFF_LIMIT } from './k8s-job-builder.js';
+import { isEnrichmentToggleAllowed } from './enrichment-toggle.js';
 
 const MAX_NAME_LEN = 63;
+
+/**
+ * Map the caller's enrichment choice to the concrete Job env vars, enforcing
+ * the allowlist server-side. Non-allowlisted emails always get `{}` (default
+ * behaviour preserved — fails closed to default, never to premium).
+ *
+ * - `free`    → `{ ENRICHMENT_DISABLED: '1', ENRICH_TIER1: '1' }`
+ *               (skips the enricher entirely; ENRICH_TIER1 signals the worker
+ *               that Tier 1 canonical extraction has already run deterministically)
+ * - `premium` → `{ ENRICH_TIER1: '1', ENRICH_PER_FILE: '1' }`
+ *               (full per-file enrichment; ENRICHMENT_DISABLED is absent so the
+ *               enricher runs normally; takes precedence over DEFER_ENRICHMENT
+ *               via the worker's own env read order)
+ * - otherwise → `{}`  (current default — no new env vars injected)
+ */
+export function resolveEnrichmentEnv(
+    email: string | undefined,
+    choice: 'premium' | 'free' | undefined,
+): Record<string, string> {
+    if (!isEnrichmentToggleAllowed(email)) return {};
+    if (choice === 'free')    return { ENRICHMENT_DISABLED: '1', ENRICH_TIER1: '1' };
+    if (choice === 'premium') return { ENRICH_TIER1: '1', ENRICH_PER_FILE: '1' };
+    return {};
+}
 
 // Pod wall-clock budget. Raised 900 -> 1800s so a large repo's canonical
 // enrichment finishes in ONE pass instead of hitting the deadline and leaving a
@@ -34,6 +59,19 @@ export interface IngestionJobOptions {
      * "no id known yet".
      */
     readonly githubRepoId?: number | null;
+    /**
+     * Verified email from the JWT payload (Cognito `email` claim). Used by
+     * `resolveEnrichmentEnv` to enforce the enrichment-toggle allowlist
+     * server-side. Never used for auth — userId is the auth anchor.
+     */
+    readonly email?: string;
+    /**
+     * Enrichment mode requested by the client. Honoured ONLY for allowlisted
+     * emails; non-allowlisted callers always get the default env (empty object).
+     * `free`    → skip enricher (ENRICHMENT_DISABLED=1) + Tier 1 only.
+     * `premium` → full per-file enrichment (ENRICH_TIER1=1 + ENRICH_PER_FILE=1).
+     */
+    readonly enrichment?: 'premium' | 'free';
 }
 
 /** Deterministic name of the per-Job token Secret for a given ingestion Job. */
@@ -175,6 +213,14 @@ export function buildIngestionJobSpec(
                             // overlaps. Default on; INGESTION_ENRICH_CANONICAL=0 reverts to
                             // free-text. Method-scoped dedup cache (ai-app) keeps the switch safe.
                             { name: 'ENRICH_CANONICAL', value: process.env['INGESTION_ENRICH_CANONICAL'] ?? '1' },
+                            // Enrichment-toggle: allowlisted users may elect 'free' (skip
+                            // enricher: ENRICHMENT_DISABLED=1 + ENRICH_TIER1=1) or 'premium'
+                            // (full per-file: ENRICH_TIER1=1 + ENRICH_PER_FILE=1). Non-
+                            // allowlisted emails always resolve to {} — no env vars added.
+                            // Note: ENRICHMENT_DISABLED=1 from the free path takes precedence
+                            // over DEFER_ENRICHMENT above because the worker checks
+                            // ENRICHMENT_DISABLED first and exits the enricher early.
+                            ...Object.entries(resolveEnrichmentEnv(opts.email, opts.enrichment)).map(([name, value]) => ({ name, value })),
                             // eu.* cross-region inference profile for BedrockChunkEnricher
                             // (on-demand Claude unsupported in eu-west-1).
                             { name: 'ENRICHMENT_MODEL_ID', value: process.env['ENRICHMENT_MODEL_ID'] ?? 'eu.anthropic.claude-haiku-4-5-20251001-v1:0' },

@@ -1,7 +1,7 @@
 /** @format */
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect, afterEach } from '@jest/globals';
 import type { AdminApiConfig } from './config.js';
-import { buildIngestionJobSpec, buildIngestionTokenSecret, buildRollupJobSpec } from './ingestion-job.js';
+import { buildIngestionJobSpec, buildIngestionTokenSecret, buildRollupJobSpec, resolveEnrichmentEnv } from './ingestion-job.js';
 
 const cfg = {
     ingestionNamespace:      'ingestion',
@@ -122,5 +122,77 @@ describe('buildRollupJobSpec', () => {
         expect(c?.envFrom?.[0]?.secretRef?.name).toBe('platform-rds-credentials');
         expect(job.metadata?.name?.startsWith('rollup-')).toBe(true);
         expect((job.metadata?.name ?? '').length).toBeLessThanOrEqual(63);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// resolveEnrichmentEnv — server-side enrichment-toggle enforcement
+// ---------------------------------------------------------------------------
+
+const ALLOWLISTED = 'lamounier_88@hotmail.com';
+const OUTSIDER    = 'someone@else.com';
+
+describe('resolveEnrichmentEnv', () => {
+    const original = process.env['ENRICHMENT_TOGGLE_EMAILS'];
+
+    afterEach(() => {
+        if (original === undefined) {
+            delete process.env['ENRICHMENT_TOGGLE_EMAILS'];
+        } else {
+            process.env['ENRICHMENT_TOGGLE_EMAILS'] = original;
+        }
+    });
+
+    it('allowlisted + free → ENRICHMENT_DISABLED=1 + ENRICH_TIER1=1', () => {
+        process.env['ENRICHMENT_TOGGLE_EMAILS'] = ALLOWLISTED;
+        expect(resolveEnrichmentEnv(ALLOWLISTED, 'free')).toMatchObject({
+            ENRICHMENT_DISABLED: '1',
+            ENRICH_TIER1:        '1',
+        });
+    });
+
+    it('allowlisted + premium → ENRICH_TIER1=1 + ENRICH_PER_FILE=1, no ENRICHMENT_DISABLED', () => {
+        process.env['ENRICHMENT_TOGGLE_EMAILS'] = ALLOWLISTED;
+        const env = resolveEnrichmentEnv(ALLOWLISTED, 'premium');
+        expect(env['ENRICHMENT_DISABLED']).toBeUndefined();
+        expect(env).toMatchObject({ ENRICH_TIER1: '1', ENRICH_PER_FILE: '1' });
+    });
+
+    it('non-allowlisted email → default ({}) regardless of requested choice', () => {
+        process.env['ENRICHMENT_TOGGLE_EMAILS'] = ALLOWLISTED;
+        expect(resolveEnrichmentEnv(OUTSIDER, 'free')).toEqual({});
+        expect(resolveEnrichmentEnv(OUTSIDER, 'premium')).toEqual({});
+    });
+
+    it('allowlisted but no choice → default ({})', () => {
+        process.env['ENRICHMENT_TOGGLE_EMAILS'] = ALLOWLISTED;
+        expect(resolveEnrichmentEnv(ALLOWLISTED, undefined)).toEqual({});
+    });
+
+    it('undefined email → default ({})', () => {
+        process.env['ENRICHMENT_TOGGLE_EMAILS'] = ALLOWLISTED;
+        expect(resolveEnrichmentEnv(undefined, 'premium')).toEqual({});
+    });
+
+    it('premium dispatch: Job env contains ENRICH_TIER1 + ENRICH_PER_FILE entries', () => {
+        process.env['ENRICHMENT_TOGGLE_EMAILS'] = ALLOWLISTED;
+        const env = envOf({ email: ALLOWLISTED, enrichment: 'premium' });
+        expect(env.get('ENRICH_TIER1')).toBe('1');
+        expect(env.get('ENRICH_PER_FILE')).toBe('1');
+        expect(env.has('ENRICHMENT_DISABLED')).toBe(false);
+    });
+
+    it('free dispatch: Job env contains ENRICHMENT_DISABLED=1 + ENRICH_TIER1=1', () => {
+        process.env['ENRICHMENT_TOGGLE_EMAILS'] = ALLOWLISTED;
+        const env = envOf({ email: ALLOWLISTED, enrichment: 'free' });
+        expect(env.get('ENRICHMENT_DISABLED')).toBe('1');
+        expect(env.get('ENRICH_TIER1')).toBe('1');
+    });
+
+    it('non-allowlisted: Job env does not contain ENRICHMENT_DISABLED or ENRICH_PER_FILE', () => {
+        process.env['ENRICHMENT_TOGGLE_EMAILS'] = ALLOWLISTED;
+        const env = envOf({ email: OUTSIDER, enrichment: 'premium' });
+        expect(env.has('ENRICHMENT_DISABLED')).toBe(false);
+        expect(env.has('ENRICH_PER_FILE')).toBe(false);
     });
 });
