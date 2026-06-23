@@ -15,8 +15,10 @@ describe('deriveRepoSlug', () => {
   });
 });
 
-// Minimal Queryable stub. `existsRows` controls the NOT EXISTS guard result.
-function fakeDb(existsRows: number) {
+// Minimal Queryable stub. `existsRows` controls the NOT EXISTS guard result;
+// `existingComponentId` simulates a project that already has a default component
+// (the orphan case — a project left behind after its repo was removed).
+function fakeDb(existsRows: number, existingComponentId?: string) {
   const calls: { sql: string; params: readonly unknown[] }[] = [];
   const db = {
     query: async (sql: string, params: readonly unknown[] = []) => {
@@ -25,6 +27,11 @@ function fakeDb(existsRows: number) {
         return { rows: existsRows > 0 ? [{ one: 1 }] : [], rowCount: existsRows };
       }
       if (/INSERT INTO projects/i.test(sql))           return { rows: [{ id: 'proj-1' }], rowCount: 1 };
+      if (/SELECT id FROM project_components/i.test(sql)) {
+        return existingComponentId
+          ? { rows: [{ id: existingComponentId }], rowCount: 1 }
+          : { rows: [], rowCount: 0 };
+      }
       if (/INSERT INTO project_components/i.test(sql))  return { rows: [{ id: 'comp-1' }], rowCount: 1 };
       return { rows: [], rowCount: 1 };
     },
@@ -49,6 +56,20 @@ describe('ensureDefaultProject', () => {
     const projInsert = calls.find(c => /INSERT INTO projects/i.test(c.sql))!;
     expect(projInsert.params).toContain('owner-my-repo');
     expect(projInsert.sql).toMatch(/'single_repo'/);
+    // Upsert reads the real id back so the component never references a
+    // non-existent project (the FK-violation bug on re-add).
+    expect(projInsert.sql).toMatch(/ON CONFLICT \(user_id, slug\) DO UPDATE/i);
+    expect(projInsert.sql).toMatch(/RETURNING id/i);
+  });
+
+  it('reuses the existing component when the project lingers (orphan re-add)', async () => {
+    const { db, calls } = fakeDb(0, 'existing-comp');
+    await ensureDefaultProject(db, 'user-1', 'repo-1', 'Owner/My-Repo');
+    // Project already had a component -> do NOT insert a duplicate 'Main'.
+    expect(calls.some(c => /INSERT INTO project_components/i.test(c.sql))).toBe(false);
+    // The repo link is attached to the reused component id.
+    const link = calls.find(c => /INSERT INTO project_repositories/i.test(c.sql))!;
+    expect(link.params).toContain('existing-comp');
   });
 });
 

@@ -45,12 +45,15 @@ export async function ensureDefaultProject(
   );
   if ((guard.rowCount ?? 0) > 0) return;
 
-  const projectId   = randomUUID();
-  const componentId = randomUUID();
-  const slug        = deriveRepoSlug(repoFullName);
-  const name        = repoFullName.split('/')[1] || repoFullName;
+  const slug = deriveRepoSlug(repoFullName);
+  const name = repoFullName.split('/')[1] || repoFullName;
 
-  await db.query(
+  // Upsert the project and ALWAYS read back the real id. A repo removed earlier
+  // can leave a project row behind (the repo link is gone, but the project +
+  // slug remain), so a fresh randomUUID() + DO NOTHING would skip the insert and
+  // then the component insert would reference a non-existent project id (FK
+  // violation). DO UPDATE ... RETURNING id yields the existing OR new id.
+  const projectRes = await db.query<{ id: string }>(
     `INSERT INTO projects (
         id, user_id, slug, name, shape, is_ai_suggested, is_user_confirmed,
         status, role_exhibited, visibility
@@ -58,14 +61,32 @@ export async function ensureDefaultProject(
         $1::uuid, $2::uuid, $3, $4, 'single_repo', FALSE, FALSE,
         'active', 'sole_builder', 'private'
      )
-     ON CONFLICT (user_id, slug) DO NOTHING`,
-    [projectId, userId, slug, name],
+     ON CONFLICT (user_id, slug) DO UPDATE SET name = EXCLUDED.name
+     RETURNING id`,
+    [randomUUID(), userId, slug, name],
   );
-  await db.query(
-    `INSERT INTO project_components (id, user_id, project_id, name, kind, order_index)
-     VALUES ($1::uuid, $2::uuid, $3::uuid, 'Main', 'shared', 0)`,
-    [componentId, userId, projectId],
+  const projectId = projectRes.rows[0]?.id;
+  if (!projectId) throw new Error('ensureDefaultProject: project upsert returned no id');
+
+  // Reuse the project's existing default component if it already has one
+  // (orphan case); otherwise create it. Avoids a duplicate 'Main' component.
+  const compRes = await db.query<{ id: string }>(
+    `SELECT id FROM project_components WHERE project_id = $1::uuid ORDER BY order_index LIMIT 1`,
+    [projectId],
   );
+  const existingComponent = compRes.rows[0];
+  let componentId: string;
+  if (existingComponent) {
+    componentId = existingComponent.id;
+  } else {
+    componentId = randomUUID();
+    await db.query(
+      `INSERT INTO project_components (id, user_id, project_id, name, kind, order_index)
+       VALUES ($1::uuid, $2::uuid, $3::uuid, 'Main', 'shared', 0)`,
+      [componentId, userId, projectId],
+    );
+  }
+
   await db.query(
     `INSERT INTO project_repositories (user_id, project_component_id, repository_id, subpath)
      VALUES ($1::uuid, $2::uuid, $3::uuid, '')

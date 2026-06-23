@@ -1,10 +1,14 @@
 import { useState, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Loader2, GitBranch, Search } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { EnrichmentModal } from './EnrichmentModal'
 import { GitHubRepoChip } from './GitHubRepoChip'
 import { UpgradeLimitBanner } from './UpgradeLimitBanner'
 import { useGitHubIngestion } from '../hooks/use-github-ingestion'
 import { useGitHubQueueRepo } from '../hooks/use-github-queue-repo'
+import { adminKeys } from '@/lib/api/query-keys'
+import { getMeFn } from '@/server/me'
 import type { GitHubAccessibleRepo, ConnectedRepo } from '@/lib/types/github.types'
 
 const PAGE_SIZE = 10
@@ -25,6 +29,14 @@ export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos, m
   const syncIngestion = useGitHubIngestion()
   const queueIngestion = useGitHubQueueRepo()
   const ingestion = mode === 'queue' ? queueIngestion : syncIngestion
+
+  // Enrichment-tier toggle (free vs premium) for allowlisted test users, on the
+  // immediate-sync Add path. When enabled, the Add CTA opens the choice modal
+  // instead of dispatching straight away — so an add never silently runs paid
+  // enrichment. Non-allowlisted users keep the unchanged direct-add behaviour.
+  const me = useQuery({ queryKey: adminKeys.me.detail(), queryFn: getMeFn })
+  const canToggle = (me.data?.enrichmentToggle ?? false) && mode === 'sync'
+  const [pendingAdd, setPendingAdd] = useState<{ repoFullName: string; defaultBranch: string } | null>(null)
 
   // In queue mode the cap applies to QUEUED (pending) repos only; in sync
   // mode it's the total connected count (Settings behaviour unchanged).
@@ -54,10 +66,10 @@ export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos, m
   const visible = filtered.slice(0, visibleCount)
   const remaining = filtered.length - visibleCount
 
-  const handleAdd = (fullName: string, defaultBranch: string) => {
+  const doAdd = (fullName: string, defaultBranch: string, enrichment?: 'premium' | 'free') => {
     setQueuingRepos((prev) => new Set(prev).add(fullName))
     ingestion.mutate(
-      { repoFullName: fullName, defaultBranch },
+      { repoFullName: fullName, defaultBranch, enrichment },
       {
         onSettled: () => {
           setQueuingRepos((prev) => {
@@ -70,8 +82,31 @@ export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos, m
     )
   }
 
+  const handleAdd = (fullName: string, defaultBranch: string) => {
+    // Allowlisted test users choose the enrichment tier before the add runs;
+    // everyone else adds directly (no enrichment field, server default).
+    if (canToggle) {
+      setPendingAdd({ repoFullName: fullName, defaultBranch })
+    } else {
+      doAdd(fullName, defaultBranch)
+    }
+  }
+
+  const handleEnrichmentChoice = (choice: 'premium' | 'free') => {
+    if (!pendingAdd) return
+    const { repoFullName, defaultBranch } = pendingAdd
+    setPendingAdd(null)
+    doAdd(repoFullName, defaultBranch, choice)
+  }
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-testid={canToggle ? 'add-enrichment-toggle-active' : undefined}>
+      <EnrichmentModal
+        open={pendingAdd !== null}
+        onChoose={handleEnrichmentChoice}
+        onClose={() => setPendingAdd(null)}
+      />
+
       {ingestion.needsUpgrade && (
         mode === 'queue' ? (
           <div className="flex items-start justify-between gap-3 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-300">
