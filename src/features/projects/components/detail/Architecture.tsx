@@ -7,7 +7,12 @@ export function Architecture({ architecture }: { readonly architecture: ProjectA
   return (
     <Section icon={Network} title="Architecture">
       {architecture?.diagram_source ? (
-        <ArchitectureDiagram format={architecture.diagram_format} source={architecture.diagram_source} />
+        <ArchitectureDiagram
+          format={architecture.diagram_format}
+          source={architecture.diagram_source}
+          nodes={architecture.nodes}
+          edges={architecture.edges}
+        />
       ) : (
         <EmptyHint>No architecture diagram generated yet.</EmptyHint>
       )}
