@@ -98,19 +98,18 @@
    in opacity on a loop. No marching dash, so nothing flows in a single direction.
    Per-line animationDelay (set inline) staggers both so the field feels organic.
    Runs off the JS main thread, so it never starves the auth form. */
-@keyframes auth-path-draw {
-  to { stroke-dashoffset: 0; }
-}
-@keyframes auth-path-breathe {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
+@keyframes auth-path-flow {
+  to { stroke-dashoffset: -1; }
 }
 .auth-paths path {
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  animation: auth-path-draw 2.6s ease-out forwards, auth-path-breathe 7s ease-in-out infinite;
+  /* pathLength=1 → a half-drawn segment travels along each line. A continuous
+     loop keeps it always moving; per-line delay/duration/direction (set inline)
+     break the lockstep so adjacent lines flow at different speeds and in
+     opposite directions — organic, not a single-direction march. */
+  stroke-dasharray: 0.5 0.5;
+  animation: auth-path-flow 12s linear infinite;
 }
 @media (prefers-reduced-motion: reduce) {
   .belt-scroll-anim, .scan-sweep-anim, .item-state-anim, .pipe-pulse-anim, .node-glow-anim, .gradient-sweep-anim, .marquee-anim { animation: none !important; }
-  .auth-paths path { animation: none !important; stroke-dashoffset: 0 !important; opacity: 1 !important; }
+  .auth-paths path { animation: none !important; stroke-dasharray: none !important; }
 }
