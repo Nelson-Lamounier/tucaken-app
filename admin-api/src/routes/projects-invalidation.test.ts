@@ -41,7 +41,7 @@ jest.unstable_mockModule('../lib/repositories/users.js', () => ({
 }));
 
 jest.unstable_mockModule('../lib/entitlements.js', () => ({
-  entitlementsFor: () => ({ repos: Infinity, projects: Infinity, resumesPerMonth: Infinity, ingestionJobsPerMonth: Infinity, enrichment: 'tier2' }),
+  entitlementsFor: () => ({ repos: Infinity, projects: Infinity, resumesPerMonth: Infinity, ingestionJobsPerMonth: Infinity, enrichment: 'full' }),
   isFullAccess: () => true,
 }));
 

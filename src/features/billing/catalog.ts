@@ -77,7 +77,7 @@ export const TIERS: readonly Tier[] = [
       'Unlimited repositories and resumes',
       'Deep chunk-enrichment on repository sync',
       'AI-rewritten bullets grounded in commits',
-      'Tier-1 and Tier-2 enrichment on sync',
+      'Full AI chunk-enrichment on sync',
       'Custom domain on web resumes',
       'Priority support',
     ],
