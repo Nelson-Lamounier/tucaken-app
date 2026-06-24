@@ -1,17 +1,17 @@
 /** @format */
 /**
- * Layer 2: Plan-write isolation — source-scan regression guard.
+ * Layer 2: Plan-write isolation - source-scan regression guard.
  *
  * This test reads the admin-api source tree from disk and asserts that the
- * plan/subscription mutators — `updateSubscriptionFromStripe` and
- * `setStripeCustomerId` — are imported or called ONLY from their definition
+ * plan/subscription mutators - `updateSubscriptionFromStripe` and
+ * `setStripeCustomerId` - are imported or called ONLY from their definition
  * site (`lib/repositories/users.ts`) and the single M2M-gated route
  * (`routes/internal-billing.ts`). If any other route file references these
  * identifiers, the test FAILS. This is the regression guard: if a future
  * change wires a plan write into a user-facing route, the test breaks
  * immediately.
  *
- * ─── Layer 3: DB-level backstop (documented, not tested here) ────────────────
+ * --- Layer 3: DB-level backstop (documented, not tested here) ----------------
  *
  * ai-applications migration 003 (`platform-rds-bootstrap/migrations/
  * 003_cognito_user_provisioning.sql`) grants:
@@ -19,7 +19,7 @@
  *   GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public
  *     TO tucaken_app;
  *
- * This is a BROAD grant — `tucaken_app` has full UPDATE on every column of
+ * This is a BROAD grant - `tucaken_app` has full UPDATE on every column of
  * the `users` table, including `plan`, `subscription_status`, and all
  * `stripe_*` columns. The grant is accompanied by an ALTER DEFAULT PRIVILEGES
  * that extends it to future tables.
@@ -28,7 +28,7 @@
  * lockdown therefore relies entirely on:
  *   (a) the M2M middleware gate (no user-JWT path reaches internal-billing),
  *   (b) the absence of plan-write calls from user-facing routes (this test),
- *   (c) RLS on the `users` table enforcing `id = app.current_user_id` —
+ *   (c) RLS on the `users` table enforcing `id = app.current_user_id` -
  *       which locks a user-RLS-context request to only their own row, but
  *       does NOT prevent writing `plan` on that row if the route were to call
  *       the mutators.
@@ -40,7 +40,7 @@
  * control. A column-level GRANT revision (excluding `plan`, `subscription_status`,
  * `stripe_*` from `tucaken_app`) would add defence-in-depth and is
  * recommended as a follow-up.
- * ─────────────────────────────────────────────────────────────────────────────
+ * -----------------------------------------------------------------------------
  */
 
 import * as fs from 'node:fs';
@@ -51,7 +51,7 @@ import { describe, it, expect } from '@jest/globals';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
-// Root of admin-api/src — this file lives at src/lib/plan-write-isolation.test.ts
+// Root of admin-api/src - this file lives at src/lib/plan-write-isolation.test.ts
 const SRC_ROOT = path.resolve(__dirname, '..');
 
 /**
@@ -99,13 +99,15 @@ describe('plan-write isolation', () => {
         }
       }
 
-      expect(offenders).toEqual(
-        [],
-        `SECURITY: "${identifier}" must only be used in routes/${ALLOWED_ROUTE} ` +
-        `(M2M-gated), but was found in: ${offenders.join(', ')}. ` +
-        `This means a user-JWT route can now write subscription data — ` +
-        `add the M2M gate or move the call to internal-billing.ts.`,
-      );
+      if (offenders.length > 0) {
+        throw new Error(
+          `SECURITY: "${identifier}" must only be used in routes/${ALLOWED_ROUTE} ` +
+          `(M2M-gated), but was found in: ${offenders.join(', ')}. ` +
+          `This means a user-JWT route can now write subscription data - ` +
+          `add the M2M gate or move the call to internal-billing.ts.`,
+        );
+      }
+      expect(offenders).toEqual([]);
     });
   }
 
@@ -114,12 +116,14 @@ describe('plan-write isolation', () => {
     const internalBillingSource = fs.readFileSync(internalBillingPath, 'utf8');
 
     for (const identifier of PLAN_WRITE_IDENTIFIERS) {
-      expect(internalBillingSource.includes(identifier)).toBe(
-        true,
-        `REGRESSION: "${identifier}" is missing from routes/${ALLOWED_ROUTE}. ` +
-        `If this mutator was moved or renamed, update PLAN_WRITE_IDENTIFIERS ` +
-        `to maintain the integrity of this isolation test.`,
-      );
+      if (!internalBillingSource.includes(identifier)) {
+        throw new Error(
+          `REGRESSION: "${identifier}" is missing from routes/${ALLOWED_ROUTE}. ` +
+          `If this mutator was moved or renamed, update PLAN_WRITE_IDENTIFIERS ` +
+          `to maintain the integrity of this isolation test.`,
+        );
+      }
+      expect(internalBillingSource.includes(identifier)).toBe(true);
     }
   });
 });
