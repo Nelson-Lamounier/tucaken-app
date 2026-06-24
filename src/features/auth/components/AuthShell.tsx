@@ -1,7 +1,7 @@
 "use client"
 // src/features/auth/components/AuthShell.tsx
 import { useState, useEffect, useRef, type ReactNode } from 'react'
-import { AnimatePresence, motion, LayoutGroup, useReducedMotion } from 'motion/react'
+import { motion, LayoutGroup, useReducedMotion } from 'motion/react'
 import { ChevronLeft } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { AuthBrandPanel } from './AuthBrandPanel'
@@ -156,7 +156,6 @@ export function AuthShell({
             )}
 
             <AnimateHeight>
-              <AnimatePresence mode="popLayout" initial={false}>
               {view === 'signin' && (
                 <SignInForm
                   key="signin"
@@ -216,7 +215,6 @@ export function AuthShell({
                   onConfirm={(code) => onConfirmSignUp?.(email, code, password) ?? Promise.resolve()}
                 />
               )}
-              </AnimatePresence>
             </AnimateHeight>
           </div>
 
