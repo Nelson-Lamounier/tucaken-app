@@ -5,6 +5,7 @@ import { motion } from 'motion/react'
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { MagneticButton } from '../lib/MagneticButton'
+import { KineticText } from '../lib/KineticText'
 import { problems, steps, comparison, founder, faq } from '../content'
 import { TIERS } from '@/features/billing/catalog'
 
@@ -32,17 +33,16 @@ export function ProblemSection() {
     <Section className="border-t border-white/5">
       <div className="mx-auto max-w-5xl">
         <Eyebrow>The problem</Eyebrow>
-        <h2 className="text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl">
-          You did the work. Your resume doesn't show it.
-        </h2>
+        <KineticText as="h2" text="You did the work. Your resume doesn't show it." className="text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl" />
         <div className="mt-12 grid gap-4 md:grid-cols-3">
           {problems.map((p, i) => (
             <motion.div
               key={i}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, y: 20, rotate: -1 }}
+              whileInView={{ opacity: 1, y: 0, rotate: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
+              transition={{ delay: i * 0.1, type: 'spring', stiffness: 90, damping: 15 }}
+              style={{ willChange: 'transform, opacity' }}
               className="group rounded-2xl border border-white/10 bg-white/[0.02] p-6 transition-colors hover:border-teal-500/30"
             >
               <div className="font-mono text-[10px] uppercase tracking-widest text-teal-400">Reality</div>
@@ -63,15 +63,16 @@ export function HowItWorksSection() {
     <Section id="how" className="border-t border-white/5">
       <div className="mx-auto max-w-5xl">
         <Eyebrow>How it works</Eyebrow>
-        <h2 className="text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl">Three steps. No magic.</h2>
+        <KineticText as="h2" text="Three steps. No magic." className="text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl" />
         <div className="mt-12 grid gap-6 md:grid-cols-3">
           {steps.map((s, i) => (
             <motion.div
               key={s.n}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, x: -28 }}
+              whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: i * 0.12 }}
+              transition={{ delay: i * 0.12, type: 'spring', stiffness: 90, damping: 16 }}
+              style={{ willChange: 'transform, opacity' }}
               className={[
                 'relative rounded-2xl border p-6',
                 'emp' in s && s.emp ? 'border-teal-500/40 bg-gradient-to-br from-teal-500/10 to-emerald-600/5' : 'border-white/10 bg-white/[0.02]',
