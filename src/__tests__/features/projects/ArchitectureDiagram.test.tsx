@@ -50,9 +50,25 @@ describe('ArchitectureDiagram', () => {
     expect(renderMock).not.toHaveBeenCalled()
   })
 
-  it('shows an error when mermaid rendering fails', async () => {
-    renderMock.mockRejectedValueOnce(new Error('bad syntax'))
-    render(<ArchitectureDiagram format="mermaid" source="not valid" />)
-    await waitFor(() => screen.getByText('bad syntax'))
+  it('normalises the source before calling mermaid.render', async () => {
+    render(<ArchitectureDiagram format="mermaid" source="graph LR\n A[x\\ny]" />)
+    await waitFor(() => expect(renderMock).toHaveBeenCalled())
+    const calledSource: string = renderMock.mock.calls[0][1] as string
+    expect(calledSource).toMatch(/<br\/>/)
+    expect(calledSource).not.toMatch(/\\n/)
+  })
+
+  it('falls back to the node/edge list when mermaid.render throws', async () => {
+    renderMock.mockRejectedValueOnce(new Error('Lexical error on line 8'))
+    render(
+      <ArchitectureDiagram
+        format="mermaid"
+        source="graph LR\n A[bad\nlabel]"
+        nodes={[{ id: 'a', label: 'AdminAPI', kind: 'service' }]}
+        edges={[{ from: 'a', to: 'b' }]}
+      />,
+    )
+    await waitFor(() => screen.getByText('AdminAPI'))
+    expect(screen.queryByText(/Lexical error/)).toBeNull()
   })
 })
