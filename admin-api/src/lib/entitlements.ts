@@ -1,19 +1,16 @@
 /**
  * @format
- * Central tier-entitlements map -- the single source of truth for per-plan
- * limits and enrichment mode. Every enforcement point (repo/project/resume/
- * ingestion quotas) and the ingestion dispatch read from here so the tier
- * definition lives in exactly one place.
+ * Central tier-entitlements map - the single source of truth for per-plan
+ * limits and enrichment mode. Every enforcement point and the ingestion
+ * dispatch read from here so the tier definition lives in one place.
  *
  * Keyed on EFFECTIVE plan (trial/active resolution), not the raw column.
- * `trial` mirrors `pro` -- a trial is a paid-tier taste.
+ * `trial` mirrors `pro` - a trial is a paid-tier taste.
  *
- * The full-access override (`isFullAccess`) reuses the existing email
- * allowlists (AB_FREE_TIER_EMAILS / ENRICHMENT_TOGGLE_EMAILS) so the test
- * user keeps unlimited access without a hardcoded address.
+ * The full-access override (`isFullAccess`) is driven by the user's persisted
+ * `role === 'admin'` (returned by getUserPlanStatus), so the grant is tied to
+ * an authenticated, auditable privilege rather than an env-var allowlist.
  */
-import { isFreeTierAllowed } from './ab-free-tier.js';
-import { isEnrichmentToggleAllowed } from './enrichment-toggle.js';
 import type { EffectivePlan } from './repositories/users.js';
 
 export type { EffectivePlan };
@@ -48,16 +45,18 @@ export const ENTITLEMENTS: Record<EffectivePlan, Entitlements> = {
 };
 
 /**
- * Full-access override for the test/owner account. Driven by the existing
- * allowlists so it is env-configurable and not hardcoded.
+ * Full-access override for the test/owner (and any other) account: ONLY a
+ * persisted admin (users.role = 'admin') bypasses tier limits. Decoupled from
+ * the A/B email allowlists; fail-closed (a non-admin or missing role gets the
+ * normal plan map).
  */
-export function isFullAccess(email: string | null | undefined): boolean {
-    return isFreeTierAllowed(email) || isEnrichmentToggleAllowed(email ?? undefined);
+export function isFullAccess(role: string | null | undefined): boolean {
+    return role === 'admin';
 }
 
-/** Effective entitlements: full-access override first, else the plan map. */
-export function entitlementsFor(plan: EffectivePlan, email?: string | null): Entitlements {
-    if (isFullAccess(email)) return ENTITLEMENTS.premium;
+/** Effective entitlements: admin override first, else the plan map. */
+export function entitlementsFor(plan: EffectivePlan, role?: string | null): Entitlements {
+    if (isFullAccess(role)) return ENTITLEMENTS.premium;
     return ENTITLEMENTS[plan];
 }
 

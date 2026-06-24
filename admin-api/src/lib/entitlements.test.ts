@@ -18,32 +18,27 @@ describe('ENTITLEMENTS', () => {
 });
 
 describe('isFullAccess', () => {
-    const A = process.env.AB_FREE_TIER_EMAILS, E = process.env.ENRICHMENT_TOGGLE_EMAILS;
-    afterEach(() => { process.env.AB_FREE_TIER_EMAILS = A; process.env.ENRICHMENT_TOGGLE_EMAILS = E; });
-
-    it('is true when the email is on either existing allowlist (case-insensitive)', () => {
-        process.env.AB_FREE_TIER_EMAILS = 'lamounier_88@hotmail.com';
-        process.env.ENRICHMENT_TOGGLE_EMAILS = '';
-        expect(isFullAccess('LAMOUNIER_88@hotmail.com')).toBe(true);
+    it('is true only for a persisted admin role', () => {
+        expect(isFullAccess('admin')).toBe(true);
     });
-    it('is false for a normal user and for null', () => {
-        process.env.AB_FREE_TIER_EMAILS = 'lamounier_88@hotmail.com';
-        process.env.ENRICHMENT_TOGGLE_EMAILS = 'lamounier_88@hotmail.com';
-        expect(isFullAccess('someone@else.com')).toBe(false);
+    it('is false for a normal user, an unknown role, and null/undefined', () => {
+        expect(isFullAccess('user')).toBe(false);
+        expect(isFullAccess('owner')).toBe(false);
         expect(isFullAccess(null)).toBe(false);
+        expect(isFullAccess(undefined)).toBe(false);
     });
 });
 
 describe('entitlementsFor', () => {
-    const A = process.env.AB_FREE_TIER_EMAILS, E = process.env.ENRICHMENT_TOGGLE_EMAILS;
-    beforeEach(() => { process.env.AB_FREE_TIER_EMAILS = 'lamounier_88@hotmail.com'; process.env.ENRICHMENT_TOGGLE_EMAILS = ''; });
-    afterEach(() => { process.env.AB_FREE_TIER_EMAILS = A; process.env.ENRICHMENT_TOGGLE_EMAILS = E; });
-
-    it('returns the plan map for a normal user', () => {
-        expect(entitlementsFor('free', 'someone@else.com')).toEqual(ENTITLEMENTS.free);
+    it('returns the plan map for a normal (non-admin) user', () => {
+        expect(entitlementsFor('free', 'user')).toEqual(ENTITLEMENTS.free);
+        expect(entitlementsFor('premium', 'user')).toEqual(ENTITLEMENTS.premium);
     });
-    it('grants premium-equivalent + full enrichment to a full-access email regardless of plan', () => {
-        expect(entitlementsFor('free', 'lamounier_88@hotmail.com')).toEqual(ENTITLEMENTS.premium);
+    it('grants premium-equivalent + full enrichment to an admin regardless of plan', () => {
+        expect(entitlementsFor('free', 'admin')).toEqual(ENTITLEMENTS.premium);
+    });
+    it('treats a missing role as non-admin (fail-closed)', () => {
+        expect(entitlementsFor('free')).toEqual(ENTITLEMENTS.free);
     });
 });
 
