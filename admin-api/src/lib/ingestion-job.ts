@@ -4,33 +4,21 @@ import type { V1Job, V1Secret } from '@kubernetes/client-node';
 
 import type { AdminApiConfig } from './config.js';
 import { traceParentEnv, observabilityEnv, ingestionModelEnv, MODEL_JOB_BACKOFF_LIMIT } from './k8s-job-builder.js';
-import { isEnrichmentToggleAllowed } from './enrichment-toggle.js';
+import { entitlementsFor, enrichmentEnv } from './entitlements.js';
+import type { EffectivePlan } from './repositories/users.js';
 
 const MAX_NAME_LEN = 63;
 
 /**
- * Map the caller's enrichment choice to the concrete Job env vars, enforcing
- * the allowlist server-side. Non-allowlisted emails always get `{}` (default
- * behaviour preserved — fails closed to default, never to premium).
- *
- * - `free`    → `{ ENRICHMENT_DISABLED: '1', ENRICH_TIER1: '1' }`
- *               (skips the enricher entirely; ENRICH_TIER1 signals the worker
- *               that Tier 1 canonical extraction has already run deterministically)
- * - `premium` → `{ ENRICH_TIER1: '1' }`
- *               (full enrichment; ENRICHMENT_DISABLED absent so the enricher
- *               runs per-chunk. ENRICH_PER_FILE is withheld until the
- *               embedding-evidence fan-back proves recall >= 0.97 -- see the
- *               ai-applications eval sweep -- then it is re-added here.)
- * - otherwise → `{}`  (current default -- no new env vars injected)
+ * Map the user's EFFECTIVE plan (+ admin override) to the concrete enrichment
+ * Job env vars. Premium (or a persisted admin) gets full per-chunk enrichment;
+ * everyone else gets Tier-1 deterministic only. Fails closed to Tier-1.
  */
 export function resolveEnrichmentEnv(
-    email: string | undefined,
-    choice: 'premium' | 'free' | undefined,
+    plan: EffectivePlan,
+    role: string | null | undefined,
 ): Record<string, string> {
-    if (!isEnrichmentToggleAllowed(email)) return {};
-    if (choice === 'free')    return { ENRICHMENT_DISABLED: '1', ENRICH_TIER1: '1' };
-    if (choice === 'premium') return { ENRICH_TIER1: '1' };
-    return {};
+    return enrichmentEnv(entitlementsFor(plan, role).enrichment);
 }
 
 // Pod wall-clock budget. Raised 900 -> 1800s so a large repo's canonical
@@ -60,19 +48,10 @@ export interface IngestionJobOptions {
      * "no id known yet".
      */
     readonly githubRepoId?: number | null;
-    /**
-     * Verified email from the JWT payload (Cognito `email` claim). Used by
-     * `resolveEnrichmentEnv` to enforce the enrichment-toggle allowlist
-     * server-side. Never used for auth — userId is the auth anchor.
-     */
-    readonly email?: string;
-    /**
-     * Enrichment mode requested by the client. Honoured ONLY for allowlisted
-     * emails; non-allowlisted callers always get the default env (empty object).
-     * `free`    → skip enricher (ENRICHMENT_DISABLED=1) + Tier 1 only.
-     * `premium` → full per-chunk enrichment (ENRICH_TIER1=1).
-     */
-    readonly enrichment?: 'premium' | 'free';
+    /** The user's effective plan, resolved server-side via getUserPlanStatus. Drives enrichment depth. */
+    readonly effectivePlan?: EffectivePlan;
+    /** The user's persisted role ('admin' grants full enrichment). Resolved server-side. */
+    readonly role?: string | null;
 }
 
 /** Deterministic name of the per-Job token Secret for a given ingestion Job. */
@@ -214,14 +193,13 @@ export function buildIngestionJobSpec(
                             // overlaps. Default on; INGESTION_ENRICH_CANONICAL=0 reverts to
                             // free-text. Method-scoped dedup cache (ai-app) keeps the switch safe.
                             { name: 'ENRICH_CANONICAL', value: process.env['INGESTION_ENRICH_CANONICAL'] ?? '1' },
-                            // Enrichment-toggle: allowlisted users may elect 'free' (skip
-                            // enricher: ENRICHMENT_DISABLED=1 + ENRICH_TIER1=1) or 'premium'
-                            // (full per-chunk: ENRICH_TIER1=1). Non-allowlisted emails always
-                            // resolve to {} -- no env vars added.
-                            // Note: ENRICHMENT_DISABLED=1 from the free path takes precedence
-                            // over DEFER_ENRICHMENT above because the worker checks
-                            // ENRICHMENT_DISABLED first and exits the enricher early.
-                            ...Object.entries(resolveEnrichmentEnv(opts.email, opts.enrichment)).map(([name, value]) => ({ name, value })),
+                            // Enrichment depth: keyed on the user's effective plan + persisted role.
+                            // Premium plan or admin role → full per-chunk enrichment (ENRICH_TIER1=1).
+                            // All other plans → Tier-1 deterministic only (ENRICHMENT_DISABLED=1 +
+                            // ENRICH_TIER1=1). Fails closed to Tier-1 when plan/role is absent.
+                            // Note: ENRICHMENT_DISABLED=1 takes precedence over DEFER_ENRICHMENT
+                            // because the worker checks ENRICHMENT_DISABLED first.
+                            ...Object.entries(resolveEnrichmentEnv(opts.effectivePlan ?? 'free', opts.role)).map(([name, value]) => ({ name, value })),
                             // eu.* cross-region inference profile for BedrockChunkEnricher
                             // (on-demand Claude unsupported in eu-west-1).
                             { name: 'ENRICHMENT_MODEL_ID', value: process.env['ENRICHMENT_MODEL_ID'] ?? 'eu.anthropic.claude-haiku-4-5-20251001-v1:0' },

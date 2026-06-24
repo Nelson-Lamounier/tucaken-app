@@ -1,5 +1,5 @@
 /** @format */
-import { describe, it, expect, afterEach } from '@jest/globals';
+import { describe, it, expect } from '@jest/globals';
 import type { AdminApiConfig } from './config.js';
 import { buildIngestionJobSpec, buildIngestionTokenSecret, buildRollupJobSpec, resolveEnrichmentEnv } from './ingestion-job.js';
 
@@ -126,74 +126,22 @@ describe('buildRollupJobSpec', () => {
 });
 
 // ---------------------------------------------------------------------------
-// resolveEnrichmentEnv — server-side enrichment-toggle enforcement
+// resolveEnrichmentEnv — plan + admin role driven enrichment
 // ---------------------------------------------------------------------------
 
-const ALLOWLISTED = 'lamounier_88@hotmail.com';
-const OUTSIDER    = 'someone@else.com';
-
-describe('resolveEnrichmentEnv', () => {
-    const original = process.env['ENRICHMENT_TOGGLE_EMAILS'];
-
-    afterEach(() => {
-        if (original === undefined) {
-            delete process.env['ENRICHMENT_TOGGLE_EMAILS'];
-        } else {
-            process.env['ENRICHMENT_TOGGLE_EMAILS'] = original;
+describe('resolveEnrichmentEnv (plan + admin driven)', () => {
+    it('free/pro/trial (non-admin) get Tier-1 only', () => {
+        for (const plan of ['free', 'pro', 'trial'] as const) {
+            expect(resolveEnrichmentEnv(plan, 'user')).toEqual({ ENRICHMENT_DISABLED: '1', ENRICH_TIER1: '1' });
         }
     });
-
-    it('allowlisted + free → ENRICHMENT_DISABLED=1 + ENRICH_TIER1=1', () => {
-        process.env['ENRICHMENT_TOGGLE_EMAILS'] = ALLOWLISTED;
-        expect(resolveEnrichmentEnv(ALLOWLISTED, 'free')).toMatchObject({
-            ENRICHMENT_DISABLED: '1',
-            ENRICH_TIER1:        '1',
-        });
+    it('premium gets full enrichment', () => {
+        expect(resolveEnrichmentEnv('premium', 'user')).toEqual({ ENRICH_TIER1: '1' });
     });
-
-    it('allowlisted + premium → ENRICH_TIER1=1 only (ENRICH_PER_FILE withheld until recall proven)', () => {
-        process.env['ENRICHMENT_TOGGLE_EMAILS'] = ALLOWLISTED;
-        const env = resolveEnrichmentEnv(ALLOWLISTED, 'premium');
-        expect(env['ENRICHMENT_DISABLED']).toBeUndefined();
-        expect(env['ENRICH_PER_FILE']).toBeUndefined();
-        expect(env).toEqual({ ENRICH_TIER1: '1' });
+    it('an admin gets full enrichment on any plan', () => {
+        expect(resolveEnrichmentEnv('free', 'admin')).toEqual({ ENRICH_TIER1: '1' });
     });
-
-    it('non-allowlisted email → default ({}) regardless of requested choice', () => {
-        process.env['ENRICHMENT_TOGGLE_EMAILS'] = ALLOWLISTED;
-        expect(resolveEnrichmentEnv(OUTSIDER, 'free')).toEqual({});
-        expect(resolveEnrichmentEnv(OUTSIDER, 'premium')).toEqual({});
-    });
-
-    it('allowlisted but no choice → default ({})', () => {
-        process.env['ENRICHMENT_TOGGLE_EMAILS'] = ALLOWLISTED;
-        expect(resolveEnrichmentEnv(ALLOWLISTED, undefined)).toEqual({});
-    });
-
-    it('undefined email → default ({})', () => {
-        process.env['ENRICHMENT_TOGGLE_EMAILS'] = ALLOWLISTED;
-        expect(resolveEnrichmentEnv(undefined, 'premium')).toEqual({});
-    });
-
-    it('premium dispatch: Job env contains ENRICH_TIER1 only (no ENRICH_PER_FILE until recall proven)', () => {
-        process.env['ENRICHMENT_TOGGLE_EMAILS'] = ALLOWLISTED;
-        const env = envOf({ email: ALLOWLISTED, enrichment: 'premium' });
-        expect(env.get('ENRICH_TIER1')).toBe('1');
-        expect(env.has('ENRICH_PER_FILE')).toBe(false);
-        expect(env.has('ENRICHMENT_DISABLED')).toBe(false);
-    });
-
-    it('free dispatch: Job env contains ENRICHMENT_DISABLED=1 + ENRICH_TIER1=1', () => {
-        process.env['ENRICHMENT_TOGGLE_EMAILS'] = ALLOWLISTED;
-        const env = envOf({ email: ALLOWLISTED, enrichment: 'free' });
-        expect(env.get('ENRICHMENT_DISABLED')).toBe('1');
-        expect(env.get('ENRICH_TIER1')).toBe('1');
-    });
-
-    it('non-allowlisted: Job env does not contain ENRICHMENT_DISABLED or ENRICH_PER_FILE', () => {
-        process.env['ENRICHMENT_TOGGLE_EMAILS'] = ALLOWLISTED;
-        const env = envOf({ email: OUTSIDER, enrichment: 'premium' });
-        expect(env.has('ENRICHMENT_DISABLED')).toBe(false);
-        expect(env.has('ENRICH_PER_FILE')).toBe(false);
+    it('a missing role fails closed to Tier-1', () => {
+        expect(resolveEnrichmentEnv('free', null)).toEqual({ ENRICHMENT_DISABLED: '1', ENRICH_TIER1: '1' });
     });
 });
