@@ -21,6 +21,7 @@ export default tseslint.config(
       'server.js',
       'telemetry.js',
       'admin-api/**',
+      '.claude/**',
     ],
   },
 
