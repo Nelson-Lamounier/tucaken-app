@@ -130,7 +130,8 @@ export async function stampProjectIntent(
       WHERE pc.project_id = p.id
         AND pr.repository_id = $2::uuid
         AND p.user_id = $1::uuid
-        AND p.shape = 'single_repo'`,
+        AND p.shape = 'single_repo'
+        AND p.status <> 'archived'`,
     [userId, repositoryId, intent.action, target],
   );
 }

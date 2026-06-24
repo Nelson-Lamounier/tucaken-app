@@ -67,8 +67,17 @@ export async function runCaseStudyReconcileTick(
     let n = 0;
     for (const p of pending) {
         try {
-            await dispatch(pool, config, p.user_id, p.id, 'reconciler');
-            n += 1;
+            const result = await dispatch(pool, config, p.user_id, p.id, 'reconciler');
+            if (result.ok) {
+                n += 1;
+            } else {
+                // No pipeline_run row was written, so the next tick retries.
+                console.warn(
+                    '[case-study-reconciler] dispatch returned not-ok (will retry)',
+                    p.id,
+                    result.reason,
+                );
+            }
         } catch (err) {
             console.warn(
                 '[case-study-reconciler] dispatch failed (non-fatal)',
