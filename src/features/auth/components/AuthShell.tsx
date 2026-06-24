@@ -79,15 +79,17 @@ export function AuthShell({
           Home
         </Link>
 
-        <div className="m-auto w-full max-w-md">
+        <div className="m-auto w-full max-w-lg">
           <motion.div
+            layout
             initial={false}
+            transition={{ layout: { type: 'spring', stiffness: 420, damping: 40 } }}
             className={[
-              'relative isolate rounded-3xl border p-7 shadow-2xl shadow-black/10 backdrop-blur-xl',
+              'relative isolate rounded-2xl border p-7 shadow-2xl shadow-black/10 backdrop-blur-xl',
               'dark:shadow-black/40',
               cardClass,
             ].join(' ')}
-            style={{ willChange: 'transform, opacity' }}
+            style={{ willChange: 'transform' }}
           >
             {/* Brand header */}
             <div className="mb-6 flex items-center gap-3">

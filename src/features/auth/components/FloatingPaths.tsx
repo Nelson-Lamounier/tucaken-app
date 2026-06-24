@@ -19,13 +19,17 @@ export function FloatingPaths({ position }: { position: number }) {
 
   return (
     <motion.div
-      // Oversized so the gentle drift never exposes the panel edges.
-      className="pointer-events-none absolute -inset-12"
+      // Oversized so the drift/rotate/scale never exposes the panel edges.
+      className="pointer-events-none absolute -inset-24"
       style={{ willChange: 'transform' }}
-      animate={reduce ? undefined : { x: [0, 14 * position, 0], y: [0, -10, 0] }}
-      transition={reduce ? undefined : { duration: 26, repeat: Infinity, ease: 'easeInOut' }}
+      animate={
+        reduce
+          ? undefined
+          : { x: [0, 36 * position, 0], y: [0, -28, 0], rotate: [0, 2.4 * position, 0], scale: [1, 1.05, 1] }
+      }
+      transition={reduce ? undefined : { duration: 12, repeat: Infinity, ease: 'easeInOut' }}
     >
-      <svg className="h-full w-full" viewBox="0 0 696 316" fill="none" preserveAspectRatio="xMidYMid slice">
+      <svg className="auth-paths h-full w-full" viewBox="0 0 696 316" fill="none" preserveAspectRatio="xMidYMid slice">
         <title>Background paths</title>
         {paths.map((path) => (
           <path

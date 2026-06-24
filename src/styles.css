@@ -92,6 +92,17 @@
 .marquee-anim[data-reverse='true'] {
   animation-direction: reverse;
 }
+/* Auth brand-panel flowing lines. CSS-driven stroke-dashoffset (off the JS
+   main thread, so it never starves the auth form's animations) gives a light
+   segment that travels along each otherwise-static teal path. */
+@keyframes auth-path-flow {
+  to { stroke-dashoffset: -360; }
+}
+.auth-paths path {
+  stroke-dasharray: 160 110;
+  animation: auth-path-flow 8s linear infinite;
+}
 @media (prefers-reduced-motion: reduce) {
   .belt-scroll-anim, .scan-sweep-anim, .item-state-anim, .pipe-pulse-anim, .node-glow-anim, .gradient-sweep-anim, .marquee-anim { animation: none !important; }
+  .auth-paths path { animation: none !important; stroke-dasharray: none !important; }
 }
