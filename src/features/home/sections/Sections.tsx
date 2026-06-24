@@ -1,7 +1,7 @@
 "use client"
 // src/features/home/sections/Sections.tsx
 // Re-usable below-the-fold sections (Problem, HowItWorks, Comparison, Founder, Pricing, FAQ, Footer).
-import { motion } from 'motion/react'
+import { motion, useReducedMotion } from 'motion/react'
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { MagneticButton } from '../lib/MagneticButton'
@@ -100,18 +100,21 @@ export function ComparisonSection() {
     <Section className="border-t border-white/5">
       <div className="mx-auto max-w-5xl">
         <Eyebrow>Why Tucaken</Eyebrow>
-        <h2 className="text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl">
-          What other AI resume tools can't say.
-        </h2>
+        <KineticText as="h2" text="What other AI resume tools can't say." className="text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl" />
         <div className="mt-10 overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/50">
           <div className="grid grid-cols-12 border-b border-white/10 bg-white/[0.03] font-mono text-[11px] uppercase tracking-widest text-zinc-400">
             <div className="col-span-5 px-5 py-3">You ask</div>
             <div className="col-span-3 border-l border-white/10 px-5 py-3 text-zinc-500">Other tools</div>
-            <div className="col-span-4 border-l border-white/10 bg-teal-500/5 px-5 py-3 text-teal-300">Tucaken</div>
+            <div className="gradient-sweep-anim col-span-4 border-l border-white/10 bg-[linear-gradient(110deg,transparent,rgba(45,212,191,0.18),transparent)] px-5 py-3 text-teal-300">Tucaken</div>
           </div>
           {comparison.map((row, i) => (
-            <div
+            <motion.div
               key={i}
+              initial={{ opacity: 0, x: -16 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.06 }}
+              style={{ willChange: 'transform, opacity' }}
               className={['grid grid-cols-12 text-sm', i < comparison.length - 1 ? 'border-b border-white/5' : ''].join(' ')}
             >
               <div className="col-span-5 px-5 py-5 font-medium text-white">{row.q}</div>
@@ -120,7 +123,7 @@ export function ComparisonSection() {
                 <span className="text-teal-400">✓ </span>
                 {row.t}
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>
@@ -129,15 +132,21 @@ export function ComparisonSection() {
 }
 
 export function FounderSection() {
+  const reduce = useReducedMotion() ?? false
   return (
     <Section className="border-t border-white/5">
       <div className="mx-auto max-w-3xl">
         <Eyebrow>Built by a user, for users</Eyebrow>
         <div className="mt-8 rounded-3xl border border-white/10 bg-gradient-to-br from-zinc-900/80 to-zinc-950/80 p-8 backdrop-blur-md md:p-10">
           <div className="flex items-start gap-5">
-            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-gradient-to-br from-teal-400 to-emerald-600 font-mono text-lg font-bold text-white">
+            <motion.div
+              animate={reduce ? undefined : { opacity: [0.85, 1, 0.85] }}
+              transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+              style={{ willChange: 'opacity' }}
+              className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-gradient-to-br from-teal-400 to-emerald-600 font-mono text-lg font-bold text-white"
+            >
               N
-            </div>
+            </motion.div>
             <div>
               <div className="text-base font-semibold text-white">{founder.name}</div>
               <div className="font-mono text-xs text-zinc-400">{founder.role}</div>
