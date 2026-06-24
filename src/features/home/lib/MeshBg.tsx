@@ -1,8 +1,12 @@
 "use client"
 // src/features/home/lib/MeshBg.tsx
-import { motion } from 'motion/react'
+import { motion, useReducedMotion } from 'motion/react'
 
 export function MeshBg({ intense = false }: { intense?: boolean }) {
+  // `filter` is not a transform, so MotionConfig reducedMotion="user" does not
+  // cover this loop — guard it explicitly so the hue-rotate stops for users
+  // who prefer reduced motion.
+  const reduce = useReducedMotion() ?? false
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
       <motion.div
@@ -11,7 +15,7 @@ export function MeshBg({ intense = false }: { intense?: boolean }) {
           backgroundImage:
             'radial-gradient(50% 40% at 20% 20%, oklch(0.65 0.14 175 / 0.45), transparent 60%), radial-gradient(45% 35% at 80% 30%, oklch(0.62 0.16 155 / 0.4), transparent 60%), radial-gradient(60% 50% at 50% 100%, oklch(0.5 0.13 200 / 0.4), transparent 60%)',
         }}
-        animate={intense ? { filter: ['hue-rotate(0deg)', 'hue-rotate(15deg)', 'hue-rotate(0deg)'] } : undefined}
+        animate={intense && !reduce ? { filter: ['hue-rotate(0deg)', 'hue-rotate(15deg)', 'hue-rotate(0deg)'] } : undefined}
         transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
       />
       <div

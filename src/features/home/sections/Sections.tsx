@@ -142,8 +142,8 @@ export function FounderSection() {
           <div className="flex items-start gap-5">
             <motion.div
               animate={reduce ? undefined : { opacity: [0.85, 1, 0.85] }}
-              transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-              style={{ willChange: 'opacity' }}
+              transition={reduce ? undefined : { duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+              style={reduce ? undefined : { willChange: 'opacity' }}
               className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-gradient-to-br from-teal-400 to-emerald-600 font-mono text-lg font-bold text-white"
             >
               N

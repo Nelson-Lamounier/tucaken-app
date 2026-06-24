@@ -3,7 +3,7 @@
 // Single-page Tucaken Home — energetic + spotlight + 3D resume + floating repos.
 import { useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { useScroll, useMotionValueEvent } from 'motion/react'
+import { MotionConfig, useScroll, useMotionValueEvent } from 'motion/react'
 import { MagneticButton } from './lib/MagneticButton'
 import { ScrollProgress } from './lib/ScrollProgress'
 import { HeroSection } from './sections/HeroSection'
@@ -52,18 +52,25 @@ function Header() {
 }
 
 export function HomePage() {
+  // `reducedMotion="user"` makes Motion auto-disable transform/layout
+  // animations (the section whileInView reveals and the Pricing hover lift)
+  // for visitors who prefer reduced motion, while keeping opacity fades.
+  // Looping CSS marquees/sweeps are frozen separately via the styles.css
+  // prefers-reduced-motion kill-switch; MeshBg guards its own filter loop.
   return (
-    <div className="dark min-h-screen bg-zinc-950 text-white antialiased">
-      <ScrollProgress />
-      <Header />
-      <HeroSection />
-      <HowItWorksSection />
-      <ProblemSection />
-      <ComparisonSection />
-      <FounderSection />
-      <PricingSection />
-      <FAQSection />
-      <FooterSection />
-    </div>
+    <MotionConfig reducedMotion="user">
+      <div className="dark min-h-screen bg-zinc-950 text-white antialiased">
+        <ScrollProgress />
+        <Header />
+        <HeroSection />
+        <HowItWorksSection />
+        <ProblemSection />
+        <ComparisonSection />
+        <FounderSection />
+        <PricingSection />
+        <FAQSection />
+        <FooterSection />
+      </div>
+    </MotionConfig>
   )
 }
