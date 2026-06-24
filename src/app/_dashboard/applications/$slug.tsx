@@ -20,6 +20,7 @@ export const Route = createFileRoute('/_dashboard/applications/$slug')({
 function ApplicationDetailRoute() {
   const { slug } = Route.useParams()
   const { stage, focus } = Route.useSearch()
+  const { me } = Route.useRouteContext()
 
-  return <ApplicationDetailContainer slug={slug} activeStage={stage} focus={focus} />
+  return <ApplicationDetailContainer slug={slug} activeStage={stage} focus={focus} viewerEmail={me?.email} />
 }
