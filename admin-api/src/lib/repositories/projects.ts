@@ -95,14 +95,14 @@ export async function ensureDefaultProject(
   );
 }
 
-// ─── Add-time project intent ───────────────────────────────────────────────
+// --- Add-time project intent ---
 
 /**
  * The caller's stated intent when adding a repo. Persisted on the repo's
  * single_repo default project so the first ingestion Job can act on it.
  *
- *   build — create a standalone case study for this repo.
- *   link  — merge the repo into an existing confirmed project.
+ *   build -- create a standalone case study for this repo.
+ *   link  -- merge the repo into an existing confirmed project.
  */
 export type ProjectIntent = { action: 'build' } | { action: 'link'; targetProjectId: string };
 

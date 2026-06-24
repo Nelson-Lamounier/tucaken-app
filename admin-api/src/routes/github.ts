@@ -1084,7 +1084,7 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         const callerEmail   = ctx.get('jwtPayload')?.['email'] as string | undefined;
 
         // Parse + validate the add-time project intent.
-        // 'none' / absent → undefined (back-compat: KB-only, no project action).
+        // 'none' / absent -> undefined (back-compat: KB-only, no project action).
         const rawIntent = body.projectIntent;
         let intent: ProjectIntent | undefined;
         if (rawIntent === 'build') {
@@ -1100,7 +1100,7 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
             if ((ok.rowCount ?? 0) === 0) return ctx.json({ error: 'targetProjectId is not a confirmed project you own' }, 400);
             intent = { action: 'link', targetProjectId: target };
         }
-        // 'none'/undefined → intent stays undefined (back-compat).
+        // 'none'/undefined -> intent stays undefined (back-compat).
 
         // deferSync (onboarding queue): connect the repo as 'pending' only —
         // no quota consumed, no Job dispatched. POST /connected-repos/sync
