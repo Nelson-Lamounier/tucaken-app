@@ -88,6 +88,16 @@ async function getConnection(pool: Pool, userId: string): Promise<OAuthRow | nul
     return rows[0] ?? null;
 }
 
+async function countConnectedRepos(pool: Pool, userId: string): Promise<number> {
+    const { rows } = await pool.query<{ n: string }>(
+        `SELECT COUNT(*)::text AS n
+         FROM repositories
+         WHERE user_id = $1::uuid AND provider = 'github'`,
+        [userId],
+    );
+    return Number(rows[0]?.n ?? '0');
+}
+
 async function upsertConnection(
     pool: Pool,
     userId: string,
@@ -404,7 +414,15 @@ async function autoDispatchRepos(
     // the row's id is absent.
     const idMap = await buildRepoIdMap(token);
 
-    for (const repo of repos) {
+    // Per-plan repository-count cap: free users auto-connecting many repos on
+    // install are limited to `repos` entitlement (e.g. 1 for free tier).
+    const repoCap = entitlementsFor(effectivePlan, role).repos;
+    const capped  = Number.isFinite(repoCap) ? repos.slice(0, repoCap) : repos;
+    if (capped.length < repos.length) {
+        console.log(`[github] plan cap: dispatching ${capped.length}/${repos.length} repos for ${userId}`);
+    }
+
+    for (const repo of capped) {
         const id = repo.github_repo_id ?? idMap.get(repo.full_name);
         if (id === null || id === undefined) {
             console.warn(`[github/auto-dispatch] no github_repo_id for ${repo.full_name} — skipping`);
@@ -422,7 +440,7 @@ async function autoDispatchRepos(
         await markSyncTriggered(pool, userId, repo.full_name);
 
         try {
-            await dispatchIngestionJob(config, userId, repo.full_name, token, forceReindex);
+            await dispatchIngestionJob(config, userId, repo.full_name, token, forceReindex, effectivePlan, role);
             queued.push(repo.full_name);
             console.log(`[github/auto-dispatch] queued ${repo.full_name} (forceReindex=${forceReindex})`);
         } catch (err) {
@@ -1137,6 +1155,27 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         if (!allowed) {
             ctx.header('Retry-After', String(secondsUntilNextMonthUTC()));
             return ctx.json({ error: 'Monthly ingestion limit reached. Upgrade to Pro for unlimited syncs.' }, 429);
+        }
+
+        // Per-plan repository-count cap. Re-syncing an existing repo must stay
+        // allowed — only NEW connections beyond the cap are blocked.
+        const repoAlreadyConnected = await pool
+            .query<{ one: number }>(
+                `SELECT 1 AS one FROM repositories
+                 WHERE user_id = $1::uuid AND provider = 'github' AND full_name = $2
+                 LIMIT 1`,
+                [uid, repoFullName],
+            )
+            .then(r => (r.rowCount ?? 0) > 0);
+        const repoCap = entitlementsFor(effectivePlan, role).repos;
+        if (Number.isFinite(repoCap) && !repoAlreadyConnected) {
+            const already = await countConnectedRepos(pool, uid);
+            if (already >= repoCap) {
+                return ctx.json({
+                    error: `Your plan allows ${repoCap} repository${repoCap === 1 ? '' : 's'}. Upgrade for more.`,
+                    upgradeUrl: '/pricing',
+                }, 403);
+            }
         }
 
         // Insert repo row + mark pending before Job dispatch so the UI
