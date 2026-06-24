@@ -689,12 +689,12 @@ type DispatchResult =
     | { ok: true; pipelineRunId: string; jobName: string }
     | { ok: false; fatal: boolean; reason: string };
 
-async function dispatchCaseStudyJob(
+export async function dispatchCaseStudyJob(
     pool: Pool,
     config: AdminApiConfig,
     userId: string,
     projectId: string,
-    triggeredBy: 'confirm' | 'manual',
+    triggeredBy: 'confirm' | 'manual' | 'reconciler',
 ): Promise<DispatchResult> {
     const image = getJobImage('job-strategist');
     if (!isImageConfigured(image)) {

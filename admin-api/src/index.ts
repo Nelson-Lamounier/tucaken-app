@@ -49,6 +49,7 @@ import { createResumeImportsRouter } from './routes/resume-imports.js';
 import { createResumesRouter } from './routes/resumes.js';
 import { createDraftsRouter } from './routes/drafts.js';
 import { createProfileRouter } from './routes/profile.js';
+import { startCaseStudyReconciler } from './lib/case-study-reconciler.js';
 import { createProjectsRouter } from './routes/projects.js';
 
 // ── Startup Validation ───────────────────────────────────────────────────────
@@ -221,3 +222,8 @@ serve(
     appLogger.info({ port: info.port, cognito_pool: config.cognitoUserPoolId }, 'admin-api listening');
   },
 );
+
+// Start the case-study reconciler after the server is up.
+// The interval is unref'd -- it will not keep the process alive and
+// is automatically silenced if the process exits cleanly.
+startCaseStudyReconciler(getPool(config), config);
