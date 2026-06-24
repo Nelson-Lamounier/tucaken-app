@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
 import {
   Target,
   Search,
@@ -15,6 +16,32 @@ import { CustomDropDown } from '@/components/ui/CustomDropDown'
 import { CommandPallete } from '@/components/ui/CommandPallete'
 import type { CommandPalleteItem } from '@/components/ui/CommandPallete'
 import { Pagination } from '@/components/ui/Pagination'
+import { getTailoredResumesFn, type TailoredResumeSummary } from '@/server/applications'
+import { adminKeys } from '@/lib/api/query-keys'
+import { ResumeBuilderDrawer } from './ResumeBuilderDrawer'
+import { ResumePreviewDrawer } from '@/features/resumes/components/ResumePreviewDrawer'
+import type { AdminResumeWithData } from '../hooks/use-resume-versions'
+
+/**
+ * Build a minimal AdminResumeWithData for ResumePreviewDrawer.
+ * The drawer renderer only reads `label` and `data`; the remaining
+ * fields (resumeId, isActive, createdAt, updatedAt) are resume-store
+ * fields that do not exist on a TailoredResumeSummary. We supply
+ * placeholder values so the type is satisfied without `as any`.
+ */
+function buildPreviewResume(
+  p: { tr: TailoredResumeSummary; kind: 'resume' | 'cover' },
+): AdminResumeWithData | null {
+  if (p.kind !== 'resume') return null
+  return {
+    resumeId: p.tr.slug,
+    label: `${p.tr.targetCompany} — ${p.tr.targetRole}`,
+    isActive: false,
+    createdAt: p.tr.updatedAt,
+    updatedAt: p.tr.updatedAt,
+    data: p.tr.data as unknown as Record<string, unknown>,
+  }
+}
 
 export function ApplicationsList({ initialStage }: { initialStage?: string }) {
   const navigate = useNavigate()
@@ -26,6 +53,8 @@ export function ApplicationsList({ initialStage }: { initialStage?: string }) {
   const [palleteOpen, setPalleteOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const ITEMS_PER_PAGE = 10
+  const [preview, setPreview] = useState<{ tr: TailoredResumeSummary; kind: 'resume' | 'cover' } | null>(null)
+  const [editTarget, setEditTarget] = useState<{ tr: TailoredResumeSummary; view: 'resume' | 'cover' } | null>(null)
 
   useEffect(() => {
     if (initialStage) {
@@ -56,6 +85,12 @@ export function ApplicationsList({ initialStage }: { initialStage?: string }) {
     isLoading,
     error,
   } = useApplications(statusFilter)
+
+  const { data: tailoredList } = useQuery({
+    queryKey: adminKeys.applications.tailoredResumes,
+    queryFn: () => getTailoredResumesFn(),
+  })
+  const tailoredBySlug = new Map((tailoredList ?? []).map((t) => [t.slug, t]))
 
   // Client-side company name filter
   // We keep it just in case searchQuery is still populated externally, otherwise the Command Palette handles navigation
@@ -152,11 +187,12 @@ export function ApplicationsList({ initialStage }: { initialStage?: string }) {
         {!isLoading && !error && filteredApps.length > 0 && (
           <>
             {/* Column headers — aligned with ApplicationListRow's grid template. */}
-            <div className="hidden grid-cols-[1.5fr_1.5fr_14rem_9rem] items-center gap-4 border-b border-zinc-200 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-400 dark:border-white/10 dark:text-zinc-500 sm:grid">
+            <div className="hidden grid-cols-[1.5fr_1.5fr_12rem_8rem_auto] items-center gap-4 border-b border-zinc-200 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-400 dark:border-white/10 dark:text-zinc-500 sm:grid">
               <span>Company</span>
               <span>Position</span>
               <span>Stage</span>
               <span>Status</span>
+              <span className="sr-only">Documents</span>
             </div>
             {/* Rows — divided, new applications append under the current ones. */}
             <div className="divide-y divide-zinc-200 dark:divide-white/10">
@@ -164,7 +200,10 @@ export function ApplicationsList({ initialStage }: { initialStage?: string }) {
                 <ApplicationListRow
                   key={app.slug}
                   app={app}
-                  onClick={() => navigate({ to: '/applications/$slug', params: { slug: app.slug } })}
+                  tailored={tailoredBySlug.get(app.slug)}
+                  onPreviewResume={(tr) => setPreview({ tr, kind: 'resume' })}
+                  onPreviewCoverLetter={(tr) => setPreview({ tr, kind: 'cover' })}
+                  onEdit={(tr, view) => setEditTarget({ tr, view })}
                 />
               ))}
             </div>
@@ -180,6 +219,32 @@ export function ApplicationsList({ initialStage }: { initialStage?: string }) {
           </>
         )}
       </div>
+
+      {preview && (
+        <ResumePreviewDrawer
+          isOpen
+          onClose={() => setPreview(null)}
+          resume={buildPreviewResume(preview)}
+          coverLetter={preview.kind === 'cover' ? preview.tr.coverLetter : null}
+          coverLetterProfile={preview.tr.data.profile}
+          coverLetterCompany={preview.tr.targetCompany}
+          coverLetterRole={preview.tr.targetRole}
+          onDownload={() => { /* download handled in detail menu; preview-only here */ }}
+          isDownloading={false}
+        />
+      )}
+      {editTarget && (
+        <ResumeBuilderDrawer
+          isOpen
+          onClose={() => setEditTarget(null)}
+          resume={editTarget.tr.data}
+          coverLetter={editTarget.tr.coverLetter}
+          company={editTarget.tr.targetCompany}
+          role={editTarget.tr.targetRole}
+          slug={editTarget.tr.slug}
+          initialView={editTarget.view}
+        />
+      )}
     </div>
   )
 }
