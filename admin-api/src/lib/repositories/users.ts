@@ -328,6 +328,53 @@ export async function incrementUsageQuota(
 }
 
 /**
+ * Atomically checks and increments the monthly resume-generation counter.
+ * Returns true if the generation is allowed (quota not exceeded), false otherwise.
+ *
+ * Uses a single INSERT … ON CONFLICT DO UPDATE … WHERE count < limit RETURNING count
+ * so the check and increment are one atomic operation with no TOCTOU window.
+ * If RETURNING yields no rows, the WHERE guard rejected the update → quota full.
+ */
+export async function checkAndIncrementResumeQuota(
+    pool: Pick<import('pg').Pool, 'query'>,
+    userId: string,
+    limit: number,
+): Promise<boolean> {
+    if (!Number.isFinite(limit)) return true;
+    const { rows } = await pool.query<{ count: number }>(
+        `INSERT INTO usage_quotas (user_id, feature, period_month, count)
+         VALUES ($1::uuid, 'resume_generations', DATE_TRUNC('month', NOW()), 1)
+         ON CONFLICT (user_id, feature, period_month)
+         DO UPDATE SET count      = usage_quotas.count + 1,
+                       updated_at = NOW()
+         WHERE usage_quotas.count < $2
+         RETURNING count`,
+        [userId, limit],
+    );
+    // Empty RETURNING → WHERE clause was false → quota already at or above limit.
+    return rows.length > 0;
+}
+
+/**
+ * Decrements the monthly resume-generation counter by 1 (floor 0).
+ * Called when a generation dispatch fails after the quota was already incremented,
+ * so a failed attempt does not burn the user's monthly credit.
+ */
+export async function decrementResumeQuota(
+    pool: Pick<import('pg').Pool, 'query'>,
+    userId: string,
+): Promise<void> {
+    await pool.query(
+        `UPDATE usage_quotas
+         SET count      = GREATEST(count - 1, 0),
+             updated_at = NOW()
+         WHERE user_id = $1::uuid AND feature = 'resume_generations'
+           AND period_month = DATE_TRUNC('month', NOW())`,
+        [userId],
+    );
+}
+
+/**
  * Returns current usage count for a feature this month (0 if no row exists).
  */
 export async function getUsageQuota(
