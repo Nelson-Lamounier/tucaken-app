@@ -222,7 +222,7 @@ export type EffectivePlan = 'free' | 'trial' | 'pro' | 'premium';
 
 export interface PlanStatus {
   plan:                 string;          // stored column: 'free' | 'pro'
-  effectivePlan:        EffectivePlan;   // derived: 'pro' | 'trial' | 'free'
+  effectivePlan:        EffectivePlan;   // derived: 'premium' | 'pro' | 'trial' | 'free'
   role:                 string;          // 'user' | 'admin'
   trialStartedAt:       Date | null;
   trialEndsAt:          Date | null;
@@ -271,8 +271,9 @@ export async function getUserPlanStatus(
        cancel_at_period_end,
        current_period_end,
        CASE
-         WHEN plan = 'pro' AND subscription_status = 'active' THEN 'pro'
-         WHEN plan = 'free' AND trial_ends_at > NOW()          THEN 'trial'
+         WHEN plan = 'premium' AND subscription_status = 'active' THEN 'premium'
+         WHEN plan = 'pro'     AND subscription_status = 'active' THEN 'pro'
+         WHEN plan = 'free'    AND trial_ends_at > NOW()          THEN 'trial'
          ELSE 'free'
        END AS effective_plan,
        CASE
