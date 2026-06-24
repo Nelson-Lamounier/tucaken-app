@@ -24,7 +24,7 @@ export function AuthBrandPanel() {
           <p aria-hidden className="text-7xl leading-none font-black text-teal-300/80">
             &ldquo;
           </p>
-          <p className="mt-1 text-2xl leading-[1.2] font-extrabold tracking-tight text-balance text-zinc-50 sm:text-[2rem]">
+          <p className="mt-1 text-2xl leading-[1.2] font-extrabold tracking-tight text-balance text-zinc-300 sm:text-[2rem]">
             {founder.quote}
           </p>
           <footer className="mt-6 flex items-center gap-3 font-mono text-sm">
