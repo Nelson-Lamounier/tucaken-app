@@ -18,6 +18,7 @@
 - `"use client"` is the first line of every client component.
 - Sonar/ESLint: no nested ternaries (guard clauses), stable React keys, complexity ≤ 10, no `console.*`.
 - UK English; product "Tucaken"; `resume` (no diacritics). New chrome uses `rounded-md`; existing card `rounded-3xl` kept.
+- **Logo:** the brand panel AND the card header use the Tucaken logo image `src/images/logo-horizontal-resume-flat-teal.png` (imported as `@/images/logo-horizontal-resume-flat-teal.png`), replacing the old `ShieldCheck`+wordmark. The asset is currently untracked in git — commit it with the task that first imports it (Task 2). Its teal (~teal-600) matches the accent; keep FloatingPaths/wash in the teal-400/500/600 range to harmonise.
 - Yarn 4: `yarn typecheck`, `yarn lint`, `yarn test` (never npm/npx). Tests live under `src/__tests__/**`, node env, vitest globals OFF — test files must `import { describe, it, expect } from 'vitest'`.
 - Before "done": `yarn typecheck && yarn lint && yarn test` all green.
 
@@ -166,7 +167,7 @@ git commit -m "feat(auth): add FloatingPaths animated backdrop"
 - Create: `src/features/auth/components/AuthBrandPanel.tsx`
 
 **Interfaces:**
-- Consumes: `FloatingPaths` (Task 1), `ShieldCheck` from `lucide-react`, `founder` from `@/features/home/content`.
+- Consumes: `FloatingPaths` (Task 1), the logo image `@/images/logo-horizontal-resume-flat-teal.png`, `founder` from `@/features/home/content`.
 - Produces: `AuthBrandPanel` component (no props), the left split column.
 
 - [ ] **Step 1: Confirm the founder copy exists**
@@ -179,12 +180,11 @@ Expected: an `export const founder = { name: 'Nelson', role: 'DevOps engineer ·
 ```tsx
 // src/features/auth/components/AuthBrandPanel.tsx
 "use client"
-// Left split column (desktop only): brand mark + founder quote over the
-// FloatingPaths backdrop. Mirrors the AuthShell card header's ShieldCheck mark
-// so no new logo asset is introduced.
-import { ShieldCheck } from 'lucide-react'
+// Left split column (desktop only): Tucaken logo + founder quote over the
+// FloatingPaths backdrop.
 import { FloatingPaths } from './FloatingPaths'
 import { founder } from '@/features/home/content'
+import logoTeal from '@/images/logo-horizontal-resume-flat-teal.png'
 
 export function AuthBrandPanel() {
   return (
@@ -194,13 +194,10 @@ export function AuthBrandPanel() {
         <FloatingPaths position={1} />
         <FloatingPaths position={-1} />
       </div>
-      <div className="absolute inset-0 z-10 bg-gradient-to-t from-zinc-950 via-zinc-950/70 to-transparent" />
+      <div className="absolute inset-0 z-10 bg-linear-to-t from-zinc-950 via-zinc-950/70 to-transparent" />
 
-      <div className="z-10 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-gradient-to-br from-teal-500 to-emerald-600 shadow-lg shadow-teal-500/30">
-          <ShieldCheck className="h-5 w-5 text-white" />
-        </div>
-        <p className="text-xl font-semibold text-white">tucaken</p>
+      <div className="z-10">
+        <img src={logoTeal} alt="Tucaken Resume" className="h-10 w-auto" />
       </div>
 
       <div className="z-10 mt-auto max-w-md">
@@ -221,13 +218,15 @@ export function AuthBrandPanel() {
 - [ ] **Step 3: Verify typecheck + lint**
 
 Run: `yarn typecheck && yarn lint`
-Expected: zero errors. (`founder` is an existing export; if `@/features/home/content` is unexpectedly absent, STOP and report — do not invent copy.)
+Expected: zero errors. (`founder` is an existing export; if `@/features/home/content` is unexpectedly absent, STOP and report — do not invent copy. The png import needs no type shim — Vite handles it via the app's image module typing.)
 
 - [ ] **Step 4: Commit** [git-commit skill]
 
+Stage the panel AND the logo asset (currently untracked):
+
 ```bash
-git add src/features/auth/components/AuthBrandPanel.tsx
-git commit -m "feat(auth): add AuthBrandPanel with founder quote"
+git add src/features/auth/components/AuthBrandPanel.tsx src/images/logo-horizontal-resume-flat-teal.png
+git commit -m "feat(auth): add AuthBrandPanel with logo and founder quote"
 ```
 
 ---
@@ -238,22 +237,23 @@ git commit -m "feat(auth): add AuthBrandPanel with founder quote"
 - Modify: `src/features/auth/components/AuthShell.tsx` (outer chrome only)
 
 **Interfaces:**
-- Consumes: `AuthBrandPanel` (Task 2), `Link` from `@tanstack/react-router`, `ChevronLeft` from `lucide-react`. The `AuthShellProps` interface and the entire `view`/callback machine are unchanged.
+- Consumes: `AuthBrandPanel` (Task 2), `Link` from `@tanstack/react-router`, `ChevronLeft` from `lucide-react`, the logo image `@/images/logo-horizontal-resume-flat-teal.png`. The `AuthShellProps` interface and the entire `view`/callback machine are unchanged.
 - Produces: the redesigned `AuthShell` (same public API).
 
 - [ ] **Step 1: Replace the whole file**
 
-Replace `src/features/auth/components/AuthShell.tsx` with the following. The `AuthShellProps` interface, the `useState`/`useEffect` state, `cardClass`, the brand header, the tab-pill `LayoutGroup`, and the entire `AnimatePresence` block are byte-identical to the current file — only the outer `return` wrapper changes from a single centred card to a two-column split, and a "← Home" link is added.
+Replace `src/features/auth/components/AuthShell.tsx` with the following. The `AuthShellProps` interface, the `useState`/`useEffect` state, `cardClass`, the tab-pill `LayoutGroup`, and the entire `AnimatePresence` block are byte-identical to the current file — the outer `return` wrapper changes from a single centred card to a two-column split, the card-header `ShieldCheck`+wordmark is replaced by the logo image, and a "← Home" link is added.
 
 ```tsx
 "use client"
 // src/features/auth/components/AuthShell.tsx
 import { useState, useEffect, type ReactNode } from 'react'
 import { AnimatePresence, motion, LayoutGroup } from 'motion/react'
-import { ShieldCheck, ChevronLeft } from 'lucide-react'
+import { ChevronLeft } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { AuthBackground } from './AuthBackground'
 import { AuthBrandPanel } from './AuthBrandPanel'
+import logoTeal from '@/images/logo-horizontal-resume-flat-teal.png'
 import { SignInForm } from './SignInForm'
 import { SignUpForm } from './SignUpForm'
 import { ForgotPasswordForm } from './ForgotPasswordForm'
@@ -322,7 +322,7 @@ export function AuthShell({
           aria-hidden
           className="pointer-events-none absolute inset-0 -z-10 opacity-60"
         >
-          <div className="absolute right-0 top-0 h-[40rem] w-[22rem] -translate-y-1/3 rounded-full bg-[radial-gradient(50%_50%_at_50%_50%,oklch(0.72_0.14_175/0.12),transparent_80%)]" />
+          <div className="absolute right-0 top-0 h-160 w-88 -translate-y-1/3 rounded-full bg-[radial-gradient(50%_50%_at_50%_50%,oklch(0.72_0.14_175/0.12),transparent_80%)]" />
         </div>
 
         <Link
@@ -347,12 +347,7 @@ export function AuthShell({
           >
             {/* Brand header */}
             <div className="mb-6 flex items-center gap-3">
-              {brand ?? (
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 shadow-lg shadow-teal-500/30">
-                  <ShieldCheck className="h-5 w-5 text-white" />
-                </div>
-              )}
-              <div className="text-sm font-semibold tracking-tight">tucaken</div>
+              {brand ?? <img src={logoTeal} alt="Tucaken Resume" className="h-8 w-auto" />}
             </div>
 
             {/* Tab indicator (only for signin/signup) */}

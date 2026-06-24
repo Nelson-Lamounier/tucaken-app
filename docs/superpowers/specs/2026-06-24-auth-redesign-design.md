@@ -66,9 +66,14 @@ functionality.
 
 2. **`AuthBrandPanel.tsx`** — the left panel (desktop only, `hidden lg:flex`).
    - Dark teal surface, relative, `overflow-hidden`, full height.
-   - Top: the same brand mark the AuthShell card header already uses — the
-     `ShieldCheck` icon in a teal→emerald gradient tile + the "tucaken"
-     wordmark (scaled up for the panel). No new image asset is introduced.
+   - Top: the Tucaken logo image
+     `src/images/logo-horizontal-resume-flat-teal.png` (teal toucan + "TUCAKEN
+     Resume" wordmark), imported via `@/images/...`. This same logo replaces the
+     `ShieldCheck`+wordmark mark in the AuthShell card header too, for
+     consistency. The logo's teal (~teal-600) matches the app accent, so the
+     panel/card teal accents (FloatingPaths colour, radial wash) stay in the
+     teal-400/500/600 range to harmonise with it. The asset is currently
+     untracked in git and is committed as part of this work.
    - Two `FloatingPaths` layers (`position={1}` and `position={-1}`) absolutely
      positioned behind, inside a `text-teal-*` wrapper, with a
      `from-background`/zinc gradient overlay (`z-10`) for legibility.
