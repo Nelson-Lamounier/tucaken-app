@@ -81,9 +81,7 @@ export function AuthShell({
 
         <div className="m-auto w-full max-w-md">
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
+            initial={false}
             className={[
               'relative isolate rounded-3xl border p-7 shadow-2xl shadow-black/10 backdrop-blur-xl',
               'dark:shadow-black/40',
