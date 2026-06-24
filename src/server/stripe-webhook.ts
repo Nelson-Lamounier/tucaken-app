@@ -103,6 +103,21 @@ async function recordPending(row: {
   })
 }
 
+// ─── Payment gate ────────────────────────────────────────────────────────────
+
+/**
+ * A checkout may complete WITHOUT a successful payment (unpaid, a $0 trial via
+ * no_payment_required, or an incomplete session). Only grant a paid plan when
+ * Stripe confirms the money landed; otherwise the later
+ * customer.subscription.updated / invoice.paid events sync the user once
+ * payment truly succeeds.
+ */
+export function shouldGrantFromCheckout(
+  session: Pick<Stripe.Checkout.Session, 'payment_status' | 'status'>,
+): boolean {
+  return session.payment_status === 'paid' && session.status === 'complete'
+}
+
 // ─── Event-specific handlers ─────────────────────────────────────────────────
 
 async function onCheckoutCompleted(session: Stripe.Checkout.Session): Promise<void> {
@@ -130,6 +145,19 @@ async function onCheckoutCompleted(session: Stripe.Checkout.Session): Promise<vo
         customerId, subscriptionId, tier,
       },
       'checkout.session.completed missing customer/subscription/tier — ignoring',
+    )
+    return
+  }
+
+  if (!shouldGrantFromCheckout(session)) {
+    logger.warn(
+      {
+        event: 'stripe_checkout_unpaid',
+        sessionId: session.id,
+        paymentStatus: session.payment_status,
+        status: session.status,
+      },
+      'checkout.session.completed without confirmed payment - not granting plan; awaiting invoice.paid',
     )
     return
   }
