@@ -78,6 +78,20 @@
 .node-glow-anim {
   animation: node-glow 2s ease-in-out infinite;
 }
+@keyframes gradient-sweep {
+  0% { background-position: 0% center; }
+  100% { background-position: 200% center; }
+}
+.gradient-sweep-anim {
+  background-size: 200% auto;
+  animation: gradient-sweep 6s linear infinite;
+}
+.marquee-anim {
+  animation: belt-scroll var(--marquee-duration, 32s) linear infinite;
+}
+.marquee-anim[data-reverse='true'] {
+  animation-direction: reverse;
+}
 @media (prefers-reduced-motion: reduce) {
-  .belt-scroll-anim, .scan-sweep-anim, .item-state-anim, .pipe-pulse-anim, .node-glow-anim { animation: none !important; }
+  .belt-scroll-anim, .scan-sweep-anim, .item-state-anim, .pipe-pulse-anim, .node-glow-anim, .gradient-sweep-anim, .marquee-anim { animation: none !important; }
 }
