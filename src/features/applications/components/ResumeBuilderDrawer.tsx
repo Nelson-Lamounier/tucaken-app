@@ -66,8 +66,12 @@ export function ResumeBuilderDrawer({
   // Load builder state when the drawer opens.
   useEffect(() => {
     if (!isOpen) return
-    prevStateRef.current = getState()
-    enterEphemeralMode()
+    // Capture the base state once per open session — not on every prop change,
+    // or a parent re-render would overwrite it with the already-edited state.
+    if (prevStateRef.current === null) {
+      prevStateRef.current = getState()
+      enterEphemeralMode()
+    }
     setState(() => mapApplicationToBuilderState(resume, coverLetter, company, role))
     setView(initialView)
     setBuilderKey((k) => k + 1)
@@ -113,7 +117,10 @@ export function ResumeBuilderDrawer({
       addToast('success', 'Saved.')
       handleClose()
     },
-    onError: (err: Error) => addToast('error', err.message),
+    onError: (err: unknown) => {
+      const message = err instanceof Error ? err.message : 'Save failed.'
+      addToast('error', message)
+    },
   })
 
   if (!isOpen) return null
