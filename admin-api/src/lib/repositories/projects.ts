@@ -107,25 +107,31 @@ export async function ensureDefaultProject(
 export type ProjectIntent = { action: 'build' } | { action: 'link'; targetProjectId: string };
 
 /**
- * Stamp a post-sync action on a repo's single_repo DEFAULT project (matched by
- * the slug deriveRepoSlug yields). Applied by the ingestion Job once the first
- * sync completes. Caller owns the transaction + RLS context.
+ * Stamp a post-sync action on a repo's single_repo DEFAULT project, matched by
+ * the REPOSITORY id (the project linked to this repo) -- not the slug, so a
+ * stale archived default sharing the slug can never be mis-stamped. Applied by
+ * the ingestion Job once the first sync completes. Caller owns the transaction
+ * + RLS context.
  */
 export async function stampProjectIntent(
   db: Queryable,
   userId: string,
-  repoFullName: string,
+  repositoryId: string,
   intent: ProjectIntent,
 ): Promise<void> {
-  const slug = deriveRepoSlug(repoFullName);
   const target = intent.action === 'link' ? intent.targetProjectId : null;
   await db.query(
-    `UPDATE projects
+    `UPDATE projects p
         SET post_sync_action = $3,
             post_sync_target_project_id = $4::uuid,
             updated_at = NOW()
-      WHERE user_id = $1::uuid AND slug = $2 AND shape = 'single_repo'`,
-    [userId, slug, intent.action, target],
+       FROM project_components pc
+       JOIN project_repositories pr ON pr.project_component_id = pc.id
+      WHERE pc.project_id = p.id
+        AND pr.repository_id = $2::uuid
+        AND p.user_id = $1::uuid
+        AND p.shape = 'single_repo'`,
+    [userId, repositoryId, intent.action, target],
   );
 }
 

@@ -234,7 +234,7 @@ export async function connectRepoWithDefaultProject(
         );
         const repoId = r.rows[0]!.id;
         await ensureDefaultProject(client, userId, repoId, fullName);
-        if (intent) await stampProjectIntent(client, userId, fullName, intent);
+        if (intent) await stampProjectIntent(client, userId, repoId, intent);
         await client.query('COMMIT');
     } catch (err) {
         await client.query('ROLLBACK').catch(() => {});

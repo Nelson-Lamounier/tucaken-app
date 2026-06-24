@@ -114,19 +114,22 @@ describe('stampProjectIntent', () => {
   function db(capture: { sql: string; params: readonly unknown[] }[]) {
     return { query: async (sql: string, params: readonly unknown[] = []) => { capture.push({ sql, params }); return { rows: [], rowCount: 1 }; } } as unknown as import('../pg.js').Queryable;
   }
-  it('build: sets post_sync_action=build on the single_repo default by slug', async () => {
+  it('build: stamps post_sync_action=build on the single_repo default keyed by repository id', async () => {
     const calls: { sql: string; params: readonly unknown[] }[] = [];
-    await stampProjectIntent(db(calls), 'user-1', 'Owner/My-Repo', { action: 'build' });
+    await stampProjectIntent(db(calls), 'user-1', 'repo-id-1', { action: 'build' });
     const u = calls.find(c => /UPDATE projects/i.test(c.sql))!;
     expect(u.sql).toMatch(/post_sync_action\s*=\s*\$/i);
     expect(u.sql).toMatch(/shape\s*=\s*'single_repo'/i);
-    expect(u.params).toEqual(['user-1', 'owner-my-repo', 'build', null]);
+    // Matched by the repository id (joined via project_repositories), not the slug.
+    expect(u.sql).toMatch(/pr\.repository_id\s*=\s*\$2/i);
+    expect(u.sql).not.toMatch(/slug\s*=/i);
+    expect(u.params).toEqual(['user-1', 'repo-id-1', 'build', null]);
   });
-  it('link: stores the target project id', async () => {
+  it('link: stores the target project id, still keyed by repository id', async () => {
     const calls: { sql: string; params: readonly unknown[] }[] = [];
-    await stampProjectIntent(db(calls), 'user-1', 'Owner/My-Repo', { action: 'link', targetProjectId: 'proj-9' });
+    await stampProjectIntent(db(calls), 'user-1', 'repo-id-1', { action: 'link', targetProjectId: 'proj-9' });
     const u = calls.find(c => /UPDATE projects/i.test(c.sql))!;
-    expect(u.params).toEqual(['user-1', 'owner-my-repo', 'link', 'proj-9']);
+    expect(u.params).toEqual(['user-1', 'repo-id-1', 'link', 'proj-9']);
   });
 });
 
