@@ -218,7 +218,7 @@ export async function upsertUser(pool: Pool, user: UserProfile): Promise<Provisi
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type EffectivePlan = 'pro' | 'trial' | 'free';
+export type EffectivePlan = 'free' | 'trial' | 'pro' | 'premium';
 
 export interface PlanStatus {
   plan:                 string;          // stored column: 'free' | 'pro'
