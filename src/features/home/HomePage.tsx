@@ -8,14 +8,13 @@ import { MagneticButton } from './lib/MagneticButton'
 import { ScrollProgress } from './lib/ScrollProgress'
 import { HeroSection } from './sections/HeroSection'
 import {
-  ProblemSection,
-  HowItWorksSection,
   ComparisonSection,
   FounderSection,
   PricingSection,
   FAQSection,
   FooterSection,
 } from './sections/Sections'
+import { ScrollStorySection } from './sections/ScrollStorySection'
 import logo from '@/images/logo.png'
 
 function Header() {
@@ -63,8 +62,7 @@ export function HomePage() {
         <ScrollProgress />
         <Header />
         <HeroSection />
-        <HowItWorksSection />
-        <ProblemSection />
+        <ScrollStorySection />
         <ComparisonSection />
         <FounderSection />
         <PricingSection />
