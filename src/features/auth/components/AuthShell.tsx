@@ -67,8 +67,10 @@ export function AuthShell({
     <main className="relative min-h-screen w-full overflow-x-hidden bg-zinc-950 lg:grid lg:grid-cols-2">
       <AuthBrandPanel />
 
-      {/* Form column — flat background, no effect (effect lives only on the brand panel) */}
-      <div className="relative flex min-h-screen flex-col items-center justify-center px-4 py-10">
+      {/* Form column — flat background, no effect (effect lives only on the brand panel).
+          Column scrolls; the card centres via m-auto and scrolls from the top when it
+          is taller than the viewport (justify-center would clip the top). */}
+      <div className="relative flex min-h-screen flex-col overflow-y-auto px-4 py-10">
         <Link
           to="/"
           className="absolute left-5 top-6 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-zinc-400 transition-colors hover:text-white"
@@ -77,13 +79,13 @@ export function AuthShell({
           Home
         </Link>
 
-        <div className="w-full max-w-md">
+        <div className="m-auto w-full max-w-md">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
             className={[
-              'relative max-h-[calc(100dvh-5rem)] overflow-y-auto rounded-3xl border p-7 shadow-2xl shadow-black/10 backdrop-blur-xl',
+              'relative isolate rounded-3xl border p-7 shadow-2xl shadow-black/10 backdrop-blur-xl',
               'dark:shadow-black/40',
               cardClass,
             ].join(' ')}
