@@ -197,6 +197,7 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
           kanbanStatus:   'analysing',
           interviewStage: 'applied',
           appliedAt:      null,
+          coverLetterOverride: null,
         });
       } catch (err: unknown) {
         console.error('[pipelines/strategist-job] failed to insert job_application', err);
