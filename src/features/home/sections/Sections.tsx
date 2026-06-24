@@ -5,6 +5,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { MagneticButton } from '../lib/MagneticButton'
+import { Marquee } from '../lib/Marquee'
 import { KineticText } from '../lib/KineticText'
 import { problems, steps, comparison, founder, faq } from '../content'
 import { TIERS } from '@/features/billing/catalog'
@@ -354,9 +355,17 @@ export function FAQSection() {
 }
 
 export function FooterSection() {
+  const band = ['Resumes grounded in real code', 'Made in Dublin', 'Backed by your commits', 'No fabricated bullet points']
   return (
-    <footer className="border-t border-white/5 px-6 py-10 md:px-12">
-      <div className="mx-auto flex max-w-5xl flex-col items-start justify-between gap-6 md:flex-row md:items-center">
+    <footer className="border-t border-white/5">
+      <Marquee speed={30} className="border-b border-white/5 py-4 mask-[linear-gradient(to_right,transparent,white_10%,white_90%,transparent)]">
+        {band.concat(band).map((t, i) => (
+          <span key={`${t}-${i}`} className="mx-6 font-mono text-[11px] uppercase tracking-[0.18em] text-zinc-500">
+            {t} <span className="text-teal-400">·</span>
+          </span>
+        ))}
+      </Marquee>
+      <div className="mx-auto flex max-w-5xl flex-col items-start justify-between gap-6 px-6 py-10 md:flex-row md:items-center md:px-12">
         <div>
           <div className="font-mono text-sm font-semibold text-white">tucaken</div>
           <div className="mt-1 text-xs text-zinc-500">Resumes grounded in real code. Made in Dublin.</div>
