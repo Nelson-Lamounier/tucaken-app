@@ -1,5 +1,5 @@
 import type { ResumeData as AppResumeData } from '@/lib/resumes/resume-data'
-import type { CoverLetter } from '@/lib/types/applications.types'
+import type { CoverLetter, CoverLetterSignoff } from '@/lib/types/applications.types'
 import {
   uid,
   DEFAULT_STATE,
@@ -144,4 +144,69 @@ function mapStructuredCoverLetter(
   base.closing = `Sincerely,\n${signoffLines.join('\n')}`
 
   return base
+}
+
+/** Builder AppState → application ResumeData (inverse of mapApplicationToBuilderState). */
+export function builderStateToResumeData(state: AppState): AppResumeData {
+  const r = state.resume
+  return {
+    profile: {
+      name: r.profile.name,
+      title: r.profile.title,
+      location: r.profile.location,
+      email: r.profile.email,
+      linkedin: r.profile.linkedin,
+      github: r.profile.github,
+      website: r.profile.website,
+    },
+    summary: r.summary,
+    keyAchievements: [],
+    experience: r.experience.map((e) => ({
+      title: e.title,
+      company: e.company,
+      period: e.period,
+      highlights: e.bullets,
+    })) as AppResumeData['experience'],
+    certifications: r.certifications.map((c) => ({
+      name: c.name,
+      issuer: c.issuer,
+      year: c.year,
+    })) as AppResumeData['certifications'],
+    skills: r.skills.map((s) => ({
+      category: s.category,
+      skills: s.skills.split(',').map((t) => t.trim()).filter(Boolean),
+    })) as AppResumeData['skills'],
+    education: r.education.map((e) => ({
+      degree: e.degree,
+      institution: e.institution,
+      period: e.period,
+      details: e.details,
+    })) as AppResumeData['education'],
+    projects: r.projects.map((p) => ({
+      name: p.name,
+      github: p.url,
+      description: p.description,
+    })) as AppResumeData['projects'],
+    sectionOrder: r.sectionOrder,
+  }
+}
+
+/**
+ * Builder AppState → CoverLetter. Greeting + paragraphs come from the builder's
+ * edited cover; the structured signoff is preserved from the original (the builder
+ * exposes signoff only as a freetext `closing`, so we do not parse it back).
+ */
+export function builderStateToCoverLetter(
+  state: AppState,
+  fallbackSignoff: CoverLetterSignoff,
+): CoverLetter {
+  const paragraphs = state.cover.body
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+  return {
+    greeting: state.cover.greeting,
+    paragraphs,
+    signoff: fallbackSignoff,
+  }
 }
