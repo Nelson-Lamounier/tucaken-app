@@ -1,10 +1,12 @@
 "use client"
 // src/features/home/sections/Sections.tsx
 // Re-usable below-the-fold sections (Problem, HowItWorks, Comparison, Founder, Pricing, FAQ, Footer).
-import { motion } from 'motion/react'
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { MagneticButton } from '../lib/MagneticButton'
+import { Marquee } from '../lib/Marquee'
+import { KineticText } from '../lib/KineticText'
 import { problems, steps, comparison, founder, faq } from '../content'
 import { TIERS } from '@/features/billing/catalog'
 
@@ -32,17 +34,16 @@ export function ProblemSection() {
     <Section className="border-t border-white/5">
       <div className="mx-auto max-w-5xl">
         <Eyebrow>The problem</Eyebrow>
-        <h2 className="text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl">
-          You did the work. Your resume doesn't show it.
-        </h2>
+        <KineticText as="h2" text="You did the work. Your resume doesn't show it." className="text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl" />
         <div className="mt-12 grid gap-4 md:grid-cols-3">
           {problems.map((p, i) => (
             <motion.div
               key={i}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, y: 20, rotate: -1 }}
+              whileInView={{ opacity: 1, y: 0, rotate: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
+              transition={{ delay: i * 0.1, type: 'spring', stiffness: 90, damping: 15 }}
+              style={{ willChange: 'transform, opacity' }}
               className="group rounded-2xl border border-white/10 bg-white/[0.02] p-6 transition-colors hover:border-teal-500/30"
             >
               <div className="font-mono text-[10px] uppercase tracking-widest text-teal-400">Reality</div>
@@ -63,15 +64,16 @@ export function HowItWorksSection() {
     <Section id="how" className="border-t border-white/5">
       <div className="mx-auto max-w-5xl">
         <Eyebrow>How it works</Eyebrow>
-        <h2 className="text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl">Three steps. No magic.</h2>
+        <KineticText as="h2" text="Three steps. No magic." className="text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl" />
         <div className="mt-12 grid gap-6 md:grid-cols-3">
           {steps.map((s, i) => (
             <motion.div
               key={s.n}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, x: -28 }}
+              whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: i * 0.12 }}
+              transition={{ delay: i * 0.12, type: 'spring', stiffness: 90, damping: 16 }}
+              style={{ willChange: 'transform, opacity' }}
               className={[
                 'relative rounded-2xl border p-6',
                 'emp' in s && s.emp ? 'border-teal-500/40 bg-gradient-to-br from-teal-500/10 to-emerald-600/5' : 'border-white/10 bg-white/[0.02]',
@@ -99,18 +101,21 @@ export function ComparisonSection() {
     <Section className="border-t border-white/5">
       <div className="mx-auto max-w-5xl">
         <Eyebrow>Why Tucaken</Eyebrow>
-        <h2 className="text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl">
-          What other AI resume tools can't say.
-        </h2>
+        <KineticText as="h2" text="What other AI resume tools can't say." className="text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl" />
         <div className="mt-10 overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/50">
           <div className="grid grid-cols-12 border-b border-white/10 bg-white/[0.03] font-mono text-[11px] uppercase tracking-widest text-zinc-400">
             <div className="col-span-5 px-5 py-3">You ask</div>
             <div className="col-span-3 border-l border-white/10 px-5 py-3 text-zinc-500">Other tools</div>
-            <div className="col-span-4 border-l border-white/10 bg-teal-500/5 px-5 py-3 text-teal-300">Tucaken</div>
+            <div className="gradient-sweep-anim col-span-4 border-l border-white/10 bg-[linear-gradient(110deg,transparent,rgba(45,212,191,0.18),transparent)] px-5 py-3 text-teal-300">Tucaken</div>
           </div>
           {comparison.map((row, i) => (
-            <div
+            <motion.div
               key={i}
+              initial={{ opacity: 0, x: -16 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.06 }}
+              style={{ willChange: 'transform, opacity' }}
               className={['grid grid-cols-12 text-sm', i < comparison.length - 1 ? 'border-b border-white/5' : ''].join(' ')}
             >
               <div className="col-span-5 px-5 py-5 font-medium text-white">{row.q}</div>
@@ -119,7 +124,7 @@ export function ComparisonSection() {
                 <span className="text-teal-400">✓ </span>
                 {row.t}
               </div>
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>
@@ -128,15 +133,21 @@ export function ComparisonSection() {
 }
 
 export function FounderSection() {
+  const reduce = useReducedMotion() ?? false
   return (
     <Section className="border-t border-white/5">
       <div className="mx-auto max-w-3xl">
         <Eyebrow>Built by a user, for users</Eyebrow>
         <div className="mt-8 rounded-3xl border border-white/10 bg-gradient-to-br from-zinc-900/80 to-zinc-950/80 p-8 backdrop-blur-md md:p-10">
           <div className="flex items-start gap-5">
-            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-gradient-to-br from-teal-400 to-emerald-600 font-mono text-lg font-bold text-white">
+            <motion.div
+              animate={reduce ? undefined : { opacity: [0.85, 1, 0.85] }}
+              transition={reduce ? undefined : { duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+              style={reduce ? undefined : { willChange: 'opacity' }}
+              className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-gradient-to-br from-teal-400 to-emerald-600 font-mono text-lg font-bold text-white"
+            >
               N
-            </div>
+            </motion.div>
             <div>
               <div className="text-base font-semibold text-white">{founder.name}</div>
               <div className="font-mono text-xs text-zinc-400">{founder.role}</div>
@@ -168,9 +179,7 @@ export function PricingSection() {
       <form className="group/tiers mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center">
           <Eyebrow>Pricing</Eyebrow>
-          <h2 className="mt-3 text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl">
-            Free until it's worth paying for.
-          </h2>
+          <KineticText as="h2" text="Free until it's worth paying for." className="mt-3 text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl" />
           <p className="mx-auto mt-5 max-w-xl text-pretty text-sm text-zinc-400 md:text-base">
             Pick a tier that matches how often you ship. Switch or cancel any
             time — we prorate down to the day.
@@ -211,13 +220,19 @@ export function PricingSection() {
         {/* Tier cards */}
         <div className="isolate mx-auto mt-10 grid max-w-md grid-cols-1 gap-6 lg:mx-0 lg:max-w-none lg:grid-cols-3">
           {TIERS.map((t) => (
-            <div
+            <motion.div
               key={t.id}
               data-featured={t.highlighted ? 'true' : undefined}
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              whileHover={{ y: -6 }}
+              transition={{ type: 'spring', stiffness: 120, damping: 16 }}
+              style={{ willChange: 'transform, opacity' }}
               className="group/tier relative rounded-3xl bg-white/[0.02] p-8 ring-1 ring-white/10 data-featured:ring-2 data-featured:ring-teal-500/60 xl:p-10"
             >
               {t.highlighted && (
-                <div className="absolute -top-3 right-6 rounded-full bg-gradient-to-r from-teal-500 to-emerald-500 px-3 py-0.5 font-mono text-[10px] uppercase tracking-widest text-zinc-950">
+                <div className="gradient-sweep-anim absolute -top-3 right-6 rounded-full bg-[linear-gradient(110deg,#14b8a6,#34d399,#14b8a6)] px-3 py-0.5 font-mono text-[10px] uppercase tracking-widest text-zinc-950">
                   Recommended
                 </div>
               )}
@@ -288,7 +303,7 @@ export function PricingSection() {
                   </li>
                 ))}
               </ul>
-            </div>
+            </motion.div>
           ))}
         </div>
       </form>
@@ -316,7 +331,21 @@ export function FAQSection() {
                 <span className="font-medium text-white">{f.q}</span>
                 <span className={['font-mono text-lg text-zinc-500 transition-transform', open === i ? 'rotate-45' : ''].join(' ')}>+</span>
               </div>
-              {open === i && <p className="mt-3 text-sm leading-relaxed text-zinc-400">{f.a}</p>}
+              <AnimatePresence initial={false}>
+                {open === i ? (
+                  <motion.p
+                    key="a"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+                    style={{ overflow: 'hidden', willChange: 'opacity' }}
+                    className="mt-3 text-sm leading-relaxed text-zinc-400"
+                  >
+                    {f.a}
+                  </motion.p>
+                ) : null}
+              </AnimatePresence>
             </button>
           ))}
         </div>
@@ -326,9 +355,17 @@ export function FAQSection() {
 }
 
 export function FooterSection() {
+  const band = ['Resumes grounded in real code', 'Made in Dublin', 'Backed by your commits', 'No fabricated bullet points']
   return (
-    <footer className="border-t border-white/5 px-6 py-10 md:px-12">
-      <div className="mx-auto flex max-w-5xl flex-col items-start justify-between gap-6 md:flex-row md:items-center">
+    <footer className="border-t border-white/5">
+      <Marquee speed={30} className="border-b border-white/5 py-4 mask-[linear-gradient(to_right,transparent,white_10%,white_90%,transparent)]">
+        {band.concat(band).map((t, i) => (
+          <span key={`${t}-${i}`} className="mx-6 font-mono text-[11px] uppercase tracking-[0.18em] text-zinc-500">
+            {t} <span className="text-teal-400">·</span>
+          </span>
+        ))}
+      </Marquee>
+      <div className="mx-auto flex max-w-5xl flex-col items-start justify-between gap-6 px-6 py-10 md:flex-row md:items-center md:px-12">
         <div>
           <div className="font-mono text-sm font-semibold text-white">tucaken</div>
           <div className="mt-1 text-xs text-zinc-500">Resumes grounded in real code. Made in Dublin.</div>
