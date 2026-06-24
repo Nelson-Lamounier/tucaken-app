@@ -26,7 +26,7 @@ export function ProjectsIndex() {
   // projects ("curated") belong in the grid — raw per-repo defaults stay hidden
   // (they still enrich JD analysis server-side) and AI proposals live in the
   // review flow. See lib/classify.
-  const { curated, proposals, pending } = useMemo(() => partitionProjects(items), [items])
+  const { curated, proposals, pending, defaults } = useMemo(() => partitionProjects(items), [items])
   const filtered = useMemo(() => applyFilters(curated, filters), [curated, filters])
   const commandItems = useMemo(
     () => curated.map((p) => ({ id: p.id, name: p.name, description: p.tagline ?? PROJECT_TYPE_LABELS[p.type] })),
@@ -57,7 +57,7 @@ export function ProjectsIndex() {
     return (
       <div className="space-y-4">
         {pending.length > 0 && <PendingSection projects={pending} />}
-        <NoCuratedState proposalCount={proposals.length} repoCount={items.length - pending.length} />
+        <NoCuratedState proposalCount={proposals.length} repoCount={defaults.length} />
       </div>
     )
   }
