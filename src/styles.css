@@ -92,15 +92,17 @@
 .marquee-anim[data-reverse='true'] {
   animation-direction: reverse;
 }
-/* Auth brand-panel flowing lines. CSS-driven stroke-dashoffset (off the JS
-   main thread, so it never starves the auth form's animations) gives a light
-   segment that travels along each otherwise-static teal path. */
+/* Auth brand-panel flowing lines. Each <path> is normalised with pathLength=1,
+   so dash/offset values are on a 0..1 scale. A 70% drawn segment with a 30% gap
+   travels along the line (stroke-dashoffset), reproducing the reference's
+   flowing-draw look in pure CSS — off the JS main thread, so it never starves
+   the auth form. Per-line animationDelay (set inline) staggers it into a wave. */
 @keyframes auth-path-flow {
-  to { stroke-dashoffset: -360; }
+  to { stroke-dashoffset: -1; }
 }
 .auth-paths path {
-  stroke-dasharray: 160 110;
-  animation: auth-path-flow 8s linear infinite;
+  stroke-dasharray: 0.7 0.3;
+  animation: auth-path-flow 9s linear infinite;
 }
 @media (prefers-reduced-motion: reduce) {
   .belt-scroll-anim, .scan-sweep-anim, .item-state-anim, .pipe-pulse-anim, .node-glow-anim, .gradient-sweep-anim, .marquee-anim { animation: none !important; }
