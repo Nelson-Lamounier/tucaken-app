@@ -182,6 +182,14 @@ export async function cleanupOrphanedDefaultProjects(
   return deleted.rows.map((r) => r.id);
 }
 
+export async function countUserProjects(db: Queryable, userId: string): Promise<number> {
+    const { rows } = await db.query<{ n: string }>(
+        `SELECT COUNT(*)::text AS n FROM projects WHERE user_id = $1::uuid`,
+        [userId],
+    );
+    return Number(rows[0]?.n ?? '0');
+}
+
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 export interface ProjectSummary {
