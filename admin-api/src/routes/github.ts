@@ -55,7 +55,8 @@ import { bomFromEvidenceRows } from '../lib/sbom.js';
 import { croissantFromAggregate, type CroissantAggregateRow } from '../lib/croissant.js';
 import { reconcileRepoName } from '../lib/reconcile-repo-name.js';
 import { isSyncInFlight, tryClaimSyncSlot } from '../lib/sync-state.js';
-import { ensureDefaultProject, cleanupOrphanedDefaultProjects } from '../lib/repositories/projects.js';
+import { ensureDefaultProject, cleanupOrphanedDefaultProjects, stampProjectIntent } from '../lib/repositories/projects.js';
+import type { ProjectIntent } from '../lib/repositories/projects.js';
 import { secondsUntilNextMonthUTC } from '../lib/retry-after.js';
 import { AdminApiBindings, requireUserId } from '../lib/types.js';
 
@@ -217,10 +218,12 @@ export async function connectRepoWithDefaultProject(
     fullName: string,
     defaultBranch: string,
     githubRepoId: number,
+    intent?: ProjectIntent,
 ): Promise<void> {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
+        await client.query(`SELECT set_config('app.current_user_id', $1, true)`, [userId]);
         const r = await client.query<{ id: string }>(
             `INSERT INTO repositories (user_id, provider, full_name, default_branch, index_status, github_repo_id)
              VALUES ($1::uuid, 'github', $2, $3, 'pending', $4)
@@ -231,9 +234,10 @@ export async function connectRepoWithDefaultProject(
         );
         const repoId = r.rows[0]!.id;
         await ensureDefaultProject(client, userId, repoId, fullName);
+        if (intent) await stampProjectIntent(client, userId, fullName, intent);
         await client.query('COMMIT');
     } catch (err) {
-        await client.query('ROLLBACK');
+        await client.query('ROLLBACK').catch(() => {});
         throw err;
     } finally {
         client.release();
@@ -1065,7 +1069,7 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         const conn = await getConnection(pool, uid);
         if (!conn?.installation_id) return ctx.json({ error: 'GitHub not connected' }, 400);
 
-        let body: { repoFullName?: string; defaultBranch?: string; forceReindex?: boolean; deferSync?: boolean; enrichment?: 'premium' | 'free' };
+        let body: { repoFullName?: string; defaultBranch?: string; forceReindex?: boolean; deferSync?: boolean; enrichment?: 'premium' | 'free'; projectIntent?: 'build' | 'link' | 'none'; targetProjectId?: string };
         try { body = await ctx.req.json(); }
         catch { return ctx.json({ error: 'Body must be valid JSON' }, 400); }
 
@@ -1078,6 +1082,25 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         const enrichment    = body.enrichment === 'premium' || body.enrichment === 'free' ? body.enrichment : undefined;
         // Email from verified Cognito JWT claim — used server-side to gate the enrichment toggle.
         const callerEmail   = ctx.get('jwtPayload')?.['email'] as string | undefined;
+
+        // Parse + validate the add-time project intent.
+        // 'none' / absent → undefined (back-compat: KB-only, no project action).
+        const rawIntent = body.projectIntent;
+        let intent: ProjectIntent | undefined;
+        if (rawIntent === 'build') {
+            intent = { action: 'build' };
+        } else if (rawIntent === 'link') {
+            const target = body.targetProjectId?.trim();
+            if (!target) return ctx.json({ error: '"targetProjectId" is required when projectIntent is "link"' }, 400);
+            // Target must be a confirmed, non-archived project owned by the caller.
+            const ok = await pool.query<{ one: number }>(
+                `SELECT 1 AS one FROM projects WHERE id = $1::uuid AND user_id = $2::uuid AND is_user_confirmed = TRUE AND status <> 'archived' LIMIT 1`,
+                [target, uid],
+            );
+            if ((ok.rowCount ?? 0) === 0) return ctx.json({ error: 'targetProjectId is not a confirmed project you own' }, 400);
+            intent = { action: 'link', targetProjectId: target };
+        }
+        // 'none'/undefined → intent stays undefined (back-compat).
 
         // deferSync (onboarding queue): connect the repo as 'pending' only —
         // no quota consumed, no Job dispatched. POST /connected-repos/sync
@@ -1098,7 +1121,7 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
             if (deferId === undefined) {
                 return ctx.json({ error: 'Repository not found in your GitHub installation' }, 404);
             }
-            await connectRepoWithDefaultProject(pool, uid, repoFullName, defaultBranch, deferId);
+            await connectRepoWithDefaultProject(pool, uid, repoFullName, defaultBranch, deferId, intent);
             await markRepoPending(pool, uid, repoFullName);
             return ctx.json({ status: 'queued', repoFullName, jobName: null }, 202);
         }
@@ -1143,7 +1166,7 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
                 await decrementQuota(pool, uid).catch(() => {});
                 return ctx.json({ error: 'Repository not found in your GitHub installation' }, 404);
             }
-            await connectRepoWithDefaultProject(pool, uid, repoFullName, defaultBranch, id);
+            await connectRepoWithDefaultProject(pool, uid, repoFullName, defaultBranch, id, intent);
 
             // Race-free backstop: lost the atomic claim → a concurrent request
             // already dispatched between the fast-path read and here. Refund the

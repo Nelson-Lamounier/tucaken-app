@@ -95,6 +95,40 @@ export async function ensureDefaultProject(
   );
 }
 
+// ─── Add-time project intent ───────────────────────────────────────────────
+
+/**
+ * The caller's stated intent when adding a repo. Persisted on the repo's
+ * single_repo default project so the first ingestion Job can act on it.
+ *
+ *   build — create a standalone case study for this repo.
+ *   link  — merge the repo into an existing confirmed project.
+ */
+export type ProjectIntent = { action: 'build' } | { action: 'link'; targetProjectId: string };
+
+/**
+ * Stamp a post-sync action on a repo's single_repo DEFAULT project (matched by
+ * the slug deriveRepoSlug yields). Applied by the ingestion Job once the first
+ * sync completes. Caller owns the transaction + RLS context.
+ */
+export async function stampProjectIntent(
+  db: Queryable,
+  userId: string,
+  repoFullName: string,
+  intent: ProjectIntent,
+): Promise<void> {
+  const slug = deriveRepoSlug(repoFullName);
+  const target = intent.action === 'link' ? intent.targetProjectId : null;
+  await db.query(
+    `UPDATE projects
+        SET post_sync_action = $3,
+            post_sync_target_project_id = $4::uuid,
+            updated_at = NOW()
+      WHERE user_id = $1::uuid AND slug = $2 AND shape = 'single_repo'`,
+    [userId, slug, intent.action, target],
+  );
+}
+
 /**
  * Remove pristine single-repo DEFAULT projects that are left without any repo
  * after a repo is deleted. Scope is deliberately narrow so curated work is never
