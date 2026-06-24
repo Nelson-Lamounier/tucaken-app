@@ -92,24 +92,25 @@
 .marquee-anim[data-reverse='true'] {
   animation-direction: reverse;
 }
-/* Auth brand-panel flowing lines. Each <path> is normalised with pathLength=1,
-   so dash/offset values are on a 0..1 scale. A 70% drawn segment with a 30% gap
-   travels along the line (stroke-dashoffset), reproducing the reference's
-   flowing-draw look in pure CSS — off the JS main thread, so it never starves
-   the auth form. Per-line animationDelay (set inline) staggers it into a wave. */
-@keyframes auth-path-flow {
-  to { stroke-dashoffset: -1; }
+/* Auth brand-panel lines (reference "Background Paths" behaviour, pure CSS).
+   Each <path> is normalised with pathLength=1: it draws itself in once
+   (stroke-dashoffset 1 -> 0, dasharray = the whole 0..1 length) and then breathes
+   in opacity on a loop. No marching dash, so nothing flows in a single direction.
+   Per-line animationDelay (set inline) staggers both so the field feels organic.
+   Runs off the JS main thread, so it never starves the auth form. */
+@keyframes auth-path-draw {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes auth-path-breathe {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
 }
 .auth-paths path {
-  stroke-dasharray: 0.75 0.25;
-  /* duration is overridden per-line inline for an organic, out-of-phase field */
-  animation: auth-path-flow 16s linear infinite;
-}
-/* position={-1} set flows the opposite way, so the two mirrored sets cross */
-.auth-paths[data-flow='rev'] path {
-  animation-direction: reverse;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: auth-path-draw 2.6s ease-out forwards, auth-path-breathe 7s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
   .belt-scroll-anim, .scan-sweep-anim, .item-state-anim, .pipe-pulse-anim, .node-glow-anim, .gradient-sweep-anim, .marquee-anim { animation: none !important; }
-  .auth-paths path { animation: none !important; stroke-dasharray: none !important; }
+  .auth-paths path { animation: none !important; stroke-dashoffset: 0 !important; opacity: 1 !important; }
 }
