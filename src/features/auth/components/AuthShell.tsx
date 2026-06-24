@@ -80,16 +80,12 @@ export function AuthShell({
         </Link>
 
         <div className="w-full max-w-lg">
-          <motion.div
-            layout
-            initial={false}
-            transition={{ layout: { type: 'spring', stiffness: 420, damping: 40 } }}
+          <div
             className={[
               'relative isolate rounded-2xl border p-5 shadow-2xl shadow-black/10 backdrop-blur-xl',
               'dark:shadow-black/40',
               cardClass,
             ].join(' ')}
-            style={{ willChange: 'transform' }}
           >
             {/* Brand header */}
             <div className="mb-4 flex items-center gap-3">
@@ -187,7 +183,7 @@ export function AuthShell({
                 />
               )}
             </AnimatePresence>
-          </motion.div>
+          </div>
 
           <p className="mt-6 text-center text-[11px] text-zinc-400 dark:text-zinc-500">
             Secured by AWS Cognito &middot; SOC 2 Type II
