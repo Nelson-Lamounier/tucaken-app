@@ -38,6 +38,7 @@ import {
   advanceStatusOffAnalysis,
   deleteApplication as pgDeleteApplication,
   updateApplicationAnnotations,
+  updateApplicationCoverLetterOverride,
 } from '../lib/repositories/applications.js';
 import {
   upsertStageUserState,
@@ -464,7 +465,7 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
       // the raw tailoredResumeData blob stored in pipeline_runs.metadata.
       const analysis = rawAnalysis ? {
         analysisXml:       rawAnalysis['analysisXml'] ?? null,
-        coverLetter:       rawAnalysis['coverLetter'] ?? null,
+        coverLetter:       (application.coverLetterOverride ?? rawAnalysis['coverLetter'] ?? null),
         metadata:          rawAnalysis['metadata'] ?? null,
         resumeSuggestions: rawAnalysis['resumeSuggestions'] ?? null,
         tailoredResume:    persistedResume ?? rawAnalysis['tailoredResumeData'] ?? null,
@@ -692,6 +693,28 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
       if (!application) return ctx.json({ error: `Application not found: ${slug}` }, 404);
 
       await updateApplicationAnnotations(db, application.id, body.annotations ?? {});
+      return ctx.json({ success: true });
+    });
+  });
+
+  // ── PUT /:slug/cover-letter — persist the user's cover-letter override ──
+  app.put('/:slug/cover-letter', async (ctx) => {
+    const userId = ctx.get('userId');
+    if (!userId) return ctx.json({ error: 'Unauthorized' }, 401);
+
+    const slug = ctx.req.param('slug');
+
+    let body: { coverLetter?: unknown };
+    try { body = await ctx.req.json(); }
+    catch { return ctx.json({ error: 'Body must be valid JSON' }, 400); }
+
+    const coverLetter = (body.coverLetter ?? null) as Record<string, unknown> | null;
+
+    return withUser(getPool(config), userId, async (db) => {
+      const application = await getApplication(db, slug);
+      if (!application) return ctx.json({ error: `Application not found: ${slug}` }, 404);
+
+      await updateApplicationCoverLetterOverride(db, application.id, coverLetter);
       return ctx.json({ success: true });
     });
   });
