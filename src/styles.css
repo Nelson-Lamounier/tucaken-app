@@ -101,8 +101,13 @@
   to { stroke-dashoffset: -1; }
 }
 .auth-paths path {
-  stroke-dasharray: 0.7 0.3;
-  animation: auth-path-flow 9s linear infinite;
+  stroke-dasharray: 0.75 0.25;
+  /* duration is overridden per-line inline for an organic, out-of-phase field */
+  animation: auth-path-flow 16s linear infinite;
+}
+/* position={-1} set flows the opposite way, so the two mirrored sets cross */
+.auth-paths[data-flow='rev'] path {
+  animation-direction: reverse;
 }
 @media (prefers-reduced-motion: reduce) {
   .belt-scroll-anim, .scan-sweep-anim, .item-state-anim, .pipe-pulse-anim, .node-glow-anim, .gradient-sweep-anim, .marquee-anim { animation: none !important; }

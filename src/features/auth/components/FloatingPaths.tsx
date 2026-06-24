@@ -20,6 +20,9 @@ export function FloatingPaths({ position }: { position: number }) {
   return (
     <div className="pointer-events-none absolute inset-0">
       <svg
+        // position 1 vs -1 flow in opposite directions (see .auth-paths CSS),
+        // so the two mirrored line-sets cross instead of marching in lockstep.
+        data-flow={position > 0 ? 'fwd' : 'rev'}
         className="auth-paths h-full w-full"
         viewBox="0 0 696 316"
         fill="none"
@@ -35,7 +38,12 @@ export function FloatingPaths({ position }: { position: number }) {
             strokeOpacity={path.opacity}
             pathLength={1}
             fill="none"
-            style={{ animationDelay: `-${((path.id % 18) * 0.55).toFixed(2)}s` }}
+            style={{
+              // Per-line stagger + varied speed (index-derived, no Math.random)
+              // so lines drift out of phase and the field feels organic.
+              animationDelay: `-${((path.id % 18) * 0.6).toFixed(2)}s`,
+              animationDuration: `${(14 + (path.id % 9)).toFixed(0)}s`,
+            }}
           />
         ))}
       </svg>

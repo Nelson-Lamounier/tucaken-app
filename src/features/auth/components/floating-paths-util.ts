@@ -14,8 +14,9 @@ export function buildFloatingPaths(position: number): FloatingPath[] {
     paths.push({
       id: i,
       d: `M-${380 - (i + 1) * 5 * position} -${189 + i * 6}C-${380 - (i + 1) * 5 * position} -${189 + i * 6} -${312 - (i + 1) * 5 * position} ${216 - i * 6} ${152 - (i + 1) * 5 * position} ${343 - i * 6}C${616 - (i + 1) * 5 * position} ${470 - i * 6} ${684 - (i + 1) * 5 * position} ${875 - i * 6} ${684 - (i + 1) * 5 * position} ${875 - i * 6}`,
-      width: 0.8 + i * 0.05,
-      opacity: 0.3 + i * 0.025,
+      // Reference stroke ramp — thin lines that thicken/brighten with depth.
+      width: 0.5 + i * 0.03,
+      opacity: 0.1 + i * 0.03,
     })
   }
   return paths
