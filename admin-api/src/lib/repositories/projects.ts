@@ -95,6 +95,47 @@ export async function ensureDefaultProject(
   );
 }
 
+// --- Add-time project intent ---
+
+/**
+ * The caller's stated intent when adding a repo. Persisted on the repo's
+ * single_repo default project so the first ingestion Job can act on it.
+ *
+ *   build -- create a standalone case study for this repo.
+ *   link  -- merge the repo into an existing confirmed project.
+ */
+export type ProjectIntent = { action: 'build' } | { action: 'link'; targetProjectId: string };
+
+/**
+ * Stamp a post-sync action on a repo's single_repo DEFAULT project, matched by
+ * the REPOSITORY id (the project linked to this repo) -- not the slug, so a
+ * stale archived default sharing the slug can never be mis-stamped. Applied by
+ * the ingestion Job once the first sync completes. Caller owns the transaction
+ * + RLS context.
+ */
+export async function stampProjectIntent(
+  db: Queryable,
+  userId: string,
+  repositoryId: string,
+  intent: ProjectIntent,
+): Promise<void> {
+  const target = intent.action === 'link' ? intent.targetProjectId : null;
+  await db.query(
+    `UPDATE projects p
+        SET post_sync_action = $3,
+            post_sync_target_project_id = $4::uuid,
+            updated_at = NOW()
+       FROM project_components pc
+       JOIN project_repositories pr ON pr.project_component_id = pc.id
+      WHERE pc.project_id = p.id
+        AND pr.repository_id = $2::uuid
+        AND p.user_id = $1::uuid
+        AND p.shape = 'single_repo'
+        AND p.status <> 'archived'`,
+    [userId, repositoryId, intent.action, target],
+  );
+}
+
 /**
  * Remove pristine single-repo DEFAULT projects that are left without any repo
  * after a repo is deleted. Scope is deliberately narrow so curated work is never
@@ -171,6 +212,8 @@ export interface ProjectSummary {
      * Derived (not stored): see `isCaseStudyStale`.
      */
     case_study_stale:         boolean;
+    /** Add-time intent action waiting for the first ingestion to apply. */
+    post_sync_action:         string | null;
 }
 
 export interface ProjectDetail extends ProjectSummary {
@@ -326,6 +369,7 @@ export async function listProjects(db: Queryable, options: ListProjectsOptions):
             p.is_ai_suggested, p.is_user_confirmed,
             p.case_study_status,
             p.case_study_generated_at,
+            p.post_sync_action,
             p.last_activity_at,
             p.started_at,
             p.ended_at,

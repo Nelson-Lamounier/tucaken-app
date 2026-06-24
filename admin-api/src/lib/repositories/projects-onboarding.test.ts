@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { deriveRepoSlug, ensureDefaultProject, archiveSupersededDefaults, cleanupOrphanedDefaultProjects } from './projects.js';
+import { deriveRepoSlug, ensureDefaultProject, archiveSupersededDefaults, cleanupOrphanedDefaultProjects, stampProjectIntent } from './projects.js';
 import type { Queryable } from '../pg.js';
 
 describe('deriveRepoSlug', () => {
@@ -107,6 +107,29 @@ describe('cleanupOrphanedDefaultProjects', () => {
     expect(del.sql).toMatch(/case_study_status\s+IS\s+NULL/i);
     expect(del.sql).toMatch(/NOT EXISTS/i);
     expect(del.params).toEqual(['user-1', ['p-1']]);
+  });
+});
+
+describe('stampProjectIntent', () => {
+  function db(capture: { sql: string; params: readonly unknown[] }[]) {
+    return { query: async (sql: string, params: readonly unknown[] = []) => { capture.push({ sql, params }); return { rows: [], rowCount: 1 }; } } as unknown as import('../pg.js').Queryable;
+  }
+  it('build: stamps post_sync_action=build on the single_repo default keyed by repository id', async () => {
+    const calls: { sql: string; params: readonly unknown[] }[] = [];
+    await stampProjectIntent(db(calls), 'user-1', 'repo-id-1', { action: 'build' });
+    const u = calls.find(c => /UPDATE projects/i.test(c.sql))!;
+    expect(u.sql).toMatch(/post_sync_action\s*=\s*\$/i);
+    expect(u.sql).toMatch(/shape\s*=\s*'single_repo'/i);
+    // Matched by the repository id (joined via project_repositories), not the slug.
+    expect(u.sql).toMatch(/pr\.repository_id\s*=\s*\$2/i);
+    expect(u.sql).not.toMatch(/slug\s*=/i);
+    expect(u.params).toEqual(['user-1', 'repo-id-1', 'build', null]);
+  });
+  it('link: stores the target project id, still keyed by repository id', async () => {
+    const calls: { sql: string; params: readonly unknown[] }[] = [];
+    await stampProjectIntent(db(calls), 'user-1', 'repo-id-1', { action: 'link', targetProjectId: 'proj-9' });
+    const u = calls.find(c => /UPDATE projects/i.test(c.sql))!;
+    expect(u.params).toEqual(['user-1', 'repo-id-1', 'link', 'proj-9']);
   });
 });
 

@@ -3,12 +3,15 @@ import { useQuery } from '@tanstack/react-query'
 import { Loader2, GitBranch, Search } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { EnrichmentModal } from './EnrichmentModal'
+import { ProjectIntentModal } from './ProjectIntentModal'
+import type { ProjectIntentChoice } from './ProjectIntentModal'
 import { GitHubRepoChip } from './GitHubRepoChip'
 import { UpgradeLimitBanner } from './UpgradeLimitBanner'
 import { useGitHubIngestion } from '../hooks/use-github-ingestion'
 import { useGitHubQueueRepo } from '../hooks/use-github-queue-repo'
 import { adminKeys } from '@/lib/api/query-keys'
 import { getMeFn } from '@/server/me'
+import { projectsQueries } from '@/features/projects/server/queries'
 import type { GitHubAccessibleRepo, ConnectedRepo } from '@/lib/types/github.types'
 
 const PAGE_SIZE = 10
@@ -37,6 +40,18 @@ export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos, m
   const me = useQuery({ queryKey: adminKeys.me.detail(), queryFn: getMeFn })
   const canToggle = (me.data?.enrichmentToggle ?? false) && mode === 'sync'
   const [pendingAdd, setPendingAdd] = useState<{ repoFullName: string; defaultBranch: string } | null>(null)
+  const [pendingIntent, setPendingIntent] = useState<{ repoFullName: string; defaultBranch: string; enrichment?: 'premium' | 'free' } | null>(null)
+
+  // Confirmed projects for the link-to-existing picker in ProjectIntentModal.
+  // is_user_confirmed === true is the same predicate used by isCurated in classify.ts.
+  const projectsQuery = useQuery(projectsQueries.list({ limit: 100, offset: 0 }))
+  const confirmedProjects = useMemo(
+    () =>
+      (projectsQuery.data?.items ?? [])
+        .filter((p) => p.is_user_confirmed === true)
+        .map((p) => ({ id: p.id, name: p.name })),
+    [projectsQuery.data],
+  )
 
   // In queue mode the cap applies to QUEUED (pending) repos only; in sync
   // mode it's the total connected count (Settings behaviour unchanged).
@@ -66,10 +81,21 @@ export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos, m
   const visible = filtered.slice(0, visibleCount)
   const remaining = filtered.length - visibleCount
 
-  const doAdd = (fullName: string, defaultBranch: string, enrichment?: 'premium' | 'free') => {
+  const doAdd = (
+    fullName: string,
+    defaultBranch: string,
+    enrichment?: 'premium' | 'free',
+    intent?: { projectIntent: 'build' | 'link' | 'none'; targetProjectId?: string },
+  ) => {
     setQueuingRepos((prev) => new Set(prev).add(fullName))
     ingestion.mutate(
-      { repoFullName: fullName, defaultBranch, enrichment },
+      {
+        repoFullName: fullName,
+        defaultBranch,
+        enrichment,
+        projectIntent:   intent?.projectIntent,
+        targetProjectId: intent?.targetProjectId,
+      },
       {
         onSettled: () => {
           setQueuingRepos((prev) => {
@@ -83,12 +109,12 @@ export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos, m
   }
 
   const handleAdd = (fullName: string, defaultBranch: string) => {
-    // Allowlisted test users choose the enrichment tier before the add runs;
-    // everyone else adds directly (no enrichment field, server default).
+    // Allowlisted test users choose the enrichment tier first; then both paths
+    // continue to ProjectIntentModal so intent is always captured on Add.
     if (canToggle) {
       setPendingAdd({ repoFullName: fullName, defaultBranch })
     } else {
-      doAdd(fullName, defaultBranch)
+      setPendingIntent({ repoFullName: fullName, defaultBranch })
     }
   }
 
@@ -96,7 +122,19 @@ export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos, m
     if (!pendingAdd) return
     const { repoFullName, defaultBranch } = pendingAdd
     setPendingAdd(null)
-    doAdd(repoFullName, defaultBranch, choice)
+    // Carry the enrichment choice forward into the intent modal (shown next).
+    setPendingIntent({ repoFullName, defaultBranch, enrichment: choice })
+  }
+
+  const handleIntentChoice = (choice: ProjectIntentChoice) => {
+    if (!pendingIntent) return
+    const { repoFullName, defaultBranch, enrichment } = pendingIntent
+    setPendingIntent(null)
+    if (choice.intent === 'link') {
+      doAdd(repoFullName, defaultBranch, enrichment, { projectIntent: 'link', targetProjectId: choice.targetProjectId })
+    } else {
+      doAdd(repoFullName, defaultBranch, enrichment, { projectIntent: choice.intent })
+    }
   }
 
   return (
@@ -105,6 +143,12 @@ export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos, m
         open={pendingAdd !== null}
         onChoose={handleEnrichmentChoice}
         onClose={() => setPendingAdd(null)}
+      />
+      <ProjectIntentModal
+        open={pendingIntent !== null}
+        projects={confirmedProjects}
+        onChoose={handleIntentChoice}
+        onClose={() => setPendingIntent(null)}
       />
 
       {ingestion.needsUpgrade && (

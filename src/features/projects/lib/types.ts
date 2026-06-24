@@ -25,6 +25,8 @@ export interface ProjectSummary {
   is_user_confirmed: boolean
   case_study_status: CaseStudyStatus | null
   case_study_generated_at: string | null
+  /** Add-time intent action waiting for the first ingestion to apply. */
+  post_sync_action: string | null
   last_activity_at: string | null
   started_at: string | null
   ended_at: string | null

@@ -10,6 +10,9 @@ interface IngestionVariables {
   readonly forceReindex?: boolean
   /** Enrichment tier for allowlisted test users; omitted otherwise. */
   readonly enrichment?: 'premium' | 'free'
+  /** Project intent captured at add-time: build a new project, link to existing, or kb-only. */
+  readonly projectIntent?: 'build' | 'link' | 'none'
+  readonly targetProjectId?: string
 }
 
 export function useGitHubIngestion() {
