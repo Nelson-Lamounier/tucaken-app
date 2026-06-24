@@ -186,12 +186,19 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
     const applicationId = randomUUID();
     const pipelineRunId = randomUUID();
 
-    return withUser(getPool(config), userId, async (db) => {
+    const pool = getPool(config);
+
+    return withUser(pool, userId, async (db) => {
       // ── Quota guard: enforce per-plan monthly resume-generation limit ──────
-      const planStatus = await getUserPlanStatus(db, userId);
+      // Run plan-status read and quota writes on the superuser pool (pool), not
+      // the RLS-scoped tucaken_app connection (db). Every other caller of
+      // getUserPlanStatus uses the superuser pool; the ingestion quota likewise
+      // runs on the raw pool. The quota SQL scopes by user_id=$1 explicitly, so
+      // RLS is not needed for correctness here.
+      const planStatus = await getUserPlanStatus(pool, userId);
       const role = planStatus?.role ?? null;
       const cap = entitlementsFor(planStatus?.effectivePlan ?? 'free', role).resumesPerMonth;
-      const allowed = await checkAndIncrementResumeQuota(db, userId, cap);
+      const allowed = await checkAndIncrementResumeQuota(pool, userId, cap);
       if (!allowed) {
         ctx.header('Retry-After', String(secondsUntilNextMonthUTC()));
         return ctx.json({
@@ -216,7 +223,7 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
         });
       } catch (err: unknown) {
         console.error('[pipelines/strategist-job] failed to insert job_application', err);
-        await decrementResumeQuota(db, userId).catch(() => {});
+        await decrementResumeQuota(pool, userId).catch(() => {});
         return ctx.json({ error: 'Failed to create application record' }, 500);
       }
 
@@ -253,7 +260,7 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
         });
       } catch (err: unknown) {
         console.error('[pipelines/strategist-job] failed to insert pipeline_run', err);
-        await decrementResumeQuota(db, userId).catch(() => {});
+        await decrementResumeQuota(pool, userId).catch(() => {});
         return ctx.json({ error: 'Failed to record pipeline run' }, 500);
       }
 
@@ -292,7 +299,7 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
       try { await getBatchApi().createNamespacedJob({ namespace: config.strategistPipelineNamespace, body: job }); }
       catch (err: unknown) {
         console.error('[pipelines/strategist-job] failed to create K8s Job', err);
-        await decrementResumeQuota(db, userId).catch(() => {});
+        await decrementResumeQuota(pool, userId).catch(() => {});
         return ctx.json({ error: 'Failed to schedule pipeline Job' }, 502);
       }
 
