@@ -19,6 +19,7 @@ import type {
   ApplicationStatus,
   ApplicationDetail,
   ScheduledInterview,
+  CoverLetter,
 } from '@/lib/types/applications.types'
 import type { ResumeData } from '@/lib/resumes/resume-data'
 import { requireAuth } from './auth-guard'
@@ -206,6 +207,7 @@ export interface TailoredResumeSummary {
   readonly targetRole: string
   readonly updatedAt: string
   readonly data: ResumeData
+  readonly coverLetter: CoverLetter | null
 }
 
 /**
@@ -247,6 +249,7 @@ export const getTailoredResumesFn = createServerFn({ method: 'GET' }).handler(as
         targetRole: candidates[i].targetRole,
         updatedAt: candidates[i].updatedAt,
         data: result.value.application.analysis.tailoredResume,
+        coverLetter: result.value.application.analysis.coverLetter ?? null,
       })
     }
   })
@@ -255,3 +258,46 @@ export const getTailoredResumesFn = createServerFn({ method: 'GET' }).handler(as
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
   )
 })
+
+// =============================================================================
+// Cover Letter Override
+// =============================================================================
+
+const coverLetterSchema = z.object({
+  greeting: z.string(),
+  paragraphs: z.array(z.string()),
+  signoff: z.object({
+    name: z.string(),
+    email: z.string(),
+    linkedin: z.string(),
+    github: z.string(),
+  }),
+})
+
+export const updateCoverLetterSchema = z.object({
+  slug: z.string().min(1),
+  coverLetter: coverLetterSchema.nullable(),
+})
+
+/**
+ * Persists a cover-letter override (or clears it with `null`) for an application.
+ *
+ * @param data.slug - The application slug
+ * @param data.coverLetter - Structured cover letter to persist, or `null` to clear
+ * @returns Success indicator
+ */
+export const updateApplicationCoverLetterFn = createServerFn({ method: 'POST' })
+  .inputValidator(updateCoverLetterSchema)
+  .handler(async ({ data }) => {
+    await requireAuth()
+
+    await apiFetch<{ success: boolean }>(
+      `/applications/${encodeURIComponent(data.slug)}/cover-letter`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ coverLetter: data.coverLetter }),
+        pathTemplate: '/applications/:slug/cover-letter',
+      },
+    )
+    return { success: true }
+  })
