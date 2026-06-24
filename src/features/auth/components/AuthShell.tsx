@@ -1,43 +1,10 @@
 "use client"
 // src/features/auth/components/AuthShell.tsx
-import { useState, useEffect, useRef, type ReactNode } from 'react'
-import { motion, LayoutGroup, useReducedMotion } from 'motion/react'
+import { useState, useEffect, type ReactNode } from 'react'
+import { motion, LayoutGroup } from 'motion/react'
 import { ChevronLeft } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { AuthBrandPanel } from './AuthBrandPanel'
-
-/**
- * Smoothly animates its own height to fit the active child. Used to wrap the
- * sign-in/sign-up form swap so switching tabs tweens the card height (no scale
- * distortion, no spring overshoot) — only the form area resizes, and the rest
- * of the card stays put. A ResizeObserver tracks the measured content height.
- */
-function AnimateHeight({ children }: { children: ReactNode }) {
-  const innerRef = useRef<HTMLDivElement>(null)
-  const [height, setHeight] = useState<number | 'auto'>('auto')
-  const reduce = useReducedMotion() ?? false
-
-  useEffect(() => {
-    const el = innerRef.current
-    if (!el) return
-    const observer = new ResizeObserver(() => setHeight(el.offsetHeight))
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
-
-  return (
-    <motion.div
-      initial={false}
-      animate={{ height }}
-      transition={reduce ? { duration: 0 } : { duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-      style={{ overflow: 'hidden' }}
-    >
-      <div ref={innerRef} className="relative">
-        {children}
-      </div>
-    </motion.div>
-  )
-}
 import logoTeal from '@/images/logo-horizontal-resume-flat-teal.png'
 import { SignInForm } from './SignInForm'
 import { SignUpForm } from './SignUpForm'
@@ -155,8 +122,7 @@ export function AuthShell({
               </LayoutGroup>
             )}
 
-            <AnimateHeight>
-              {view === 'signin' && (
+            {view === 'signin' && (
                 <SignInForm
                   key="signin"
                   onSwitchToSignUp={() => setView('signup')}
@@ -215,7 +181,6 @@ export function AuthShell({
                   onConfirm={(code) => onConfirmSignUp?.(email, code, password) ?? Promise.resolve()}
                 />
               )}
-            </AnimateHeight>
           </div>
 
           <p className="mt-6 text-center text-[11px] text-zinc-400 dark:text-zinc-500">
