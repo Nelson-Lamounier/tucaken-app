@@ -4,7 +4,6 @@ import { useState, useEffect, type ReactNode } from 'react'
 import { AnimatePresence, motion, LayoutGroup } from 'motion/react'
 import { ChevronLeft } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
-import { AuthBackground } from './AuthBackground'
 import { AuthBrandPanel } from './AuthBrandPanel'
 import logoTeal from '@/images/logo-horizontal-resume-flat-teal.png'
 import { SignInForm } from './SignInForm'
@@ -65,19 +64,11 @@ export function AuthShell({
         : 'bg-zinc-950/60 border-white/10 text-zinc-100'
 
   return (
-    <main className="relative min-h-screen w-full overflow-hidden lg:grid lg:grid-cols-2">
-      <AuthBackground variant={variant} />
+    <main className="relative min-h-screen w-full overflow-x-hidden bg-zinc-950 lg:grid lg:grid-cols-2">
       <AuthBrandPanel />
 
+      {/* Form column — flat background, no effect (effect lives only on the brand panel) */}
       <div className="relative flex min-h-screen flex-col items-center justify-center px-4 py-10">
-        {/* Right-column radial wash (teal), behind the card */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 -z-10 opacity-60"
-        >
-          <div className="absolute right-0 top-0 h-160 w-88 -translate-y-1/3 rounded-full bg-[radial-gradient(50%_50%_at_50%_50%,oklch(0.72_0.14_175/0.12),transparent_80%)]" />
-        </div>
-
         <Link
           to="/"
           className="absolute left-5 top-6 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-zinc-400 transition-colors hover:text-white"
@@ -92,7 +83,7 @@ export function AuthShell({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
             className={[
-              'relative overflow-hidden rounded-3xl border p-7 shadow-2xl shadow-black/10 backdrop-blur-xl',
+              'relative max-h-[calc(100dvh-5rem)] overflow-y-auto rounded-3xl border p-7 shadow-2xl shadow-black/10 backdrop-blur-xl',
               'dark:shadow-black/40',
               cardClass,
             ].join(' ')}

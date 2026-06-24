@@ -9,7 +9,7 @@ export function AuthBrandPanel() {
   return (
     <div className="relative hidden h-full flex-col overflow-hidden border-r border-white/10 bg-zinc-950 p-10 lg:flex">
       {/* FloatingPaths inherit teal via the text colour here */}
-      <div className="absolute inset-0 text-teal-400/40">
+      <div className="absolute inset-0 text-teal-300/70">
         <FloatingPaths position={1} />
         <FloatingPaths position={-1} />
       </div>
