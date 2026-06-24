@@ -54,6 +54,7 @@ function makeProject(overrides: Partial<ProjectSummary> = {}): ProjectSummary {
     repository_count:        1,
     latest_repo_sync_at:     null,
     case_study_stale:        false,
+    post_sync_action:        null,
     ...overrides,
   }
 }

@@ -211,6 +211,8 @@ export interface ProjectSummary {
      * Derived (not stored): see `isCaseStudyStale`.
      */
     case_study_stale:         boolean;
+    /** Add-time intent action waiting for the first ingestion to apply. */
+    post_sync_action:         string | null;
 }
 
 export interface ProjectDetail extends ProjectSummary {
@@ -366,6 +368,7 @@ export async function listProjects(db: Queryable, options: ListProjectsOptions):
             p.is_ai_suggested, p.is_user_confirmed,
             p.case_study_status,
             p.case_study_generated_at,
+            p.post_sync_action,
             p.last_activity_at,
             p.started_at,
             p.ended_at,

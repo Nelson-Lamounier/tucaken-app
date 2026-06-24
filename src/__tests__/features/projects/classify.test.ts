@@ -3,6 +3,7 @@ import {
   isCurated,
   isProposal,
   isRepoDefault,
+  isPendingSetup,
   partitionProjects,
 } from '@/features/projects/lib/classify'
 import type { ProjectSummary } from '@/features/projects/lib/types'
@@ -22,6 +23,7 @@ function project(p: Partial<ProjectSummary> & { id: string }): ProjectSummary {
     is_user_confirmed: false,
     case_study_status: null,
     case_study_generated_at: null,
+    post_sync_action: null,
     last_activity_at: null,
     started_at: null,
     ended_at: null,
@@ -34,10 +36,11 @@ function project(p: Partial<ProjectSummary> & { id: string }): ProjectSummary {
   }
 }
 
-const repoDefault = project({ id: 'repo-default' }) // !ai, !confirmed
-const proposal    = project({ id: 'proposal', is_ai_suggested: true })       // ai, !confirmed
-const confirmed   = project({ id: 'confirmed', is_user_confirmed: true })    // confirmed (manual/merge)
-const acceptedAI  = project({ id: 'accepted', is_ai_suggested: true, is_user_confirmed: true })
+const repoDefault   = project({ id: 'repo-default' }) // !ai, !confirmed, no intent
+const proposal      = project({ id: 'proposal', is_ai_suggested: true })       // ai, !confirmed
+const confirmed     = project({ id: 'confirmed', is_user_confirmed: true })    // confirmed (manual/merge)
+const acceptedAI    = project({ id: 'accepted', is_ai_suggested: true, is_user_confirmed: true })
+const pendingBuild  = project({ id: 'pending-build', post_sync_action: 'build' })  // default + pending intent
 
 describe('project classification', () => {
   it('a raw per-repo default is a default, not curated or a proposal', () => {
@@ -59,7 +62,7 @@ describe('project classification', () => {
   })
 
   it('partitionProjects splits into mutually-exclusive buckets', () => {
-    const { curated, proposals, defaults } = partitionProjects([
+    const { curated, proposals, pending, defaults } = partitionProjects([
       repoDefault,
       proposal,
       confirmed,
@@ -67,10 +70,31 @@ describe('project classification', () => {
     ])
     expect(curated.map((p) => p.id)).toEqual(['confirmed', 'accepted'])
     expect(proposals.map((p) => p.id)).toEqual(['proposal'])
+    expect(pending.map((p) => p.id)).toEqual([])
     expect(defaults.map((p) => p.id)).toEqual(['repo-default'])
   })
 
   it('partitions an empty list into empty buckets', () => {
-    expect(partitionProjects([])).toEqual({ curated: [], proposals: [], defaults: [] })
+    expect(partitionProjects([])).toEqual({ curated: [], proposals: [], pending: [], defaults: [] })
+  })
+})
+
+describe('isPendingSetup', () => {
+  it('a repo default with post_sync_action="build" is pending setup', () => {
+    expect(isPendingSetup(pendingBuild)).toBe(true)
+  })
+
+  it('a plain repo default with no intent is not pending setup', () => {
+    expect(isPendingSetup(repoDefault)).toBe(false)
+  })
+
+  it('a confirmed project with no intent is not pending setup', () => {
+    expect(isPendingSetup(confirmed)).toBe(false)
+  })
+
+  it('partitionProjects routes a pending-intent default into pending, not defaults', () => {
+    const { pending, defaults } = partitionProjects([repoDefault, pendingBuild])
+    expect(pending.map((p) => p.id)).toEqual(['pending-build'])
+    expect(defaults.map((p) => p.id)).toEqual(['repo-default'])
   })
 })

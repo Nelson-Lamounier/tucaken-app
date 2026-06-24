@@ -29,6 +29,7 @@ function summary(id: string, name: string): ProjectSummary {
     last_activity_at: now, started_at: null, ended_at: null,
     created_at: now, updated_at: now, repository_count: 1,
     latest_repo_sync_at: null, case_study_stale: false,
+    post_sync_action: null,
   }
 }
 

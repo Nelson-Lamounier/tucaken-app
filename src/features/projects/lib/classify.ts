@@ -38,24 +38,37 @@ export function isRepoDefault(p: ProjectSummary): boolean {
   return p.is_ai_suggested === false && p.is_user_confirmed === false
 }
 
+/**
+ * A per-repo default still carrying an Add-time intent (build/link) that the
+ * ingestion Job has not yet applied -- surface it as an actionable card so the
+ * user can see the project is being set up, instead of it being hidden.
+ */
+export function isPendingSetup(p: ProjectSummary): boolean {
+  return isRepoDefault(p) && p.post_sync_action != null
+}
+
 export interface PartitionedProjects {
-  /** User-confirmed projects — rendered in the grid. */
+  /** User-confirmed projects -- rendered in the grid. */
   readonly curated: ProjectSummary[]
   /** AI proposals awaiting review. */
   readonly proposals: ProjectSummary[]
-  /** Raw per-repo defaults available to fold into a curated project. */
+  /** Per-repo defaults with a pending Add-time intent (build/link) -- shown as setup cards. */
+  readonly pending: ProjectSummary[]
+  /** Raw per-repo defaults with no pending action -- hidden substrate. */
   readonly defaults: ProjectSummary[]
 }
 
-/** Split a project list into the three lifecycle buckets (mutually exclusive). */
+/** Split a project list into the four lifecycle buckets (mutually exclusive). */
 export function partitionProjects(items: readonly ProjectSummary[]): PartitionedProjects {
   const curated: ProjectSummary[] = []
   const proposals: ProjectSummary[] = []
+  const pending: ProjectSummary[] = []
   const defaults: ProjectSummary[] = []
   for (const p of items) {
     if (isCurated(p)) curated.push(p)
     else if (isProposal(p)) proposals.push(p)
+    else if (isPendingSetup(p)) pending.push(p)
     else defaults.push(p)
   }
-  return { curated, proposals, defaults }
+  return { curated, proposals, pending, defaults }
 }

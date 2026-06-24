@@ -7,6 +7,7 @@ import { projectsQueries } from '../../server/queries'
 import { PROJECT_TYPE_LABELS, type ProjectSummary } from '../../lib/types'
 import { partitionProjects } from '../../lib/classify'
 import { ProjectCard } from './ProjectCard'
+import { PendingProjectCard } from './PendingProjectCard'
 import { ProjectFilterBar, type ProjectFilterValue } from './ProjectFilterBar'
 
 const DEFAULT_FILTERS: ProjectFilterValue = { type: 'all', status: 'all' }
@@ -25,7 +26,7 @@ export function ProjectsIndex() {
   // projects ("curated") belong in the grid — raw per-repo defaults stay hidden
   // (they still enrich JD analysis server-side) and AI proposals live in the
   // review flow. See lib/classify.
-  const { curated, proposals, defaults } = useMemo(() => partitionProjects(items), [items])
+  const { curated, proposals, pending } = useMemo(() => partitionProjects(items), [items])
   const filtered = useMemo(() => applyFilters(curated, filters), [curated, filters])
   const commandItems = useMemo(
     () => curated.map((p) => ({ id: p.id, name: p.name, description: p.tagline ?? PROJECT_TYPE_LABELS[p.type] })),
@@ -50,9 +51,15 @@ export function ProjectsIndex() {
   if (items.length === 0) return <EmptyState />
 
   // Repos are synced but the user hasn't curated any project yet. Guide them to
-  // the right next step instead of showing the raw per-repo defaults.
+  // the right next step. If there are pending-setup projects, surface them so
+  // the user knows setup is in progress rather than seeing nothing.
   if (curated.length === 0) {
-    return <NoCuratedState proposalCount={proposals.length} repoCount={defaults.length} />
+    return (
+      <div className="space-y-4">
+        {pending.length > 0 && <PendingSection projects={pending} />}
+        <NoCuratedState proposalCount={proposals.length} repoCount={items.length - pending.length} />
+      </div>
+    )
   }
 
   return (
@@ -66,6 +73,8 @@ export function ProjectsIndex() {
       />
 
       {proposals.length > 0 && <ProposalsBanner count={proposals.length} />}
+
+      {pending.length > 0 && <PendingSection projects={pending} />}
 
       <ProjectFilterBar
         value={filters}
@@ -82,6 +91,22 @@ export function ProjectsIndex() {
           ))}
         </ul>
       )}
+    </div>
+  )
+}
+
+/** A strip of in-progress setup cards shown above the main grid or guidance. */
+function PendingSection({ projects }: { readonly projects: ProjectSummary[] }) {
+  return (
+    <div>
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
+        Finishing setup
+      </p>
+      <ul role="list" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {projects.map((p) => (
+          <PendingProjectCard key={p.id} project={p} />
+        ))}
+      </ul>
     </div>
   )
 }
