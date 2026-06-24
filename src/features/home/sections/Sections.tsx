@@ -1,7 +1,7 @@
 "use client"
 // src/features/home/sections/Sections.tsx
 // Re-usable below-the-fold sections (Problem, HowItWorks, Comparison, Founder, Pricing, FAQ, Footer).
-import { motion, useReducedMotion } from 'motion/react'
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { MagneticButton } from '../lib/MagneticButton'
@@ -178,9 +178,7 @@ export function PricingSection() {
       <form className="group/tiers mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center">
           <Eyebrow>Pricing</Eyebrow>
-          <h2 className="mt-3 text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl">
-            Free until it's worth paying for.
-          </h2>
+          <KineticText as="h2" text="Free until it's worth paying for." className="mt-3 text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl" />
           <p className="mx-auto mt-5 max-w-xl text-pretty text-sm text-zinc-400 md:text-base">
             Pick a tier that matches how often you ship. Switch or cancel any
             time — we prorate down to the day.
@@ -221,13 +219,19 @@ export function PricingSection() {
         {/* Tier cards */}
         <div className="isolate mx-auto mt-10 grid max-w-md grid-cols-1 gap-6 lg:mx-0 lg:max-w-none lg:grid-cols-3">
           {TIERS.map((t) => (
-            <div
+            <motion.div
               key={t.id}
               data-featured={t.highlighted ? 'true' : undefined}
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              whileHover={{ y: -6 }}
+              transition={{ type: 'spring', stiffness: 120, damping: 16 }}
+              style={{ willChange: 'transform, opacity' }}
               className="group/tier relative rounded-3xl bg-white/[0.02] p-8 ring-1 ring-white/10 data-featured:ring-2 data-featured:ring-teal-500/60 xl:p-10"
             >
               {t.highlighted && (
-                <div className="absolute -top-3 right-6 rounded-full bg-gradient-to-r from-teal-500 to-emerald-500 px-3 py-0.5 font-mono text-[10px] uppercase tracking-widest text-zinc-950">
+                <div className="gradient-sweep-anim absolute -top-3 right-6 rounded-full bg-[linear-gradient(110deg,#14b8a6,#34d399,#14b8a6)] px-3 py-0.5 font-mono text-[10px] uppercase tracking-widest text-zinc-950">
                   Recommended
                 </div>
               )}
@@ -298,7 +302,7 @@ export function PricingSection() {
                   </li>
                 ))}
               </ul>
-            </div>
+            </motion.div>
           ))}
         </div>
       </form>
@@ -326,7 +330,21 @@ export function FAQSection() {
                 <span className="font-medium text-white">{f.q}</span>
                 <span className={['font-mono text-lg text-zinc-500 transition-transform', open === i ? 'rotate-45' : ''].join(' ')}>+</span>
               </div>
-              {open === i && <p className="mt-3 text-sm leading-relaxed text-zinc-400">{f.a}</p>}
+              <AnimatePresence initial={false}>
+                {open === i ? (
+                  <motion.p
+                    key="a"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+                    style={{ overflow: 'hidden', willChange: 'opacity' }}
+                    className="mt-3 text-sm leading-relaxed text-zinc-400"
+                  >
+                    {f.a}
+                  </motion.p>
+                ) : null}
+              </AnimatePresence>
             </button>
           ))}
         </div>
