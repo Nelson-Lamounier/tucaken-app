@@ -47,6 +47,7 @@ export function createMeRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
     const plan = await getUserPlanStatus(getPool(config), userId);
 
     return ctx.json({
+      // Generated users.id (UUID), returned at onboarding (isNew=true) so the client persists the user identity.
       id:        userId,
       email:     payload['email']   as string,
       abFreeTier:        isFreeTierAllowed(payload['email'] as string | undefined),
