@@ -609,8 +609,9 @@ describe('POST /connected-repos', () => {
     it('inserts repo, marks pending, generates token, dispatches Job', async () => {
         seedQuery([connectedRow]);       // 1. getConnection
         seedQuery([]);                   // 2. isSyncInFlight SELECT (empty → not in flight)
-        seedQuery([]);                   // 3. plan SELECT (empty rows → defaults to 'free')
-        seedQuery([{ count: 1 }]);       // 4. quota INSERT…RETURNING: count=1 → allowed
+        seedQuery([{ plan: 'pro', role: 'user', trial_started_at: null, trial_ends_at: null, subscription_status: 'active', stripe_customer_id: null, stripe_subscription_id: null, cancel_at_period_end: false, current_period_end: null, effective_plan: 'pro', trial_days_remaining: null }]); // 3. getUserPlanStatus → pro plan (unlimited repos)
+        // 4. quota INSERT SKIPPED — pro plan has Infinity limit, checkAndIncrementQuota returns true immediately
+        seedQuery([{ one: 1 }]);         // 4. repoAlreadyConnected SELECT → already connected (skips countConnectedRepos)
         seedQuery([{ repo_full_name: 'Nelson-Lamounier/cdk-monitoring' }]); // 5. tryClaimSyncSlot → claim won
         // The repo INSERT now runs inside connectRepoWithDefaultProject on a
         // dedicated transaction client (BEGIN/INSERT…RETURNING/guard/COMMIT) — it
@@ -632,11 +633,11 @@ describe('POST /connected-repos', () => {
         expect(body.jobName).toMatch(/^ingestion-/);
         expect(body.jobName.length).toBeLessThanOrEqual(63);
 
-        // getConnection (1) + isSyncInFlight SELECT (1) + plan SELECT (1)
-        // + quota INSERT…RETURNING (1, atomic) + tryClaimSyncSlot (1)
+        // getConnection (1) + isSyncInFlight (1) + getUserPlanStatus (1)
+        // + repoAlreadyConnected SELECT (1) + tryClaimSyncSlot (1)
         // + markSyncTriggered (1) + github_repo_id lookup ×2 (ingestion +
-        // tech-extract dispatch). The repo INSERT runs on the transaction
-        // client (pool.connect()), not poolQueryMock.
+        // tech-extract dispatch). quota INSERT is skipped (pro=Infinity limit).
+        // The repo INSERT runs on the transaction client (pool.connect()), not poolQueryMock.
         expect(poolQueryMock).toHaveBeenCalledTimes(8);
 
         // Installation token generated for this user's installation
@@ -681,8 +682,9 @@ describe('POST /connected-repos', () => {
     it('stamps unsanitized user-id + repo-full-name annotations for reconciliation', async () => {
         seedQuery([connectedRow]);       // getConnection
         seedQuery([]);                   // isSyncInFlight → not in flight
-        seedQuery([]);                   // plan SELECT → 'free'
-        seedQuery([{ count: 1 }]);       // quota INSERT…RETURNING → allowed
+        seedQuery([{ plan: 'pro', role: 'user', trial_started_at: null, trial_ends_at: null, subscription_status: 'active', stripe_customer_id: null, stripe_subscription_id: null, cancel_at_period_end: false, current_period_end: null, effective_plan: 'pro', trial_days_remaining: null }]); // getUserPlanStatus → pro plan
+        // quota INSERT SKIPPED — pro plan has Infinity limit
+        seedQuery([{ one: 1 }]);         // repoAlreadyConnected SELECT
         seedQuery([{ repo_full_name: 'Nelson-Lamounier/cdk-monitoring' }]); // tryClaimSyncSlot → claim won
         seedQuery([]);                          // markSyncTriggered
         seedQuery([{ github_repo_id: '555' }]); // dispatchIngestionJob → github_repo_id lookup
@@ -759,9 +761,10 @@ describe('POST /connected-repos', () => {
     it('non-defer returns 404 + refunds quota when the repo is not in the installation (no insert)', async () => {
         seedQuery([connectedRow]);       // 1. getConnection
         seedQuery([]);                   // 2. isSyncInFlight → not in flight
-        seedQuery([]);                   // 3. plan SELECT → free
-        seedQuery([{ count: 1 }]);       // 4. quota INSERT…RETURNING → allowed
-        // 5. decrementQuota (refund) → default { rows: [] }
+        seedQuery([{ plan: 'free', role: 'user', trial_started_at: null, trial_ends_at: null, subscription_status: null, stripe_customer_id: null, stripe_subscription_id: null, cancel_at_period_end: false, current_period_end: null, effective_plan: 'free', trial_days_remaining: null }]); // 3. getUserPlanStatus → free plan (finite quota, so quota INSERT runs)
+        seedQuery([{ count: 1 }]);       // 4. quota INSERT…RETURNING → allowed (limit=3 for free)
+        seedQuery([{ one: 1 }]);         // 5. repoAlreadyConnected SELECT → already connected (skips countConnectedRepos)
+        // 6. decrementQuota (refund) → default { rows: [] }
         mockListInstallationRepos.mockResolvedValueOnce([
             { id: 1, full_name: 'Nelson-Lamounier/cdk-monitoring', owner: { login: 'Nelson-Lamounier' }, name: 'cdk-monitoring', default_branch: 'develop', private: false, updated_at: '2026-04-29T00:00:00Z' },
         ]);
@@ -823,15 +826,14 @@ describe('POST /connected-repos/sync', () => {
             { full_name: 'Nelson-Lamounier/cdk-monitoring',      default_branch: 'develop' },
             { full_name: 'Nelson-Lamounier/kubernetes-bootstrap', default_branch: 'develop' },
         ]);
-        seedQuery([]);                 // 3. plan SELECT → free
-        seedQuery([{ count: 1 }]);     // 4. quota INSERT…RETURNING repo 1 → allowed
-        seedQuery([]); seedQuery([]);  // 5-6 markPending/markTriggered repo 1 (repo INSERT is on the tx client)
-        seedQuery([{ github_repo_id: '1' }]); // 7. dispatchIngestionJob repo 1 → github_repo_id lookup
-        seedQuery([{ github_repo_id: '1' }]); // 8. dispatchTechExtractJob repo 1 → github_repo_id lookup
-        seedQuery([{ count: 2 }]);     // 9. quota INSERT…RETURNING repo 2 → allowed
-        seedQuery([]); seedQuery([]);  // 10-11 markPending/markTriggered repo 2 (repo INSERT is on the tx client)
-        seedQuery([{ github_repo_id: '2' }]); // 12. dispatchIngestionJob repo 2 → github_repo_id lookup
-        seedQuery([{ github_repo_id: '2' }]); // 13. dispatchTechExtractJob repo 2 → github_repo_id lookup
+        seedQuery([{ plan: 'pro', role: 'user', trial_started_at: null, trial_ends_at: null, subscription_status: 'active', stripe_customer_id: null, stripe_subscription_id: null, cancel_at_period_end: false, current_period_end: null, effective_plan: 'pro', trial_days_remaining: null }]); // 3. getUserPlanStatus → pro plan (unlimited repos)
+        // quota INSERT SKIPPED for each repo — pro plan has Infinity limit
+        seedQuery([]); seedQuery([]);  // 4-5 markPending/markTriggered repo 1 (repo INSERT is on the tx client)
+        seedQuery([{ github_repo_id: '1' }]); // 6. dispatchIngestionJob repo 1 → github_repo_id lookup
+        seedQuery([{ github_repo_id: '1' }]); // 7. dispatchTechExtractJob repo 1 → github_repo_id lookup
+        seedQuery([]); seedQuery([]);  // 8-9 markPending/markTriggered repo 2 (repo INSERT is on the tx client)
+        seedQuery([{ github_repo_id: '2' }]); // 10. dispatchIngestionJob repo 2 → github_repo_id lookup
+        seedQuery([{ github_repo_id: '2' }]); // 11. dispatchTechExtractJob repo 2 → github_repo_id lookup
 
         const res  = await buildApp().request('/connected-repos/sync', { method: 'POST' });
         const body = await res.json() as { started: number };
@@ -876,10 +878,11 @@ describe('POST /connected-repos/:fullName/retry', () => {
     it('re-dispatches without touching usage_quotas (no double charge)', async () => {
         seedQuery([connectedRow]);                       // 1. getConnection
         seedQuery([{ full_name: 'octo/app' }]);          // 2. ownership SELECT
-        seedQuery([{ repo_full_name: 'octo/app' }]);     // 3. tryClaimSyncSlot → claim won
-        seedQuery([]);                                   // 4. markSyncTriggered
-        seedQuery([{ github_repo_id: '555' }]);          // 5. dispatchIngestionJob → github_repo_id lookup
-        seedQuery([{ github_repo_id: '555' }]);          // 6. dispatchTechExtractJob → github_repo_id lookup
+        seedQuery([{ plan: 'pro', role: 'user', trial_started_at: null, trial_ends_at: null, subscription_status: 'active', stripe_customer_id: null, stripe_subscription_id: null, cancel_at_period_end: false, current_period_end: null, effective_plan: 'pro', trial_days_remaining: null }]); // 3. getUserPlanStatus (plan + role for enrichment depth; no quota charged on retry)
+        seedQuery([{ repo_full_name: 'octo/app' }]);     // 4. tryClaimSyncSlot → claim won
+        seedQuery([]);                                   // 5. markSyncTriggered
+        seedQuery([{ github_repo_id: '555' }]);          // 6. dispatchIngestionJob → github_repo_id lookup
+        seedQuery([{ github_repo_id: '555' }]);          // 7. dispatchTechExtractJob → github_repo_id lookup
 
         const res  = await buildApp().request('/connected-repos/octo%2Fapp/retry', { method: 'POST' });
         const body = await res.json() as { status: string; repoFullName: string; jobName: string };

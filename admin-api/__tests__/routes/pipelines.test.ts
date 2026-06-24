@@ -17,13 +17,16 @@ const insertPipelineRunMock   = jest.fn<() => Promise<void>>().mockResolvedValue
 const upsertArticleMock       = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
 const getPipelineRunMock      = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 
+const poolQueryMock = jest.fn<(...args: unknown[]) => Promise<{ rows: unknown[]; rowCount?: number }>>()
+  .mockResolvedValue({ rows: [{ plan: 'pro', role: 'user', trial_started_at: null, trial_ends_at: null, subscription_status: 'active', stripe_customer_id: null, stripe_subscription_id: null, cancel_at_period_end: false, current_period_end: null, effective_plan: 'pro', trial_days_remaining: null }] });
+
 jest.unstable_mockModule('../../src/lib/k8s.js', () => ({
   getBatchApi:     () => ({ createNamespacedJob: createNamespacedJobMock }),
   _resetBatchApi:  () => {},
 }));
 
 jest.unstable_mockModule('../../src/lib/pg.js', () => ({
-  getPool:    () => ({}),
+  getPool:    () => ({ query: poolQueryMock }),
   withUser:   async (_pool: unknown, _userId: string, fn: (db: { query: jest.Mock }) => Promise<unknown>) =>
     fn({ query: jest.fn() }),
   _resetPool: () => {},
@@ -102,6 +105,7 @@ describe('POST /article-job/:slug — K8s Job article pipeline', () => {
     createNamespacedJobMock.mockResolvedValue({});
     insertPipelineRunMock.mockResolvedValue(undefined);
     upsertArticleMock.mockResolvedValue(undefined);
+    poolQueryMock.mockResolvedValue({ rows: [{ plan: 'pro', role: 'user', trial_started_at: null, trial_ends_at: null, subscription_status: 'active', stripe_customer_id: null, stripe_subscription_id: null, cancel_at_period_end: false, current_period_end: null, effective_plan: 'pro', trial_days_remaining: null }] });
     const { _resetJobImageCache } = await import('../../src/lib/config.js');
     _resetJobImageCache();
   });
@@ -188,6 +192,7 @@ describe('POST /strategist-job — K8s Job strategist pipeline', () => {
     jest.clearAllMocks();
     createNamespacedJobMock.mockResolvedValue({});
     insertPipelineRunMock.mockResolvedValue(undefined);
+    poolQueryMock.mockResolvedValue({ rows: [{ plan: 'pro', role: 'user', trial_started_at: null, trial_ends_at: null, subscription_status: 'active', stripe_customer_id: null, stripe_subscription_id: null, cancel_at_period_end: false, current_period_end: null, effective_plan: 'pro', trial_days_remaining: null }] });
   });
 
   it.each([

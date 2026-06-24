@@ -182,14 +182,15 @@ describe('GET /clustering/proposals', () => {
 
 describe('POST /', () => {
     it('creates and returns the new id', async () => {
-        poolQueryMock.mockResolvedValueOnce({ rows: [{ id: TEST_PROJECT_UUID }] });
+        poolQueryMock.mockResolvedValueOnce({ rows: [{ plan: 'pro', role: 'user', trial_started_at: null, trial_ends_at: null, subscription_status: 'active', stripe_customer_id: null, stripe_subscription_id: null, cancel_at_period_end: false, current_period_end: null, effective_plan: 'pro', trial_days_remaining: null }] }); // getUserPlanStatus → pro plan (unlimited projects)
+        poolQueryMock.mockResolvedValueOnce({ rows: [{ id: TEST_PROJECT_UUID }] }); // INSERT INTO projects
         const res = await buildApp().request('/', {
             method: 'POST', headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ slug: 'tucaken', name: 'Tucaken', type: 'production_saas' }),
         });
         expect(res.status).toBe(201);
         expect(await res.json()).toMatchObject({ id: TEST_PROJECT_UUID });
-        expect(String(poolQueryMock.mock.calls[0][0])).toMatch(/INSERT INTO projects/);
+        expect(poolQueryMock.mock.calls.some(c => /INSERT INTO projects/.test(String(c[0])))).toBe(true);
     });
 
     it('rejects an invalid slug', async () => {
@@ -201,6 +202,7 @@ describe('POST /', () => {
     });
 
     it('returns 409 on unique-slug collision', async () => {
+        poolQueryMock.mockResolvedValueOnce({ rows: [{ plan: 'pro', role: 'user', trial_started_at: null, trial_ends_at: null, subscription_status: 'active', stripe_customer_id: null, stripe_subscription_id: null, cancel_at_period_end: false, current_period_end: null, effective_plan: 'pro', trial_days_remaining: null }] }); // getUserPlanStatus → pro plan
         poolQueryMock.mockRejectedValueOnce(Object.assign(new Error('dup'), { code: '23505' }));
         const res = await buildApp().request('/', {
             method: 'POST', headers: { 'content-type': 'application/json' },

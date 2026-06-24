@@ -124,7 +124,14 @@ describe('POST /strategist-job — interview stage seeding', () => {
     createNamespacedJobMock.mockResolvedValue({});
     insertPipelineRunMock.mockResolvedValue(undefined);
     upsertApplicationMock.mockResolvedValue(undefined);
-    pgQueryMock.mockResolvedValue({ rows: [] });
+    pgQueryMock.mockImplementation(async (sql: unknown) => {
+      const s = String(sql);
+      // getUserPlanStatus → return pro plan (unlimited resumes, no quota enforced)
+      if (s.includes('effective_plan') || (s.includes('FROM users') && s.includes('trial_ends_at'))) {
+        return { rows: [{ plan: 'pro', role: 'user', trial_started_at: null, trial_ends_at: null, subscription_status: 'active', stripe_customer_id: null, stripe_subscription_id: null, cancel_at_period_end: false, current_period_end: null, effective_plan: 'pro', trial_days_remaining: null }] };
+      }
+      return { rows: [] };
+    });
     const { _resetJobImageCache } = await import('../../src/lib/config.js');
     _resetJobImageCache();
   });
