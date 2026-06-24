@@ -48,16 +48,13 @@ export function SignUpForm({ onSwitchToSignIn, onSubmit, onGoogle, onGithub, err
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
-      className="space-y-5"
+      className="space-y-4"
       style={{ willChange: 'transform, opacity' }}
     >
-      <header className="space-y-1">
-        <h2 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+      <header>
+        <h2 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
           Create your account
         </h2>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Get started in less than a minute.
-        </p>
       </header>
 
       {error && (
@@ -102,7 +99,7 @@ export function SignUpForm({ onSwitchToSignIn, onSubmit, onGoogle, onGithub, err
           e.stopPropagation()
           form.handleSubmit()
         }}
-        className="space-y-3"
+        className="space-y-2.5"
       >
         <form.Field
           name="name"
@@ -116,7 +113,7 @@ export function SignUpForm({ onSwitchToSignIn, onSubmit, onGoogle, onGithub, err
             <AuthInput label="Email" field={field} icon={<Mail className="h-4 w-4" />} autoComplete="email" type="email" />
           )}
         />
-        <form.Field name="password" children={(field) => <PasswordField field={field} />} />
+        <form.Field name="password" children={(field) => <PasswordField field={field} showChecklist={false} />} />
         <form.Field
           name="confirm"
           children={(field) => (

@@ -64,13 +64,13 @@ export function AuthShell({
         : 'bg-zinc-950/60 border-white/10 text-zinc-100'
 
   return (
-    <main className="relative min-h-screen w-full overflow-x-hidden bg-zinc-950 lg:grid lg:grid-cols-2">
+    <main className="relative h-screen w-full overflow-hidden bg-zinc-950 lg:grid lg:grid-cols-2">
       <AuthBrandPanel />
 
       {/* Form column — flat background, no effect (effect lives only on the brand panel).
-          Column scrolls; the card centres via m-auto and scrolls from the top when it
-          is taller than the viewport (justify-center would clip the top). */}
-      <div className="relative flex min-h-screen flex-col overflow-y-auto px-4 py-10">
+          Fixed to the viewport height; the card is compact enough to fit without
+          the page ever growing or the card scrolling. */}
+      <div className="relative flex h-screen flex-col items-center justify-center px-4 py-6">
         <Link
           to="/"
           className="absolute left-5 top-6 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-zinc-400 transition-colors hover:text-white"
@@ -79,27 +79,27 @@ export function AuthShell({
           Home
         </Link>
 
-        <div className="m-auto w-full max-w-lg">
+        <div className="w-full max-w-lg">
           <motion.div
             layout
             initial={false}
             transition={{ layout: { type: 'spring', stiffness: 420, damping: 40 } }}
             className={[
-              'relative isolate rounded-2xl border p-7 shadow-2xl shadow-black/10 backdrop-blur-xl',
+              'relative isolate rounded-2xl border p-5 shadow-2xl shadow-black/10 backdrop-blur-xl',
               'dark:shadow-black/40',
               cardClass,
             ].join(' ')}
             style={{ willChange: 'transform' }}
           >
             {/* Brand header */}
-            <div className="mb-6 flex items-center gap-3">
+            <div className="mb-4 flex items-center gap-3">
               {brand ?? <img src={logoTeal} alt="Tucaken Resume" className="h-8 w-auto" />}
             </div>
 
             {/* Tab indicator (only for signin/signup) */}
             {(view === 'signin' || view === 'signup') && (
               <LayoutGroup id="auth-tabs">
-                <div className="mb-6 flex rounded-xl border border-zinc-200/70 bg-zinc-100/60 p-1 text-sm font-medium dark:border-white/10 dark:bg-white/5">
+                <div className="mb-4 flex rounded-xl border border-zinc-200/70 bg-zinc-100/60 p-1 text-sm font-medium dark:border-white/10 dark:bg-white/5">
                   {(['signin', 'signup'] as const).map((v) => (
                     <button
                       key={v}

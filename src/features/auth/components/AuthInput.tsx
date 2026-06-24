@@ -68,7 +68,7 @@ export function AuthInput({ label, field, icon, showValid = true, type = 'text',
           }}
           onChange={(e) => field.handleChange(e.target.value)}
           className={[
-            'w-full bg-transparent pb-2 pt-6 text-sm text-zinc-900 dark:text-zinc-100',
+            'w-full bg-transparent pb-1.5 pt-5 text-sm text-zinc-900 dark:text-zinc-100',
             'placeholder:text-zinc-400 focus:outline-none',
             icon ? 'pl-10 pr-10' : 'pl-3 pr-10',
           ].join(' ')}
