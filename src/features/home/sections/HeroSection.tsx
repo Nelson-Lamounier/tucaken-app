@@ -1,5 +1,5 @@
-// src/features/home/sections/HeroSection.tsx
 "use client"
+// src/features/home/sections/HeroSection.tsx
 import { motion } from 'motion/react'
 import { useNavigate } from '@tanstack/react-router'
 import { MagneticButton } from '../lib/MagneticButton'
@@ -12,7 +12,7 @@ import { hero, repos } from '../content'
 
 function RepoBand({ reverse, speed }: { reverse?: boolean; speed: number }) {
   return (
-    <Marquee reverse={reverse} speed={speed} className="mask-[linear-gradient(to_right,transparent,white_12%,white_88%,transparent)]">
+    <Marquee reverse={reverse} speed={speed} className="[mask-image:linear-gradient(to_right,transparent,white_12%,white_88%,transparent)]">
       {repeatForLoop([...repos]).map((r, i) => (
         <div key={`${r.name}-${i}`} className="mx-3 w-64 shrink-0">
           <RepoCard r={r} />
@@ -36,6 +36,7 @@ export function HeroSection() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
             className="inline-flex w-fit items-center gap-2 rounded-full border border-teal-500/30 bg-teal-500/10 px-3 py-1 backdrop-blur-md"
+            style={{ willChange: 'opacity' }}
           >
             <span className="h-1.5 w-1.5 rounded-full bg-teal-400 shadow-[0_0_8px_currentColor]" />
             <span className="font-mono text-[10px] uppercase tracking-widest text-teal-200">{hero.eyebrow}</span>
