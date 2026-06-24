@@ -8,15 +8,16 @@ vi.mock('@tanstack/react-router', () => ({
 }))
 
 import { HeroSection } from '@/features/home/sections/HeroSection'
-import { hero } from '@/features/home/content'
+import { hero, repos } from '@/features/home/content'
 
 describe('HeroSection', () => {
   beforeEach(() => navigateMock.mockReset())
 
   it('renders eyebrow, headline, founder note and both CTAs', () => {
-    render(<HeroSection />)
+    const { container } = render(<HeroSection />)
     expect(screen.getByText(hero.eyebrow)).toBeTruthy()
-    expect(screen.getByText(/already proves/i)).toBeTruthy()
+    // KineticText splits headline into per-word spans — check container text content
+    expect(container.textContent).toMatch(/already proves/i)
     expect(screen.getByText(hero.founderNote)).toBeTruthy()
     expect(screen.getByRole('button', { name: new RegExp(hero.primaryCta, 'i') })).toBeTruthy()
     expect(screen.getByRole('button', { name: new RegExp(hero.secondaryCta, 'i') })).toBeTruthy()
@@ -31,10 +32,11 @@ describe('HeroSection', () => {
     expect(navigateMock).toHaveBeenCalledWith({ to: '/sign-in' })
   })
 
-  it('renders conveyor backdrop AND the static depth pipeline panel', () => {
+  it('renders repo marquee bands with repo card content', () => {
     const { container } = render(<HeroSection />)
-    expect(container.querySelector('[data-belt="root"]')).toBeTruthy()
-    expect(container.querySelector('[data-scene="stage"]')).toBeTruthy()
-    expect(container.querySelector('[data-layer="copy"]')).toBeNull()
+    // Marquee bands are present
+    expect(container.querySelectorAll('.marquee-anim').length).toBeGreaterThan(0)
+    // At least one repo name from the repos content is rendered
+    expect(container.textContent).toContain(repos[0].name)
   })
 })

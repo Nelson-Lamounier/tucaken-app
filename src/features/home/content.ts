@@ -47,8 +47,9 @@ export const faq = [
 export const interviewedAt = ['AWS', 'Google', 'Stripe', 'Cloudflare', 'Datadog', 'Vercel'] as const
 
 export const repos = [
-  { name: 'k8s-cluster-platform', desc: 'Kubernetes platform · 12k LOC', meta: '47 commits · 6 contributors', lang: 'Go', color: '#00ADD8' },
-  { name: 'event-driven-migration', desc: 'Legacy → event-sourced services', meta: '83 PRs · 99.95% uptime', lang: 'TS', color: '#3178C6' },
-  { name: 'iac-aws-pipelines', desc: 'Terraform + GitHub Actions', meta: '18 envs · 0 drift', lang: 'HCL', color: '#7B42BC' },
-  { name: 'observability-stack', desc: 'Grafana + Loki + Tempo', meta: '14 dashboards', lang: 'Py', color: '#FFD43B' },
+  { name: 'platform-eks', desc: 'Zero-trust network policies, autoscaling', meta: 'PR #284 · merged', lang: 'YAML', color: '#2dd4bf' },
+  { name: 'cost-optimiser', desc: 'Spot-fleet scheduler, −38% spend', meta: '14 commits this week', lang: 'Go', color: '#34d399' },
+  { name: 'kafka-migration', desc: 'Event backbone cutover · ADR-007', meta: '99.95% uptime', lang: 'Rust', color: '#22d3ee' },
+  { name: 'tucaken-app', desc: 'TanStack Start SSR web app', meta: 'main · green', lang: 'TS', color: '#5eead4' },
+  { name: 'rds-bootstrap', desc: 'Aurora DSQL migrations, IAM auth', meta: 'release v2.1', lang: 'SQL', color: '#2dd4bf' },
 ] as const
