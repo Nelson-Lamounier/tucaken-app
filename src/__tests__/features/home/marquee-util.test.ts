@@ -1,4 +1,4 @@
-/// <reference types="vitest" />
+import { describe, it, expect } from 'vitest'
 import { repeatForLoop } from '@/features/home/lib/marquee-util'
 
 describe('repeatForLoop', () => {
