@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react'
 import { Button } from '@/components/ui/Button'
 
@@ -20,6 +20,15 @@ export function ProjectIntentModal({
 }) {
   const [mode, setMode] = useState<'pick' | 'link'>('pick')
   const [target, setTarget] = useState('')
+
+  // Reset to the choice screen whenever the modal closes, so a half-navigated
+  // link flow does not carry over to the next repo the user adds.
+  useEffect(() => {
+    if (!open) {
+      setMode('pick')
+      setTarget('')
+    }
+  }, [open])
 
   return (
     <Dialog open={open} onClose={onClose} className="relative z-50">
