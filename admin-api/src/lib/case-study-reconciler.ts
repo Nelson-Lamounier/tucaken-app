@@ -7,8 +7,9 @@
  * pipeline_runs. No set_config('app.current_user_id') is required here.
  *
  * Debounce / double-dispatch guard: a single NOT EXISTS subquery on
- * pipeline_runs covers both "a run is already active (queued/running)" and
- * "a run was created within the last 120 seconds". Idempotent by design.
+ * pipeline_runs covers both "a run is still in flight (any non-terminal
+ * status)" and "a run was created within the last 120 seconds". Idempotent by
+ * design.
  */
 
 import type { Pool } from 'pg';
@@ -22,10 +23,13 @@ const TICK_MS = 30_000;
  *  or recently-dispatched pipeline run.
  *
  *  The NOT EXISTS clause covers two cases atomically:
- *    1. A run is already active (status IN ('queued','running')).
+ *    1. A run is still in flight -- any non-terminal status. The live
+ *       case_study lifecycle is queued -> fetching_context -> generating ->
+ *       complete|failed, so we gate on `status NOT IN ('complete','failed')`
+ *       rather than enumerating the in-flight states (enumerating misses
+ *       fetching_context/generating and would re-dispatch a running Job).
  *    2. A run was dispatched within the 120-second debounce window
- *       (prevents double-dispatch when the Job has not yet flipped to
- *       'running').
+ *       (prevents double-dispatch in the brief gap before the run row exists).
  */
 export async function selectPendingCaseStudies(
     pool: Pool,
@@ -40,7 +44,7 @@ export async function selectPendingCaseStudies(
               SELECT 1 FROM pipeline_runs r
                WHERE r.pipeline_type = 'case_study'
                  AND r.reference_id = p.id::text
-                 AND (r.status IN ('queued', 'running')
+                 AND (r.status NOT IN ('complete', 'failed')
                       OR r.created_at > NOW() - INTERVAL '120 seconds')
             )
           ORDER BY p.updated_at ASC
