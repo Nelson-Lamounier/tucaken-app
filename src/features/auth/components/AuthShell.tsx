@@ -124,7 +124,7 @@ export function AuthShell({
               </LayoutGroup>
             )}
 
-            <AnimatePresence mode="wait">
+            <AnimatePresence mode="popLayout" initial={false}>
               {view === 'signin' && (
                 <SignInForm
                   key="signin"
