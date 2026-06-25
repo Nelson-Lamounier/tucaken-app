@@ -961,3 +961,49 @@ export async function getAdminUserById(
     })),
   };
 }
+
+// ─── Admin mutations (plan/role + audit) ────────────────────────────────────
+
+/**
+ * Admin updates a user's role and/or plan, writing audit rows to plan_events
+ * for each change. Runs inside a transaction (caller passes a PoolClient
+ * already in BEGIN — this function does NOT call BEGIN/COMMIT itself).
+ *
+ * Returns false if the patch is empty or the user does not exist.
+ * Returns true when at least one update was applied.
+ */
+export async function adminUpdateUser(
+  client: import('pg').PoolClient,
+  id: string,
+  patch: { role?: 'user' | 'admin'; plan?: 'free' | 'pro' | 'premium' },
+): Promise<boolean> {
+  const wantsRole = patch.role !== undefined;
+  const wantsPlan = patch.plan !== undefined;
+  if (!wantsRole && !wantsPlan) return false;
+
+  const current = await client.query<{ plan: string; role: string }>(
+    `SELECT plan, role FROM users WHERE id = $1`,
+    [id],
+  );
+  const before = current.rows[0];
+  if (!before) return false;
+
+  if (wantsRole && patch.role !== before.role) {
+    await client.query(`UPDATE users SET role = $2, updated_at = NOW() WHERE id = $1`, [id, patch.role]);
+    await client.query(
+      `INSERT INTO plan_events (user_id, event_type, from_plan, to_plan, reason)
+       VALUES ($1, 'admin_role_change', $2, $3, $4)`,
+      [id, before.role, patch.role, `admin set role ${before.role} -> ${patch.role}`],
+    );
+  }
+
+  if (wantsPlan && patch.plan !== before.plan) {
+    await client.query(`UPDATE users SET plan = $2, updated_at = NOW() WHERE id = $1`, [id, patch.plan]);
+    await client.query(
+      `INSERT INTO plan_events (user_id, event_type, from_plan, to_plan, reason)
+       VALUES ($1, $4, $2, $3, $5)`,
+      [id, before.plan, patch.plan, 'admin_manual_override', 'admin_manual_override'],
+    );
+  }
+  return true;
+}
