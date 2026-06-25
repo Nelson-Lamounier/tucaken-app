@@ -50,3 +50,31 @@ describe('enrichmentEnv', () => {
         expect(enrichmentEnv('full')).toEqual({ ENRICH_TIER1: '1' });
     });
 });
+
+import { entitlementsFromConfig } from './entitlements.js';
+import { DEFAULT_TIER_CONFIG } from './tier-config-shape.js';
+
+describe('entitlementsFromConfig', () => {
+    it('maps free tier limits from config', () => {
+        const e = entitlementsFromConfig(DEFAULT_TIER_CONFIG, 'free');
+        expect(e.repos).toBe(1);
+        expect(e.resumesPerMonth).toBe(1);
+        expect(e.enrichment).toBe('tier1');
+    });
+
+    it('maps null entitlements to Infinity', () => {
+        const e = entitlementsFromConfig(DEFAULT_TIER_CONFIG, 'pro');
+        expect(e.repos).toBe(Number.POSITIVE_INFINITY);
+    });
+
+    it('admin role gets premium entitlements regardless of plan', () => {
+        const e = entitlementsFromConfig(DEFAULT_TIER_CONFIG, 'free', 'admin');
+        expect(e.repos).toBe(Number.POSITIVE_INFINITY);
+        expect(e.enrichment).toBe('full');
+    });
+
+    it('trial plan falls back to unlimited (trial is not a stored tier id)', () => {
+        const e = entitlementsFromConfig(DEFAULT_TIER_CONFIG, 'trial');
+        expect(e.repos).toBe(Number.POSITIVE_INFINITY);
+    });
+});
