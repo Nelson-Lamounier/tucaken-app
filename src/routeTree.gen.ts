@@ -46,6 +46,7 @@ import { Route as DashboardResumesNewRouteRouteImport } from './app/_dashboard/r
 import { Route as DashboardAdminUsersRouteRouteImport } from './app/_dashboard/admin/users/route'
 import { Route as UUsernamePSlugRouteImport } from './app/u/$username/p/$slug'
 import { Route as DashboardProjectsIdEditRouteImport } from './app/_dashboard/projects/$id.edit'
+import { Route as DashboardAdminUsersUserIdReposRepoRouteImport } from './app/_dashboard/admin/users_.$userId.repos.$repo'
 
 const SignInRoute = SignInRouteImport.update({
   id: '/sign-in',
@@ -239,6 +240,12 @@ const DashboardProjectsIdEditRoute = DashboardProjectsIdEditRouteImport.update({
   path: '/edit',
   getParentRoute: () => DashboardProjectsIdRoute,
 } as any)
+const DashboardAdminUsersUserIdReposRepoRoute =
+  DashboardAdminUsersUserIdReposRepoRouteImport.update({
+    id: '/admin/users_/$userId/repos/$repo',
+    path: '/admin/users/$userId/repos/$repo',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -277,6 +284,7 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof DashboardSettingsIndexRoute
   '/projects/$id/edit': typeof DashboardProjectsIdEditRoute
   '/u/$username/p/$slug': typeof UUsernamePSlugRoute
+  '/admin/users/$userId/repos/$repo': typeof DashboardAdminUsersUserIdReposRepoRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -315,6 +323,7 @@ export interface FileRoutesByTo {
   '/settings': typeof DashboardSettingsIndexRoute
   '/projects/$id/edit': typeof DashboardProjectsIdEditRoute
   '/u/$username/p/$slug': typeof UUsernamePSlugRoute
+  '/admin/users/$userId/repos/$repo': typeof DashboardAdminUsersUserIdReposRepoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -355,6 +364,7 @@ export interface FileRoutesById {
   '/_dashboard/settings/': typeof DashboardSettingsIndexRoute
   '/_dashboard/projects/$id/edit': typeof DashboardProjectsIdEditRoute
   '/u/$username/p/$slug': typeof UUsernamePSlugRoute
+  '/_dashboard/admin/users_/$userId/repos/$repo': typeof DashboardAdminUsersUserIdReposRepoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -395,6 +405,7 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/projects/$id/edit'
     | '/u/$username/p/$slug'
+    | '/admin/users/$userId/repos/$repo'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -433,6 +444,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/projects/$id/edit'
     | '/u/$username/p/$slug'
+    | '/admin/users/$userId/repos/$repo'
   id:
     | '__root__'
     | '/'
@@ -472,6 +484,7 @@ export interface FileRouteTypes {
     | '/_dashboard/settings/'
     | '/_dashboard/projects/$id/edit'
     | '/u/$username/p/$slug'
+    | '/_dashboard/admin/users_/$userId/repos/$repo'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -749,6 +762,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardProjectsIdEditRouteImport
       parentRoute: typeof DashboardProjectsIdRoute
     }
+    '/_dashboard/admin/users_/$userId/repos/$repo': {
+      id: '/_dashboard/admin/users_/$userId/repos/$repo'
+      path: '/admin/users/$userId/repos/$repo'
+      fullPath: '/admin/users/$userId/repos/$repo'
+      preLoaderRoute: typeof DashboardAdminUsersUserIdReposRepoRouteImport
+      parentRoute: typeof DashboardRoute
+    }
   }
 }
 
@@ -800,6 +820,7 @@ interface DashboardRouteChildren {
   DashboardApplicationsIndexRoute: typeof DashboardApplicationsIndexRoute
   DashboardProjectsIndexRoute: typeof DashboardProjectsIndexRoute
   DashboardSettingsIndexRoute: typeof DashboardSettingsIndexRoute
+  DashboardAdminUsersUserIdReposRepoRoute: typeof DashboardAdminUsersUserIdReposRepoRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
@@ -827,6 +848,8 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardApplicationsIndexRoute: DashboardApplicationsIndexRoute,
   DashboardProjectsIndexRoute: DashboardProjectsIndexRoute,
   DashboardSettingsIndexRoute: DashboardSettingsIndexRoute,
+  DashboardAdminUsersUserIdReposRepoRoute:
+    DashboardAdminUsersUserIdReposRepoRoute,
 }
 
 const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
