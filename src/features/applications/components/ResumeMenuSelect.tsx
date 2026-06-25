@@ -29,12 +29,13 @@ export function ResumeMenuSelect({ resumeId, onChange }: ResumeMenuSelectProps) 
   const sorted = useMemo(() => (resumes ? sortResumes(resumes) : []), [resumes])
 
   // Resolve the default exactly once: only while resumeId is still unresolved (null).
-  // `sorted` stays in the dep array for correctness, but the `resumeId !== null` guard
-  // makes any later re-fire (e.g. a query refetch) a no-op — do not remove that guard.
+  // "Build from scratch with Tucaken" is the default selection regardless of any
+  // saved resumes. The `resumeId !== null` guard makes any later re-fire
+  // (e.g. a query refetch) a no-op — do not remove that guard.
   useEffect(() => {
     if (resumeId !== null || isLoading) return
-    onChange(sorted.length > 0 ? sorted[0].resumeId : BUILD_FROM_SCRATCH)
-  }, [resumeId, isLoading, sorted, onChange])
+    onChange(BUILD_FROM_SCRATCH)
+  }, [resumeId, isLoading, onChange])
 
   // Only show the skeleton during a genuine fetch. Once data is present we can
   // render immediately using the resolved default, even before the parent's
@@ -49,8 +50,8 @@ export function ResumeMenuSelect({ resumeId, onChange }: ResumeMenuSelectProps) 
   }
 
   const hasNoResumes = sorted.length === 0
-  const defaultId = hasNoResumes ? BUILD_FROM_SCRATCH : sorted[0].resumeId
-  const effectiveId = resumeId ?? defaultId
+  // Default to "build from scratch"; the user opts into a saved resume explicitly.
+  const effectiveId = resumeId ?? BUILD_FROM_SCRATCH
   const selected = sorted.find((r) => r.resumeId === effectiveId)
   const buttonLabel = selected ? selected.label : 'Build from scratch with Tucaken'
 

@@ -35,7 +35,7 @@ describe('ResumeMenuSelect', () => {
     useResumeVersionsMock.mockReset()
   })
 
-  it('resolves the active resume as the default when resumeId is null', () => {
+  it('defaults to build-from-scratch even when an active resume exists', () => {
     const resumes = [
       makeResume({ resumeId: 'old', label: 'Old', updatedAt: '2026-02-01T00:00:00.000Z' }),
       makeResume({ resumeId: 'active', label: 'Active One', isActive: true, updatedAt: '2026-01-01T00:00:00.000Z' }),
@@ -43,10 +43,10 @@ describe('ResumeMenuSelect', () => {
     useResumeVersionsMock.mockReturnValue({ data: resumes, isLoading: false })
     const onChange = vi.fn()
     render(<ResumeMenuSelect resumeId={null} onChange={onChange} />)
-    expect(onChange).toHaveBeenCalledWith('active')
+    expect(onChange).toHaveBeenCalledWith('')
   })
 
-  it('defaults to most-recent when no resume is active', () => {
+  it('defaults to build-from-scratch when resumes exist but none is active', () => {
     const resumes = [
       makeResume({ resumeId: 'older', updatedAt: '2026-01-01T00:00:00.000Z' }),
       makeResume({ resumeId: 'newer', updatedAt: '2026-03-01T00:00:00.000Z' }),
@@ -54,7 +54,7 @@ describe('ResumeMenuSelect', () => {
     useResumeVersionsMock.mockReturnValue({ data: resumes, isLoading: false })
     const onChange = vi.fn()
     render(<ResumeMenuSelect resumeId={null} onChange={onChange} />)
-    expect(onChange).toHaveBeenCalledWith('newer')
+    expect(onChange).toHaveBeenCalledWith('')
   })
 
   it('defaults to build-from-scratch ("") when there are no resumes', () => {
