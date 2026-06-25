@@ -13,7 +13,7 @@ vi.mock('@number-flow/react', () => ({
   default: ({ value }: { value: number }) => <span>{value}</span>,
 }))
 
-import { TierPrice, BillingToggle } from '@/features/home/sections/Sections'
+import { TierPrice, BillingToggle, PricingSection } from '@/features/home/sections/Sections'
 import { TIERS } from '@/features/billing/catalog'
 
 const byId = (id: string) => {
@@ -59,13 +59,13 @@ describe('BillingToggle', () => {
   })
 })
 
-import { PricingSection } from '@/features/home/sections/Sections'
-
 describe('PricingSection', () => {
   it('renders every tier name', () => {
     render(<PricingSection />)
     for (const t of TIERS) {
-      expect(screen.getByText(t.name)).toBeTruthy()
+      const heading = document.getElementById(`tier-${t.id}`)
+      expect(heading).not.toBeNull()
+      expect(heading?.textContent?.trim().toLowerCase()).toBe(t.name.toLowerCase())
     }
   })
 

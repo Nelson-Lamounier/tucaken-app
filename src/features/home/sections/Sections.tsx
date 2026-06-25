@@ -206,7 +206,7 @@ export function PricingSection() {
           <Eyebrow>Pricing</Eyebrow>
           <KineticText
             as="h2"
-            text="Start free — pay only when it's worth it."
+            text="Free until it's worth paying for."
             className="mt-3 text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl"
           />
           <p className="mx-auto mt-5 max-w-xl text-pretty text-sm text-zinc-400 md:text-base">
@@ -237,13 +237,9 @@ export function PricingSection() {
               )}
               <h3
                 id={`tier-${t.id}`}
-                aria-label={t.name}
                 className="font-mono text-xs uppercase tracking-widest text-zinc-400 group-data-featured/tier:text-teal-300"
               >
-                {/* For the free tier, the tier name is also rendered by TierPrice as the price display.
-                    Showing only the id here (uppercased by CSS) avoids a duplicate "Free" text node
-                    that would cause getByText('Free') to find multiple elements in tests. */}
-                {t.free ? t.id : t.name}
+                {t.name}
               </h3>
               <p className="mt-3 text-sm/6 text-zinc-300">{t.blurb}</p>
 
