@@ -7,12 +7,15 @@ import { Button } from '@/components/ui/Button'
 import { useGitHubConnectedRepos } from '@/features/github/hooks/use-github-connected-repos'
 import { useProfileSummary } from '@/features/profile/hooks/use-profile-summary'
 import { adminKeys } from '@/lib/api/query-keys'
+import { getMeFn } from '@/server/me'
 import { listResumeImportsFn, listCareerEntriesFn } from '@/server/resume-imports'
 import { AnimatedTabs } from '@/components/ui/AnimatedTabs'
 import { MirrorPanel } from '@/features/profile/components/MirrorPanel'
 import { DirectionPanel } from '@/features/profile/components/DirectionPanel'
 import { ReconciliationPanel } from '@/features/profile/components/ReconciliationPanel'
 import { KbScorePanel } from './KbScorePanel'
+import { KbQualityPanel } from './KbQualityPanel'
+import { ActivityPanel } from './ActivityPanel'
 import { KbStatsPanel } from './KbStatsPanel'
 import { KbSetupChecklist } from './KbSetupChecklist'
 import { KbActivityFeed } from './KbActivityFeed'
@@ -26,6 +29,8 @@ import { buildHeroTiles, deriveHeroSparks, deriveHeroMeta } from '../lib/hero-ti
 export function UserDashboard() {
   const { data: repos = [], isLoading: loadingRepos } = useGitHubConnectedRepos()
   const { data: profileSummary } = useProfileSummary()
+  const { data: me } = useQuery({ queryKey: adminKeys.me.detail(), queryFn: getMeFn })
+  const isAdmin = me?.plan.role === 'admin'
 
   const { data: imports = [], isLoading: loadingImports } = useQuery({
     queryKey: adminKeys.resumeImports.list(),
@@ -58,11 +63,21 @@ export function UserDashboard() {
       }
     >
       <div className="space-y-8">
-        {/* Hero band: readiness gauge + KPI tiles */}
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_1fr] xl:items-stretch">
-          <KbScorePanel diagnostic={profileSummary?.diagnostic ?? null} isLoading={isLoading} />
-          <KbStatsPanel tiles={heroTiles} />
-        </div>
+        {/* Hero band. The Resume-Readiness diagnostic is not yet trustworthy for
+            end users (lossy-rollup false negatives), so it is admin-only until the
+            data matures; users see honest KB quality + their own activity instead. */}
+        {isAdmin ? (
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_1fr] xl:items-stretch">
+            <KbScorePanel diagnostic={profileSummary?.diagnostic ?? null} isLoading={isLoading} />
+            <KbStatsPanel tiles={heroTiles} />
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <KbStatsPanel tiles={heroTiles} />
+            <KbQualityPanel />
+            <ActivityPanel />
+          </div>
+        )}
 
         {/* Main column + health rail */}
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_340px] xl:items-start">
