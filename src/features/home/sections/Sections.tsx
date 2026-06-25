@@ -185,7 +185,7 @@ export function PricingSection() {
                 <>
                   <p className="mt-6 flex items-baseline gap-x-1 group-not-has-[[name=frequency][value=monthly]:checked]/tiers:hidden">
                     <span className="text-4xl font-semibold tracking-tight text-white">
-                      ${t.priceMonthly}
+                      €{t.priceMonthly}
                     </span>
                     <span className="text-sm/6 font-semibold text-zinc-500">
                       /month
@@ -193,7 +193,7 @@ export function PricingSection() {
                   </p>
                   <p className="mt-6 flex items-baseline gap-x-1 group-not-has-[[name=frequency][value=annually]:checked]/tiers:hidden">
                     <span className="text-4xl font-semibold tracking-tight text-white">
-                      ${t.priceAnnual}
+                      €{t.priceAnnual}
                     </span>
                     <span className="text-sm/6 font-semibold text-zinc-500">
                       /year

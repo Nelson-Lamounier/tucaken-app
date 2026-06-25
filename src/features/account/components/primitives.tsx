@@ -227,6 +227,6 @@ export function timeAgo(iso: string | null | undefined) {
   return fmtDate(iso)
 }
 
-export function fmtMoney(n: number, cur = '$') {
+export function fmtMoney(n: number, cur = '€') {
   return cur + n.toFixed(2)
 }

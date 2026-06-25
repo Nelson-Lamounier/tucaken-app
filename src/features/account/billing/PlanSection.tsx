@@ -179,12 +179,12 @@ export function PlanSection({ billing, onUpdateBilling }: Props) {
               </p>
               <div className="mt-3 flex items-baseline gap-1.5">
                 <span className="text-2xl font-semibold tabular-nums text-zinc-50">
-                  ${price}
+                  €{price}
                 </span>
                 <span className="text-[11px] text-zinc-500">/ mo</span>
                 {interval === 'annual' && p.yearly > 0 && (
                   <span className="ml-1 text-[10px] text-zinc-600">
-                    billed ${p.yearly}/yr
+                    billed €{p.yearly}/yr
                   </span>
                 )}
               </div>

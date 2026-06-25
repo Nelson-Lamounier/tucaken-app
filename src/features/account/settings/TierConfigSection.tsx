@@ -13,6 +13,7 @@ import {
   updateTierConfigFn,
 } from '@/server/tier-config'
 import { adminKeys } from '@/lib/api/query-keys'
+import { notifyError, notifySuccess } from '@/lib/errors/notify'
 import type { TierConfig, TierConfigEntry, TierEntitlements } from '@/features/billing/tier-config'
 
 // ---- Types -----------------------------------------------------------------
@@ -172,7 +173,7 @@ function TierCard({
             onChange={(e) => onChange({ cta: e.target.value })}
           />
         </Field>
-        <Field label="Monthly price (USD)">
+        <Field label="Monthly price (EUR)">
           <input
             className={inputCls()}
             type="number"
@@ -183,7 +184,7 @@ function TierCard({
             }
           />
         </Field>
-        <Field label="Annual price (USD)">
+        <Field label="Annual price (EUR)">
           <input
             className={inputCls()}
             type="number"
@@ -267,6 +268,11 @@ export function TierConfigSection() {
       void qc.invalidateQueries({ queryKey: adminKeys.me.detail() })
       setDraft(null)
       setConfirming(false)
+      notifySuccess('Tiers saved', 'Subscription tier configuration updated.')
+    },
+    onError: (err) => {
+      setConfirming(false)
+      notifyError(err, 'generic')
     },
   })
 
