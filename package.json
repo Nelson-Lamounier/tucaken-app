@@ -14,7 +14,7 @@
   "imports": {},
   "scripts": {
     "dev": "vite dev --port 5001",
-    "build": "vite build && esbuild src/server/patches.ts --bundle --platform=node --format=esm --outfile=server.js '--external:./dist/*' '--external:@opentelemetry/*' '--external:pino' '--external:prom-client' '--external:@pyroscope/*' && esbuild src/lib/observability/telemetry.ts --bundle --platform=node --format=esm --outfile=telemetry.js '--external:@opentelemetry/*' '--external:@pyroscope/*'",
+    "build": "vite build && esbuild src/server/patches.ts --bundle --platform=node --format=esm --outfile=server.js '--external:./dist/*' '--external:tanstack-start-*' '--external:#tanstack-*' '--external:@opentelemetry/*' '--external:pino' '--external:prom-client' '--external:@pyroscope/*' && esbuild src/lib/observability/telemetry.ts --bundle --platform=node --format=esm --outfile=telemetry.js '--external:@opentelemetry/*' '--external:@pyroscope/*'",
     "preview": "vite preview",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
