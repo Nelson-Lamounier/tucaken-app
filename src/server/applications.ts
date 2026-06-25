@@ -19,6 +19,7 @@ import type {
   ApplicationStatus,
   ApplicationDetail,
   ScheduledInterview,
+  CoverLetter,
 } from '@/lib/types/applications.types'
 import type { ResumeData } from '@/lib/resumes/resume-data'
 import { requireAuth } from './auth-guard'
@@ -206,6 +207,7 @@ export interface TailoredResumeSummary {
   readonly targetRole: string
   readonly updatedAt: string
   readonly data: ResumeData
+  readonly coverLetter: CoverLetter | null
 }
 
 /**
@@ -247,6 +249,7 @@ export const getTailoredResumesFn = createServerFn({ method: 'GET' }).handler(as
         targetRole: candidates[i].targetRole,
         updatedAt: candidates[i].updatedAt,
         data: result.value.application.analysis.tailoredResume,
+        coverLetter: result.value.application.analysis.coverLetter ?? null,
       })
     }
   })
