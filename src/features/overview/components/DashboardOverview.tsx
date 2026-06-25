@@ -254,7 +254,6 @@ export function DashboardOverview() {
   const quickActions = [
     { label: 'New Article', href: '/editor/new', description: 'Open the article editor' },
     { label: 'Moderate Comments', href: '/comments', description: `${pendingComments} pending` },
-    { label: 'Manage Resumes', href: '/resumes', description: `${totalResumes} version${totalResumes === 1 ? '' : 's'}` },
     { label: 'AI Reports', href: '/reports', description: 'View AI metrics' },
   ] as const
 

@@ -1,10 +1,10 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { adminKeys } from '@/lib/api/query-keys'
-import { ResumeForm } from '../features/resumes/components/ResumeForm'
-import { getResumeFn, updateResumeFn } from '../server/resumes'
+import { ResumeForm } from '@/features/resumes/components/ResumeForm'
+import { getResumeFn, updateResumeFn } from '@/server/resumes'
 import { useToastStore } from '@/lib/stores/toast-store'
-import { DashboardDrawer } from '../components/ui/DashboardDrawer'
+import { DashboardDrawer } from '@/components/ui/DashboardDrawer'
 import type { ResumeData } from '@/lib/resumes/resume-data'
 
 export const Route = createFileRoute('/_dashboard/resumes/edit/$id')({
@@ -44,7 +44,7 @@ function EditResumePage() {
   })
 
   const updateMutation = useMutation({
-    mutationFn: (variables: { label: string; data: Record<string, unknown> }) => 
+    mutationFn: (variables: { label: string; data: Record<string, unknown> }) =>
       updateResumeFn({ data: { resumeId: id, label: variables.label, data: variables.data } }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: adminKeys.resumes.all })
