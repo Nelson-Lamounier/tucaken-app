@@ -6,9 +6,14 @@ describe('toPublicTierConfig', () => {
 
   it('keeps display fields and tier order', () => {
     expect(pub.tiers.map((t) => t.id)).toEqual(['free', 'pro', 'premium']);
-    expect(pub.tiers[1].name).toBe(DEFAULT_TIER_CONFIG.tiers[1].name);
-    expect(pub.tiers[1].priceMonthly).toBe(DEFAULT_TIER_CONFIG.tiers[1].priceMonthly);
-    expect(pub.tiers[1].features).toEqual(DEFAULT_TIER_CONFIG.tiers[1].features);
+
+    const pro = pub.tiers.find((t) => t.id === 'pro');
+    const defPro = DEFAULT_TIER_CONFIG.tiers.find((t) => t.id === 'pro');
+    if (!pro || !defPro) throw new Error('pro tier missing from config');
+
+    expect(pro.name).toBe(defPro.name);
+    expect(pro.priceMonthly).toBe(defPro.priceMonthly);
+    expect(pro.features).toEqual(defPro.features);
   });
 
   it('omits entitlements and Stripe price IDs', () => {
