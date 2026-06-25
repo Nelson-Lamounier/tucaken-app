@@ -22,6 +22,7 @@ import { StageCoachingNarrative } from '../stages/components/CoachingSections'
 import { StageDraftProvider } from '../stages/hooks/stage-draft-context'
 import type { StageDraft } from '../stages/hooks/useStageDraft'
 import { STAGE_ORDER, stageIndex, isInterviewStage } from '../stages/types/stage'
+import { enabledStagesFor, type StageViewer } from '../stages/types/stage-access'
 import DropDownOptions from '@/components/ui/DropDownOptions'
 import { ApplicationActionsMenu } from './ApplicationActionsMenu'
 import { triggerCoachFn } from '@/server/pipelines'
@@ -33,6 +34,14 @@ import {
   STATUS_LABELS,
   STAGE_LABELS,
 } from './ApplicationTypes'
+
+/** Reduce a requested stage to one the viewer may open; falls back to 'applied'. */
+export function clampStage(
+  requested: InterviewStage,
+  enabledStages: ReadonlySet<InterviewStage>,
+): InterviewStage {
+  return enabledStages.has(requested) ? requested : 'applied'
+}
 
 /**
  * Stages whose Schedule panel lives in the dashboard StageGlancePanel — wrapped
@@ -147,9 +156,11 @@ interface ApplicationDetailContainerProps {
   readonly focus?: string
   /** The authenticated user's email — used to gate privileged actions. */
   readonly viewerEmail?: string
+  /** The authenticated viewer — used to gate interview-stage access. */
+  readonly viewer?: StageViewer | null
 }
 
-export function ApplicationDetailContainer({ slug, activeStage, focus, viewerEmail }: ApplicationDetailContainerProps) {
+export function ApplicationDetailContainer({ slug, activeStage, focus, viewerEmail, viewer }: ApplicationDetailContainerProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const statusMutation = useApplicationStatus()
@@ -258,8 +269,11 @@ export function ApplicationDetailContainer({ slug, activeStage, focus, viewerEma
 
   if (!detail) return null
 
-  // Active Stage = explicit ?stage param, else the application's Current Stage.
-  const resolvedStage: InterviewStage = activeStage ?? detail.interviewStage
+  // Active Stage = explicit ?stage param, else the application's Current Stage —
+  // clamped to a stage this viewer may open (blocks ?stage= URL bypass).
+  const enabledStages = enabledStagesFor(viewer ?? null)
+  const requestedStage: InterviewStage = activeStage ?? detail.interviewStage
+  const resolvedStage: InterviewStage = clampStage(requestedStage, enabledStages)
 
   const dateStr = new Date(detail.createdAt).toLocaleDateString('en-GB', {
     day: 'numeric',
@@ -326,6 +340,7 @@ export function ApplicationDetailContainer({ slug, activeStage, focus, viewerEma
           current={detail.interviewStage}
           active={resolvedStage}
           onSelect={handleStageSelect}
+          enabledStages={enabledStages}
           stages={detail.stages}
         />
       </div>
