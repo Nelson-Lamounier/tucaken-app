@@ -238,6 +238,19 @@ export interface AdminApiConfig {
   readonly researchModel: string;
 
   /**
+   * Retrieval backend forwarded to ARTICLE-pipeline K8s Jobs as
+   * RESEARCH_RETRIEVAL_SOURCE. Selects which KB the research agent grounds on:
+   *   - 'pgvector'  → the user KB (document_embeddings + repository_profile_embeddings)
+   *                   via the shared PgVectorRetriever (RLS-scoped to USER_ID).
+   *   - 'bedrock-kb'→ the legacy Bedrock/Pinecone KB (requires KNOWLEDGE_BASE_ID,
+   *                   which the article route does not set — so it retrieves nothing).
+   * Defaults to 'pgvector': the article route always passes USER_ID and the
+   * pgvector KB is the populated, RLS-isolated source. Overridable via
+   * RESEARCH_RETRIEVAL_SOURCE for a fast rollback to the legacy path.
+   */
+  readonly researchRetrievalSource: string;
+
+  /**
    * Bedrock model ID forwarded to JOB-STRATEGIST K8s Jobs as RESEARCH_MODEL
    * (the research-agent "matcher"). Defaults to Sonnet 4.6 — the matcher emits a
    * nuanced multi-section brief (verified/partial/gap classification + fit
@@ -372,6 +385,7 @@ export function loadConfig(): AdminApiConfig {
     // TECH_EXTRACT_GITHUB_SBOM_ENABLED=0 to disable without a code change.
     githubSbomEnabled:               process.env['TECH_EXTRACT_GITHUB_SBOM_ENABLED'] !== '0',
     researchModel:                   required['RESEARCH_MODEL']!,
+    researchRetrievalSource:         process.env['RESEARCH_RETRIEVAL_SOURCE'] ?? 'pgvector',
     strategistResearchModel:         process.env['STRATEGIST_RESEARCH_MODEL'] ?? 'eu.anthropic.claude-sonnet-4-6',
     foundationModel:                 process.env['FOUNDATION_MODEL'] ?? 'eu.anthropic.claude-sonnet-4-6',
     coachModel:                      process.env['COACH_MODEL'] ?? 'eu.anthropic.claude-sonnet-4-6',

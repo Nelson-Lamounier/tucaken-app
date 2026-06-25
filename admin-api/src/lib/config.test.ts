@@ -45,6 +45,20 @@ describe('loadConfig — coachModel', () => {
   });
 });
 
+describe('loadConfig — researchRetrievalSource', () => {
+  it('defaults to pgvector (user KB) when RESEARCH_RETRIEVAL_SOURCE is unset', () => {
+    withEnv({ RESEARCH_RETRIEVAL_SOURCE: undefined }, () => {
+      expect(loadConfig().researchRetrievalSource).toBe('pgvector');
+    });
+  });
+
+  it('respects an explicit RESEARCH_RETRIEVAL_SOURCE override (legacy rollback)', () => {
+    withEnv({ RESEARCH_RETRIEVAL_SOURCE: 'bedrock-kb' }, () => {
+      expect(loadConfig().researchRetrievalSource).toBe('bedrock-kb');
+    });
+  });
+});
+
 describe('loadConfig — strategistResearchModel', () => {
   it('defaults to Claude Sonnet 4.6 when STRATEGIST_RESEARCH_MODEL is unset', () => {
     withEnv({ STRATEGIST_RESEARCH_MODEL: undefined }, () => {

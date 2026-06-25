@@ -14,6 +14,7 @@
 
 import { randomUUID } from 'node:crypto';
 
+import type { V1Job } from '@kubernetes/client-node';
 import { Hono } from 'hono';
 
 import { resolveDispatchMode } from '../lib/ab-free-tier.js';
@@ -29,6 +30,34 @@ import { insertPipelineRun, getPipelineRun } from '../lib/repositories/pipeline-
 import { getUserPlanStatus, checkAndIncrementResumeQuota, decrementResumeQuota } from '../lib/repositories/users.js';
 import { secondsUntilNextMonthUTC } from '../lib/retry-after.js';
 import type { AdminApiBindings } from '../lib/types.js';
+
+/**
+ * Resolve the article-pipeline image URI, or `null` when the admin-api-job-images
+ * Secret has not synced yet. Shared by the article-job and article-eval-job
+ * routes, which dispatch the same image. Logs the unresolved value on miss.
+ */
+function resolveArticlePipelineImage(logTag: string): string | null {
+  const image = getJobImage('article-pipeline');
+  if (!isImageConfigured(image)) {
+    console.error(`[${logTag}] image URI unresolved — admin-api-job-images Secret not yet synced`, { value: image });
+    return null;
+  }
+  return image;
+}
+
+/**
+ * Create a K8s Job, returning false (and logging) on failure. Shared dispatch
+ * scaffolding so each route does not re-implement the BatchV1 call + error path.
+ */
+async function createPipelineJob(namespace: string, job: V1Job, logTag: string): Promise<boolean> {
+  try {
+    await getBatchApi().createNamespacedJob({ namespace, body: job });
+    return true;
+  } catch (err: unknown) {
+    console.error(`[${logTag}] failed to create K8s Job`, err);
+    return false;
+  }
+}
 
 /**
  * Create the pipelines admin router.
@@ -61,9 +90,8 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
     const s3SourceKey = `drafts/${slug}.md`;
     const mode        = body.mode?.trim() || 'kb-augmented';
 
-    const articlePipelineImage = getJobImage('article-pipeline');
-    if (!isImageConfigured(articlePipelineImage)) {
-      console.error('[pipelines/article-job] image URI unresolved — admin-api-job-images Secret not yet synced', { value: articlePipelineImage });
+    const articlePipelineImage = resolveArticlePipelineImage('pipelines/article-job');
+    if (!articlePipelineImage) {
       return ctx.json({ error: 'Article pipeline image not yet configured — wait ~60s for ESO/kubelet sync' }, 502);
     }
 
@@ -76,7 +104,10 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
           userId,
           pipelineType:  'article',
           referenceId:   slug,
-          metadata:      { s3Bucket, s3SourceKey, mode },
+          // Stamp the exact article-pipeline image this run will execute, so a
+          // run's code version is always queryable from its metadata — never
+          // inferred from deploy timelines. Mirrors the strategist route.
+          metadata:      { s3Bucket, s3SourceKey, mode, dispatchedImage: articlePipelineImage },
         });
       } catch (err: unknown) {
         console.error('[pipelines/article-job] failed to insert pipeline_run', err);
@@ -122,6 +153,11 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
           { name: 'USER_ID',          value: userId },
           { name: 'MODE',             value: mode },
           { name: 'RESEARCH_MODEL',   value: config.researchModel },
+          // Ground the research agent on the user KB (pgvector) rather than the
+          // legacy Bedrock KB. USER_ID above is required by the pgvector path and
+          // is already set; without this env the agent defaults to 'bedrock-kb',
+          // which has no KNOWLEDGE_BASE_ID here and so retrieves nothing.
+          { name: 'RESEARCH_RETRIEVAL_SOURCE', value: config.researchRetrievalSource },
           { name: 'FOUNDATION_MODEL', value: config.foundationModel },
           { name: 'QA_MODEL',         value: config.foundationModel },
           { name: 'AWS_REGION',       value: config.awsRegion },
@@ -129,13 +165,75 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
         envFromSecretRefs:   ['platform-rds-credentials'],
       });
 
-      try { await getBatchApi().createNamespacedJob({ namespace: config.articlePipelineNamespace, body: job }); }
-      catch (err: unknown) {
-        console.error('[pipelines/article-job] failed to create K8s Job', err);
+      if (!(await createPipelineJob(config.articlePipelineNamespace, job, 'pipelines/article-job'))) {
         return ctx.json({ error: 'Failed to schedule pipeline Job' }, 502);
       }
 
       return ctx.json({ status: 'queued', pipelineRunId, jobName: job.metadata!.name!, slug }, 202);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /api/admin/pipelines/article-eval-job
+  // Dispatch the article-pipeline per-phase LIVE evals (research grounding +
+  // writer quality + QA judge) as a one-shot K8s Job. Reuses the SAME image, SA
+  // and platform-rds-credentials secret as a real article run, so the evals
+  // exercise the live pgvector KB + Bedrock exactly as production does. Runs the
+  // `dist/run-evals.js` entrypoint instead of the pipeline; writes pass/fail to
+  // its pipeline_runs row (poll via GET /runs/:id). On-demand only — never on a
+  // schedule and never in GitHub CI (where article generation must not happen).
+  // -------------------------------------------------------------------------
+  router.post('/article-eval-job', async (ctx) => {
+    const userId = ctx.get('userId');
+    if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
+
+    const articlePipelineImage = resolveArticlePipelineImage('pipelines/article-eval-job');
+    if (!articlePipelineImage) {
+      return ctx.json({ error: 'Article pipeline image not yet configured — wait ~60s for ESO/kubelet sync' }, 502);
+    }
+
+    const pipelineRunId = randomUUID();
+
+    return withUser(getPool(config), userId, async (db) => {
+      try {
+        await insertPipelineRun(db, {
+          id:            pipelineRunId,
+          userId,
+          pipelineType:  'article-eval',
+          referenceId:   userId,
+          metadata:      { dispatchedImage: articlePipelineImage },
+        });
+      } catch (err: unknown) {
+        console.error('[pipelines/article-eval-job] failed to insert pipeline_run', err);
+        return ctx.json({ error: 'Failed to record pipeline run' }, 500);
+      }
+
+      const suffixInput = `${pipelineRunId}:eval:${Date.now()}`;
+      const job = buildPipelineJob({
+        namespace:           config.articlePipelineNamespace,
+        image:               articlePipelineImage,
+        serviceAccountName:  config.articlePipelineServiceAccount,
+        nameStem:            `article-eval-${sanitizeLabel(userId)}`,
+        suffixInput,
+        labels:              { app: 'article-pipeline', userId, job: 'eval' },
+        // Same image, different entrypoint: run the evals, not the pipeline.
+        command:             ['node', 'dist/run-evals.js'],
+        env: [
+          { name: 'PIPELINE_RUN_ID',  value: pipelineRunId },
+          { name: 'USER_ID',          value: userId },
+          // Writer + QA evals invoke Bedrock; the research eval only needs pgvector.
+          { name: 'FOUNDATION_MODEL', value: config.foundationModel },
+          { name: 'QA_MODEL',         value: config.foundationModel },
+          { name: 'AWS_REGION',       value: config.awsRegion },
+        ],
+        envFromSecretRefs:   ['platform-rds-credentials'],
+      });
+
+      if (!(await createPipelineJob(config.articlePipelineNamespace, job, 'pipelines/article-eval-job'))) {
+        return ctx.json({ error: 'Failed to schedule eval Job' }, 502);
+      }
+
+      return ctx.json({ status: 'queued', pipelineRunId, jobName: job.metadata!.name! }, 202);
     });
   });
 
