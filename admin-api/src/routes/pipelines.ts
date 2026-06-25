@@ -148,6 +148,73 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
   });
 
   // -------------------------------------------------------------------------
+  // POST /api/admin/pipelines/article-eval-job
+  // Dispatch the article-pipeline per-phase LIVE evals (research grounding +
+  // writer quality + QA judge) as a one-shot K8s Job. Reuses the SAME image, SA
+  // and platform-rds-credentials secret as a real article run, so the evals
+  // exercise the live pgvector KB + Bedrock exactly as production does. Runs the
+  // `dist/run-evals.js` entrypoint instead of the pipeline; writes pass/fail to
+  // its pipeline_runs row (poll via GET /runs/:id). On-demand only — never on a
+  // schedule and never in GitHub CI (where article generation must not happen).
+  // -------------------------------------------------------------------------
+  router.post('/article-eval-job', async (ctx) => {
+    const userId = ctx.get('userId');
+    if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
+
+    const articlePipelineImage = getJobImage('article-pipeline');
+    if (!isImageConfigured(articlePipelineImage)) {
+      console.error('[pipelines/article-eval-job] image URI unresolved — admin-api-job-images Secret not yet synced', { value: articlePipelineImage });
+      return ctx.json({ error: 'Article pipeline image not yet configured — wait ~60s for ESO/kubelet sync' }, 502);
+    }
+
+    const pipelineRunId = randomUUID();
+
+    return withUser(getPool(config), userId, async (db) => {
+      try {
+        await insertPipelineRun(db, {
+          id:            pipelineRunId,
+          userId,
+          pipelineType:  'article-eval',
+          referenceId:   userId,
+          metadata:      { dispatchedImage: articlePipelineImage },
+        });
+      } catch (err: unknown) {
+        console.error('[pipelines/article-eval-job] failed to insert pipeline_run', err);
+        return ctx.json({ error: 'Failed to record pipeline run' }, 500);
+      }
+
+      const suffixInput = `${pipelineRunId}:eval:${Date.now()}`;
+      const job = buildPipelineJob({
+        namespace:           config.articlePipelineNamespace,
+        image:               articlePipelineImage,
+        serviceAccountName:  config.articlePipelineServiceAccount,
+        nameStem:            `article-eval-${sanitizeLabel(userId)}`,
+        suffixInput,
+        labels:              { app: 'article-pipeline', userId, job: 'eval' },
+        // Same image, different entrypoint: run the evals, not the pipeline.
+        command:             ['node', 'dist/run-evals.js'],
+        env: [
+          { name: 'PIPELINE_RUN_ID',  value: pipelineRunId },
+          { name: 'USER_ID',          value: userId },
+          // Writer + QA evals invoke Bedrock; the research eval only needs pgvector.
+          { name: 'FOUNDATION_MODEL', value: config.foundationModel },
+          { name: 'QA_MODEL',         value: config.foundationModel },
+          { name: 'AWS_REGION',       value: config.awsRegion },
+        ],
+        envFromSecretRefs:   ['platform-rds-credentials'],
+      });
+
+      try { await getBatchApi().createNamespacedJob({ namespace: config.articlePipelineNamespace, body: job }); }
+      catch (err: unknown) {
+        console.error('[pipelines/article-eval-job] failed to create K8s Job', err);
+        return ctx.json({ error: 'Failed to schedule eval Job' }, 502);
+      }
+
+      return ctx.json({ status: 'queued', pipelineRunId, jobName: job.metadata!.name! }, 202);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // POST /api/admin/pipelines/strategist-job
   // Phase 4: K8s-Job-based strategist pipeline trigger.
   // -------------------------------------------------------------------------
