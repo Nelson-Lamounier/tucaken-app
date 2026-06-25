@@ -11,6 +11,7 @@
 // to the client.
 
 import type { PlanId } from '@/features/account/types'
+import type { TierConfig } from '@/features/billing/tier-config'
 
 export type BillingInterval = 'monthly' | 'annual'
 
@@ -98,4 +99,23 @@ export function formatPrice(t: Tier, interval: BillingInterval = 'monthly'): str
   if (t.free) return 'Free'
   const n = interval === 'monthly' ? t.priceMonthly : t.priceAnnual
   return `$${n}`
+}
+
+/**
+ * Map the persisted tier config into the display `Tier[]` the pricing and
+ * billing UIs consume. Returns the static `TIERS` when no config is present.
+ */
+export function tiersFromConfig(config: TierConfig | null | undefined): readonly Tier[] {
+  if (!config) return TIERS
+  return config.tiers.map((t) => ({
+    id: t.id,
+    name: t.name,
+    priceMonthly: t.priceMonthly,
+    priceAnnual: t.priceAnnual,
+    blurb: t.blurb,
+    features: [...t.features],
+    cta: t.cta,
+    highlighted: t.highlighted || undefined,
+    free: t.free || undefined,
+  }))
 }
