@@ -93,7 +93,7 @@ export function BillingPage({ billing, onUpdateBilling }: BillingPageProps) {
         label="Invoices"
         sub="The last twelve are listed here. Older are available in the customer portal."
       >
-        <InvoicesSection billing={billing} />
+        <InvoicesSection />
       </PageSection>
 
       <PageSection
