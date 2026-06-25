@@ -15,8 +15,11 @@ jest.unstable_mockModule('../lib/repositories/users.js', () => ({
   adminUpdateUser: jest.fn(),
   softDeleteUser: jest.fn(),
   hardDeleteUser: jest.fn(),
+  getUserPlanStatus: jest.fn(),
 }));
 jest.unstable_mockModule('../lib/pg.js', () => ({ getPool: () => ({}) }));
+jest.unstable_mockModule('../lib/github-uninstall.js', () => ({ revokeGitHubInstallationForUser: jest.fn() }));
+jest.unstable_mockModule('./github.js', () => ({ deleteConnection: jest.fn(), createGithubRouter: jest.fn() }));
 
 const { createAdminUsersRouter } = await import('./admin-users.js');
 

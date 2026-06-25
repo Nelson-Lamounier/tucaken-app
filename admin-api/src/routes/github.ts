@@ -123,7 +123,7 @@ async function upsertConnection(
     );
 }
 
-async function deleteConnection(pool: Pool, userId: string): Promise<void> {
+export async function deleteConnection(pool: Pool, userId: string): Promise<void> {
     // Cascade: delete connected repos + their sync state + embeddings.
     // Ordering matters — FK-free tables first, then oauth_connections.
     await pool.query(

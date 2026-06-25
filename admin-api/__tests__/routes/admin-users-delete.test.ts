@@ -12,13 +12,18 @@ const getPool = jest.fn(() => ({
 
 jest.unstable_mockModule('../../src/lib/repositories/users.js', () => ({
   softDeleteUser, getAdminUserById,
-  // re-export the other named members the router imports, as no-op mocks:
+  // re-export the other named members the router imports (directly or via github.js), as no-op mocks:
   listUsers: jest.fn(), adminUpdateUser: jest.fn(), restoreSoftDeletedUser: jest.fn(),
+  hardDeleteUser: jest.fn(), getUserPlanStatus: jest.fn(),
 }))
 jest.unstable_mockModule('../../src/lib/cognito-admin.js', () => ({
   adminDisableUser, adminEnableUser: jest.fn(),
 }))
 jest.unstable_mockModule('../../src/lib/purge-user.js', () => ({ purgeUser }))
+jest.unstable_mockModule('../../src/lib/github-uninstall.js', () => ({ revokeGitHubInstallationForUser: jest.fn() }))
+jest.unstable_mockModule('../../src/routes/github.js', () => ({
+  deleteConnection: jest.fn(), createGithubRouter: jest.fn(),
+}))
 jest.unstable_mockModule('../../src/lib/pg.js', () => ({ getPool }))
 
 const { createAdminUsersRouter } = await import('../../src/routes/admin-users.js')

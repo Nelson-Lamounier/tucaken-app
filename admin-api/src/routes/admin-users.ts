@@ -28,9 +28,11 @@ import { z } from 'zod';
 
 import { adminDisableUser, adminEnableUser } from '../lib/cognito-admin.js';
 import type { AdminApiConfig } from '../lib/config.js';
+import { revokeGitHubInstallationForUser } from '../lib/github-uninstall.js';
 import { logger } from '../lib/observability/logger.js';
 import { getPool } from '../lib/pg.js';
 import { purgeUser } from '../lib/purge-user.js';
+import { deleteConnection } from './github.js';
 import {
   adminUpdateUser,
   getAdminUserById,
@@ -138,6 +140,36 @@ export function createAdminUsersRouter(
     );
     logger.warn({ event: 'admin_user_hard_deleted', userId, outcome }, 'admin hard-deleted user');
     return ctx.json({ ok: true, mode: 'hard', outcome });
+  });
+
+  /**
+   * DELETE /api/admin/users/:userId/github
+   *
+   * Standalone GitHub repo disconnect — revokes the App installation on GitHub
+   * and clears all oauth_connections / repositories / embeddings rows for the
+   * user, without touching the Cognito account or users table.
+   *
+   * Returns { ok: true, disconnected: boolean, githubUninstall: RevokeOutcome }.
+   * disconnected is false when the user had no GitHub connection (no-op path).
+   * Guards: 400 bad UUID, 404 user not found.
+   */
+  router.delete('/:userId/github', async (ctx) => {
+    const userId = ctx.req.param('userId');
+    if (!UUID_RE.test(userId)) return ctx.json({ error: 'Invalid userId' }, 400);
+
+    const pool = getPool(config);
+    const target = await getAdminUserById(pool, userId);
+    if (!target) return ctx.json({ error: 'NotFound', userId }, 404);
+
+    const githubUninstall = await revokeGitHubInstallationForUser(
+      pool, config.githubAppId, config.githubPrivateKey, userId,
+    );
+    // Always clear DB rows even if revoke was best-effort 'failed' — the row
+    // delete is the user-visible disconnect; orphaned installs are reconciled.
+    await deleteConnection(pool, userId);
+    const disconnected = githubUninstall !== 'not_connected';
+    logger.warn({ event: 'admin_user_github_disconnected', userId, githubUninstall }, 'admin disconnected GitHub');
+    return ctx.json({ ok: true, disconnected, githubUninstall });
   });
 
   /**
