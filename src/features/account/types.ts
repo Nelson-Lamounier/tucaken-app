@@ -8,13 +8,6 @@ export type PlanId = 'free' | 'pro' | 'premium'
 export type BillingStatus = 'active' | 'trialing' | 'past_due' | 'canceled'
 export type BillingInterval = 'monthly' | 'annual'
 
-export interface PaymentMethod {
-  brand: string
-  last4: string
-  expMonth: number
-  expYear: number
-}
-
 /** Read-only card view fetched live from Stripe — never persisted. */
 export interface PaymentMethodView {
   brand: string
@@ -50,15 +43,6 @@ export interface InvoiceView {
   hostedUrl: string | null
 }
 
-export interface BillingAddress {
-  line1: string
-  line2?: string
-  city: string
-  state: string
-  postal: string
-  country: string
-}
-
 export interface UsageMeter {
   used: number
   included: number
@@ -72,14 +56,6 @@ export interface UsageBlock {
   storage: UsageMeter
 }
 
-export interface Invoice {
-  id: string
-  date: string         // ISO
-  amount: number
-  status: 'paid' | 'open' | 'failed'
-  number: string
-}
-
 export interface Billing {
   plan: PlanId
   status: BillingStatus
@@ -90,12 +66,7 @@ export interface Billing {
   renewsAt: string                 // ISO
   trialEndsAt: string | null
   cancelAtPeriodEnd: boolean
-  paymentMethod: PaymentMethod
-  billingEmail: string
-  taxId: string
-  address: BillingAddress
   usage: UsageBlock
-  invoices: Invoice[]
   /** Stripe Customer ID once a subscription has been created. */
   stripeCustomerId?: string | null
   /** Stripe Subscription ID once a subscription has been created. */
