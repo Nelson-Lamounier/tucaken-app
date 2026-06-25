@@ -40,6 +40,7 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
 
   const { data: me } = useQuery({ queryKey: adminKeys.me.detail(), queryFn: getMeFn })
   const abFreeTier = me?.abFreeTier ?? false
+  const isAdmin = me?.plan?.role === 'admin'
   const pendingMode = useRef<'free' | 'standard' | undefined>(undefined)
 
   const [initialDraft] = useState(() => {
@@ -262,26 +263,29 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
               </label>
             </div>
 
-            <div className="flex items-center gap-2">
-              <form.Field
-                name="testMode"
-                children={(field) => (
-                  <input
-                    id={field.name}
-                    name={field.name}
-                    type="checkbox"
-                    checked={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(e) => field.handleChange(e.target.checked)}
-                    className="h-4 w-4 rounded border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-800 text-emerald-500 focus:ring-emerald-500/20 focus:ring-offset-0 focus:ring-offset-white dark:focus:ring-offset-zinc-900"
-                  />
-                )}
-              />
-              <label htmlFor="testMode" className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                Run in Test Mode
-              </label>
-              <span className="text-xs text-zinc-400 dark:text-zinc-500">mock data, skips the real run</span>
-            </div>
+            {/* Test Mode is an admin-only affordance — it skips the real run. */}
+            {isAdmin && (
+              <div className="flex items-center gap-2">
+                <form.Field
+                  name="testMode"
+                  children={(field) => (
+                    <input
+                      id={field.name}
+                      name={field.name}
+                      type="checkbox"
+                      checked={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(e) => field.handleChange(e.target.checked)}
+                      className="h-4 w-4 rounded border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-800 text-emerald-500 focus:ring-emerald-500/20 focus:ring-offset-0 focus:ring-offset-white dark:focus:ring-offset-zinc-900"
+                    />
+                  )}
+                />
+                <label htmlFor="testMode" className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                  Run in Test Mode
+                </label>
+                <span className="text-xs text-zinc-400 dark:text-zinc-500">mock data, skips the real run</span>
+              </div>
+            )}
           </div>
 
           {/* Errors surface as a standardized top-right toast (see notifyError). */}
