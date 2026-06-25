@@ -12,6 +12,8 @@ interface StageProgressBarProps {
   /** The stage the user is viewing (Active Stage). */
   readonly active: InterviewStage
   readonly onSelect: (stage: InterviewStage) => void
+  /** Stages this viewer may open. Stages not in the set render disabled with a "Soon" cue. */
+  readonly enabledStages: ReadonlySet<InterviewStage>
   /**
    * Per-stage lifecycle state from the backend. When provided and a stage has a
    * row, the segment's display is derived from `stage_status` rather than index
@@ -83,7 +85,7 @@ function nodeAriaLabel(stage: InterviewStage, notApplicable: boolean, queued: bo
  * reflect Current-Stage lifecycle (completed / current / not-applicable), and
  * the active node carries an accent halo. Scrolls horizontally on mobile.
  */
-export function StageProgressBar({ current, active, onSelect, stages }: StageProgressBarProps) {
+export function StageProgressBar({ current, active, onSelect, enabledStages, stages }: StageProgressBarProps) {
   const activeIndex = STAGE_ORDER.indexOf(active)
 
   return (
@@ -91,6 +93,7 @@ export function StageProgressBar({ current, active, onSelect, stages }: StagePro
       {STAGE_ORDER.map((stage, idx) => {
         const { completed, isCurrent, notApplicable, queued } = resolveSegment(stage, current, stages)
         const isActive = stage === active
+        const isEnabled = enabledStages.has(stage)
 
         return (
           <Fragment key={stage}>
@@ -106,8 +109,10 @@ export function StageProgressBar({ current, active, onSelect, stages }: StagePro
               aria-selected={isActive}
               aria-current={isCurrent ? 'step' : undefined}
               aria-label={nodeAriaLabel(stage, notApplicable, queued)}
-              onClick={() => onSelect(stage)}
-              className={`group relative flex shrink-0 flex-col items-center gap-2 whitespace-nowrap rounded-md px-2 pb-1 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-500 ${nodeTextClass(notApplicable, isActive)}`}
+              disabled={!isEnabled}
+              title={isEnabled ? undefined : 'Coming soon — available after launch'}
+              onClick={() => { if (isEnabled) onSelect(stage) }}
+              className={`group relative flex shrink-0 flex-col items-center gap-2 whitespace-nowrap rounded-md px-2 pb-1 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-500 ${nodeTextClass(notApplicable, isActive)} ${isEnabled ? '' : 'cursor-not-allowed opacity-60'}`}
             >
               <span
                 className={
@@ -127,6 +132,11 @@ export function StageProgressBar({ current, active, onSelect, stages }: StagePro
                   />
                 )}
               </span>
+              {!isEnabled && (
+                <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:bg-white/10 dark:text-zinc-400">
+                  Soon
+                </span>
+              )}
             </button>
           </Fragment>
         )
