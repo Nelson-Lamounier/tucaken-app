@@ -1,10 +1,18 @@
 name: Continuous Integration
 
 on:
+  # Run on pushes to main (post-merge) and on every PR. Feature-branch pushes are
+  # covered by the pull_request event, so this avoids the duplicate push+PR runs
+  # that previously raced (Sonar "CANCELLED", flaky type-check/build on one run).
   push:
-    branches: ['**']
+    branches: [main]
   pull_request:
     branches: ['**']
+
+# Cancel a superseded run for the same ref so rapid re-pushes don't pile up.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
 
 env:
   NODE_VERSION: '22'
