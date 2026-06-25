@@ -22,5 +22,17 @@ function ApplicationDetailRoute() {
   const { stage, focus } = Route.useSearch()
   const { me } = Route.useRouteContext()
 
-  return <ApplicationDetailContainer slug={slug} activeStage={stage} focus={focus} viewerEmail={me?.email} />
+  const viewer = me
+    ? { id: me.id, email: me.email, role: me.plan.role, tier: me.plan.effectivePlan }
+    : null
+
+  return (
+    <ApplicationDetailContainer
+      slug={slug}
+      activeStage={stage}
+      focus={focus}
+      viewerEmail={me?.email}
+      viewer={viewer}
+    />
+  )
 }
