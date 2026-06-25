@@ -22,7 +22,7 @@ import { StageCoachingNarrative } from '../stages/components/CoachingSections'
 import { StageDraftProvider } from '../stages/hooks/stage-draft-context'
 import type { StageDraft } from '../stages/hooks/useStageDraft'
 import { STAGE_ORDER, stageIndex, isInterviewStage } from '../stages/types/stage'
-import { enabledStagesFor, type StageViewer } from '../stages/types/stage-access'
+import { enabledStagesFor, canAdvanceStages, type StageViewer } from '../stages/types/stage-access'
 import DropDownOptions from '@/components/ui/DropDownOptions'
 import { ApplicationActionsMenu } from './ApplicationActionsMenu'
 import { triggerCoachFn } from '@/server/pipelines'
@@ -275,6 +275,10 @@ export function ApplicationDetailContainer({ slug, activeStage, focus, viewerEma
   const requestedStage: InterviewStage = activeStage ?? detail.interviewStage
   const resolvedStage: InterviewStage = clampStage(requestedStage, enabledStages)
 
+  // The advance control is active only when the viewer has a stage to advance to
+  // beyond the launch default; otherwise it is disabled with a "Soon" cue.
+  const canAdvance = canAdvanceStages(enabledStages)
+
   const dateStr = new Date(detail.createdAt).toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'short',
@@ -358,17 +362,33 @@ export function ApplicationDetailContainer({ slug, activeStage, focus, viewerEma
         dateStr={dateStr}
         viewerEmail={viewerEmail}
         advanceControl={
-          <DropDownOptions
-            label="Mark complete and advance"
-            disabled={statusMutation.isPending}
-            options={STAGE_SELECT_OPTIONS}
-            selectedValue={detail.interviewStage}
-            onSelect={(val) => {
-              if (isInterviewStage(val) && val !== detail.interviewStage) {
-                handleAdvanceTo(val, detail.status)
-              }
-            }}
-          />
+          canAdvance ? (
+            <DropDownOptions
+              label="Mark complete and advance"
+              disabled={statusMutation.isPending}
+              options={STAGE_SELECT_OPTIONS}
+              selectedValue={detail.interviewStage}
+              onSelect={(val) => {
+                if (isInterviewStage(val) && val !== detail.interviewStage) {
+                  handleAdvanceTo(val, detail.status)
+                }
+              }}
+            />
+          ) : (
+            <span title="Coming soon — available after launch">
+              <DropDownOptions
+                label={
+                  <span className="flex items-center gap-1.5">
+                    Mark complete and advance
+                    <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:bg-white/10 dark:text-zinc-400">
+                      Soon
+                    </span>
+                  </span>
+                }
+                disabled
+              />
+            </span>
+          )
         }
       />
 

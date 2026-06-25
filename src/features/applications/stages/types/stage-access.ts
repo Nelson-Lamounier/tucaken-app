@@ -53,3 +53,13 @@ export function enabledStagesFor(viewer: StageViewer | null): ReadonlySet<Interv
 export function isStageEnabledFor(stage: InterviewStage, viewer: StageViewer | null): boolean {
   return enabledStagesFor(viewer).has(stage)
 }
+
+/**
+ * True when the viewer has at least one stage to advance to beyond the launch
+ * default (Applied). Drives whether the "Mark complete and advance" control is
+ * active; it is disabled with a "Soon" cue otherwise. 'applied' is always
+ * present, so a set of size 1 means there is nowhere to advance.
+ */
+export function canAdvanceStages(enabledStages: ReadonlySet<InterviewStage>): boolean {
+  return enabledStages.size > 1
+}
