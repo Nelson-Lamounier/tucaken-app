@@ -6,8 +6,9 @@
  * admin-api image. Loads the same Pool as the HTTP server, finds users
  * whose `deleted_at` is older than the grace window, then for each:
  *
- *   1. Cognito — `AdminDeleteUser` so the email is freed for re-registration.
- *   2. Postgres — `DELETE FROM users WHERE id = $1`. Children cascade.
+ *   1. GitHub App — revoke the installation (best-effort).
+ *   2. Cognito — `AdminDeleteUser` so the email is freed for re-registration.
+ *   3. Postgres — `DELETE FROM users WHERE id = $1`. Children cascade.
  *
  * Stripe customer deletion is intentionally NOT performed here. Stripe
  * recommends keeping customer records for tax/invoice retention; an
@@ -20,21 +21,16 @@
  * state is not committed; the row stays soft-deleted for the next run.
  *
  * Trigger locally for verification:
- *   GRACE_DAYS=0 npx tsx admin-api/src/scripts/account-sweep.ts --dry-run
+ *   GRACE_DAYS=0 yarn dlx tsx admin-api/src/scripts/account-sweep.ts --dry-run
  */
 
 import {
   CognitoIdentityProviderClient,
-  AdminDeleteUserCommand,
-  UserNotFoundException,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { Pool } from 'pg';
 
-import { revokeGitHubInstallationForUser } from '../lib/github-uninstall.js';
-import {
-  findUsersForHardDelete,
-  hardDeleteUser,
-} from '../lib/repositories/users.js';
+import { purgeUser } from '../lib/purge-user.js';
+import { findUsersForHardDelete } from '../lib/repositories/users.js';
 
 const GRACE_DAYS = Number(process.env['GRACE_DAYS'] ?? '30');
 const DRY_RUN    = process.argv.includes('--dry-run');
@@ -45,21 +41,6 @@ interface SweepResult {
   total: number;
   purged: string[];
   skipped: Array<{ id: string; reason: string }>;
-}
-
-async function deleteFromCognito(
-  cognito: CognitoIdentityProviderClient,
-  userPoolId: string,
-  sub: string,
-): Promise<void> {
-  try {
-    await cognito.send(
-      new AdminDeleteUserCommand({ UserPoolId: userPoolId, Username: sub }),
-    );
-  } catch (err) {
-    if (err instanceof UserNotFoundException) return;
-    throw err;
-  }
 }
 
 async function main(): Promise<SweepResult> {
@@ -89,6 +70,15 @@ async function main(): Promise<SweepResult> {
     skipped: [],
   };
 
+  const deps = {
+    pool,
+    cognito,
+    userPoolId,
+    region: process.env['AWS_REGION'] ?? 'eu-west-1',
+    githubAppId: GITHUB_APP_ID,
+    githubPrivateKey: GITHUB_PRIVATE_KEY,
+  };
+
   for (const user of candidates) {
     const ctx = { id: user.id, email: user.email, deletedAt: user.deletedAt };
     if (DRY_RUN) {
@@ -96,19 +86,15 @@ async function main(): Promise<SweepResult> {
       console.log('[dry-run] would purge', ctx);
       continue;
     }
+    if (!user.cognitoSub) {
+      result.skipped.push({ id: user.id, reason: 'no cognito_sub' });
+      continue;
+    }
     try {
-      // Uninstall the GitHub App BEFORE the row + oauth_connections cascade
-      // away — once the row is gone the installation_id is lost and the App
-      // would be orphaned on GitHub. Best-effort; the reconcile sweep is the
-      // backstop if this fails.
-      const gh = await revokeGitHubInstallationForUser(
-        pool, GITHUB_APP_ID, GITHUB_PRIVATE_KEY, user.id,
-      );
-      await deleteFromCognito(cognito, userPoolId, user.id);
-      await hardDeleteUser(pool, user.id);
+      const outcome = await purgeUser(deps, user.id, user.cognitoSub);
       result.purged.push(user.id);
       // eslint-disable-next-line no-console
-      console.log('purged', { ...ctx, githubUninstall: gh });
+      console.log('purged', { ...ctx, ...outcome });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       result.skipped.push({ id: user.id, reason: msg });
