@@ -30,7 +30,7 @@ function EditResumePage() {
   function handleClose() {
     setIsOpen(false)
     setTimeout(() => {
-      navigate({ to: '/resumes' })
+      navigate({ to: '/applications/list' })
     }, 400) // matches duration-500 roughly, just enough to feel right
   }
   const navigate = useNavigate({ from: Route.fullPath })
@@ -49,7 +49,7 @@ function EditResumePage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: adminKeys.resumes.all })
       addToast('success', 'Resume saved successfully.')
-      navigate({ to: '/resumes' })
+      navigate({ to: '/applications/list' })
     },
     onError: (err: Error) => addToast('error', err.message),
   })
@@ -72,10 +72,10 @@ function EditResumePage() {
           </div>
           <button
             type="button"
-            onClick={() => navigate({ to: '/resumes' })}
+            onClick={() => navigate({ to: '/applications/list' })}
             className="mt-4 text-sm text-zinc-500 transition hover:text-zinc-700 dark:text-zinc-400"
           >
-            ← Back to Resumes
+            ← Back to Applications
           </button>
         </div>
       ) : (
