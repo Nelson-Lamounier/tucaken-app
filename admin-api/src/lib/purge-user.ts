@@ -10,17 +10,16 @@
  * reconciliation sweep is the backstop. Cognito + DB failures propagate so the
  * caller can abort and leave the row soft-deleted for a later retry.
  */
-import type { CognitoIdentityProviderClient } from '@aws-sdk/client-cognito-identity-provider'
 import type { Pool } from 'pg'
 
 import { adminDeleteUser } from './cognito-admin.js'
 import type { RevokeOutcome } from './github-uninstall.js'
 import { revokeGitHubInstallationForUser } from './github-uninstall.js'
+import { logger } from './observability/logger.js'
 import { hardDeleteUser } from './repositories/users.js'
 
 export interface PurgeUserDeps {
   pool: Pool
-  cognito: CognitoIdentityProviderClient
   userPoolId: string
   region: string
   githubAppId: string | undefined
@@ -38,9 +37,18 @@ export async function purgeUser(
   userId: string,
   cognitoSub: string,
 ): Promise<PurgeOutcome> {
-  const githubUninstall = await revokeGitHubInstallationForUser(
-    deps.pool, deps.githubAppId, deps.githubPrivateKey, userId,
-  )
+  let githubUninstall: RevokeOutcome
+  try {
+    githubUninstall = await revokeGitHubInstallationForUser(
+      deps.pool, deps.githubAppId, deps.githubPrivateKey, userId,
+    )
+  } catch (err) {
+    logger.error(
+      { event: 'purge_github_revoke_threw', userId, err },
+      'revokeGitHubInstallationForUser threw unexpectedly — treating as failed',
+    )
+    githubUninstall = 'failed'
+  }
   await adminDeleteUser(deps.userPoolId, deps.region, cognitoSub)
   await hardDeleteUser(deps.pool, userId)
   return { githubUninstall, cognitoDeleted: true, dbDeleted: true }

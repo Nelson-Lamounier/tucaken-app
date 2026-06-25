@@ -14,12 +14,14 @@ jest.unstable_mockModule('../../src/lib/cognito-admin.js', () => ({
 jest.unstable_mockModule('../../src/lib/repositories/users.js', () => ({
   hardDeleteUser: hardDeleteMock,
 }))
+jest.unstable_mockModule('../../src/lib/observability/logger.js', () => ({
+  logger: { error: jest.fn(), warn: jest.fn(), info: jest.fn() },
+}))
 
 const { purgeUser } = await import('../../src/lib/purge-user.js')
 
 const deps = {
   pool: {} as never,
-  cognito: {} as never,
   userPoolId: 'pool-1',
   region: 'eu-west-1',
   githubAppId: 'app-1',
@@ -49,5 +51,19 @@ describe('purgeUser', () => {
     expect(out.githubUninstall).toBe('failed')
     expect(out.cognitoDeleted).toBe(true)
     expect(out.dbDeleted).toBe(true)
+  })
+
+  it('still deletes Cognito + DB when GitHub revoke throws unexpectedly', async () => {
+    revokeMock.mockRejectedValue(new Error('network'))
+    adminDeleteMock.mockResolvedValue(undefined)
+    hardDeleteMock.mockResolvedValue(undefined)
+
+    const out = await purgeUser(deps, 'user-1', 'sub-1')
+
+    expect(out.githubUninstall).toBe('failed')
+    expect(out.cognitoDeleted).toBe(true)
+    expect(out.dbDeleted).toBe(true)
+    expect(adminDeleteMock).toHaveBeenCalledTimes(1)
+    expect(hardDeleteMock).toHaveBeenCalledTimes(1)
   })
 })

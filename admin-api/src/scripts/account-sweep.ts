@@ -24,9 +24,6 @@
  *   GRACE_DAYS=0 yarn dlx tsx admin-api/src/scripts/account-sweep.ts --dry-run
  */
 
-import {
-  CognitoIdentityProviderClient,
-} from '@aws-sdk/client-cognito-identity-provider';
 import { Pool } from 'pg';
 
 import { purgeUser } from '../lib/purge-user.js';
@@ -54,9 +51,6 @@ async function main(): Promise<SweepResult> {
     max:      1,
   });
 
-  const cognito = new CognitoIdentityProviderClient({
-    region: process.env['AWS_REGION'] ?? 'eu-west-1',
-  });
   const userPoolId =
     process.env['COGNITO_USER_POOL_ID'] ??
     (process.env['COGNITO_ISSUER_URL'] ?? '').split('/').pop() ??
@@ -72,7 +66,6 @@ async function main(): Promise<SweepResult> {
 
   const deps = {
     pool,
-    cognito,
     userPoolId,
     region: process.env['AWS_REGION'] ?? 'eu-west-1',
     githubAppId: GITHUB_APP_ID,
