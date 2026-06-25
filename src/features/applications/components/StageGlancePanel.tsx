@@ -11,6 +11,7 @@ import { resolveStagePrep } from '../stages/types/workspace'
 import { JdUnderstandingPanel } from '../stages/components/JdUnderstandingPanel'
 import { RoleEmphasisPanel } from '../stages/components/RoleEmphasisPanel'
 import { AtsPanel } from '../stages/components/AtsPanel'
+import { FitScorePanel } from '../stages/components/FitScorePanel'
 import { ScheduleCard } from '../stages/components/ScheduleCard'
 import { useStageDraftContext } from '../stages/hooks/stage-draft-context'
 
@@ -677,16 +678,26 @@ function ResearchGlance({ detail, stage }: StageGlancePanelProps) {
   const jd = detail.analysis?.jdExtraction ?? null
   const mix = detail.research?.dimensionMix ?? null
   const atsCheck = detail.analysis?.atsCheck ?? null
+  // Free tier ships a deterministic evidence-fit score in place of the LLM
+  // matcher's verified/partial/gap donut. Show it when present and the matcher
+  // produced no verdicts (the free path), otherwise keep the skill-coverage donut.
+  const evidenceFit = detail.analysis?.evidenceFit ?? null
+  const matcherVerdicts =
+    (detail.research?.verifiedMatches?.length ?? 0) +
+    (detail.research?.partialMatches?.length ?? 0) +
+    (detail.research?.gaps?.length ?? 0)
+  const showFreeFit = Boolean(evidenceFit) && matcherVerdicts === 0
   // @container so the columns respond to the panel's own width (the dashboard has
   // a sidebar), not the viewport — cards go side by side as soon as there is room
   // and stack when narrow.
   return (
     <div className="@container">
       <motion.div key={stage} className="grid gap-4 @2xl:grid-cols-3" variants={GRID} initial="hidden" animate="show">
-        {/* Left column (slim): Assessment tile beside ATS, over the skill-coverage donut */}
+        {/* Left column (slim): Assessment tile, then either the free-tier evidence-fit
+            panel (no matcher verdicts) or the paid skill-coverage donut. */}
         <motion.div variants={TILE} style={{ willChange: 'transform' }} className="flex flex-col gap-4 @2xl:col-span-1">
           {fit && <GlanceTile tile={fit} />}
-          <ResearchCompareGraphic detail={detail} />
+          {showFreeFit && evidenceFit ? <FitScorePanel fit={evidenceFit} /> : <ResearchCompareGraphic detail={detail} />}
         </motion.div>
 
         {/* Right column (wide): ATS check on top of "What we understood from the JD" */}

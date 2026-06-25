@@ -528,6 +528,28 @@ export interface AnalysisOutput {
   readonly yearsGap?: YearsGap | null
   /** Recruiter-snapshot assessment (score, missing keywords, red flags). */
   readonly recruiterSnapshot?: RecruiterSnapshot | null
+  /** Free-tier deterministic evidence-fit score (candidate-side JD coverage). */
+  readonly evidenceFit?: EvidenceFit | null
+}
+
+/**
+ * Free-tier evidence-fit score — what fraction of the JD's required/preferred
+ * skills the user has evidence for, matched against their evidence corpus
+ * (code tech, career, projects, KB, achievements). Deterministic, zero-LLM;
+ * NOT the paid matcher's verified/partial/gap ledger (no `partial` verdict).
+ * Mirrors EvidenceFit in ai-applications (job-strategist/src/ats/evidence-fit.ts).
+ */
+export interface EvidenceFit {
+  /** Weighted blend of required (0.7) and preferred (0.3); 0..1. Headline score. */
+  readonly overallFit: number
+  /** Fraction of the required universe (requiredSkills ∪ tools) backed by evidence; 0..1. */
+  readonly requiredFit: number
+  /** Fraction of the preferred universe (preferredSkills ∪ concepts) backed by evidence; 0..1. */
+  readonly preferredFit: number
+  readonly requiredCovered: readonly string[]
+  readonly requiredMissing: readonly string[]
+  readonly preferredCovered: readonly string[]
+  readonly preferredMissing: readonly string[]
 }
 
 /**
