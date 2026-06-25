@@ -77,7 +77,7 @@ export function BillingPage({ billing, onUpdateBilling }: BillingPageProps) {
         label="Payment method"
         sub="Cards are tokenized — we never see the full number."
       >
-        <PaymentSection billing={billing} onUpdateBilling={onUpdateBilling} />
+        <PaymentSection billing={billing} />
       </PageSection>
 
       <PageSection
