@@ -53,6 +53,7 @@ import { Hono } from 'hono';
 import type { Pool } from 'pg';
 
 import { getJobImage, isImageConfigured, type AdminApiConfig } from '../lib/config.js';
+import { entitlementsFor } from '../lib/entitlements.js';
 import { buildPipelineJob, sanitizeLabel } from '../lib/k8s-job-builder.js';
 import { getBatchApi } from '../lib/k8s.js';
 import { getPool, withUser } from '../lib/pg.js';
@@ -61,6 +62,7 @@ import { insertPipelineRun } from '../lib/repositories/pipeline-runs.js';
 import {
     archiveProject,
     archiveSupersededDefaults,
+    countUserProjects,
     createProject,
     deleteDecision,
     getProjectDetail,
@@ -71,6 +73,7 @@ import {
     patchProject,
     splitProject,
 } from '../lib/repositories/projects.js';
+import { getUserPlanStatus } from '../lib/repositories/users.js';
 import { AdminApiBindings, requireUserId } from '../lib/types.js';
 
 const VALID_TYPES        = new Set(['side_project', 'open_source', 'production_saas', 'client_work', 'internal_tool', 'learning_project']);
@@ -191,6 +194,18 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
         if (input.role_exhibited !== undefined && !isValidOption(VALID_ROLES, input.role_exhibited))      return ctx.json({ error: 'invalid role_exhibited' }, 400);
 
         const pool = getPool(config);
+        const planStatus = await getUserPlanStatus(pool, uid);
+        const role = planStatus?.role ?? null;
+        const projectCap = entitlementsFor(planStatus?.effectivePlan ?? 'free', role).projects;
+        if (Number.isFinite(projectCap)) {
+            const existing = await withUser(pool, uid, (db) => countUserProjects(db, uid));
+            if (existing >= projectCap) {
+                return ctx.json({
+                    error: `Your plan allows ${projectCap} project${projectCap === 1 ? '' : 's'}. Upgrade for more.`,
+                    upgradeUrl: '/pricing',
+                }, 403);
+            }
+        }
         try {
             const created = await withUser(pool, uid, async (db) =>
                 createProject(db, uid, {

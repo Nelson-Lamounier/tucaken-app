@@ -1,6 +1,6 @@
 /**
  * @format
- * Tests for admin-api routes/pipelines.ts (Phase 5 — K8s Job-only).
+ * Tests for admin-api routes/pipelines.ts (Phase 5 - K8s Job-only).
  *
  * The legacy Lambda-based article/strategist routes were removed in Phase 5;
  * these tests cover only the K8s Job-based replacements.
@@ -17,13 +17,16 @@ const insertPipelineRunMock   = jest.fn<() => Promise<void>>().mockResolvedValue
 const upsertArticleMock       = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
 const getPipelineRunMock      = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 
+const poolQueryMock = jest.fn<(...args: unknown[]) => Promise<{ rows: unknown[]; rowCount?: number }>>()
+  .mockResolvedValue({ rows: [{ plan: 'pro', role: 'user', trial_started_at: null, trial_ends_at: null, subscription_status: 'active', stripe_customer_id: null, stripe_subscription_id: null, cancel_at_period_end: false, current_period_end: null, effective_plan: 'pro', trial_days_remaining: null }] });
+
 jest.unstable_mockModule('../../src/lib/k8s.js', () => ({
   getBatchApi:     () => ({ createNamespacedJob: createNamespacedJobMock }),
   _resetBatchApi:  () => {},
 }));
 
 jest.unstable_mockModule('../../src/lib/pg.js', () => ({
-  getPool:    () => ({}),
+  getPool:    () => ({ query: poolQueryMock }),
   withUser:   async (_pool: unknown, _userId: string, fn: (db: { query: jest.Mock }) => Promise<unknown>) =>
     fn({ query: jest.fn() }),
   _resetPool: () => {},
@@ -39,7 +42,7 @@ jest.unstable_mockModule('../../src/lib/repositories/articles.js', () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Module imports — after mocks
+// Module imports - after mocks
 // ---------------------------------------------------------------------------
 
 /** Resolved application configuration stub for tests. */
@@ -66,7 +69,7 @@ const testConfig = {
 };
 
 // ---------------------------------------------------------------------------
-// Phase 4 — K8s-Job-based pipeline routes
+// Phase 4 - K8s-Job-based pipeline routes
 // ---------------------------------------------------------------------------
 
 const { Hono } = await import('hono');
@@ -96,12 +99,13 @@ async function buildAuthedApp(jwtSub: string | null = 'test-user') {
 process.env['ARTICLE_PIPELINE_IMAGE']    = '771826808455.dkr.ecr.eu-west-1.amazonaws.com/article-pipeline:latest';
 process.env['STRATEGIST_PIPELINE_IMAGE'] = '771826808455.dkr.ecr.eu-west-1.amazonaws.com/job-strategist:latest';
 
-describe('POST /article-job/:slug — K8s Job article pipeline', () => {
+describe('POST /article-job/:slug - K8s Job article pipeline', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     createNamespacedJobMock.mockResolvedValue({});
     insertPipelineRunMock.mockResolvedValue(undefined);
     upsertArticleMock.mockResolvedValue(undefined);
+    poolQueryMock.mockResolvedValue({ rows: [{ plan: 'pro', role: 'user', trial_started_at: null, trial_ends_at: null, subscription_status: 'active', stripe_customer_id: null, stripe_subscription_id: null, cancel_at_period_end: false, current_period_end: null, effective_plan: 'pro', trial_days_remaining: null }] });
     const { _resetJobImageCache } = await import('../../src/lib/config.js');
     _resetJobImageCache();
   });
@@ -126,7 +130,7 @@ describe('POST /article-job/:slug — K8s Job article pipeline', () => {
 
   it('returns 202 with pipelineRunId and creates a Job with correct env vars', async () => {
     const app = await buildAuthedApp();
-    // Body is optional — s3Bucket and s3SourceKey are derived from config + slug.
+    // Body is optional - s3Bucket and s3SourceKey are derived from config + slug.
     const res = await app.request('/article-job/my-slug', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -175,9 +179,9 @@ describe('POST /article-job/:slug — K8s Job article pipeline', () => {
   });
 });
 
-describe('POST /strategist-job — K8s Job strategist pipeline', () => {
+describe('POST /strategist-job - K8s Job strategist pipeline', () => {
   // Route validates targetCompany / targetRole / jobDescription only.
-  // applicationId is server-generated (randomUUID) — not accepted from caller.
+  // applicationId is server-generated (randomUUID) - not accepted from caller.
   const validBody = {
     targetCompany:  'Acme',
     targetRole:     'Senior Engineer',
@@ -188,6 +192,7 @@ describe('POST /strategist-job — K8s Job strategist pipeline', () => {
     jest.clearAllMocks();
     createNamespacedJobMock.mockResolvedValue({});
     insertPipelineRunMock.mockResolvedValue(undefined);
+    poolQueryMock.mockResolvedValue({ rows: [{ plan: 'pro', role: 'user', trial_started_at: null, trial_ends_at: null, subscription_status: 'active', stripe_customer_id: null, stripe_subscription_id: null, cancel_at_period_end: false, current_period_end: null, effective_plan: 'pro', trial_days_remaining: null }] });
   });
 
   it.each([
@@ -216,7 +221,7 @@ describe('POST /strategist-job — K8s Job strategist pipeline', () => {
     expect(res.status).toBe(202);
     const body = await res.json() as { status: string; pipelineRunId: string; jobName: string; applicationId: string; applicationSlug: string };
     expect(body.status).toBe('queued');
-    // applicationId is server-generated — verify it is a valid UUID
+    // applicationId is server-generated - verify it is a valid UUID
     expect(body.applicationId).toMatch(/^[0-9a-f-]{36}$/);
     // applicationSlug mirrors the generated applicationId
     expect(body.applicationSlug).toBe(body.applicationId);
@@ -263,7 +268,7 @@ describe('POST /strategist-job — K8s Job strategist pipeline', () => {
   });
 });
 
-describe('GET /runs/:id — pipeline run status polling', () => {
+describe('GET /runs/:id - pipeline run status polling', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });

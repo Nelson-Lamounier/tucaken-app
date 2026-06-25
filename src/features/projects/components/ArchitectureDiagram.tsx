@@ -1,10 +1,27 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { Code2, Download, Image } from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
+import { normaliseMermaidSource } from '../lib/mermaid-normalise'
+
+type ArchNode = { id: string; label: string; kind?: string }
+type ArchEdge = { from: string; to: string; label?: string }
+
+function readNodes(raw: unknown): ArchNode[] {
+  return Array.isArray(raw)
+    ? raw.filter((n): n is ArchNode => !!n && typeof (n as ArchNode).label === 'string')
+    : []
+}
+function readEdges(raw: unknown): ArchEdge[] {
+  return Array.isArray(raw)
+    ? raw.filter((e): e is ArchEdge => !!e && typeof (e as ArchEdge).from === 'string' && typeof (e as ArchEdge).to === 'string')
+    : []
+}
 
 export interface ArchitectureDiagramProps {
   readonly format: 'mermaid' | 'svg'
   readonly source: string
+  readonly nodes?: unknown
+  readonly edges?: unknown
 }
 
 /**
@@ -16,7 +33,7 @@ export interface ArchitectureDiagramProps {
  * DOMPurify pass strips its <style> + foreignObject labels.
  * Offers a raw-source toggle and an SVG download.
  */
-export function ArchitectureDiagram({ format, source }: ArchitectureDiagramProps) {
+export function ArchitectureDiagram({ format, source, nodes, edges }: ArchitectureDiagramProps) {
   const { theme } = useTheme()
   const reactId = useId().replace(/[^a-zA-Z0-9]/g, '')
   const [svg, setSvg]           = useState<string | null>(null)
@@ -75,7 +92,8 @@ export function ArchitectureDiagram({ format, source }: ArchitectureDiagramProps
         // strips scripts/click handlers, so its own SVG is safe to inject. A second
         // DOMPurify SVG-profile pass strips Mermaid's <style> block + the
         // <foreignObject> HTML node labels, leaving unlabelled/uncoloured shapes.
-        const { svg: rendered } = await mermaid.render(`arch-${reactId}`, source)
+        const safeSource = normaliseMermaidSource(source)
+        const { svg: rendered } = await mermaid.render(`arch-${reactId}`, safeSource)
         if (!cancelled) { setSvg(rendered); setError(null) }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to render diagram')
@@ -130,11 +148,35 @@ export function ArchitectureDiagram({ format, source }: ArchitectureDiagramProps
           <code>{source}</code>
         </pre>
       )}
-      {!showSource && error && (
-        <p className="rounded-md bg-rose-400/5 px-4 py-6 text-center text-xs text-rose-300 inset-ring inset-ring-rose-400/30">
-          {error}
-        </p>
-      )}
+      {!showSource && error && (() => {
+        const fbNodes = readNodes(nodes)
+        const fbEdges = readEdges(edges)
+        if (fbNodes.length === 0) {
+          return (
+            <p className="rounded-md bg-white/2 px-4 py-6 text-center text-xs text-zinc-400 inset-ring inset-ring-white/10">
+              Diagram preview unavailable. Use <span className="font-medium text-zinc-300">View source</span> to see the raw definition.
+            </p>
+          )
+        }
+        const byId = new Map(fbNodes.map((n) => [n.id, n.label]))
+        return (
+          <div className="rounded-md bg-white/2 p-4 inset-ring inset-ring-white/10">
+            <p className="mb-3 text-xs text-zinc-400">Diagram preview unavailable; showing the component map.</p>
+            <ul className="flex flex-wrap gap-2">
+              {fbNodes.map((n) => (
+                <li key={n.id} className="rounded-md bg-teal-400/10 px-2 py-1 text-xs text-teal-200 inset-ring inset-ring-teal-400/20">{n.label}</li>
+              ))}
+            </ul>
+            {fbEdges.length > 0 && (
+              <ul className="mt-3 space-y-1 font-mono text-[11px] text-zinc-400">
+                {fbEdges.map((e, i) => (
+                  <li key={i}>{byId.get(e.from) ?? e.from} &rarr; {byId.get(e.to) ?? e.to}{e.label ? ` (${e.label})` : ''}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )
+      })()}
       {!showSource && !error && svg && (
         <div
           ref={containerRef}
