@@ -480,6 +480,9 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
         yearsGap:          rawAnalysis['yearsGap'] ?? null,
         // Recruiter snapshot (metadata.analysis.recruiterSnapshot) — hybrid score + missing keywords + red flags.
         recruiterSnapshot: rawAnalysis['recruiterSnapshot'] ?? null,
+        // Free-tier evidence-fit score (metadata.analysis.evidenceFit) — deterministic
+        // candidate-side JD coverage. Null on the paid path (it has the matcher ledger).
+        evidenceFit:       rawAnalysis['evidenceFit'] ?? null,
       } : null;
 
       // Map research agent output → ResearchOutput shape.
