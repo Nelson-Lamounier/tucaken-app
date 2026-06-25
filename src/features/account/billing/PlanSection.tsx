@@ -13,10 +13,13 @@
 import { ArrowDown, ArrowUp, Check, ExternalLink, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
 import type { Billing, BillingInterval, PlanId } from '../types'
 import { fmtDate, fmtMoney } from '../components/primitives'
-import { PLANS, planRank } from './plans'
+import { PLANS, planRank, plansFromTiers } from './plans'
+import { tiersFromConfig } from '@/features/billing/catalog'
 import { createPortalSessionFn } from '@/server/billing'
+import { getTierConfigFn } from '@/server/tier-config'
 
 interface Props {
   billing: Billing
@@ -25,7 +28,13 @@ interface Props {
 
 export function PlanSection({ billing, onUpdateBilling }: Props) {
   const interval = billing.interval
-  const currentPlan = PLANS.find((p) => p.id === billing.plan)!
+  // Live, admin-editable tier display; falls back to the static PLANS catalog.
+  const { data: tierConfig } = useQuery({
+    queryKey: ['tier-config'],
+    queryFn: getTierConfigFn,
+  })
+  const plans = tierConfig ? plansFromTiers(tiersFromConfig(tierConfig)) : PLANS
+  const currentPlan = plans.find((p) => p.id === billing.plan) ?? plans[0]
   const renews = fmtDate(billing.renewsAt)
   const navigate = useNavigate()
   const [portalLoading, setPortalLoading] = useState<PlanId | null>(null)
@@ -144,7 +153,7 @@ export function PlanSection({ billing, onUpdateBilling }: Props) {
 
       {/* Plan grid */}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        {PLANS.map((p) => {
+        {plans.map((p) => {
           const isCurrent = p.id === billing.plan
           const price =
             interval === 'annual' ? Math.round(p.yearly / 12) : p.price

@@ -99,8 +99,8 @@ const observabilityLinks = [
 ] as const;
 
 const settingsNavigation = [
-  { name: "Settings", href: "/settings", icon: SettingsIcon },
-  { name: "Billing", href: "/billing", icon: CreditCard },
+  { name: "Settings", href: "/settings", icon: SettingsIcon, adminOnly: true },
+  { name: "Billing", href: "/billing", icon: CreditCard, adminOnly: false },
 ] as const;
 
 /**
@@ -351,7 +351,7 @@ function SidebarNavList({ isAdmin }: { isAdmin: boolean }) {
           role="list"
           className="-mx-2 space-y-1"
         >
-          {settingsNavigation.map((item) => (
+          {settingsNavigation.filter((item) => !item.adminOnly || isAdmin).map((item) => (
             <li key={item.name}>
               <Link
                 to={item.href as string}

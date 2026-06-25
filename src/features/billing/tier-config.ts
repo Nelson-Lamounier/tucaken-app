@@ -108,3 +108,28 @@ export function nullToInfinity(v: number | null): number {
 export function infinityToNull(v: number): number | null {
   return Number.isFinite(v) ? v : null
 }
+
+// -----------------------------------------------------------------------------
+// Public, display-only projection
+// -----------------------------------------------------------------------------
+//
+// The shape returned by the unauthenticated GET /api/public/tier-config — it
+// carries only the marketing display fields. Entitlement limits and Stripe
+// price IDs are deliberately omitted so anonymous visitors never see internal
+// configuration.
+
+export interface PublicTierEntry {
+  id: PlanId
+  name: string
+  blurb: string
+  cta: string
+  highlighted: boolean
+  free: boolean
+  priceMonthly: number
+  priceAnnual: number
+  features: string[]
+}
+
+export interface PublicTierConfig {
+  tiers: PublicTierEntry[]
+}

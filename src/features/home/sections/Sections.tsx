@@ -4,11 +4,13 @@
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
 import { MagneticButton } from '../lib/MagneticButton'
 import { Marquee } from '../lib/Marquee'
 import { KineticText } from '../lib/KineticText'
 import { comparison, founder, faq } from '../content'
-import { TIERS } from '@/features/billing/catalog'
+import { tiersFromPublic } from '@/features/billing/catalog'
+import { getPublicTierConfigFn } from '@/server/tier-config'
 
 function Section({ children, id, className = '' }: { children: ReactNode; id?: string; className?: string }) {
   return (
@@ -102,6 +104,13 @@ export function FounderSection() {
 
 export function PricingSection() {
   const navigate = useNavigate()
+  // Live, admin-editable tier display. Falls back to the static TIERS catalog
+  // while loading or if the public endpoint is unreachable.
+  const { data: publicConfig } = useQuery({
+    queryKey: ['public-tier-config'],
+    queryFn: getPublicTierConfigFn,
+  })
+  const tiers = tiersFromPublic(publicConfig)
   // Adapted from TailwindPlus "Three tiers with emphasized tier" — re-skinned
   // to repo palette (zinc/teal, no indigo) and wired to the central TIERS
   // catalog + /checkout flow. The CSS-only monthly/annual toggle uses
@@ -152,7 +161,7 @@ export function PricingSection() {
 
         {/* Tier cards */}
         <div className="isolate mx-auto mt-10 grid max-w-md grid-cols-1 gap-6 lg:mx-0 lg:max-w-none lg:grid-cols-3">
-          {TIERS.map((t) => (
+          {tiers.map((t) => (
             <motion.div
               key={t.id}
               data-featured={t.highlighted ? 'true' : undefined}
