@@ -31,6 +31,7 @@ import type { AdminApiConfig } from '../lib/config.js';
 import { logger } from '../lib/observability/logger.js';
 import { getPool } from '../lib/pg.js';
 import {
+  adminUpdateUser,
   getAdminUserById,
   listUsers,
   restoreSoftDeletedUser,
@@ -163,6 +164,52 @@ export function createAdminUsersRouter(
       return ctx.json({ error: 'NotFound', userId }, 404);
     }
     return ctx.json({ user });
+  });
+
+  /**
+   * PATCH /api/admin/users/:userId
+   *
+   * Updates a user's role and/or plan inside a transaction.
+   * Body: { role?: 'user' | 'admin', plan?: 'free' | 'pro' | 'premium' }
+   * At least one field is required.
+   * Returns { ok: true, updated: boolean }.
+   */
+  const UpdateBody = z.object({
+    role: z.enum(['user', 'admin']).optional(),
+    plan: z.enum(['free', 'pro', 'premium']).optional(),
+  }).refine((b) => b.role !== undefined || b.plan !== undefined, {
+    message: 'At least one of role or plan is required',
+  });
+
+  router.patch('/:userId', async (ctx) => {
+    const userId = ctx.req.param('userId');
+    if (!UUID_RE.test(userId)) return ctx.json({ error: 'Invalid userId' }, 400);
+
+    let raw: unknown;
+    try { raw = await ctx.req.json(); } catch { return ctx.json({ error: 'Invalid JSON body' }, 400); }
+    const parsed = UpdateBody.safeParse(raw);
+    if (!parsed.success) return ctx.json({ error: 'Validation failed', issues: parsed.error.issues }, 400);
+
+    const { role, plan } = parsed.data;
+    const patch: { role?: 'user' | 'admin'; plan?: 'free' | 'pro' | 'premium' } = {};
+    if (role !== undefined) patch.role = role;
+    if (plan !== undefined) patch.plan = plan;
+
+    const pool = getPool(config);
+    const client = await pool.connect();
+    let updated = false;
+    try {
+      await client.query('BEGIN');
+      updated = await adminUpdateUser(client, userId, patch);
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+    logger.warn({ event: 'admin_user_updated', userId, patch: parsed.data, updated }, 'admin updated user');
+    return ctx.json({ ok: true, updated });
   });
 
   return router;
