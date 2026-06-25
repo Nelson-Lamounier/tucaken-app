@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { AIAgentContainer } from '@/features/ai-agent/components/AIAgentContainer'
 import { KbHealthPanel } from '@/features/ai-agent/components/KbHealthPanel'
 import { DashboardPage } from '@/components/layouts/DashboardPage'
@@ -12,6 +12,9 @@ const searchSchema = z.object({
 
 export const Route = createFileRoute('/_dashboard/ai-agent')({
   validateSearch: searchSchema,
+  beforeLoad: ({ context }) => {
+    if (!context.isAdmin) throw redirect({ to: '/overview' })
+  },
   component: AIAgentRoute,
 })
 
