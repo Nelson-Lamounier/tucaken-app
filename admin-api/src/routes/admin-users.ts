@@ -24,13 +24,26 @@
  */
 
 import { Hono } from 'hono';
+import { z } from 'zod';
 
 import { adminEnableUser } from '../lib/cognito-admin.js';
 import type { AdminApiConfig } from '../lib/config.js';
 import { logger } from '../lib/observability/logger.js';
 import { getPool } from '../lib/pg.js';
-import { restoreSoftDeletedUser } from '../lib/repositories/users.js';
+import {
+  getAdminUserById,
+  listUsers,
+  restoreSoftDeletedUser,
+} from '../lib/repositories/users.js';
 import type { AdminApiBindings } from '../lib/types.js';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const ListQuery = z.object({
+  tier: z.enum(['all', 'free', 'pro', 'premium']).default('all'),
+  limit: z.coerce.number().int().min(1).max(200).default(100),
+  offset: z.coerce.number().int().min(0).default(0),
+});
 
 export function createAdminUsersRouter(
   config: AdminApiConfig,
@@ -111,6 +124,45 @@ export function createAdminUsersRouter(
       'soft-deleted account restored during grace window',
     );
     return ctx.json({ ok: true, restored: true });
+  });
+
+  /**
+   * GET /api/admin/users
+   *
+   * Returns a paginated list of users. Accepts optional query params:
+   *   - tier: 'all' | 'free' | 'pro' | 'premium' (default: 'all')
+   *   - limit: 1–200 (default: 100)
+   *   - offset: ≥ 0 (default: 0)
+   */
+  router.get('/', async (ctx) => {
+    const parsed = ListQuery.safeParse({
+      tier: ctx.req.query('tier'),
+      limit: ctx.req.query('limit'),
+      offset: ctx.req.query('offset'),
+    });
+    if (!parsed.success) {
+      return ctx.json({ error: 'Validation failed', issues: parsed.error.issues }, 400);
+    }
+    const { rows, total } = await listUsers(getPool(config), parsed.data);
+    return ctx.json({ users: rows, total });
+  });
+
+  /**
+   * GET /api/admin/users/:userId
+   *
+   * Returns detail for a single user including Stripe fields and usage quotas.
+   * Returns 400 for a malformed UUID, 404 if the user does not exist.
+   */
+  router.get('/:userId', async (ctx) => {
+    const userId = ctx.req.param('userId');
+    if (!UUID_RE.test(userId)) {
+      return ctx.json({ error: 'Invalid userId' }, 400);
+    }
+    const user = await getAdminUserById(getPool(config), userId);
+    if (!user) {
+      return ctx.json({ error: 'NotFound', userId }, 404);
+    }
+    return ctx.json({ user });
   });
 
   return router;
