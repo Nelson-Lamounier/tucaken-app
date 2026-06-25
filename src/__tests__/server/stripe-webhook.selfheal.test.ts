@@ -12,18 +12,23 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 const mockInternalApiFetch = vi.fn()
+const mockApiFetch = vi.fn()
 const mockConstructEvent = vi.fn()
-const mockTierForPriceId = vi.fn()
+const mockTierForPriceIdFromConfig = vi.fn()
 
 vi.mock('../../server/_internal-api-client', () => ({
   internalApiFetch: (...a: unknown[]) => mockInternalApiFetch(...a),
+}))
+
+vi.mock('../../server/_api-client', () => ({
+  apiFetch: (...a: unknown[]) => mockApiFetch(...a),
 }))
 
 vi.mock('../../server/stripe', () => ({
   stripe: () => ({
     webhooks: { constructEvent: (...a: unknown[]) => mockConstructEvent(...a) },
   }),
-  tierForPriceId: (...a: unknown[]) => mockTierForPriceId(...a),
+  tierForPriceIdFromConfig: (...a: unknown[]) => mockTierForPriceIdFromConfig(...a),
 }))
 
 vi.mock('@/lib/observability/logger', () => ({
@@ -49,6 +54,8 @@ describe('stripe webhook — self-healing customer link', () => {
     vi.clearAllMocks()
     process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test'
     mockInternalApiFetch.mockResolvedValue({ ok: true })
+    // tier-config fetch has no user session in webhook context; falls back to null
+    mockApiFetch.mockRejectedValue(new Error('no session'))
   })
 
   it('links the customer to the user before patching on an authenticated checkout', async () => {
@@ -92,7 +99,7 @@ describe('stripe webhook — self-healing customer link', () => {
   })
 
   it('links the customer when a subscription event carries metadata.userId', async () => {
-    mockTierForPriceId.mockReturnValue('pro')
+    mockTierForPriceIdFromConfig.mockReturnValue('pro')
     mockConstructEvent.mockReturnValue({
       type: 'customer.subscription.updated',
       data: {
@@ -170,7 +177,7 @@ describe('stripe webhook — self-healing customer link', () => {
   })
 
   it('patches by customer without linking when a subscription event has no metadata.userId', async () => {
-    mockTierForPriceId.mockReturnValue('pro')
+    mockTierForPriceIdFromConfig.mockReturnValue('pro')
     mockConstructEvent.mockReturnValue({
       type: 'customer.subscription.updated',
       data: {

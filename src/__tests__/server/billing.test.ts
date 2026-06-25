@@ -37,8 +37,8 @@ vi.mock('../../server/_internal-api-client', () => ({
 
 vi.mock('../../server/stripe', () => ({
   appOrigin: () => 'https://tucaken.io',
-  priceIdForTier: vi.fn(),
-  tierForPriceId: vi.fn(),
+  priceIdForTierFromConfig: vi.fn(),
+  tierForPriceIdFromConfig: vi.fn(),
   stripe: () => ({
     billingPortal: {
       sessions: {

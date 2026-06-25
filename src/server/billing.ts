@@ -20,8 +20,8 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import {
   stripe,
-  priceIdForTier,
-  tierForPriceId,
+  priceIdForTierFromConfig,
+  tierForPriceIdFromConfig,
   appOrigin,
 } from './stripe'
 import { requireAuth, tryAuth } from './auth-guard'
@@ -29,6 +29,7 @@ import { apiFetch } from './_api-client'
 import { internalApiFetch } from './_internal-api-client'
 import { logger } from '@/lib/observability/logger'
 import type { PlanId, PaymentMethodView, InvoiceView, BillingDetailsView } from '@/features/account/types'
+import type { TierConfig } from '@/features/billing/tier-config'
 import { enforceBillingRateLimit } from './_rate-limit'
 
 // -----------------------------------------------------------------------------
@@ -228,7 +229,8 @@ export const createCheckoutSessionFn = createServerFn({ method: 'POST' })
   .inputValidator(CreateCheckoutInput)
   .handler(async ({ data }) => {
     enforceBillingRateLimit('checkout')
-    const priceId = priceIdForTier(data.tier)
+    const tierConfig = await apiFetch<TierConfig>('/tier-config', { pathTemplate: '/tier-config' }).catch(() => null)
+    const priceId = priceIdForTierFromConfig(tierConfig, data.tier)
     const user    = await tryAuth()
 
     // Resolve the right `customer` parameter for the session:
@@ -305,9 +307,10 @@ export const getCheckoutSessionFn = createServerFn({ method: 'GET' })
 
     // Derive tier from the line item price (more reliable than metadata if a
     // partner ever creates a session with a different code path).
+    const tierConfig = await apiFetch<TierConfig>('/tier-config', { pathTemplate: '/tier-config' }).catch(() => null)
     let tier: PlanId | null = null
     const priceId = session.line_items?.data[0]?.price?.id
-    if (priceId) tier = tierForPriceId(priceId)
+    if (priceId) tier = tierForPriceIdFromConfig(tierConfig, priceId)
     tier ??= (session.metadata?.tier as PlanId | undefined) ?? null
 
     return {
