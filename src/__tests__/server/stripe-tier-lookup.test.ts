@@ -23,3 +23,35 @@ describe('config-aware Stripe lookup', () => {
     expect(tierForPriceIdFromConfig(cfg, 'price_unknown')).toBeNull()
   })
 })
+
+// Regression: a seed/placeholder price id in the DB tier config must never be
+// sent to Stripe. Config is the single source of truth (Settings → Subscription
+// Tiers) — an unconfigured tier throws an actionable error rather than silently
+// using an env price. The live error was `No such price: 'price_seed_placeholder'`
+// on premium checkout.
+describe('placeholder / unconfigured price ids throw an actionable error', () => {
+  it.each(['price_seed_placeholder', 'n_placeholder'])(
+    'rejects placeholder %s with a Subscription Tiers hint',
+    (placeholder) => {
+      const seeded = structuredClone(DEFAULT_TIER_CONFIG)
+      seeded.tiers[2].stripePriceIdMonthly = placeholder
+      expect(() => priceIdForTierFromConfig(seeded, 'premium')).toThrow(
+        /Subscription Tiers/,
+      )
+    },
+  )
+
+  it('throws when a paid tier has no price configured at all', () => {
+    const seeded = structuredClone(DEFAULT_TIER_CONFIG)
+    seeded.tiers[2].stripePriceIdMonthly = null
+    expect(() => priceIdForTierFromConfig(seeded, 'premium')).toThrow(
+      /No Stripe price is configured for the premium tier/,
+    )
+  })
+
+  it('does not invert a placeholder price id to a tier', () => {
+    const seeded = structuredClone(DEFAULT_TIER_CONFIG)
+    seeded.tiers[2].stripePriceIdMonthly = 'price_seed_placeholder'
+    expect(tierForPriceIdFromConfig(seeded, 'price_seed_placeholder')).toBeNull()
+  })
+})

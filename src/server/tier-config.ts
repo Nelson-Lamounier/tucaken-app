@@ -5,14 +5,18 @@
  * - updateTierConfigFn — persists a new config via admin-api
  * - listStripePricesFn — lists active Stripe prices for the admin UI picker
  *
- * SECURITY: all three functions require authentication. updateTierConfigFn
- * also validates the request body against TierConfigSchema before forwarding.
+ * SECURITY: the read (getTierConfigFn) requires authentication — it feeds the
+ * pricing catalog, so any signed-in user may read it. The write
+ * (updateTierConfigFn) and the Stripe price enumeration (listStripePricesFn)
+ * require the admin role server-side via requireAdmin — never rely on the
+ * client-side UI gate. updateTierConfigFn also validates the request body
+ * against TierConfigSchema before forwarding.
  */
 
 import Stripe from 'stripe'
 import { createServerFn } from '@tanstack/react-start'
 import { apiFetch } from './_api-client'
-import { requireAuth } from './auth-guard'
+import { requireAdmin, requireAuth } from './auth-guard'
 import { stripe } from './stripe'
 import { TierConfigSchema, type TierConfig } from '@/features/billing/tier-config'
 
@@ -34,7 +38,7 @@ export const getTierConfigFn = createServerFn({ method: 'GET' }).handler(
 export const updateTierConfigFn = createServerFn({ method: 'POST' })
   .inputValidator(TierConfigSchema)
   .handler(async ({ data }): Promise<{ updated: true }> => {
-    await requireAuth()
+    await requireAdmin()
     return apiFetch<{ updated: true }>('/tier-config', {
       method: 'PUT',
       pathTemplate: '/tier-config',
@@ -55,7 +59,7 @@ function extractProductName(product: Stripe.Price['product']): string | null {
 }
 
 export const listStripePricesFn = createServerFn({ method: 'GET' }).handler(async () => {
-  await requireAuth()
+  await requireAdmin()
   const res = await stripe().prices.list({ active: true, expand: ['data.product'], limit: 100 })
   return res.data.map((p) => ({
     id: p.id,

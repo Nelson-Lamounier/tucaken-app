@@ -40,31 +40,16 @@ export function stripe(): Stripe {
 // Tier → Stripe Price ID
 // -----------------------------------------------------------------------------
 //
-// Price IDs are environment-specific (test vs live each have separate IDs).
-// The mapping lives in env vars so the same code ships across envs.
-
-export function priceIdForTier(tier: PlanId): string {
-  switch (tier) {
-    case 'pro':
-      return required('STRIPE_PRICE_PRO_MONTHLY')
-    case 'premium':
-      return required('STRIPE_PRICE_PREMIUM_MONTHLY')
-    case 'free':
-      throw new Error('Free tier has no Stripe price — do not call checkout.')
-  }
-}
+// Checkout resolves prices from the admin-editable tier config (see
+// priceIdForTierFromConfig below) — the env price vars below are retained only
+// as a webhook-side safety net for mapping a Stripe price back to a tier when
+// the config has not been set yet.
 
 /** Inverse lookup — used by webhook to map a Stripe subscription back to a tier. */
 export function tierForPriceId(priceId: string): PlanId | null {
   if (priceId === process.env.STRIPE_PRICE_PRO_MONTHLY) return 'pro'
   if (priceId === process.env.STRIPE_PRICE_PREMIUM_MONTHLY) return 'premium'
   return null
-}
-
-function required(name: string): string {
-  const v = process.env[name]
-  if (!v) throw new Error(`${name} is not set in env.`)
-  return v
 }
 
 // -----------------------------------------------------------------------------
@@ -83,28 +68,55 @@ export function appOrigin(): string {
 // Config-aware lookups (admin-editable tier config, env fallback)
 // -----------------------------------------------------------------------------
 
+// Seed sentinels written to the tier-config row when no real Stripe price has
+// been set yet (admin-api seeds a paid tier with one to satisfy the schema's
+// "paid tier needs an id" rule). They are NOT real Stripe prices — sending one
+// to Stripe yields `No such price`. Treat them as "unset" so resolution falls
+// back to the env price.
+const PLACEHOLDER_PRICE_IDS = new Set(['n_placeholder', 'price_seed_placeholder'])
+
 /**
- * Resolves the Stripe monthly price ID for a paid tier, preferring the
- * admin-editable config when a price ID is set there, and falling back to
- * the env-var lookup when not.
+ * True only for a value that looks like a real Stripe price ID — `price_…` and
+ * not a known placeholder sentinel. Used to decide whether the admin-editable
+ * config genuinely overrides the env price.
+ */
+function isRealPriceId(id: string | null | undefined): id is string {
+  return typeof id === 'string' && id.startsWith('price_') && !PLACEHOLDER_PRICE_IDS.has(id)
+}
+
+/**
+ * Resolves the Stripe monthly price ID for a paid tier from the admin-editable
+ * tier config — the single source of truth for tier↔price mapping, owned by the
+ * Settings → Subscription Tiers UI.
  *
- * @throws {Error} Always throws for the free tier — it has no Stripe price.
+ * A placeholder seed sentinel counts as "not configured": rather than silently
+ * falling back to an env price (which can diverge from what the owner sees in
+ * the UI), this throws an actionable error so the misconfiguration is obvious.
+ *
+ * @throws {Error} For the free tier (no Stripe price), or when the paid tier has
+ *   no real Stripe price configured yet.
  */
 export function priceIdForTierFromConfig(config: TierConfig | null, tier: PlanId): string {
   if (tier === 'free') throw new Error('Free tier has no Stripe price — do not call checkout.')
   const entry = config?.tiers.find((t) => t.id === tier)
-  if (entry?.stripePriceIdMonthly) return entry.stripePriceIdMonthly
-  return priceIdForTier(tier)
+  if (isRealPriceId(entry?.stripePriceIdMonthly)) return entry.stripePriceIdMonthly
+  throw new Error(
+    `No Stripe price is configured for the ${tier} tier. ` +
+      'Set it in Settings → Subscription Tiers before starting checkout.',
+  )
 }
 
 /**
  * Inverts a Stripe price ID back to a PlanId, preferring the admin-editable
- * config and falling back to the env-var lookup.
+ * config and falling back to the env-var lookup. Placeholder sentinels in the
+ * config are ignored so a seed value can never masquerade as a real tier.
  *
  * @returns The matching PlanId, or null if the price ID is unknown.
  */
 export function tierForPriceIdFromConfig(config: TierConfig | null, priceId: string): PlanId | null {
-  const entry = config?.tiers.find((t) => t.stripePriceIdMonthly === priceId)
+  const entry = config?.tiers.find(
+    (t) => isRealPriceId(t.stripePriceIdMonthly) && t.stripePriceIdMonthly === priceId,
+  )
   if (entry) return entry.id
   return tierForPriceId(priceId)
 }
