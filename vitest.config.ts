@@ -17,7 +17,7 @@ export default defineConfig({
   },
   test: {
     globals: true,
-    environment: 'jsdom',
+    environment: 'node',
     include: ['src/__tests__/**/*.test.ts', 'src/__tests__/**/*.test.tsx'],
     env: {
       STRATEGIST_TABLE_NAME: 'test-strategist-table',
