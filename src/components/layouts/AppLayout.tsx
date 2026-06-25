@@ -18,6 +18,7 @@ import {
   XMarkIcon,
   BriefcaseIcon,
   BeakerIcon,
+  UsersIcon,
 } from "@heroicons/react/24/outline";
 import {
   BarChart3,
@@ -54,6 +55,7 @@ const navigation = [
   { name: "Search Analytics", href: "/search-analytics", icon: ChartPieIcon,       adminOnly: true  },
   { name: "Reports",         href: "/reports",       icon: ChartPieIcon,          adminOnly: true  },
   { name: "Test Components", href: "/test",          icon: BeakerIcon,            adminOnly: true  },
+  { name: "Users",            href: "/admin/users",   icon: UsersIcon,             adminOnly: true  },
 ];
 
 /** External observability tool links rendered in the sidebar secondary section. */
