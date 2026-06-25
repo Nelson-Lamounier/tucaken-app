@@ -3060,6 +3060,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@number-flow/react@npm:^0.6.0":
+  version: 0.6.0
+  resolution: "@number-flow/react@npm:0.6.0"
+  dependencies:
+    esm-env: "npm:^1.1.4"
+    number-flow: "npm:0.6.0"
+  peerDependencies:
+    react: ^18 || ^19
+    react-dom: ^18 || ^19
+  checksum: 10c0/5d3d348a369bd415d75182304e7f2e7a300f37c6d232d73947112073b6934c8844bff6afdb47c8f70455eb5893e09feeba4b8c1a3af8ed17ad8c73b2bf5b9e28
+  languageName: node
+  linkType: hard
+
 "@oozcitak/dom@npm:^2.0.2":
   version: 2.0.2
   resolution: "@oozcitak/dom@npm:2.0.2"
@@ -10433,6 +10446,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"esm-env@npm:^1.1.4":
+  version: 1.2.2
+  resolution: "esm-env@npm:1.2.2"
+  checksum: 10c0/3d25c973f2fd69c25ffff29c964399cea573fe10795ecc1d26f6f957ce0483d3254e1cceddb34bf3296a0d7b0f1d53a28992f064ba509dfe6366751e752c4166
+  languageName: node
+  linkType: hard
+
 "espree@npm:^10.0.1, espree@npm:^10.4.0":
   version: 10.4.0
   resolution: "espree@npm:10.4.0"
@@ -14386,6 +14406,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"number-flow@npm:0.6.0":
+  version: 0.6.0
+  resolution: "number-flow@npm:0.6.0"
+  dependencies:
+    esm-env: "npm:^1.1.4"
+  checksum: 10c0/dc1a86a89d5e8205f2885ee3dacbbaf11e99ab6a603a29beec337b324ff17c0a575e2e6831163ad39b6a4ca54d676028f7e3dd2f51166e521db8cf923a7d1c94
+  languageName: node
+  linkType: hard
+
 "oauth4webapi@npm:^3.8.5":
   version: 3.8.6
   resolution: "oauth4webapi@npm:3.8.6"
@@ -17032,6 +17061,7 @@ __metadata:
     "@headlessui/react": "npm:^2.2.9"
     "@heroicons/react": "npm:^2.2.0"
     "@mdx-js/mdx": "npm:^3.1.1"
+    "@number-flow/react": "npm:^0.6.0"
     "@opentelemetry/api": "npm:^1.9.0"
     "@opentelemetry/auto-instrumentations-node": "npm:^0.75.0"
     "@opentelemetry/exporter-trace-otlp-http": "npm:^0.217.0"
