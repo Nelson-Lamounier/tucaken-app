@@ -1,10 +1,10 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { adminKeys } from '@/lib/api/query-keys'
-import { ResumeForm } from '../features/resumes/components/ResumeForm'
-import { createResumeFn } from '../server/resumes'
+import { ResumeForm } from '../../../../features/resumes/components/ResumeForm'
+import { createResumeFn } from '../../../../server/resumes'
 import { useToastStore } from '@/lib/stores/toast-store'
-import { DashboardDrawer } from '../components/ui/DashboardDrawer'
+import { DashboardDrawer } from '../../../../components/ui/DashboardDrawer'
 
 export const Route = createFileRoute('/_dashboard/resumes/new')({
   component: CreateResumePage,
@@ -28,7 +28,7 @@ function CreateResumePage() {
   function handleClose() {
     setIsOpen(false)
     setTimeout(() => {
-      navigate({ to: '/resumes' })
+      navigate({ to: '/applications/list' })
     }, 400)
   }
   const navigate = useNavigate({ from: Route.fullPath })
@@ -41,7 +41,7 @@ function CreateResumePage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: adminKeys.resumes.all })
       addToast('success', 'Resume created successfully.')
-      navigate({ to: '/resumes' })
+      navigate({ to: '/applications/list' })
     },
     onError: (err: Error) => addToast('error', err.message),
   })

@@ -24,7 +24,7 @@ import {
   downloadTxt, downloadDoc, downloadPdf, sanitizeFilename,
 } from './downloads'
 
-export function ResumeBuilderApp({ onClose }: { onClose?: () => void } = {}) {
+export function ResumeBuilderApp({ onClose, onSave }: { onClose?: () => void; onSave?: () => void } = {}) {
   const state = useStore((s) => s)
 
   React.useEffect(() => {
@@ -64,7 +64,7 @@ export function ResumeBuilderApp({ onClose }: { onClose?: () => void } = {}) {
 
   return (
     <div className="main" style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-      <TopBar state={state} theme={theme} view={view} margins={margins} onClose={onClose} />
+      <TopBar state={state} theme={theme} view={view} margins={margins} onClose={onClose} onSave={onSave} />
       <div className="workspace">
         <FormPanel state={state} />
         <div className="preview-pane" ref={previewRef}>
@@ -92,12 +92,14 @@ function TopBar({
   view,
   margins,
   onClose,
+  onSave,
 }: {
   state: AppState;
   theme: ThemeName;
   view: AppState['view'];
   margins: number;
   onClose?: () => void;
+  onSave?: () => void;
 }) {
   const [savedFlash, setSavedFlash] = React.useState(false)
 
@@ -221,6 +223,16 @@ function TopBar({
         />
 
         <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700" />
+
+        {onSave && (
+          <button
+            type="button"
+            onClick={onSave}
+            className="inline-flex items-center gap-x-1.5 rounded-md bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-teal-500 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+          >
+            Save
+          </button>
+        )}
 
         {/* Download dropdown */}
         <Menu as="div" className="relative">

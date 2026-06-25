@@ -92,6 +92,7 @@ interface ApplicationHeaderProps {
   readonly dateStr: string
   /** Stage-advance dropdown, rendered side-by-side with the status control. */
   readonly advanceControl?: ReactNode
+  readonly viewerEmail?: string
 }
 
 /**
@@ -99,7 +100,7 @@ interface ApplicationHeaderProps {
  * status control. Mirrors the KB dashboard header (title + subtitle + action);
  * the at-a-glance stat tiles render beneath it via StageGlancePanel.
  */
-function ApplicationHeader({ detail, viewedStage, statusPending, onStatusChange, dateStr, advanceControl }: ApplicationHeaderProps) {
+function ApplicationHeader({ detail, viewedStage, statusPending, onStatusChange, dateStr, advanceControl, viewerEmail }: ApplicationHeaderProps) {
   return (
     <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-center gap-3">
@@ -129,6 +130,7 @@ function ApplicationHeader({ detail, viewedStage, statusPending, onStatusChange,
           statusValue={detail.status}
           statusPending={statusPending}
           onStatusChange={onStatusChange}
+          viewerEmail={viewerEmail}
         />
         {advanceControl}
       </div>
@@ -143,9 +145,11 @@ interface ApplicationDetailContainerProps {
   readonly activeStage?: InterviewStage
   /** Selected summary-row id from the `?focus` search param. */
   readonly focus?: string
+  /** The authenticated user's email — used to gate privileged actions. */
+  readonly viewerEmail?: string
 }
 
-export function ApplicationDetailContainer({ slug, activeStage, focus }: ApplicationDetailContainerProps) {
+export function ApplicationDetailContainer({ slug, activeStage, focus, viewerEmail }: ApplicationDetailContainerProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const statusMutation = useApplicationStatus()
@@ -217,7 +221,7 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
     const stage = confirmGenStage
     const force = confirmGenForce
     setConfirmGenStage(null)
-    void triggerCoachFn({ data: { slug, interviewStage: stage, force } })
+    triggerCoachFn({ data: { slug, interviewStage: stage, force } })
       .then(() => {
         void queryClient.invalidateQueries({ queryKey: adminKeys.applications.detail(slug) })
       })
@@ -229,7 +233,7 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
   /** Schedule: trigger a non-force dispatch so the stage row is seeded, then refetch. */
   const handleSchedule = useCallback(
     (stage: InterviewStage) => {
-      void triggerCoachFn({ data: { slug, interviewStage: stage, force: false } })
+      triggerCoachFn({ data: { slug, interviewStage: stage, force: false } })
         .then(() => {
           void queryClient.invalidateQueries({ queryKey: adminKeys.applications.detail(slug) })
         })
@@ -337,6 +341,7 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
         statusPending={statusMutation.isPending}
         onStatusChange={handleStatusChange}
         dateStr={dateStr}
+        viewerEmail={viewerEmail}
         advanceControl={
           <DropDownOptions
             label="Mark complete and advance"

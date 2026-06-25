@@ -7,6 +7,8 @@
  * idx_resumes_one_active_per_user enforces one active resume per user at the
  * database level, so setActiveResume just needs two UPDATE statements.
  */
+import { randomUUID } from 'node:crypto';
+
 import type { Queryable } from '../pg.js';
 
 export interface Resume {
@@ -112,5 +114,32 @@ export async function setActiveResume(
     await pool.query(
         `UPDATE resumes SET is_active = TRUE WHERE id = $1`,
         [newActiveId],
+    );
+}
+
+/**
+ * Upserts the persisted tailored resume for an application. Updates the existing
+ * resumes row (the pipeline-seeded one) keyed by job_application_id so the detail
+ * read returns the edit; inserts a fresh row only if none exists yet. RLS via the
+ * withUser(...) context scopes this to the caller's own rows.
+ */
+export async function updateApplicationTailoredResume(
+    pool: Queryable,
+    applicationId: string,
+    userId: string,
+    label: string,
+    content: Record<string, unknown>,
+): Promise<void> {
+    const updated = await pool.query(
+        `UPDATE resumes
+            SET content_json = $2::jsonb, generated_at = NOW()
+          WHERE job_application_id = $1`,
+        [applicationId, JSON.stringify(content)],
+    );
+    if ((updated.rowCount ?? 0) > 0) return;
+    await pool.query(
+        `INSERT INTO resumes (id, user_id, job_application_id, label, is_active, content_json)
+         VALUES ($1, $2, $3, $4, false, $5::jsonb)`,
+        [randomUUID(), userId, applicationId, label, JSON.stringify(content)],
     );
 }

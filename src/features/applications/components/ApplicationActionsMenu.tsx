@@ -1,27 +1,20 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useState, useCallback, type ReactNode } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import type { ApplicationDetail, ApplicationStatus, InterviewStage } from '@/lib/types/applications.types'
 import { adminKeys } from '@/lib/api/query-keys'
 import { useToastStore } from '@/lib/stores/toast-store'
-import { DashboardDrawer } from '@/components/ui/DashboardDrawer'
 import DropDownOptions from '@/components/ui/DropDownOptions'
 import { createResumeFn, setActiveResumeFn } from '@/server/resumes'
 import { deleteApplicationFn } from '@/server/applications'
 import { buildResumeDomForPdf, buildCoverLetterDomForPdf } from '@/lib/resumes/resume-dom-builder'
 import { usePdfDownload } from '@/hooks/use-pdf-download'
 import type { ResumeData } from '@/lib/resumes/resume-data'
-import { ResumeBuilderApp } from '@/features/resume-theme/app/main'
-import {
-  getState,
-  setState,
-  enterEphemeralMode,
-  exitEphemeralMode,
-  type AppState,
-} from '@/features/resume-theme/app/state'
-import { mapApplicationToBuilderState } from '../utils/resume-adapters'
+import { ResumeBuilderDrawer } from './ResumeBuilderDrawer'
+
+const PUBLISH_ALLOWED_EMAILS = new Set(['lamounier_88@hotmail.com'])
 
 interface ApplicationActionsMenuProps {
   readonly detail: ApplicationDetail
@@ -33,6 +26,7 @@ interface ApplicationActionsMenuProps {
   readonly statusValue: string
   readonly statusPending: boolean
   readonly onStatusChange: (status: ApplicationStatus) => void
+  readonly viewerEmail?: string
 }
 
 /**
@@ -48,60 +42,19 @@ export function ApplicationActionsMenu({
   statusValue,
   statusPending,
   onStatusChange,
+  viewerEmail,
 }: ApplicationActionsMenuProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { addToast } = useToastStore()
 
-  const [isBuilderOpen, setIsBuilderOpen] = useState(false)
-  const [builderKey, setBuilderKey] = useState(0)
-  const prevStateRef = useRef<AppState | null>(null)
+  const [builderView, setBuilderView] = useState<'resume' | 'cover' | null>(null)
 
   // Resume attachments / edit / publish are relevant when viewing the Applied
   // stage tab (?stage=applied) — not gated on the application's furthest stage.
   const isApplied = viewedStage === 'applied'
 
-  const handleOpenBuilder = useCallback(() => {
-    if (!detail.analysis?.tailoredResume) return
-    prevStateRef.current = getState()
-    enterEphemeralMode()
-    try {
-      setState(() =>
-        mapApplicationToBuilderState(
-          detail.analysis!.tailoredResume as unknown as ResumeData,
-          detail.analysis?.coverLetter ?? null,
-          detail.targetCompany,
-          detail.targetRole,
-        ),
-      )
-    } catch {
-      // Adapter failed — restore prior builder state and bail out of edit mode.
-      exitEphemeralMode()
-      prevStateRef.current = null
-      return
-    }
-    setBuilderKey(k => k + 1)
-    setIsBuilderOpen(true)
-  }, [detail])
-
-  const handleCloseBuilder = useCallback(() => {
-    setIsBuilderOpen(false)
-    if (prevStateRef.current) {
-      setState(() => prevStateRef.current!)
-      prevStateRef.current = null
-    }
-    exitEphemeralMode()
-  }, [])
-
-  useEffect(() => {
-    return () => {
-      if (prevStateRef.current) {
-        setState(() => prevStateRef.current!)
-        prevStateRef.current = null
-        exitEphemeralMode()
-      }
-    }
-  }, [])
+  const canPublish = viewerEmail !== undefined && PUBLISH_ALLOWED_EMAILS.has(viewerEmail)
 
   const { generatePdf } = usePdfDownload()
 
@@ -167,23 +120,22 @@ export function ApplicationActionsMenu({
         onSelect={val => onStatusChange(val as ApplicationStatus)}
         onDownloadResume={isApplied && hasTailoredResume ? handleDownloadResume : undefined}
         onDownloadCoverLetter={isApplied && detail.analysis?.coverLetter ? handleDownloadCoverLetter : undefined}
-        onEdit={isApplied && hasTailoredResume ? handleOpenBuilder : undefined}
-        onPublish={isApplied && hasTailoredResume ? () => publishMutation.mutate() : undefined}
+        onEdit={isApplied && hasTailoredResume ? () => setBuilderView('resume') : undefined}
+        onPublish={isApplied && hasTailoredResume && canPublish ? () => publishMutation.mutate() : undefined}
         onDelete={() => deleteMutation.mutate()}
       />
 
-      {isApplied && detail.analysis?.tailoredResume && (
-        <DashboardDrawer
-          isOpen={isBuilderOpen}
-          onClose={handleCloseBuilder}
-          title="Edit Tailored Resume"
-          description={`${detail.targetCompany} — ${detail.targetRole}`}
-          unstyledContent
-          fullBleed
-          modal={false}
-        >
-          {isBuilderOpen && <ResumeBuilderApp key={builderKey} onClose={handleCloseBuilder} />}
-        </DashboardDrawer>
+      {builderView && detail.analysis?.tailoredResume && (
+        <ResumeBuilderDrawer
+          isOpen
+          onClose={() => setBuilderView(null)}
+          resume={detail.analysis.tailoredResume as unknown as ResumeData}
+          coverLetter={detail.analysis.coverLetter ?? null}
+          company={detail.targetCompany}
+          role={detail.targetRole}
+          slug={detail.slug}
+          initialView={builderView}
+        />
       )}
     </>
   )

@@ -18,9 +18,10 @@ restrict it to a single operator.
 | Decision | Choice |
 |---|---|
 | Link placement | Inline icon buttons in each list row |
-| Resume "Edit" target | Promote tailored resume to a saved resume, then edit |
+| Edit surface | Reuse the existing `ResumeBuilderApp` (Resume + Cover letter tabs); add real Save |
+| Resume persistence | Builder Save upserts a saved-resume record by label (promote-to-saved) |
 | Publish flow | Keep it; move into Applications; **email-gated** to `lamounier_88@hotmail.com` |
-| Cover-letter edit | Full edit via a new server fn (overrides store) + `CoverLetterForm` drawer |
+| Cover-letter persistence | Builder Save → new server fn writing an overrides store |
 | Resumes route group | Migrate `_dashboard.resumes.*` flat files → directory routes |
 
 ## Current state (verified in code)
@@ -40,7 +41,8 @@ restrict it to a single operator.
 - Preview: `src/features/resumes/components/ResumePreviewDrawer.tsx` (handles both
   resume and cover letter).
 - Cover-letter form: `src/features/applications/components/CoverLetterForm.tsx`
-  (exists, not wired to a route).
+  (exists, **never imported anywhere** — dead).
+- **The existing detail-view "Edit" is ephemeral and discarded.** `ApplicationActionsMenu.handleOpenBuilder` loads BOTH `tailoredResume` and `coverLetter` into the builder via `mapApplicationToBuilderState` and opens `ResumeBuilderApp`, which already has **Resume / Cover letter tabs** (`setView('resume' | 'cover')`, `main.tsx:167-183`). But `handleCloseBuilder` restores the prior state and exits ephemeral mode — **all edits are thrown away**. The builder has no server-save; its only persistence-looking UI is a fake "All changes saved" flash and a Download menu (PDF/Word/txt). The only thing that persists today is **Publish** (`createResumeFn` + `setActiveResumeFn`) — resume only, as a new saved-resume record.
 - Resumes hub: `src/app/_dashboard.resumes.tsx` renders `ResumesDisplayer` +
   `<Outlet/>`; children `_dashboard.resumes.edit.$id.tsx`, `_dashboard.resumes.new.tsx`.
 - Current user: `_dashboard.tsx` `beforeLoad` calls `getMeFn()` and puts
@@ -88,27 +90,54 @@ Rework `ApplicationListRow`:
 `rounded-md` icon buttons (lucide), each with an accessible label:
 
 - **Preview Resume** (`Eye`) → opens `ResumePreviewDrawer` with `tailored.data`.
-- **Edit Resume** (`Pencil`) → promote-to-saved, then navigate to edit route.
+- **Edit Resume** (`Pencil`) → opens the shared builder drawer on the **Resume**
+  tab (`initialView: 'resume'`).
 - **Preview Cover Letter** (`FileText`) → `ResumePreviewDrawer` with
   `tailored.coverLetter` — only when present.
-- **Edit Cover Letter** (`PenLine`) → opens `CoverLetterForm` drawer — only when
-  present.
+- **Edit Cover Letter** (`PenLine`) → opens the shared builder drawer on the
+  **Cover letter** tab (`initialView: 'cover'`) — only when present.
 
 Buttons emit callbacks; the controlling drawer/selection state lives in
-`ApplicationsList` (one drawer instance shared across rows), driven by a
-`selected: { slug; kind: 'preview-resume' | 'preview-cl' | 'edit-cl' } | null`.
+`ApplicationsList` (one preview drawer + one builder drawer shared across rows),
+driven by a `selected: { tr: TailoredResumeSummary; kind: 'preview-resume' |
+'preview-cl' | 'edit' ; initialView?: 'resume' | 'cover' } | null`.
 
-### 4. Promote-to-saved, then edit (idempotent)
+The edit toggles open the **same builder** used by the detail view (section 4),
+so "the right toggle direct access" = jump straight into the correct document tab.
 
-`onEditResume(tr)`:
+### 4. Edit = builder with real persistence (the core fix)
 
-1. `getResumesFn()` → find by label `${tr.targetCompany} — ${tr.targetRole}`.
-2. If found, reuse its `resumeId`; else `createResumeFn({ label, data: tr.data })`.
-3. Navigate to the resume edit route with that `resumeId`.
+Today the builder edits both documents but discards them. We make edits persist,
+and reuse one editing surface everywhere.
 
-Deterministic label ⇒ re-editing the same application reuses the same saved
-record (no duplicates). Matches the label already used by the detail-view publish
-mutation.
+**Shared component** `ResumeBuilderDrawer`
+(`src/features/applications/components/ResumeBuilderDrawer.tsx`): wraps
+`DashboardDrawer` + `ResumeBuilderApp` + ephemeral-mode lifecycle. Props:
+`{ resume: ResumeData; coverLetter: CoverLetter | null; company; role; slug;
+initialView?: 'resume' | 'cover'; isOpen; onClose }`. On open it
+`enterEphemeralMode()`, loads state via `mapApplicationToBuilderState`, and calls
+`setView(initialView)`. Used by BOTH the detail menu and `ApplicationRowActions`
+(list rows have all inputs from the extended `TailoredResumeSummary`).
+
+**Save action** — add an `onSave` to `ResumeBuilderApp`'s `TopBar` (rendered only
+when provided), beside Download. On save the drawer reads the live builder state
+(`getState()`) and persists via **reverse adapters** (new in
+`resume-adapters.ts`): `builderStateToResumeData(state)` and
+`builderStateToCoverLetter(state)`.
+
+Persistence targets (analysis is immutable pipeline output, so neither writes
+back to it):
+
+- **Resume** → upsert a saved-resume record by label
+  `${company} — ${role}`: `getResumesFn()` → if label exists `updateResumeFn`,
+  else `createResumeFn`. Idempotent — re-edits reuse the same record, which is
+  also what Publish activates.
+- **Cover letter** → `updateApplicationCoverLetterFn` (section 6) writing the
+  override store.
+
+On success: toast, invalidate `adminKeys.resumes.*` + `adminKeys.applications.*`
++ the tailored-resumes query, and close without the discard path. On failure:
+toast, keep the drawer open.
 
 ### 5. Publish — email-gated
 
@@ -130,16 +159,16 @@ Cover letter is immutable pipeline output; do **not** mutate
 - **client**: `updateApplicationCoverLetterFn` in `src/server/applications.ts`
   (`createServerFn` POST → admin-api PUT, Zod-validated body matching
   `CoverLetter`).
-- Wire `CoverLetterForm` into a `DashboardDrawer` opened from
-  `ApplicationRowActions`; on submit call the fn, invalidate
-  `adminKeys.applications.*` and the tailored-resumes query.
+- Called from the builder **Save** (section 4) when the cover letter changed —
+  not from `CoverLetterForm`. The unused `CoverLetterForm.tsx` is **deleted**
+  (editing happens in the builder's Cover letter tab).
 
 ### 7. Decommission Resumes hub + route migration
 
 Migrate `_dashboard.resumes.*` flat files to directory form (CLAUDE.md mandate
 when touching a route group non-trivially):
 
-```
+```text
 src/app/_dashboard/resumes/
   route.tsx        # bare <Outlet/> host (NO ResumesDisplayer, NO DashboardPage chrome)
   edit.$id/route.tsx
@@ -159,10 +188,13 @@ src/app/_dashboard/resumes/
 |---|---|---|
 | `getTailoredResumesFn` (extended) | server: resume + cover letter per app | admin-api detail |
 | `updateApplicationCoverLetterFn` (new) | server: persist CL override | admin-api PUT |
-| `ApplicationsList` (edited) | fetch tailored map, own shared drawers | the two server fns |
+| reverse adapters (new) | builder state → `ResumeData` / `CoverLetter` | `resume-adapters.ts` |
+| `ResumeBuilderApp` (edited) | optional `onSave` in TopBar | builder state |
+| `ResumeBuilderDrawer` (new) | shared edit surface: ephemeral load + save | builder, adapters, server fns |
+| `ApplicationsList` (edited) | fetch tailored map, own shared drawers | server fns, drawers |
 | `ApplicationListRow` (refactored) | layout, link region + actions cell | `ApplicationRowActions` |
-| `ApplicationRowActions` (new) | per-row Preview/Edit buttons + callbacks | drawers, navigate |
-| `ApplicationActionsMenu` (edited) | email-gated publish | route context `me.email` |
+| `ApplicationRowActions` (new) | per-row Preview/Edit buttons + callbacks | drawers |
+| `ApplicationActionsMenu` (edited) | reuse `ResumeBuilderDrawer`; email-gated publish | route context `me.email` |
 | Resumes route dir (migrated) | host edit/new drawers only | — |
 
 ## Error handling
@@ -177,12 +209,17 @@ src/app/_dashboard/resumes/
 ## Testing
 
 - `getTailoredResumesFn` returns `coverLetter` alongside resume data.
-- Promote-to-saved is idempotent (existing label reused, no duplicate create).
+- Reverse adapters round-trip: `builderStateToResumeData`/`builderStateToCoverLetter`
+  invert `mapApplicationToBuilderState` without data loss.
+- Builder Save upserts saved resume idempotently (existing label → update, no
+  duplicate create) and persists the cover-letter override.
 - Publish option renders only for the gated email (extend
   `ResumeMenuSelect.test.tsx` / add a menu test).
-- `ApplicationRowActions` renders only the buttons matching available content.
-- Cover-letter override round-trips (server fn unit + read-merge).
-- `yarn typecheck && yarn lint && yarn test` green; manual `yarn dev` golden path.
+- `ApplicationRowActions` renders only the buttons matching available content,
+  and opens the builder on the correct tab (`initialView`).
+- Cover-letter override round-trips (server fn unit + admin-api read-merge).
+- `yarn typecheck && yarn lint && yarn test` green; manual `yarn dev`: edit resume
+  + cover letter from a list row, save, reload, confirm both persisted.
 
 ## Scope / risks
 

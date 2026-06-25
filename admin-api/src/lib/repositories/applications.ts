@@ -15,6 +15,7 @@ export interface Application {
     interviewStage: string;
     appliedAt:      Date | null;
     userAnnotations?: Record<string, unknown>;
+    coverLetterOverride: Record<string, unknown> | null;
     createdAt?:     Date | undefined;
     updatedAt?:     Date | undefined;
 }
@@ -35,6 +36,7 @@ function rowToApplication(row: Record<string, unknown>): Application {
         interviewStage: (row['reached_stage'] as string | null | undefined)
                         ?? (row['interview_stage'] as string | null | undefined) ?? 'applied',
         userAnnotations: (row['user_annotations'] as Record<string, unknown> | null | undefined) ?? {},
+        coverLetterOverride: (row['cover_letter_override'] ?? null) as Record<string, unknown> | null,
         appliedAt:      row['applied_at']       ? new Date(row['applied_at']  as string) : null,
         createdAt:      row['created_at']       ? new Date(row['created_at']  as string) : undefined,
         updatedAt:      row['updated_at']       ? new Date(row['updated_at']  as string) : undefined,
@@ -72,7 +74,7 @@ export async function upsertApplication(pool: Queryable, application: Applicatio
 export async function getApplication(pool: Queryable, id: string): Promise<Application | null> {
     const result = await pool.query(
         `SELECT id, user_id, company, role, job_url, job_description,
-                kanban_status, interview_stage, applied_at, user_annotations, created_at, updated_at
+                kanban_status, interview_stage, applied_at, user_annotations, cover_letter_override, created_at, updated_at
          FROM job_applications WHERE id = $1`,
         [id],
     );
@@ -89,6 +91,18 @@ export async function updateApplicationAnnotations(
     await pool.query(
         `UPDATE job_applications SET user_annotations = $2::jsonb, updated_at = NOW() WHERE id = $1`,
         [id, JSON.stringify(annotations)],
+    );
+}
+
+/** Persist a user-authored cover letter override (or clear it by passing null). */
+export async function updateApplicationCoverLetterOverride(
+    pool: Queryable,
+    id: string,
+    coverLetter: Record<string, unknown> | null,
+): Promise<void> {
+    await pool.query(
+        `UPDATE job_applications SET cover_letter_override = $2::jsonb, updated_at = NOW() WHERE id = $1`,
+        [id, JSON.stringify(coverLetter)],
     );
 }
 
