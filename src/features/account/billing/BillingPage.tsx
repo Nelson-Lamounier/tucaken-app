@@ -101,7 +101,7 @@ export function BillingPage({ billing, onUpdateBilling }: BillingPageProps) {
         label="Billing details"
         sub="Used on every invoice. Update before your next renewal to apply."
       >
-        <DetailsSection billing={billing} onUpdateBilling={onUpdateBilling} />
+        <DetailsSection billing={billing} />
       </PageSection>
 
       <PageSection
