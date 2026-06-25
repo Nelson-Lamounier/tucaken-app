@@ -7,7 +7,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { MagneticButton } from '../lib/MagneticButton'
 import { Marquee } from '../lib/Marquee'
 import { KineticText } from '../lib/KineticText'
-import { problems, steps, comparison, founder, faq } from '../content'
+import { comparison, founder, faq } from '../content'
 import { TIERS } from '@/features/billing/catalog'
 
 function Section({ children, id, className = '' }: { children: ReactNode; id?: string; className?: string }) {
@@ -27,73 +27,6 @@ function Section({ children, id, className = '' }: { children: ReactNode; id?: s
 
 function Eyebrow({ children }: { children: ReactNode }) {
   return <div className="mb-3 font-mono text-[11px] uppercase tracking-[0.18em] text-teal-400">{children}</div>
-}
-
-export function ProblemSection() {
-  return (
-    <Section className="border-t border-white/5">
-      <div className="mx-auto max-w-5xl">
-        <Eyebrow>The problem</Eyebrow>
-        <KineticText as="h2" text="You did the work. Your resume doesn't show it." className="text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl" />
-        <div className="mt-12 grid gap-4 md:grid-cols-3">
-          {problems.map((p, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 20, rotate: -1 }}
-              whileInView={{ opacity: 1, y: 0, rotate: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.1, type: 'spring', stiffness: 90, damping: 15 }}
-              style={{ willChange: 'transform, opacity' }}
-              className="group rounded-2xl border border-white/10 bg-white/[0.02] p-6 transition-colors hover:border-teal-500/30"
-            >
-              <div className="font-mono text-[10px] uppercase tracking-widest text-teal-400">Reality</div>
-              <p className="mt-2 text-[15px] leading-relaxed text-white">{p.real}</p>
-              <div className="my-4 h-px w-full bg-gradient-to-r from-white/10 via-white/5 to-transparent" />
-              <div className="font-mono text-[10px] uppercase tracking-widest text-zinc-500">On your resume</div>
-              <p className="mt-2 text-[15px] leading-relaxed text-zinc-400 line-through decoration-zinc-600">{p.deflated}</p>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-    </Section>
-  )
-}
-
-export function HowItWorksSection() {
-  return (
-    <Section id="how" className="border-t border-white/5">
-      <div className="mx-auto max-w-5xl">
-        <Eyebrow>How it works</Eyebrow>
-        <KineticText as="h2" text="Three steps. No magic." className="text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl" />
-        <div className="mt-12 grid gap-6 md:grid-cols-3">
-          {steps.map((s, i) => (
-            <motion.div
-              key={s.n}
-              initial={{ opacity: 0, x: -28 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.12, type: 'spring', stiffness: 90, damping: 16 }}
-              style={{ willChange: 'transform, opacity' }}
-              className={[
-                'relative rounded-2xl border p-6',
-                'emp' in s && s.emp ? 'border-teal-500/40 bg-gradient-to-br from-teal-500/10 to-emerald-600/5' : 'border-white/10 bg-white/[0.02]',
-              ].join(' ')}
-            >
-              <div className={['font-mono text-xs', 'emp' in s && s.emp ? 'text-teal-300' : 'text-zinc-500'].join(' ')}>{s.n}</div>
-              <h3 className="mt-3 text-xl font-semibold text-white">{s.t}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-zinc-400">{s.d}</p>
-              {'emp' in s && s.emp && (
-                <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-teal-500/15 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-teal-300">
-                  <span className="h-1.5 w-1.5 rounded-full bg-teal-400" />
-                  The differentiator
-                </div>
-              )}
-            </motion.div>
-          ))}
-        </div>
-      </div>
-    </Section>
-  )
 }
 
 export function ComparisonSection() {
