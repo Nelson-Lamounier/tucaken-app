@@ -16,6 +16,7 @@
 // See docs/billing-integration.md for the end-to-end flow and the contracts
 // expected by admin-api's /api/internal/billing/* routes.
 
+import { randomUUID } from 'node:crypto'
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import type Stripe from 'stripe'
@@ -65,10 +66,15 @@ async function ensureStripeCustomerForUser(user: {
   if (me.plan.stripeCustomerId) return me.plan.stripeCustomerId
 
   // 2. None on file → create one in Stripe and persist.
-  const customer = await stripe().customers.create({
-    email: user.email,
-    metadata: { userId: user.id },
-  })
+  // Idempotency key is stable per user: a retried create (network blip,
+  // double-submit) returns the same customer rather than a duplicate.
+  const customer = await stripe().customers.create(
+    {
+      email: user.email,
+      metadata: { userId: user.id },
+    },
+    { idempotencyKey: `cus-create-${user.id}` },
+  )
 
   try {
     await internalApiFetch<{ ok: true }>('/api/internal/billing/customers', {
@@ -283,7 +289,7 @@ export const createCheckoutSessionFn = createServerFn({ method: 'POST' })
           ...(user ? { userId: user.id } : { source: 'guest' }),
         },
       },
-    })
+    }, { idempotencyKey: randomUUID() })
 
     if (!session.client_secret) {
       throw new Error(
