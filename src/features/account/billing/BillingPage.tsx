@@ -77,7 +77,7 @@ export function BillingPage({ billing, onUpdateBilling }: BillingPageProps) {
         label="Payment method"
         sub="Cards are tokenized — we never see the full number."
       >
-        <PaymentSection billing={billing} onUpdateBilling={onUpdateBilling} />
+        <PaymentSection billing={billing} />
       </PageSection>
 
       <PageSection
@@ -93,7 +93,7 @@ export function BillingPage({ billing, onUpdateBilling }: BillingPageProps) {
         label="Invoices"
         sub="The last twelve are listed here. Older are available in the customer portal."
       >
-        <InvoicesSection billing={billing} />
+        <InvoicesSection />
       </PageSection>
 
       <PageSection
@@ -101,7 +101,7 @@ export function BillingPage({ billing, onUpdateBilling }: BillingPageProps) {
         label="Billing details"
         sub="Used on every invoice. Update before your next renewal to apply."
       >
-        <DetailsSection billing={billing} onUpdateBilling={onUpdateBilling} />
+        <DetailsSection billing={billing} />
       </PageSection>
 
       <PageSection

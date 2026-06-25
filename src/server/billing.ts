@@ -28,7 +28,7 @@ import { requireAuth, tryAuth } from './auth-guard'
 import { apiFetch } from './_api-client'
 import { internalApiFetch } from './_internal-api-client'
 import { logger } from '@/lib/observability/logger'
-import type { PlanId } from '@/features/account/types'
+import type { PlanId, PaymentMethodView, InvoiceView, BillingDetailsView } from '@/features/account/types'
 import { enforceBillingRateLimit } from './_rate-limit'
 
 // -----------------------------------------------------------------------------
@@ -85,6 +85,136 @@ async function ensureStripeCustomerForUser(user: {
   }
   return customer.id
 }
+
+// -----------------------------------------------------------------------------
+// Shared customer resolver (never trusts client-supplied IDs)
+// -----------------------------------------------------------------------------
+
+/**
+ * Resolves the authenticated user's Stripe customer ID server-side via the
+ * user-JWT-protected /me endpoint. Returns null for free-tier users with no
+ * customer yet. Never trusts a client-supplied customerId (prevents IDOR).
+ */
+async function requireCustomerId(): Promise<string | null> {
+  const me = await apiFetch<{ plan: { stripeCustomerId: string | null } }>(
+    '/me',
+    { pathTemplate: '/me' },
+  )
+  return me.plan.stripeCustomerId
+}
+
+// -----------------------------------------------------------------------------
+// Live read: default payment method
+// -----------------------------------------------------------------------------
+
+/**
+ * Live read of the customer's default card. Resolution order:
+ *   invoice_settings.default_payment_method → first card on file → null.
+ * Card data is never persisted — this is fetched per request.
+ */
+export const getPaymentMethodFn = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<PaymentMethodView | null> => {
+    await requireAuth()
+    const customerId = await requireCustomerId()
+    if (!customerId) return null
+
+    const customer = await stripe().customers.retrieve(customerId, {
+      expand: ['invoice_settings.default_payment_method'],
+    })
+    if ('deleted' in customer && customer.deleted) return null
+
+    let pm = customer.invoice_settings?.default_payment_method ?? null
+    if (typeof pm === 'string') {
+      pm = await stripe().paymentMethods.retrieve(pm)
+    }
+    if (!pm) {
+      const list = await stripe().paymentMethods.list({
+        customer: customerId,
+        type: 'card',
+        limit: 1,
+      })
+      pm = list.data[0] ?? null
+    }
+    if (!pm?.card) return null
+
+    return {
+      brand: pm.card.brand,
+      last4: pm.card.last4,
+      expMonth: pm.card.exp_month,
+      expYear: pm.card.exp_year,
+      wallet: pm.card.wallet?.type ?? null,
+    }
+  },
+)
+
+// -----------------------------------------------------------------------------
+// Live read: billing details (email, tax IDs, address)
+// -----------------------------------------------------------------------------
+
+const EMPTY_DETAILS: BillingDetailsView = { email: null, taxIds: [], address: null }
+
+/** Live read of customer billing details (read-only; edits go via Portal). */
+export const getBillingDetailsFn = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<BillingDetailsView> => {
+    await requireAuth()
+    const customerId = await requireCustomerId()
+    if (!customerId) return EMPTY_DETAILS
+
+    const customer = await stripe().customers.retrieve(customerId, {
+      expand: ['tax_ids'],
+    })
+    if ('deleted' in customer && customer.deleted) return EMPTY_DETAILS
+
+    const taxIds = (customer.tax_ids?.data ?? []).map((t) => ({
+      type: t.type,
+      value: t.value ?? '',
+    }))
+    const a = customer.address
+    return {
+      email: customer.email,
+      taxIds,
+      address: a
+        ? {
+            line1: a.line1,
+            line2: a.line2,
+            city: a.city,
+            state: a.state,
+            postal: a.postal_code,
+            country: a.country,
+          }
+        : null,
+    }
+  },
+)
+
+// -----------------------------------------------------------------------------
+// Live read: invoice history
+// -----------------------------------------------------------------------------
+
+function toInvoiceView(inv: import('stripe').default.Invoice): InvoiceView {
+  const cents = inv.amount_paid || inv.amount_due
+  return {
+    id: inv.id ?? '',
+    number: inv.number ?? null,
+    date: new Date(inv.created * 1000).toISOString(),
+    amount: cents / 100,
+    currency: inv.currency,
+    status: inv.status ?? 'draft',
+    invoicePdf: inv.invoice_pdf ?? null,
+    hostedUrl: inv.hosted_invoice_url ?? null,
+  }
+}
+
+/** Live read of the most recent 12 invoices for the user's customer. */
+export const getInvoicesFn = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<InvoiceView[]> => {
+    await requireAuth()
+    const customerId = await requireCustomerId()
+    if (!customerId) return []
+    const list = await stripe().invoices.list({ customer: customerId, limit: 12 })
+    return list.data.map(toInvoiceView)
+  },
+)
 
 // -----------------------------------------------------------------------------
 // Create Checkout Session (Embedded UI, mode=subscription)

@@ -33,7 +33,6 @@ export function useBilling() {
       plan:               planFromApi(p.plan),
       status:             statusFromApi(p.subscriptionStatus, p.trialEndsAt),
       trialEndsAt:        p.trialEndsAt ?? null,
-      billingEmail:       me.email,
       stripeCustomerId:     p.stripeCustomerId ?? null,
       stripeSubscriptionId: p.stripeSubscriptionId ?? null,
       cancelAtPeriodEnd:    Boolean(p.cancelAtPeriodEnd),

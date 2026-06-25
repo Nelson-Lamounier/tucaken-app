@@ -8,20 +8,39 @@ export type PlanId = 'free' | 'pro' | 'premium'
 export type BillingStatus = 'active' | 'trialing' | 'past_due' | 'canceled'
 export type BillingInterval = 'monthly' | 'annual'
 
-export interface PaymentMethod {
+/** Read-only card view fetched live from Stripe — never persisted. */
+export interface PaymentMethodView {
   brand: string
   last4: string
   expMonth: number
   expYear: number
+  wallet: string | null
 }
 
-export interface BillingAddress {
-  line1: string
-  line2?: string
-  city: string
-  state: string
-  postal: string
-  country: string
+/** Read-only billing details fetched live from the Stripe customer. */
+export interface BillingDetailsView {
+  email: string | null
+  taxIds: { type: string; value: string }[]
+  address: {
+    line1: string | null
+    line2: string | null
+    city: string | null
+    state: string | null
+    postal: string | null
+    country: string | null
+  } | null
+}
+
+/** Read-only invoice view fetched live from Stripe. */
+export interface InvoiceView {
+  id: string
+  number: string | null
+  date: string                // ISO
+  amount: number              // major units
+  currency: string
+  status: 'paid' | 'open' | 'void' | 'uncollectible' | 'draft'
+  invoicePdf: string | null
+  hostedUrl: string | null
 }
 
 export interface UsageMeter {
@@ -37,14 +56,6 @@ export interface UsageBlock {
   storage: UsageMeter
 }
 
-export interface Invoice {
-  id: string
-  date: string         // ISO
-  amount: number
-  status: 'paid' | 'open' | 'failed'
-  number: string
-}
-
 export interface Billing {
   plan: PlanId
   status: BillingStatus
@@ -55,12 +66,7 @@ export interface Billing {
   renewsAt: string                 // ISO
   trialEndsAt: string | null
   cancelAtPeriodEnd: boolean
-  paymentMethod: PaymentMethod
-  billingEmail: string
-  taxId: string
-  address: BillingAddress
   usage: UsageBlock
-  invoices: Invoice[]
   /** Stripe Customer ID once a subscription has been created. */
   stripeCustomerId?: string | null
   /** Stripe Subscription ID once a subscription has been created. */
