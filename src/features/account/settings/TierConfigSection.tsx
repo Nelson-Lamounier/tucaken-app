@@ -8,12 +8,14 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Card, Field, Toggle, inputCls } from '../components/primitives'
 import {
+  createTierStripePriceFn,
   getTierConfigFn,
   listStripePricesFn,
   updateTierConfigFn,
 } from '@/server/tier-config'
 import { adminKeys } from '@/lib/api/query-keys'
 import { notifyError, notifySuccess } from '@/lib/errors/notify'
+import { ALLOWED_PRICE_CURRENCIES, type PriceCurrency } from '@/features/billing/money'
 import type { TierConfig, TierConfigEntry, TierEntitlements } from '@/features/billing/tier-config'
 
 // ---- Types -----------------------------------------------------------------
@@ -103,6 +105,109 @@ function PriceSelect({
   )
 }
 
+// ---- CreateStripePrice -----------------------------------------------------
+
+function toCurrency(v: string): PriceCurrency {
+  const found = ALLOWED_PRICE_CURRENCIES.find((c) => c === v)
+  return found ?? 'eur'
+}
+
+/**
+ * Create a brand-new Stripe Product + monthly Price for a paid tier and map the
+ * tier to it. The created objects land in whatever MODE the deployment's Stripe
+ * key is (test key → test, live key → live).
+ */
+function CreateStripePrice({
+  tier,
+  defaultAmount,
+  onChange,
+}: {
+  tier: 'pro' | 'premium'
+  defaultAmount: number
+  onChange: (patch: Partial<TierConfigEntry>) => void
+}) {
+  const qc = useQueryClient()
+  const [amount, setAmount] = useState(defaultAmount)
+  const [currency, setCurrency] = useState<PriceCurrency>('eur')
+  const [confirming, setConfirming] = useState(false)
+
+  const create = useMutation({
+    mutationFn: () => createTierStripePriceFn({ data: { tier, amount, currency } }),
+    onSuccess: (res) => {
+      void qc.invalidateQueries({ queryKey: ['stripe-prices'] })
+      onChange({ stripePriceIdMonthly: res.priceId, priceMonthly: amount })
+      setConfirming(false)
+      notifySuccess('Stripe price created', `Mapped ${tier} to ${res.priceId}.`)
+    },
+    onError: (err) => {
+      setConfirming(false)
+      notifyError(err, 'generic')
+    },
+  })
+
+  return (
+    <div className="mt-2 rounded-md border border-white/10 bg-white/[0.02] p-3">
+      <p className="mb-2 text-xs text-zinc-400">
+        Or create a new Stripe price (mode follows this deployment&apos;s key):
+      </p>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="flex flex-col gap-1 text-[11px] uppercase tracking-wide text-zinc-500">
+          Amount
+          <input
+            className={inputCls()}
+            type="number"
+            min={0}
+            step="0.01"
+            value={amount}
+            onChange={(e) => setAmount(Number.parseFloat(e.target.value) || 0)}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-[11px] uppercase tracking-wide text-zinc-500">
+          Currency
+          <select className={inputCls()} value={currency} onChange={(e) => setCurrency(toCurrency(e.target.value))}>
+            {ALLOWED_PRICE_CURRENCIES.map((c) => (
+              <option key={c} value={c}>{c.toUpperCase()}</option>
+            ))}
+          </select>
+        </label>
+        {confirming ? (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="rounded-md bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-500 disabled:opacity-50"
+              disabled={create.isPending || amount <= 0}
+              onClick={() => create.mutate()}
+            >
+              Confirm create
+            </button>
+            <button
+              type="button"
+              className="rounded-md border border-white/10 px-3 py-2 text-sm text-zinc-300"
+              onClick={() => setConfirming(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="rounded-md border border-teal-400/30 bg-teal-500/10 px-3 py-2 text-sm text-teal-200 disabled:opacity-50"
+            disabled={amount <= 0}
+            onClick={() => setConfirming(true)}
+          >
+            Create price
+          </button>
+        )}
+      </div>
+      {confirming ? (
+        <p className="mt-2 text-[11px] text-amber-400">
+          Creates a real Stripe product + monthly price ({currency.toUpperCase()} {amount.toFixed(2)}) and maps {tier} to it. A live key creates live, chargeable prices.
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
 // ---- EntitlementField ------------------------------------------------------
 
 function EntitlementField({
@@ -155,6 +260,10 @@ function TierCard({
   }
 
   const enrichmentValue = entry.entitlements.enrichment === 'full' ? 'full' : 'tier1'
+  // Narrow the tier id to a paid tier so CreateStripePrice gets a precise type
+  // (and the Stripe-price block only shows for paid tiers).
+  const paidTier: 'pro' | 'premium' | null =
+    entry.id === 'pro' || entry.id === 'premium' ? entry.id : null
 
   return (
     <Card>
@@ -197,7 +306,7 @@ function TierCard({
         </Field>
       </div>
 
-      {entry.free ? null : (
+      {paidTier ? (
         <div className="mb-4">
           <Field label="Stripe price (monthly)">
             <PriceSelect
@@ -206,8 +315,9 @@ function TierCard({
               onChange={(v) => onChange({ stripePriceIdMonthly: v })}
             />
           </Field>
+          <CreateStripePrice tier={paidTier} defaultAmount={entry.priceMonthly} onChange={onChange} />
         </div>
-      )}
+      ) : null}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <EntitlementField
