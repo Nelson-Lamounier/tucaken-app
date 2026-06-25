@@ -169,6 +169,56 @@ describe('stripe webhook — self-healing customer link', () => {
     ).rejects.toThrow()
   })
 
+  it('patches by customer without linking when a subscription event has no metadata.userId', async () => {
+    mockTierForPriceId.mockReturnValue('pro')
+    mockConstructEvent.mockReturnValue({
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: 'sub_1',
+          customer: 'cus_1',
+          status: 'active',
+          items: { data: [{ price: { id: 'price_1' }, current_period_end: 1_800_000_000 }] },
+          cancel_at_period_end: false,
+          metadata: {},
+        },
+      },
+    })
+
+    await handleStripeWebhook({ rawBody: '{}', signature: 'sig' })
+
+    expect(callsTo(CUSTOMERS)).toHaveLength(0)
+    expect(callsTo(SUBSCRIPTION)).toHaveLength(1)
+  })
+
+  it('rethrows when the link target user is not found (404) so Stripe retries', async () => {
+    mockConstructEvent.mockReturnValue({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: 'cs_1',
+          client_reference_id: 'user-x',
+          customer: 'cus_1',
+          subscription: 'sub_1',
+          payment_status: 'paid',
+          status: 'complete',
+          metadata: { tier: 'pro', userId: 'user-x' },
+        },
+      },
+    })
+    mockInternalApiFetch.mockImplementation((path: string) => {
+      if (path === CUSTOMERS) {
+        return Promise.reject(Object.assign(new Error('User not found'), { status: 404 }))
+      }
+      return Promise.resolve({ ok: true })
+    })
+
+    await expect(
+      handleStripeWebhook({ rawBody: '{}', signature: 'sig' }),
+    ).rejects.toThrow()
+    expect(callsTo(SUBSCRIPTION)).toHaveLength(0)
+  })
+
   it('parks a guest checkout as pending without attempting a customer link', async () => {
     mockConstructEvent.mockReturnValue({
       type: 'checkout.session.completed',
