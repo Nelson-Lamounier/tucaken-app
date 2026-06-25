@@ -76,7 +76,10 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
           userId,
           pipelineType:  'article',
           referenceId:   slug,
-          metadata:      { s3Bucket, s3SourceKey, mode },
+          // Stamp the exact article-pipeline image this run will execute, so a
+          // run's code version is always queryable from its metadata — never
+          // inferred from deploy timelines. Mirrors the strategist route.
+          metadata:      { s3Bucket, s3SourceKey, mode, dispatchedImage: articlePipelineImage },
         });
       } catch (err: unknown) {
         console.error('[pipelines/article-job] failed to insert pipeline_run', err);
