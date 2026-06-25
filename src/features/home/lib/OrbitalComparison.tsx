@@ -3,8 +3,8 @@
 // Radial comparison orbital: nodes orbit a teal Tucaken hub on lg+ (CSS-transform
 // spin, no per-frame React re-render); an accessible static list is shown on
 // mobile and under reduced motion. Only the real q/o/t data is rendered.
-import { motion, AnimatePresence } from 'motion/react'
-import { useState, useEffect } from 'react'
+import { motion, AnimatePresence, useReducedMotionConfig } from 'motion/react'
+import { useState } from 'react'
 import { FileSearch, Target, FileWarning, Fingerprint, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { nodeAngles, nodeTransform } from './orbital-geometry'
@@ -12,19 +12,6 @@ import type { ComparisonItem } from '../content'
 
 const ICONS: Record<string, LucideIcon> = { FileSearch, Target, FileWarning, Fingerprint }
 const RADIUS = 200
-
-function useReducedMotion(): boolean {
-  const [reduce, setReduce] = useState(false)
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
-    setReduce(mq.matches)
-    const handler = () => setReduce(mq.matches)
-    mq.addEventListener('change', handler)
-    return () => mq.removeEventListener('change', handler)
-  }, [])
-  return reduce
-}
 
 function ComparisonDetail({ item }: { item: ComparisonItem }) {
   return (
@@ -109,7 +96,7 @@ function OrbitalNode({
 }
 
 export function OrbitalComparison({ items }: { items: readonly ComparisonItem[] }) {
-  const reduce = useReducedMotion()
+  const reduce = useReducedMotionConfig() ?? false
   const [activeId, setActiveId] = useState<string | null>(null)
   const angles = nodeAngles(items.length)
   const activeItem = items.find((x) => x.label === activeId) ?? null

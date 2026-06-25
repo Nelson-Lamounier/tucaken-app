@@ -2,6 +2,7 @@
 /** @vitest-environment happy-dom */
 import { describe, it, expect, afterEach } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
+import { MotionConfig } from 'motion/react'
 import { OrbitalComparison } from '@/features/home/lib/OrbitalComparison'
 import type { ComparisonItem } from '@/features/home/content'
 
@@ -42,18 +43,12 @@ describe('OrbitalComparison', () => {
   })
 
   it('renders only the static list under reduced motion (no node buttons)', () => {
-    const original = window.matchMedia
-    window.matchMedia = ((q: string) => ({
-      matches: true, media: q, onchange: null,
-      addEventListener: () => {}, removeEventListener: () => {},
-      addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false,
-    })) as unknown as typeof window.matchMedia
-    try {
-      render(<OrbitalComparison items={items} />)
-      expect(screen.queryAllByRole('button')).toHaveLength(0)
-      expect(screen.getByText('Q-evidence?')).toBeTruthy()
-    } finally {
-      window.matchMedia = original
-    }
+    render(
+      <MotionConfig reducedMotion="always">
+        <OrbitalComparison items={items} />
+      </MotionConfig>,
+    )
+    expect(screen.queryAllByRole('button')).toHaveLength(0)
+    expect(screen.getByText('Q-evidence?')).toBeTruthy()
   })
 })
