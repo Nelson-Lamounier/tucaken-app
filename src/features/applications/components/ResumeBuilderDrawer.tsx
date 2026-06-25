@@ -17,8 +17,7 @@ import {
   builderStateToResumeData,
   builderStateToCoverLetter,
 } from '../utils/resume-adapters'
-import { getResumesFn, createResumeFn, updateResumeFn } from '@/server/resumes'
-import { updateApplicationCoverLetterFn } from '@/server/applications'
+import { updateApplicationCoverLetterFn, updateApplicationResumeFn } from '@/server/applications'
 import type { ResumeData } from '@/lib/resumes/resume-data'
 import type { CoverLetter } from '@/lib/types/applications.types'
 import { useToastStore } from '@/lib/stores/toast-store'
@@ -33,19 +32,6 @@ interface ResumeBuilderDrawerProps {
   readonly role: string
   readonly slug: string
   readonly initialView?: 'resume' | 'cover'
-}
-
-async function upsertResume(
-  label: string,
-  resumeData: Record<string, unknown>,
-): Promise<void> {
-  const existing = await getResumesFn()
-  const match = existing.find((r) => r.label === label)
-  if (match) {
-    await updateResumeFn({ data: { resumeId: match.resumeId, label, data: resumeData } })
-  } else {
-    await createResumeFn({ data: { label, data: resumeData } })
-  }
 }
 
 export function ResumeBuilderDrawer({
@@ -97,23 +83,19 @@ export function ResumeBuilderDrawer({
   const saveMutation = useMutation({
     mutationFn: async () => {
       const state = getState()
-      const label = `${company} — ${role}`
-      const resumeData = builderStateToResumeData(state) as unknown as Record<string, unknown>
-      await upsertResume(label, resumeData)
+      const resume = builderStateToResumeData(state) as unknown as Record<string, unknown>
+      await updateApplicationResumeFn({ data: { slug, resume } })
       if (coverLetter) {
         const cl = builderStateToCoverLetter(state, coverLetter.signoff)
         await updateApplicationCoverLetterFn({
-          data: {
-            slug,
-            coverLetter: { ...cl, paragraphs: [...cl.paragraphs] },
-          },
+          data: { slug, coverLetter: { ...cl, paragraphs: [...cl.paragraphs] } },
         })
       }
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: adminKeys.resumes.all })
       void queryClient.invalidateQueries({ queryKey: adminKeys.applications.all })
       void queryClient.invalidateQueries({ queryKey: adminKeys.applications.tailoredResumes })
+      void queryClient.invalidateQueries({ queryKey: adminKeys.applications.detail(slug) })
       addToast('success', 'Saved.')
       handleClose()
     },

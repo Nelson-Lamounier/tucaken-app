@@ -260,6 +260,38 @@ export const getTailoredResumesFn = createServerFn({ method: 'GET' }).handler(as
 })
 
 // =============================================================================
+// Resume Override
+// =============================================================================
+
+const updateResumeDataSchema = z.object({
+  slug: z.string().min(1),
+  resume: z.record(z.unknown()),
+})
+
+/**
+ * Persists a resume override for an application (upserts the
+ * resumes-by-job_application_id row that the detail read returns).
+ *
+ * @param data.slug - The application slug
+ * @param data.resume - The full resume data blob to persist
+ * @returns Success indicator
+ */
+export const updateApplicationResumeFn = createServerFn({ method: 'POST' })
+  .inputValidator(updateResumeDataSchema)
+  .handler(async ({ data }) => {
+    await requireAuth()
+    await apiFetch<{ success: boolean }>(
+      `/applications/${encodeURIComponent(data.slug)}/resume`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ resume: data.resume }),
+        pathTemplate: '/applications/:slug/resume',
+      },
+    )
+    return { success: true }
+  })
+
+// =============================================================================
 // Cover Letter Override
 // =============================================================================
 
