@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   Archive,
   Building2,
+  CreditCard,
   Cpu,
   FileText,
   Globe,
@@ -24,10 +25,11 @@ import { TokensSection } from './TokensSection'
 import { WebhooksSection } from './WebhooksSection'
 import { DataSection } from './DataSection'
 import { DangerZoneSection } from './DangerZoneSection'
+import { TierConfigSection } from './TierConfigSection'
 import { adminKeys } from '@/lib/api/query-keys'
 import { getMeFn } from '@/server/me'
 
-const SECTIONS: PageNavSection[] = [
+const BASE_SECTIONS: PageNavSection[] = [
   { id: 'appearance', label: 'Appearance',      icon: Layout         },
   { id: 'locale',     label: 'Locale & time',   icon: Globe          },
   { id: 'resumes',    label: 'Resume defaults', icon: FileText       },
@@ -38,6 +40,12 @@ const SECTIONS: PageNavSection[] = [
   { id: 'danger',     label: 'Danger zone',     icon: AlertTriangle  },
 ]
 
+const TIERS_SECTION: PageNavSection = {
+  id: 'tiers',
+  label: 'Subscription tiers',
+  icon: CreditCard,
+}
+
 export function SettingsPage({ settings, onUpdateSettings }: SettingsPageProps) {
   // The danger zone needs the canonical email for the type-to-confirm step.
   // useQuery shares cache with use-billing → /me is fetched at most once.
@@ -45,14 +53,16 @@ export function SettingsPage({ settings, onUpdateSettings }: SettingsPageProps) 
     queryKey: adminKeys.me.detail(),
     queryFn:  getMeFn,
   })
+
+  const isAdmin = me?.plan?.role === 'admin'
+  const sections = isAdmin ? [...BASE_SECTIONS, TIERS_SECTION] : BASE_SECTIONS
+
   // Helpers — patch a single nested slice without callers having to spread.
   function patch<K extends keyof Settings>(
     key: K,
     value: Partial<Settings[K]>,
   ) {
-    onUpdateSettings({
-      [key]: { ...(settings[key] as object), ...value },
-    } as Partial<Settings>)
+    onUpdateSettings({ [key]: { ...(settings[key] as object), ...value } } as Partial<Settings>)
   }
 
   return (
@@ -60,7 +70,7 @@ export function SettingsPage({ settings, onUpdateSettings }: SettingsPageProps) 
       eyebrow="Account"
       title="Settings"
       sub="Workspace-wide preferences and developer integrations. Personal profile lives on the Profile page."
-      sections={SECTIONS}
+      sections={sections}
     >
       <PageSection
         id="appearance"
@@ -143,6 +153,16 @@ export function SettingsPage({ settings, onUpdateSettings }: SettingsPageProps) 
       >
         <DangerZoneSection email={me?.email ?? ''} />
       </PageSection>
+
+      {isAdmin ? (
+        <PageSection
+          id="tiers"
+          label="Subscription tiers"
+          sub="Control Free, Pro and Premium pricing, Stripe mapping and entitlements. Owner only."
+        >
+          <TierConfigSection />
+        </PageSection>
+      ) : null}
     </PageShell>
   )
 }
