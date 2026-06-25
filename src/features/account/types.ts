@@ -24,6 +24,20 @@ export interface PaymentMethodView {
   wallet: string | null
 }
 
+/** Read-only billing details fetched live from the Stripe customer. */
+export interface BillingDetailsView {
+  email: string | null
+  taxIds: { type: string; value: string }[]
+  address: {
+    line1: string | null
+    line2: string | null
+    city: string | null
+    state: string | null
+    postal: string | null
+    country: string | null
+  } | null
+}
+
 /** Read-only invoice view fetched live from Stripe. */
 export interface InvoiceView {
   id: string

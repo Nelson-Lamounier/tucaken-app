@@ -28,7 +28,7 @@ import { requireAuth, tryAuth } from './auth-guard'
 import { apiFetch } from './_api-client'
 import { internalApiFetch } from './_internal-api-client'
 import { logger } from '@/lib/observability/logger'
-import type { PlanId, PaymentMethodView, InvoiceView } from '@/features/account/types'
+import type { PlanId, PaymentMethodView, InvoiceView, BillingDetailsView } from '@/features/account/types'
 import { enforceBillingRateLimit } from './_rate-limit'
 
 // -----------------------------------------------------------------------------
@@ -143,6 +143,46 @@ export const getPaymentMethodFn = createServerFn({ method: 'GET' }).handler(
       expMonth: pm.card.exp_month,
       expYear: pm.card.exp_year,
       wallet: pm.card.wallet?.type ?? null,
+    }
+  },
+)
+
+// -----------------------------------------------------------------------------
+// Live read: billing details (email, tax IDs, address)
+// -----------------------------------------------------------------------------
+
+const EMPTY_DETAILS: BillingDetailsView = { email: null, taxIds: [], address: null }
+
+/** Live read of customer billing details (read-only; edits go via Portal). */
+export const getBillingDetailsFn = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<BillingDetailsView> => {
+    await requireAuth()
+    const customerId = await requireCustomerId()
+    if (!customerId) return EMPTY_DETAILS
+
+    const customer = await stripe().customers.retrieve(customerId, {
+      expand: ['tax_ids'],
+    })
+    if ('deleted' in customer && customer.deleted) return EMPTY_DETAILS
+
+    const taxIds = (customer.tax_ids?.data ?? []).map((t) => ({
+      type: t.type,
+      value: t.value ?? '',
+    }))
+    const a = customer.address
+    return {
+      email: customer.email,
+      taxIds,
+      address: a
+        ? {
+            line1: a.line1,
+            line2: a.line2,
+            city: a.city,
+            state: a.state,
+            postal: a.postal_code,
+            country: a.country,
+          }
+        : null,
     }
   },
 )

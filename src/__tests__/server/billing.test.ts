@@ -158,6 +158,37 @@ describe('getPaymentMethodFn', () => {
   })
 })
 
+const { getBillingDetailsFn } = await import('../../server/billing')
+
+describe('getBillingDetailsFn', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockRequireAuth.mockResolvedValue({ id: 'user-1', email: 'user@example.com' })
+  })
+
+  it('returns empty details without calling Stripe when no customer', async () => {
+    mockApiFetch.mockResolvedValue({ plan: { stripeCustomerId: null } })
+    const fn = getBillingDetailsFn as () => Promise<unknown>
+    await expect(fn()).resolves.toEqual({ email: null, taxIds: [], address: null })
+    expect(mockCustomersRetrieve).not.toHaveBeenCalled()
+  })
+
+  it('maps customer email, tax IDs and address', async () => {
+    mockApiFetch.mockResolvedValue({ plan: { stripeCustomerId: 'cus_1' } })
+    mockCustomersRetrieve.mockResolvedValue({
+      email: 'pay@acme.test',
+      tax_ids: { data: [{ type: 'eu_vat', value: 'GB123' }] },
+      address: { line1: '1 St', line2: null, city: 'Leeds', state: null, postal_code: 'LS1', country: 'GB' },
+    })
+    const fn = getBillingDetailsFn as () => Promise<unknown>
+    await expect(fn()).resolves.toEqual({
+      email: 'pay@acme.test',
+      taxIds: [{ type: 'eu_vat', value: 'GB123' }],
+      address: { line1: '1 St', line2: null, city: 'Leeds', state: null, postal: 'LS1', country: 'GB' },
+    })
+  })
+})
+
 const { getInvoicesFn } = await import('../../server/billing')
 
 describe('getInvoicesFn', () => {
