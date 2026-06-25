@@ -70,6 +70,20 @@ Returns `{ repositories: RepoRagSummary[] }`. The list view renders score column
 the dedicated repo-detail route renders the full `kb_quality_breakdown` /
 `retrieval_breakdown` JSON.
 
+### Endpoint 1b — admin: per-user readiness diagnostic (full)
+
+`GET /api/admin/users/:userId/diagnostic` (requireAdminGroup)
+
+Returns `{ diagnostic, refreshedAt }` from `user_profile_rollup` for the target
+user. The existing `GET /profile/summary` only returns the *caller's own* rollup
+(via `requireUserId`); admins need to read an arbitrary user's diagnostic to keep
+the FULL Resume-Readiness panel — every metric currently displayed (overall
+N/100 + the "On track"/"Solid foundation" framing + all five sub-metrics:
+RAG depth, Profile depth, Resume coverage, Direction, Reconciliation + each
+component's blockers). The admin user-detail renders the SAME existing
+`KbScorePanel` + `KbReadinessPanel`/`DiagnosticPanel` components, unchanged, fed
+by this endpoint — nothing is dropped for the admin.
+
 ### Endpoint 2 — user: applications + resumes generated per day
 
 `GET /activity/daily?days=30` (authenticated user; `userId` from verified claims)
