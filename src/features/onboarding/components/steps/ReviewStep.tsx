@@ -16,6 +16,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/Button'
 import { useProfileSummary } from '@/features/profile/hooks/use-profile-summary'
 import { DiagnosticPanel } from '@/features/profile/components/DiagnosticPanel'
+import { KbQualityPanel } from '@/features/user-home/components/KbQualityPanel'
+import { ActivityPanel } from '@/features/user-home/components/ActivityPanel'
+import { getMeFn } from '@/server/me'
 import { adminKeys } from '@/lib/api/query-keys'
 import {
   getImportProgressFn,
@@ -82,6 +85,8 @@ export function ReviewStep({ importId, onFinish }: ReviewStepProps) {
   const queryClient               = useQueryClient()
   const [sub, setSub]             = useState<SubPhase>('review')
   const { data: profileSummary }  = useProfileSummary()
+  const { data: me }              = useQuery({ queryKey: adminKeys.me.detail(), queryFn: getMeFn })
+  const isAdmin                   = me?.plan.role === 'admin'
 
   const finish = onFinish ?? (() => void navigate({ to: '/overview', replace: true }))
 
@@ -270,14 +275,21 @@ export function ReviewStep({ importId, onFinish }: ReviewStepProps) {
   // ── Review sub-view (default) ──────────────────────────────────────────────
   return (
     <div className="space-y-5">
-      {profileSummary ? (
-        <DiagnosticPanel summary={profileSummary} />
+      {isAdmin ? (
+        profileSummary ? (
+          <DiagnosticPanel summary={profileSummary} />
+        ) : (
+          <Panel>
+            <p className="px-6 py-10 text-center text-sm text-zinc-500">
+              Generating your readiness diagnostic…
+            </p>
+          </Panel>
+        )
       ) : (
-        <Panel>
-          <p className="px-6 py-10 text-center text-sm text-zinc-500">
-            Generating your readiness diagnostic…
-          </p>
-        </Panel>
+        <>
+          <KbQualityPanel />
+          <ActivityPanel />
+        </>
       )}
 
       <div className="px-1">
