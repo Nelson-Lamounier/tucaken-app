@@ -58,3 +58,36 @@ describe('BillingToggle', () => {
     expect(screen.getByRole('radio', { name: /monthly/i }).getAttribute('aria-checked')).toBe('false')
   })
 })
+
+import { PricingSection } from '@/features/home/sections/Sections'
+
+describe('PricingSection', () => {
+  it('renders every tier name', () => {
+    render(<PricingSection />)
+    for (const t of TIERS) {
+      expect(screen.getByText(t.name)).toBeTruthy()
+    }
+  })
+
+  it('free tier CTA navigates to sign-in', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event')
+    render(<PricingSection />)
+    await userEvent.click(screen.getByRole('button', { name: new RegExp(byId('free').cta, 'i') }))
+    expect(navigateMock).toHaveBeenCalledWith({ to: '/sign-in' })
+  })
+
+  it('paid tier CTA navigates to checkout with its id', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event')
+    render(<PricingSection />)
+    await userEvent.click(screen.getByRole('button', { name: new RegExp(byId('pro').cta, 'i') }))
+    expect(navigateMock).toHaveBeenCalledWith({ to: '/checkout/$tier', params: { tier: 'pro' } })
+  })
+
+  it('toggling to annually swaps the displayed prices', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event')
+    render(<PricingSection />)
+    expect(screen.getByText(String(byId('pro').priceMonthly))).toBeTruthy()
+    await userEvent.click(screen.getByRole('radio', { name: /annually/i }))
+    expect(screen.getByText(String(byId('pro').priceAnnual))).toBeTruthy()
+  })
+})

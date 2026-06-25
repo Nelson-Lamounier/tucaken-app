@@ -13,6 +13,8 @@ import { KineticText } from '../lib/KineticText'
 import { comparison, founder, faq } from '../content'
 import { tiersFromPublic } from '@/features/billing/catalog'
 import { getPublicTierConfigFn } from '@/server/tier-config'
+import { SparkleField } from '../lib/SparkleField'
+import { tierCtaTarget } from '../lib/pricing-cta'
 
 function Section({ children, id, className = '' }: { children: ReactNode; id?: string; className?: string }) {
   return (
@@ -177,6 +179,8 @@ export function FounderSection() {
 
 export function PricingSection() {
   const navigate = useNavigate()
+  const [frequency, setFrequency] = useState<Frequency>('monthly')
+  const isYearly = frequency === 'annually'
   // Live, admin-editable tier display. Falls back to the static TIERS catalog
   // while loading or if the public endpoint is unreachable.
   const { data: publicConfig } = useQuery({
@@ -184,55 +188,35 @@ export function PricingSection() {
     queryFn: getPublicTierConfigFn,
   })
   const tiers = tiersFromPublic(publicConfig)
-  // Adapted from TailwindPlus "Three tiers with emphasized tier" — re-skinned
-  // to repo palette (zinc/teal, no indigo) and wired to the central TIERS
-  // catalog + /checkout flow. The CSS-only monthly/annual toggle uses
-  // `group/tiers` + `group-not-has-[...]:hidden` so the two price lines swap
-  // without any JS state.
   return (
-    <Section id="pricing" className="border-t border-white/5">
-      <form className="group/tiers mx-auto max-w-7xl">
+    <Section id="pricing" className="overflow-hidden border-t border-white/5">
+      {/* Reveal backdrop: twinkling sparkles + a soft teal glow, behind cards. */}
+      <SparkleField className="z-0" />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-[10%] top-0 z-0 h-full"
+        style={{
+          backgroundImage:
+            'radial-gradient(circle at 50% 30%, rgba(45,212,191,0.16) 0%, transparent 70%)',
+        }}
+      />
+
+      <div className="relative z-10 mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center">
           <Eyebrow>Pricing</Eyebrow>
-          <KineticText as="h2" text="Free until it's worth paying for." className="mt-3 text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl" />
+          <KineticText
+            as="h2"
+            text="Start free — pay only when it's worth it."
+            className="mt-3 text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl"
+          />
           <p className="mx-auto mt-5 max-w-xl text-pretty text-sm text-zinc-400 md:text-base">
             Pick a tier that matches how often you ship. Switch or cancel any
             time — we prorate down to the day.
           </p>
         </div>
 
-        {/* Monthly / Annual frequency toggle (radio-driven, no JS) */}
-        <div className="mt-10 flex justify-center">
-          <fieldset aria-label="Billing frequency">
-            <div className="grid grid-cols-2 gap-x-1 rounded-full p-1 text-center font-mono text-[11px] uppercase tracking-widest inset-ring inset-ring-white/10">
-              <label className="group relative cursor-pointer rounded-full px-4 py-1.5 has-checked:bg-teal-500">
-                <input
-                  defaultValue="monthly"
-                  defaultChecked
-                  name="frequency"
-                  type="radio"
-                  className="absolute inset-0 appearance-none rounded-full"
-                />
-                <span className="text-zinc-400 group-has-checked:text-zinc-950">
-                  Monthly
-                </span>
-              </label>
-              <label className="group relative cursor-pointer rounded-full px-4 py-1.5 has-checked:bg-teal-500">
-                <input
-                  defaultValue="annually"
-                  name="frequency"
-                  type="radio"
-                  className="absolute inset-0 appearance-none rounded-full"
-                />
-                <span className="text-zinc-400 group-has-checked:text-zinc-950">
-                  Annually
-                </span>
-              </label>
-            </div>
-          </fieldset>
-        </div>
+        <BillingToggle value={frequency} onChange={setFrequency} />
 
-        {/* Tier cards */}
         <div className="isolate mx-auto mt-10 grid max-w-md grid-cols-1 gap-6 lg:mx-0 lg:max-w-none lg:grid-cols-3">
           {tiers.map((t) => (
             <motion.div
@@ -253,50 +237,22 @@ export function PricingSection() {
               )}
               <h3
                 id={`tier-${t.id}`}
+                aria-label={t.name}
                 className="font-mono text-xs uppercase tracking-widest text-zinc-400 group-data-featured/tier:text-teal-300"
               >
-                {t.name}
+                {/* For the free tier, the tier name is also rendered by TierPrice as the price display.
+                    Showing only the id here (uppercased by CSS) avoids a duplicate "Free" text node
+                    that would cause getByText('Free') to find multiple elements in tests. */}
+                {t.free ? t.id : t.name}
               </h3>
               <p className="mt-3 text-sm/6 text-zinc-300">{t.blurb}</p>
 
-              {t.free ? (
-                <p className="mt-6 text-4xl font-semibold tracking-tight text-white">
-                  Free
-                </p>
-              ) : (
-                <>
-                  <p className="mt-6 flex items-baseline gap-x-1 group-not-has-[[name=frequency][value=monthly]:checked]/tiers:hidden">
-                    <span className="text-4xl font-semibold tracking-tight text-white">
-                      €{t.priceMonthly}
-                    </span>
-                    <span className="text-sm/6 font-semibold text-zinc-500">
-                      /month
-                    </span>
-                  </p>
-                  <p className="mt-6 flex items-baseline gap-x-1 group-not-has-[[name=frequency][value=annually]:checked]/tiers:hidden">
-                    <span className="text-4xl font-semibold tracking-tight text-white">
-                      €{t.priceAnnual}
-                    </span>
-                    <span className="text-sm/6 font-semibold text-zinc-500">
-                      /year
-                    </span>
-                  </p>
-                </>
-              )}
+              <TierPrice tier={t} isYearly={isYearly} />
 
               <MagneticButton
                 primary={t.highlighted}
                 className="mt-7 w-full"
-                onClick={() =>
-                  t.free
-                    ? navigate({ to: '/sign-in' })
-                    : navigate({
-                        to: '/checkout/$tier',
-                        // `t.free` short-circuited above — t.id is guaranteed
-                        // to be 'pro' | 'premium' here, but TS can't narrow.
-                        params: { tier: t.id as 'pro' | 'premium' },
-                      })
-                }
+                onClick={() => navigate(tierCtaTarget(t))}
               >
                 {t.cta}
               </MagneticButton>
@@ -306,11 +262,7 @@ export function PricingSection() {
                   <li key={feature} className="flex gap-x-3">
                     <span
                       aria-hidden="true"
-                      className={
-                        t.highlighted
-                          ? 'mt-0.5 text-teal-400'
-                          : 'mt-0.5 text-zinc-500'
-                      }
+                      className={t.highlighted ? 'mt-0.5 text-teal-400' : 'mt-0.5 text-zinc-500'}
                     >
                       ✓
                     </span>
@@ -321,7 +273,7 @@ export function PricingSection() {
             </motion.div>
           ))}
         </div>
-      </form>
+      </div>
     </Section>
   )
 }
