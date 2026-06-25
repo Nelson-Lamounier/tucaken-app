@@ -28,6 +28,7 @@ import {
   UserNotFoundError,
   StripeCustomerConflictError,
 } from '../lib/repositories/users.js';
+import { markWebhookEventSeen } from '../lib/repositories/webhook-events.js';
 import type { AdminApiBindings } from '../lib/types.js';
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
@@ -56,6 +57,11 @@ const PendingSubscriptionInput = z.object({
   stripeSubscriptionId: z.string().startsWith('sub_'),
   plan:                 z.enum(['pro', 'premium']),
   subscriptionStatus:   z.enum(['active', 'trialing', 'past_due', 'unpaid']),
+});
+
+const WebhookSeenInput = z.object({
+  eventId: z.string().startsWith('evt_'),
+  type:    z.string().min(1),
 });
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
@@ -200,6 +206,20 @@ export function createInternalBillingRouter(
       'Pending subscription recorded for guest signup',
     );
     return ctx.json({ ok: true });
+  });
+
+  /**
+   * POST /api/internal/billing/webhook-seen
+   *
+   * Idempotency guard for the Stripe webhook. Claims an event id the first time
+   * it is seen; returns { alreadyProcessed: true } on a duplicate delivery so
+   * the caller can skip re-processing.
+   */
+  router.post('/webhook-seen', async (ctx) => {
+    const parsed = await parseBody(ctx, WebhookSeenInput);
+    if (parsed instanceof Response) return parsed;
+    const isNew = await markWebhookEventSeen(pool, parsed.eventId, parsed.type);
+    return ctx.json({ alreadyProcessed: !isNew });
   });
 
   return router;
