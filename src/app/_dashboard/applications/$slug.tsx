@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { ApplicationDetailContainer } from '@/features/applications/components/ApplicationDetailContainer'
+import { canPublishResume } from '@/features/applications/components/ApplicationActionsMenu'
 import { STAGE_ORDER } from '@/features/applications/stages/types/stage'
 
 const stageSearchSchema = z.object({
@@ -20,6 +21,14 @@ export const Route = createFileRoute('/_dashboard/applications/$slug')({
 function ApplicationDetailRoute() {
   const { slug } = Route.useParams()
   const { stage, focus } = Route.useSearch()
+  const { me } = Route.useRouteContext()
 
-  return <ApplicationDetailContainer slug={slug} activeStage={stage} focus={focus} />
+  return (
+    <ApplicationDetailContainer
+      slug={slug}
+      activeStage={stage}
+      focus={focus}
+      canPublish={canPublishResume(me.email)}
+    />
+  )
 }

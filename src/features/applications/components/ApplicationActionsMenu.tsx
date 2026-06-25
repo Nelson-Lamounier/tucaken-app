@@ -23,6 +23,13 @@ import {
 } from '@/features/resume-theme/app/state'
 import { mapApplicationToBuilderState } from '../utils/resume-adapters'
 
+const PUBLISH_ALLOW_LIST = new Set(['lamounier_88@hotmail.com'])
+
+/** Presentation gate for the publish action; admin-api remains the real authority. */
+export function canPublishResume(email: string | undefined): boolean {
+  return typeof email === 'string' && PUBLISH_ALLOW_LIST.has(email)
+}
+
 interface ApplicationActionsMenuProps {
   readonly detail: ApplicationDetail
   /** The stage tab currently being viewed (?stage=) — resume actions show on 'applied'. */
@@ -33,6 +40,8 @@ interface ApplicationActionsMenuProps {
   readonly statusValue: string
   readonly statusPending: boolean
   readonly onStatusChange: (status: ApplicationStatus) => void
+  /** Presentation gate — true only for the permitted operator email. */
+  readonly canPublish: boolean
 }
 
 /**
@@ -48,6 +57,7 @@ export function ApplicationActionsMenu({
   statusValue,
   statusPending,
   onStatusChange,
+  canPublish,
 }: ApplicationActionsMenuProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -168,7 +178,7 @@ export function ApplicationActionsMenu({
         onDownloadResume={isApplied && hasTailoredResume ? handleDownloadResume : undefined}
         onDownloadCoverLetter={isApplied && detail.analysis?.coverLetter ? handleDownloadCoverLetter : undefined}
         onEdit={isApplied && hasTailoredResume ? handleOpenBuilder : undefined}
-        onPublish={isApplied && hasTailoredResume ? () => publishMutation.mutate() : undefined}
+        onPublish={isApplied && hasTailoredResume && canPublish ? () => publishMutation.mutate() : undefined}
         onDelete={() => deleteMutation.mutate()}
       />
 

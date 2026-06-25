@@ -92,6 +92,8 @@ interface ApplicationHeaderProps {
   readonly dateStr: string
   /** Stage-advance dropdown, rendered side-by-side with the status control. */
   readonly advanceControl?: ReactNode
+  /** Presentation gate — true only for the permitted operator email. */
+  readonly canPublish: boolean
 }
 
 /**
@@ -99,7 +101,7 @@ interface ApplicationHeaderProps {
  * status control. Mirrors the KB dashboard header (title + subtitle + action);
  * the at-a-glance stat tiles render beneath it via StageGlancePanel.
  */
-function ApplicationHeader({ detail, viewedStage, statusPending, onStatusChange, dateStr, advanceControl }: ApplicationHeaderProps) {
+function ApplicationHeader({ detail, viewedStage, statusPending, onStatusChange, dateStr, advanceControl, canPublish }: ApplicationHeaderProps) {
   return (
     <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-center gap-3">
@@ -129,6 +131,7 @@ function ApplicationHeader({ detail, viewedStage, statusPending, onStatusChange,
           statusValue={detail.status}
           statusPending={statusPending}
           onStatusChange={onStatusChange}
+          canPublish={canPublish}
         />
         {advanceControl}
       </div>
@@ -143,9 +146,11 @@ interface ApplicationDetailContainerProps {
   readonly activeStage?: InterviewStage
   /** Selected summary-row id from the `?focus` search param. */
   readonly focus?: string
+  /** Presentation gate — true only for the permitted operator email. */
+  readonly canPublish: boolean
 }
 
-export function ApplicationDetailContainer({ slug, activeStage, focus }: ApplicationDetailContainerProps) {
+export function ApplicationDetailContainer({ slug, activeStage, focus, canPublish }: ApplicationDetailContainerProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const statusMutation = useApplicationStatus()
@@ -337,6 +342,7 @@ export function ApplicationDetailContainer({ slug, activeStage, focus }: Applica
         statusPending={statusMutation.isPending}
         onStatusChange={handleStatusChange}
         dateStr={dateStr}
+        canPublish={canPublish}
         advanceControl={
           <DropDownOptions
             label="Mark complete and advance"
