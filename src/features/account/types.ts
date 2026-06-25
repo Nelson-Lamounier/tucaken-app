@@ -15,6 +15,15 @@ export interface PaymentMethod {
   expYear: number
 }
 
+/** Read-only card view fetched live from Stripe — never persisted. */
+export interface PaymentMethodView {
+  brand: string
+  last4: string
+  expMonth: number
+  expYear: number
+  wallet: string | null
+}
+
 export interface BillingAddress {
   line1: string
   line2?: string

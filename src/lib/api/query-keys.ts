@@ -91,6 +91,14 @@ export const adminKeys = {
     connectedRepos: () => ['admin', 'github', 'connected-repos'] as const,
   },
 
+  /** Live Stripe billing reads (payment method, invoices, customer details) */
+  billing: {
+    all: ['admin', 'billing'] as const,
+    paymentMethod: () => ['admin', 'billing', 'payment-method'] as const,
+    invoices: () => ['admin', 'billing', 'invoices'] as const,
+    details: () => ['admin', 'billing', 'details'] as const,
+  },
+
   /** Current-user profile + plan (from /api/admin/me) */
   me: {
     detail: () => ['admin', 'me'] as const,

@@ -28,7 +28,7 @@ import { requireAuth, tryAuth } from './auth-guard'
 import { apiFetch } from './_api-client'
 import { internalApiFetch } from './_internal-api-client'
 import { logger } from '@/lib/observability/logger'
-import type { PlanId } from '@/features/account/types'
+import type { PlanId, PaymentMethodView } from '@/features/account/types'
 import { enforceBillingRateLimit } from './_rate-limit'
 
 // -----------------------------------------------------------------------------
@@ -85,6 +85,67 @@ async function ensureStripeCustomerForUser(user: {
   }
   return customer.id
 }
+
+// -----------------------------------------------------------------------------
+// Shared customer resolver (never trusts client-supplied IDs)
+// -----------------------------------------------------------------------------
+
+/**
+ * Resolves the authenticated user's Stripe customer ID server-side via the
+ * user-JWT-protected /me endpoint. Returns null for free-tier users with no
+ * customer yet. Never trusts a client-supplied customerId (prevents IDOR).
+ */
+async function requireCustomerId(): Promise<string | null> {
+  const me = await apiFetch<{ plan: { stripeCustomerId: string | null } }>(
+    '/me',
+    { pathTemplate: '/me' },
+  )
+  return me.plan.stripeCustomerId
+}
+
+// -----------------------------------------------------------------------------
+// Live read: default payment method
+// -----------------------------------------------------------------------------
+
+/**
+ * Live read of the customer's default card. Resolution order:
+ *   invoice_settings.default_payment_method → first card on file → null.
+ * Card data is never persisted — this is fetched per request.
+ */
+export const getPaymentMethodFn = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<PaymentMethodView | null> => {
+    await requireAuth()
+    const customerId = await requireCustomerId()
+    if (!customerId) return null
+
+    const customer = await stripe().customers.retrieve(customerId, {
+      expand: ['invoice_settings.default_payment_method'],
+    })
+    if ('deleted' in customer && customer.deleted) return null
+
+    let pm = customer.invoice_settings?.default_payment_method ?? null
+    if (typeof pm === 'string') {
+      pm = await stripe().paymentMethods.retrieve(pm)
+    }
+    if (!pm) {
+      const list = await stripe().paymentMethods.list({
+        customer: customerId,
+        type: 'card',
+        limit: 1,
+      })
+      pm = list.data[0] ?? null
+    }
+    if (!pm?.card) return null
+
+    return {
+      brand: pm.card.brand,
+      last4: pm.card.last4,
+      expMonth: pm.card.exp_month,
+      expYear: pm.card.exp_year,
+      wallet: pm.card.wallet?.type ?? null,
+    }
+  },
+)
 
 // -----------------------------------------------------------------------------
 // Create Checkout Session (Embedded UI, mode=subscription)

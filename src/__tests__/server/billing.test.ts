@@ -17,6 +17,10 @@ vi.mock('@tanstack/react-start', () => ({
 const mockRequireAuth = vi.fn()
 const mockApiFetch = vi.fn()
 const mockPortalCreate = vi.fn()
+const mockCustomersRetrieve = vi.fn()
+const mockPmRetrieve = vi.fn()
+const mockPmList = vi.fn()
+const mockInvoicesList = vi.fn()
 
 vi.mock('../../server/auth-guard', () => ({
   requireAuth: (...args: unknown[]) => mockRequireAuth(...args),
@@ -41,6 +45,9 @@ vi.mock('../../server/stripe', () => ({
         create: mockPortalCreate,
       },
     },
+    customers: { retrieve: mockCustomersRetrieve },
+    paymentMethods: { retrieve: mockPmRetrieve, list: mockPmList },
+    invoices: { list: mockInvoicesList },
   }),
 }))
 
@@ -105,5 +112,48 @@ describe('createPortalSessionFn', () => {
       .rejects
       .toThrow(/return path/i)
     expect(mockPortalCreate).not.toHaveBeenCalled()
+  })
+})
+
+const { getPaymentMethodFn } = await import('../../server/billing')
+
+describe('getPaymentMethodFn', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockRequireAuth.mockResolvedValue({ id: 'user-1', email: 'user@example.com' })
+  })
+
+  it('returns null without calling Stripe when the user has no customer', async () => {
+    mockApiFetch.mockResolvedValue({ plan: { stripeCustomerId: null } })
+    const fn = getPaymentMethodFn as () => Promise<unknown>
+    await expect(fn()).resolves.toBeNull()
+    expect(mockCustomersRetrieve).not.toHaveBeenCalled()
+  })
+
+  it('maps the expanded default card to a PaymentMethodView', async () => {
+    mockApiFetch.mockResolvedValue({ plan: { stripeCustomerId: 'cus_1' } })
+    mockCustomersRetrieve.mockResolvedValue({
+      invoice_settings: {
+        default_payment_method: {
+          card: { brand: 'visa', last4: '4242', exp_month: 12, exp_year: 2031, wallet: null },
+        },
+      },
+    })
+    const fn = getPaymentMethodFn as () => Promise<unknown>
+    await expect(fn()).resolves.toEqual({
+      brand: 'visa', last4: '4242', expMonth: 12, expYear: 2031, wallet: null,
+    })
+  })
+
+  it('falls back to the first card payment method when no default is set', async () => {
+    mockApiFetch.mockResolvedValue({ plan: { stripeCustomerId: 'cus_1' } })
+    mockCustomersRetrieve.mockResolvedValue({ invoice_settings: { default_payment_method: null } })
+    mockPmList.mockResolvedValue({
+      data: [{ card: { brand: 'mastercard', last4: '5555', exp_month: 1, exp_year: 2030, wallet: { type: 'apple_pay' } } }],
+    })
+    const fn = getPaymentMethodFn as () => Promise<unknown>
+    await expect(fn()).resolves.toEqual({
+      brand: 'mastercard', last4: '5555', expMonth: 1, expYear: 2030, wallet: 'apple_pay',
+    })
   })
 })
