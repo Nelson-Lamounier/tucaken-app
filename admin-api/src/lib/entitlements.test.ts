@@ -77,4 +77,24 @@ describe('entitlementsFromConfig', () => {
         const e = entitlementsFromConfig(DEFAULT_TIER_CONFIG, 'trial');
         expect(e.repos).toBe(Number.POSITIVE_INFINITY);
     });
+
+    it('reads ingestionJobsPerMonth from the config (finite value beats static map)', () => {
+        // Construct a config where the pro tier has a finite ingestion cap (e.g. 10)
+        // rather than the static-map Infinity. Verifies that getPlanLimit-equivalent
+        // logic reads the live config value, not the static ENTITLEMENTS table.
+        const configWithCap: typeof DEFAULT_TIER_CONFIG = {
+            tiers: DEFAULT_TIER_CONFIG.tiers.map((t) =>
+                t.id === 'pro'
+                    ? { ...t, entitlements: { ...t.entitlements, ingestionJobsPerMonth: 10 } }
+                    : t,
+            ),
+        };
+        const e = entitlementsFromConfig(configWithCap, 'pro');
+        expect(e.ingestionJobsPerMonth).toBe(10);
+    });
+
+    it('null ingestionJobsPerMonth in config maps to Infinity (unlimited)', () => {
+        const e = entitlementsFromConfig(DEFAULT_TIER_CONFIG, 'pro');
+        expect(e.ingestionJobsPerMonth).toBe(Number.POSITIVE_INFINITY);
+    });
 });

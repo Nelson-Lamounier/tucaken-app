@@ -20,7 +20,8 @@ import { Hono } from 'hono';
 import { resolveDispatchMode } from '../lib/ab-free-tier.js';
 import type { AdminApiConfig } from '../lib/config.js';
 import { getJobImage, isImageConfigured, isAssetsBucketConfigured } from '../lib/config.js';
-import { entitlementsFor } from '../lib/entitlements.js';
+import { entitlementsFromConfig } from '../lib/entitlements.js';
+import { getCachedTierConfig } from '../lib/tier-config-cache.js';
 import { buildPipelineJob, sanitizeLabel } from '../lib/k8s-job-builder.js';
 import { getBatchApi } from '../lib/k8s.js';
 import { getPool, withUser } from '../lib/pg.js';
@@ -295,7 +296,8 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
       // RLS is not needed for correctness here.
       const planStatus = await getUserPlanStatus(pool, userId);
       const role = planStatus?.role ?? null;
-      const cap = entitlementsFor(planStatus?.effectivePlan ?? 'free', role).resumesPerMonth;
+      const tierConfig = await getCachedTierConfig(pool);
+      const cap = entitlementsFromConfig(tierConfig, planStatus?.effectivePlan ?? 'free', role).resumesPerMonth;
       const allowed = await checkAndIncrementResumeQuota(pool, userId, cap);
       if (!allowed) {
         ctx.header('Retry-After', String(secondsUntilNextMonthUTC()));

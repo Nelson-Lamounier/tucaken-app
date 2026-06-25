@@ -61,7 +61,9 @@ import { secondsUntilNextMonthUTC } from '../lib/retry-after.js';
 import { AdminApiBindings, requireUserId } from '../lib/types.js';
 import { getUserPlanStatus } from '../lib/repositories/users.js';
 import type { EffectivePlan } from '../lib/repositories/users.js';
-import { entitlementsFor } from '../lib/entitlements.js';
+import { entitlementsFromConfig } from '../lib/entitlements.js';
+import { getCachedTierConfig } from '../lib/tier-config-cache.js';
+import type { TierConfig } from '../lib/tier-config-shape.js';
 
 // Push events: skip re-index if a job was already triggered within this window.
 const PUSH_COOLDOWN_MS = 30 * 60 * 1000;
@@ -304,8 +306,8 @@ async function deleteRepository(pool: Pool, userId: string, fullName: string): P
 // QUOTA + DEBOUNCE HELPERS
 // =============================================================================
 
-function getPlanLimit(plan: EffectivePlan, role: string | null | undefined): number {
-    return entitlementsFor(plan, role).ingestionJobsPerMonth;
+function getPlanLimit(config: TierConfig, plan: EffectivePlan, role: string | null | undefined): number {
+    return entitlementsFromConfig(config, plan, role).ingestionJobsPerMonth;
 }
 
 /**
@@ -407,7 +409,8 @@ async function autoDispatchRepos(
     token:         string,
     forceReindex:  boolean,
 ): Promise<string[]> {
-    const limit   = getPlanLimit(effectivePlan, role);
+    const tierConfig = await getCachedTierConfig(pool);
+    const limit   = getPlanLimit(tierConfig, effectivePlan, role);
     const queued: string[] = [];
     // github_repo_id is NOT NULL post-085, so we must resolve a real id for every
     // repo. Build the installation name->id map once and fall back to it whenever
@@ -416,7 +419,7 @@ async function autoDispatchRepos(
 
     // Per-plan repository-count cap: free users auto-connecting many repos on
     // install are limited to `repos` entitlement (e.g. 1 for free tier).
-    const repoCap = entitlementsFor(effectivePlan, role).repos;
+    const repoCap = entitlementsFromConfig(tierConfig, effectivePlan, role).repos;
     const capped  = Number.isFinite(repoCap) ? repos.slice(0, repoCap) : repos;
     if (capped.length < repos.length) {
         console.log(`[github] plan cap: dispatching ${capped.length}/${repos.length} repos for ${userId}`);
@@ -1150,7 +1153,8 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         const planStatus    = await getUserPlanStatus(pool, uid);
         const effectivePlan = planStatus?.effectivePlan ?? 'free';
         const role          = planStatus?.role ?? null;
-        const limit = getPlanLimit(effectivePlan, role);
+        const tierConfig    = await getCachedTierConfig(pool);
+        const limit = getPlanLimit(tierConfig, effectivePlan, role);
         const allowed = await checkAndIncrementQuota(pool, uid, limit);
         if (!allowed) {
             ctx.header('Retry-After', String(secondsUntilNextMonthUTC()));
@@ -1167,7 +1171,7 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
                 [uid, repoFullName],
             )
             .then(r => (r.rowCount ?? 0) > 0);
-        const repoCap = entitlementsFor(effectivePlan, role).repos;
+        const repoCap = entitlementsFromConfig(tierConfig, effectivePlan, role).repos;
         if (Number.isFinite(repoCap) && !repoAlreadyConnected) {
             const already = await countConnectedRepos(pool, uid);
             if (already >= repoCap) {
@@ -1687,7 +1691,8 @@ export function createGitHubWebhookRouter(config: AdminApiConfig): Hono {
             const pushPlanStatus    = await getUserPlanStatus(pool, user.userId);
             const pushEffectivePlan = pushPlanStatus?.effectivePlan ?? 'free';
             const pushRole          = pushPlanStatus?.role ?? null;
-            const limit   = getPlanLimit(pushEffectivePlan, pushRole);
+            const pushTierConfig    = await getCachedTierConfig(pool);
+            const limit   = getPlanLimit(pushTierConfig, pushEffectivePlan, pushRole);
             const allowed = await checkAndIncrementQuota(pool, user.userId, limit);
             if (!allowed) {
                 console.log(`[github/webhook] push skipped — quota exceeded for user ${user.userId}`);
