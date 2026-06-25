@@ -18,6 +18,7 @@
 
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
+import type Stripe from 'stripe'
 import {
   stripe,
   priceIdForTierFromConfig,
@@ -333,7 +334,37 @@ const CreatePortalInput = z.object({
   customerId: z.string().startsWith('cus_'),
   /** Where to send the user after they close the portal. */
   returnPath: z.string().default('/billing'),
+  /**
+   * Optional deep-link into a Stripe portal flow: 'update' lands the user on
+   * the plan-change screen, 'cancel' on the cancellation screen. Omitted opens
+   * the portal home. Plan switching also requires the Stripe Customer Portal to
+   * be configured to allow it (Dashboard → Settings → Billing → Customer
+   * portal), otherwise Stripe rejects the session.
+   */
+  flow: z.enum(['update', 'cancel']).optional(),
 })
+
+/**
+ * Build the Stripe portal `flow_data` for a plan-change deep-link. Returns
+ * undefined when no flow is requested or the user has no live subscription, so
+ * the portal opens on its home screen.
+ */
+function portalFlowData(
+  flow: 'update' | 'cancel' | undefined,
+  subscriptionId: string | null,
+): NonNullable<Stripe.BillingPortal.SessionCreateParams['flow_data']> | undefined {
+  if (!flow || !subscriptionId) return undefined
+  if (flow === 'cancel') {
+    return {
+      type: 'subscription_cancel',
+      subscription_cancel: { subscription: subscriptionId },
+    }
+  }
+  return {
+    type: 'subscription_update',
+    subscription_update: { subscription: subscriptionId },
+  }
+}
 
 function safePortalReturnPath(returnPath: string): string {
   if (
@@ -352,10 +383,9 @@ export const createPortalSessionFn = createServerFn({ method: 'POST' })
     enforceBillingRateLimit('billing_portal')
     const user = await requireAuth()
     const returnPath = safePortalReturnPath(data.returnPath ?? '/billing')
-    const me = await apiFetch<{ plan: { stripeCustomerId: string | null } }>(
-      '/me',
-      { pathTemplate: '/me' },
-    )
+    const me = await apiFetch<{
+      plan: { stripeCustomerId: string | null; stripeSubscriptionId: string | null }
+    }>('/me', { pathTemplate: '/me' })
 
     if (!me.plan.stripeCustomerId || me.plan.stripeCustomerId !== data.customerId) {
       logger.warn(
@@ -370,9 +400,11 @@ export const createPortalSessionFn = createServerFn({ method: 'POST' })
       throw new Error('Stripe customer does not belong to the current user.')
     }
 
+    const flowData = portalFlowData(data.flow, me.plan.stripeSubscriptionId)
     const portal = await stripe().billingPortal.sessions.create({
       customer: data.customerId,
       return_url: `${appOrigin()}${returnPath}`,
+      ...(flowData ? { flow_data: flowData } : {}),
     })
     return { url: portal.url }
   })
