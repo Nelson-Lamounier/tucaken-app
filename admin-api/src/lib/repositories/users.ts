@@ -907,3 +907,57 @@ function toPlan(value: string): 'free' | 'pro' | 'premium' {
   if (value === 'premium') return 'premium';
   return 'free';
 }
+
+export interface AdminUserDetailRow extends AdminUserRow {
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  quotas: { feature: string; periodMonth: string; count: number }[];
+}
+
+export async function getAdminUserById(
+  pool: Pick<import('pg').Pool, 'query'>,
+  id: string,
+): Promise<AdminUserDetailRow | null> {
+  const userResult = await pool.query<{
+    id: string; email: string; full_name: string | null; role: string; plan: string;
+    subscription_status: string | null; trial_ends_at: Date | null; deleted_at: Date | null;
+    created_at: Date; stripe_customer_id: string | null; stripe_subscription_id: string | null;
+    current_period_end: Date | null; cancel_at_period_end: boolean;
+  }>(
+    `SELECT id, email, full_name, role, plan, subscription_status, trial_ends_at,
+            deleted_at, created_at, stripe_customer_id, stripe_subscription_id,
+            current_period_end, cancel_at_period_end
+       FROM users WHERE id = $1`,
+    [id],
+  );
+  const u = userResult.rows[0];
+  if (!u) return null;
+
+  const quotaResult = await pool.query<{ feature: string; period_month: string; count: number }>(
+    `SELECT feature, period_month, count
+       FROM usage_quotas WHERE user_id = $1
+      ORDER BY period_month DESC, feature ASC`,
+    [id],
+  );
+
+  return {
+    id: u.id,
+    email: u.email,
+    fullName: u.full_name,
+    role: u.role === 'admin' ? 'admin' : 'user',
+    plan: toPlan(u.plan),
+    subscriptionStatus: u.subscription_status,
+    trialEndsAt: u.trial_ends_at ? u.trial_ends_at.toISOString() : null,
+    deletedAt: u.deleted_at ? u.deleted_at.toISOString() : null,
+    createdAt: u.created_at.toISOString(),
+    stripeCustomerId: u.stripe_customer_id,
+    stripeSubscriptionId: u.stripe_subscription_id,
+    currentPeriodEnd: u.current_period_end ? u.current_period_end.toISOString() : null,
+    cancelAtPeriodEnd: u.cancel_at_period_end,
+    quotas: quotaResult.rows.map((q) => ({
+      feature: q.feature, periodMonth: q.period_month, count: Number(q.count),
+    })),
+  };
+}
