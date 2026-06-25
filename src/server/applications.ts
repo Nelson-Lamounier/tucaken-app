@@ -41,6 +41,20 @@ const updateStatusSchema = z.object({
   interviewStage: z.string().optional(),
 })
 
+export const coverLetterBodySchema = z.object({
+  slug: z.string().min(1),
+  coverLetter: z.object({
+    greeting: z.string(),
+    paragraphs: z.array(z.string()),
+    signoff: z.object({
+      name: z.string(),
+      email: z.string(),
+      linkedin: z.string(),
+      github: z.string(),
+    }),
+  }),
+})
+
 // =============================================================================
 // Server Functions
 // =============================================================================
@@ -133,6 +147,26 @@ export const patchApplicationAnnotationsFn = createServerFn({ method: 'POST' })
         method: 'PATCH',
         body: JSON.stringify({ annotations: data.annotations }),
         pathTemplate: '/applications/:slug/annotations',
+      },
+    )
+    return { success: true }
+  })
+
+/**
+ * Overrides the tailored cover letter for an application. The pipeline output is
+ * immutable; this persists a per-application override merged at read time.
+ */
+export const updateApplicationCoverLetterFn = createServerFn({ method: 'POST' })
+  .inputValidator(coverLetterBodySchema)
+  .handler(async ({ data }) => {
+    await requireAuth()
+
+    await apiFetch<{ success: boolean }>(
+      `/applications/${encodeURIComponent(data.slug)}/cover-letter`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ coverLetter: data.coverLetter }),
+        pathTemplate: '/applications/:slug/cover-letter',
       },
     )
     return { success: true }
