@@ -26,17 +26,20 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 
-import { adminEnableUser } from '../lib/cognito-admin.js';
+import { adminDisableUser, adminEnableUser } from '../lib/cognito-admin.js';
 import type { AdminApiConfig } from '../lib/config.js';
 import { logger } from '../lib/observability/logger.js';
 import { getPool } from '../lib/pg.js';
+import { purgeUser } from '../lib/purge-user.js';
 import {
   adminUpdateUser,
   getAdminUserById,
   listUsers,
   restoreSoftDeletedUser,
+  softDeleteUser,
 } from '../lib/repositories/users.js';
 import type { AdminApiBindings } from '../lib/types.js';
+import { requireUserId } from '../lib/types.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -46,10 +49,96 @@ const ListQuery = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
+const DeleteBody = z.object({
+  mode: z.enum(['soft', 'hard']),
+  reason: z.string().max(500).optional(),
+});
+
+const PRIVILEGED_ROLES = new Set(['admin', 'super_admin']);
+
+async function firstCognitoSub(
+  pool: import('pg').Pool,
+  userId: string,
+): Promise<string | null> {
+  const { rows } = await pool.query<{ cognito_sub: string }>(
+    `SELECT cognito_sub FROM user_identities WHERE user_id = $1 LIMIT 1`,
+    [userId],
+  );
+  return rows[0]?.cognito_sub ?? null;
+}
+
+async function handleSoftDelete(
+  config: AdminApiConfig,
+  pool: import('pg').Pool,
+  userId: string,
+  reason: string | null,
+): Promise<{ ok: true; mode: 'soft'; alreadyDeleted: boolean }> {
+  const sub = await firstCognitoSub(pool, userId);
+  if (sub) await adminDisableUser(config.cognitoUserPoolId, config.awsRegion, sub);
+  const deleted = await softDeleteUser(pool, userId, reason);
+  logger.warn({ event: 'admin_user_soft_deleted', userId, reason }, 'admin soft-deleted user');
+  return { ok: true, mode: 'soft', alreadyDeleted: !deleted };
+}
+
+
 export function createAdminUsersRouter(
   config: AdminApiConfig,
 ): Hono<AdminApiBindings> {
   const router = new Hono<AdminApiBindings>();
+
+  /**
+   * DELETE /api/admin/users/:userId
+   *
+   * Soft or hard delete for a user account.
+   *   mode=soft — disables Cognito login + stamps deleted_at (30-day grace).
+   *   mode=hard — purges Cognito, GitHub App, and DB rows immediately.
+   *
+   * Guards:
+   *   400 — malformed UUID or bad body.
+   *   401 — caller not authenticated.
+   *   403 CannotDeleteSelf — caller is the target.
+   *   403 CannotDeleteAdmin — target has a privileged role.
+   *   404 — user not found.
+   *   409 NoCognitoIdentity — hard delete but no cognito_sub row.
+   */
+  router.delete('/:userId', async (ctx) => {
+    const userId = ctx.req.param('userId');
+    if (!UUID_RE.test(userId)) return ctx.json({ error: 'Invalid userId' }, 400);
+
+    const callerId = requireUserId(ctx);
+    if (!callerId) return ctx.json({ error: 'Unauthenticated' }, 401);
+    if (callerId === userId) return ctx.json({ error: 'CannotDeleteSelf' }, 403);
+
+    let raw: unknown;
+    try { raw = await ctx.req.json(); } catch { return ctx.json({ error: 'Invalid JSON body' }, 400); }
+    const parsed = DeleteBody.safeParse(raw);
+    if (!parsed.success) return ctx.json({ error: 'Validation failed', issues: parsed.error.issues }, 400);
+
+    const pool = getPool(config);
+    const target = await getAdminUserById(pool, userId);
+    if (!target) return ctx.json({ error: 'NotFound', userId }, 404);
+    if (PRIVILEGED_ROLES.has(target.role)) return ctx.json({ error: 'CannotDeleteAdmin' }, 403);
+
+    if (parsed.data.mode === 'soft') {
+      return ctx.json(await handleSoftDelete(config, pool, userId, parsed.data.reason ?? null));
+    }
+
+    const sub = await firstCognitoSub(pool, userId);
+    if (!sub) return ctx.json({ error: 'NoCognitoIdentity', userId }, 409);
+    const outcome = await purgeUser(
+      {
+        pool,
+        userPoolId: config.cognitoUserPoolId,
+        region: config.awsRegion,
+        githubAppId: config.githubAppId,
+        githubPrivateKey: config.githubPrivateKey,
+      },
+      userId,
+      sub,
+    );
+    logger.warn({ event: 'admin_user_hard_deleted', userId, outcome }, 'admin hard-deleted user');
+    return ctx.json({ ok: true, mode: 'hard', outcome });
+  });
 
   /**
    * POST /api/admin/users/:userId/restore
