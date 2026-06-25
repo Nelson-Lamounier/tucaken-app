@@ -833,3 +833,177 @@ export async function provisionUserWithPendingLink(
     client.release();
   }
 }
+
+// ─── Admin user listing (no RLS) ─────────────────────────────────────────────
+
+export interface AdminUserRow {
+  id: string;
+  email: string;
+  fullName: string | null;
+  role: 'user' | 'admin';
+  plan: 'free' | 'pro' | 'premium';
+  subscriptionStatus: string | null;
+  trialEndsAt: string | null;
+  deletedAt: string | null;
+  createdAt: string;
+}
+
+const ADMIN_TIERS = new Set(['free', 'pro', 'premium']);
+
+/**
+ * Admin-only list of all users. MUST run on the superuser pool (NOT withUser)
+ * so RLS does not restrict the result to a single row.
+ */
+export async function listUsers(
+  pool: Pick<import('pg').Pool, 'query'>,
+  opts: { tier: 'all' | 'free' | 'pro' | 'premium'; limit: number; offset: number },
+): Promise<{ rows: AdminUserRow[]; total: number }> {
+  const hasTier = opts.tier !== 'all' && ADMIN_TIERS.has(opts.tier);
+  const where = hasTier ? 'WHERE plan = $1' : '';
+  const countParams = hasTier ? [opts.tier] : [];
+
+  const countResult = await pool.query<{ total: string }>(
+    `SELECT COUNT(*)::text AS total FROM users ${where}`,
+    countParams,
+  );
+  const total = Number.parseInt(countResult.rows[0]?.total ?? '0', 10);
+
+  const limitIdx = hasTier ? '$2' : '$1';
+  const offsetIdx = hasTier ? '$3' : '$2';
+  const listParams = hasTier
+    ? [opts.tier, opts.limit, opts.offset]
+    : [opts.limit, opts.offset];
+
+  const result = await pool.query<{
+    id: string; email: string; full_name: string | null;
+    role: string; plan: string; subscription_status: string | null;
+    trial_ends_at: Date | null; deleted_at: Date | null; created_at: Date;
+  }>(
+    `SELECT id, email, full_name, role, plan, subscription_status,
+            trial_ends_at, deleted_at, created_at
+       FROM users
+       ${where}
+      ORDER BY created_at DESC
+      LIMIT ${limitIdx} OFFSET ${offsetIdx}`,
+    listParams,
+  );
+
+  const rows: AdminUserRow[] = result.rows.map((r) => ({
+    id: r.id,
+    email: r.email,
+    fullName: r.full_name,
+    role: r.role === 'admin' ? 'admin' : 'user',
+    plan: toPlan(r.plan),
+    subscriptionStatus: r.subscription_status,
+    trialEndsAt: r.trial_ends_at ? r.trial_ends_at.toISOString() : null,
+    deletedAt: r.deleted_at ? r.deleted_at.toISOString() : null,
+    createdAt: r.created_at.toISOString(),
+  }));
+  return { rows, total };
+}
+
+function toPlan(value: string): 'free' | 'pro' | 'premium' {
+  if (value === 'pro') return 'pro';
+  if (value === 'premium') return 'premium';
+  return 'free';
+}
+
+export interface AdminUserDetailRow extends AdminUserRow {
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  quotas: { feature: string; periodMonth: string; count: number }[];
+}
+
+export async function getAdminUserById(
+  pool: Pick<import('pg').Pool, 'query'>,
+  id: string,
+): Promise<AdminUserDetailRow | null> {
+  const userResult = await pool.query<{
+    id: string; email: string; full_name: string | null; role: string; plan: string;
+    subscription_status: string | null; trial_ends_at: Date | null; deleted_at: Date | null;
+    created_at: Date; stripe_customer_id: string | null; stripe_subscription_id: string | null;
+    current_period_end: Date | null; cancel_at_period_end: boolean;
+  }>(
+    `SELECT id, email, full_name, role, plan, subscription_status, trial_ends_at,
+            deleted_at, created_at, stripe_customer_id, stripe_subscription_id,
+            current_period_end, cancel_at_period_end
+       FROM users WHERE id = $1`,
+    [id],
+  );
+  const u = userResult.rows[0];
+  if (!u) return null;
+
+  const quotaResult = await pool.query<{ feature: string; period_month: string; count: number }>(
+    `SELECT feature, period_month, count
+       FROM usage_quotas WHERE user_id = $1
+      ORDER BY period_month DESC, feature ASC`,
+    [id],
+  );
+
+  return {
+    id: u.id,
+    email: u.email,
+    fullName: u.full_name,
+    role: u.role === 'admin' ? 'admin' : 'user',
+    plan: toPlan(u.plan),
+    subscriptionStatus: u.subscription_status,
+    trialEndsAt: u.trial_ends_at ? u.trial_ends_at.toISOString() : null,
+    deletedAt: u.deleted_at ? u.deleted_at.toISOString() : null,
+    createdAt: u.created_at.toISOString(),
+    stripeCustomerId: u.stripe_customer_id,
+    stripeSubscriptionId: u.stripe_subscription_id,
+    currentPeriodEnd: u.current_period_end ? u.current_period_end.toISOString() : null,
+    cancelAtPeriodEnd: u.cancel_at_period_end,
+    quotas: quotaResult.rows.map((q) => ({
+      feature: q.feature, periodMonth: q.period_month, count: Number(q.count),
+    })),
+  };
+}
+
+// ─── Admin mutations (plan/role + audit) ────────────────────────────────────
+
+/**
+ * Admin updates a user's role and/or plan, writing audit rows to plan_events
+ * for each change. Runs inside a transaction (caller passes a PoolClient
+ * already in BEGIN — this function does NOT call BEGIN/COMMIT itself).
+ *
+ * Returns false if the patch is empty or the user does not exist.
+ * Returns true when at least one update was applied.
+ */
+export async function adminUpdateUser(
+  client: import('pg').PoolClient,
+  id: string,
+  patch: { role?: 'user' | 'admin'; plan?: 'free' | 'pro' | 'premium' },
+): Promise<boolean> {
+  const wantsRole = patch.role !== undefined;
+  const wantsPlan = patch.plan !== undefined;
+  if (!wantsRole && !wantsPlan) return false;
+
+  const current = await client.query<{ plan: string; role: string }>(
+    `SELECT plan, role FROM users WHERE id = $1`,
+    [id],
+  );
+  const before = current.rows[0];
+  if (!before) return false;
+
+  if (wantsRole && patch.role !== before.role) {
+    await client.query(`UPDATE users SET role = $2, updated_at = NOW() WHERE id = $1`, [id, patch.role]);
+    await client.query(
+      `INSERT INTO plan_events (user_id, event_type, from_plan, to_plan, reason)
+       VALUES ($1, 'admin_role_change', $2, $3, $4)`,
+      [id, before.role, patch.role, `admin set role ${before.role} -> ${patch.role}`],
+    );
+  }
+
+  if (wantsPlan && patch.plan !== before.plan) {
+    await client.query(`UPDATE users SET plan = $2, updated_at = NOW() WHERE id = $1`, [id, patch.plan]);
+    await client.query(
+      `INSERT INTO plan_events (user_id, event_type, from_plan, to_plan, reason)
+       VALUES ($1, $4, $2, $3, $5)`,
+      [id, before.plan, patch.plan, 'admin_manual_override', 'admin_manual_override'],
+    );
+  }
+  return true;
+}

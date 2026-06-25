@@ -43,6 +43,7 @@ import { Route as DashboardApplicationsListRouteImport } from './app/_dashboard/
 import { Route as DashboardApplicationsInterviewPrepRouteImport } from './app/_dashboard/applications/interview-prep'
 import { Route as DashboardApplicationsSlugRouteImport } from './app/_dashboard/applications/$slug'
 import { Route as DashboardResumesNewRouteRouteImport } from './app/_dashboard/resumes/new/route'
+import { Route as DashboardAdminUsersRouteRouteImport } from './app/_dashboard/admin/users/route'
 import { Route as UUsernamePSlugRouteImport } from './app/u/$username/p/$slug'
 import { Route as DashboardProjectsIdEditRouteImport } from './app/_dashboard/projects/$id.edit'
 
@@ -222,6 +223,12 @@ const DashboardResumesNewRouteRoute =
     path: '/new',
     getParentRoute: () => DashboardResumesRouteRoute,
   } as any)
+const DashboardAdminUsersRouteRoute =
+  DashboardAdminUsersRouteRouteImport.update({
+    id: '/admin/users',
+    path: '/admin/users',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const UUsernamePSlugRoute = UUsernamePSlugRouteImport.update({
   id: '/u/$username/p/$slug',
   path: '/u/$username/p/$slug',
@@ -255,6 +262,7 @@ export interface FileRoutesByFullPath {
   '/checkout/return': typeof CheckoutReturnRoute
   '/github/callback': typeof GithubCallbackRoute
   '/sign-in/callback': typeof SignInCallbackRoute
+  '/admin/users': typeof DashboardAdminUsersRouteRoute
   '/resumes/new': typeof DashboardResumesNewRouteRoute
   '/applications/$slug': typeof DashboardApplicationsSlugRoute
   '/applications/interview-prep': typeof DashboardApplicationsInterviewPrepRoute
@@ -292,6 +300,7 @@ export interface FileRoutesByTo {
   '/checkout/return': typeof CheckoutReturnRoute
   '/github/callback': typeof GithubCallbackRoute
   '/sign-in/callback': typeof SignInCallbackRoute
+  '/admin/users': typeof DashboardAdminUsersRouteRoute
   '/resumes/new': typeof DashboardResumesNewRouteRoute
   '/applications/$slug': typeof DashboardApplicationsSlugRoute
   '/applications/interview-prep': typeof DashboardApplicationsInterviewPrepRoute
@@ -331,6 +340,7 @@ export interface FileRoutesById {
   '/checkout/return': typeof CheckoutReturnRoute
   '/github/callback': typeof GithubCallbackRoute
   '/sign-in/callback': typeof SignInCallbackRoute
+  '/_dashboard/admin/users': typeof DashboardAdminUsersRouteRoute
   '/_dashboard/resumes/new': typeof DashboardResumesNewRouteRoute
   '/_dashboard/applications/$slug': typeof DashboardApplicationsSlugRoute
   '/_dashboard/applications/interview-prep': typeof DashboardApplicationsInterviewPrepRoute
@@ -370,6 +380,7 @@ export interface FileRouteTypes {
     | '/checkout/return'
     | '/github/callback'
     | '/sign-in/callback'
+    | '/admin/users'
     | '/resumes/new'
     | '/applications/$slug'
     | '/applications/interview-prep'
@@ -407,6 +418,7 @@ export interface FileRouteTypes {
     | '/checkout/return'
     | '/github/callback'
     | '/sign-in/callback'
+    | '/admin/users'
     | '/resumes/new'
     | '/applications/$slug'
     | '/applications/interview-prep'
@@ -445,6 +457,7 @@ export interface FileRouteTypes {
     | '/checkout/return'
     | '/github/callback'
     | '/sign-in/callback'
+    | '/_dashboard/admin/users'
     | '/_dashboard/resumes/new'
     | '/_dashboard/applications/$slug'
     | '/_dashboard/applications/interview-prep'
@@ -715,6 +728,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardResumesNewRouteRouteImport
       parentRoute: typeof DashboardResumesRouteRoute
     }
+    '/_dashboard/admin/users': {
+      id: '/_dashboard/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof DashboardAdminUsersRouteRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/u/$username/p/$slug': {
       id: '/u/$username/p/$slug'
       path: '/u/$username/p/$slug'
@@ -769,6 +789,7 @@ interface DashboardRouteChildren {
   DashboardResumeThemeRoute: typeof DashboardResumeThemeRoute
   DashboardSearchAnalyticsRoute: typeof DashboardSearchAnalyticsRoute
   DashboardTestRoute: typeof DashboardTestRoute
+  DashboardAdminUsersRouteRoute: typeof DashboardAdminUsersRouteRoute
   DashboardApplicationsSlugRoute: typeof DashboardApplicationsSlugRoute
   DashboardApplicationsInterviewPrepRoute: typeof DashboardApplicationsInterviewPrepRoute
   DashboardApplicationsListRoute: typeof DashboardApplicationsListRoute
@@ -794,6 +815,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardResumeThemeRoute: DashboardResumeThemeRoute,
   DashboardSearchAnalyticsRoute: DashboardSearchAnalyticsRoute,
   DashboardTestRoute: DashboardTestRoute,
+  DashboardAdminUsersRouteRoute: DashboardAdminUsersRouteRoute,
   DashboardApplicationsSlugRoute: DashboardApplicationsSlugRoute,
   DashboardApplicationsInterviewPrepRoute:
     DashboardApplicationsInterviewPrepRoute,

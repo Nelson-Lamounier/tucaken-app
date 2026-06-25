@@ -79,6 +79,16 @@ export const adminKeys = {
     tailoredResumes: ['admin', 'applications', 'tailored-resumes'] as const,
   },
 
+  /** Admin user-management query keys */
+  users: {
+    /** All users queries */
+    all: ['admin', 'users'] as const,
+    /** User listing by tier filter */
+    list: (tier: string) => ['admin', 'users', 'list', tier] as const,
+    /** Individual user detail */
+    detail: (id: string) => ['admin', 'users', 'detail', id] as const,
+  },
+
   /** GitHub integration query keys */
   github: {
     /** All GitHub queries */
