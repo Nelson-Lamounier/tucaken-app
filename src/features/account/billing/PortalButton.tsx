@@ -36,14 +36,28 @@ export function PortalButton({
       setError('No Stripe customer yet — subscribe to a paid plan first.')
       return
     }
+    // Open the tab synchronously, inside the click gesture, so popup blockers
+    // allow it — we point it at the Stripe URL once the session resolves. The
+    // portal's return_url brings the user back to /billing inside that tab,
+    // leaving our app untouched in the original tab. `opener` is severed so the
+    // Stripe tab cannot script back into our window (reverse-tabnabbing).
+    const portalTab = window.open('about:blank', '_blank')
+    if (portalTab) portalTab.opener = null
     setLoading(true)
     setError(null)
     try {
       const { url } = await createPortalSessionFn({
         data: { customerId, returnPath },
       })
-      window.location.assign(url)
+      if (portalTab) {
+        portalTab.location.href = url
+      } else {
+        // Popup blocked — fall back to a same-tab redirect so the action works.
+        window.location.assign(url)
+      }
+      setLoading(false)
     } catch (e) {
+      portalTab?.close()
       setError(e instanceof Error ? e.message : 'Could not open portal.')
       setLoading(false)
     }
