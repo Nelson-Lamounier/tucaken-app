@@ -7,6 +7,8 @@ import {
   getAdminUserFn,
   updateAdminUserFn,
   restoreAdminUserFn,
+  deleteAdminUserFn,
+  disconnectAdminUserGithubFn,
 } from '@/server/admin-users'
 
 export function useAdminUsers(tier: UserTier | 'all' = 'all') {
@@ -43,6 +45,29 @@ export function useRestoreAdminUser() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (vars: { id: string }) => restoreAdminUserFn({ data: vars }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.users.all })
+    },
+    onError: (err) => notifyError(err),
+  })
+}
+
+export function useDeleteAdminUser() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { id: string; mode: 'soft' | 'hard'; reason?: string }) =>
+      deleteAdminUserFn({ data: vars }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.users.all })
+    },
+    onError: (err) => notifyError(err),
+  })
+}
+
+export function useDisconnectAdminUserGithub() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { id: string }) => disconnectAdminUserGithubFn({ data: vars }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: adminKeys.users.all })
     },
