@@ -833,3 +833,77 @@ export async function provisionUserWithPendingLink(
     client.release();
   }
 }
+
+// ─── Admin user listing (no RLS) ─────────────────────────────────────────────
+
+export interface AdminUserRow {
+  id: string;
+  email: string;
+  fullName: string | null;
+  role: 'user' | 'admin';
+  plan: 'free' | 'pro' | 'premium';
+  subscriptionStatus: string | null;
+  trialEndsAt: string | null;
+  deletedAt: string | null;
+  createdAt: string;
+}
+
+const ADMIN_TIERS = new Set(['free', 'pro', 'premium']);
+
+/**
+ * Admin-only list of all users. MUST run on the superuser pool (NOT withUser)
+ * so RLS does not restrict the result to a single row.
+ */
+export async function listUsers(
+  pool: Pick<import('pg').Pool, 'query'>,
+  opts: { tier: 'all' | 'free' | 'pro' | 'premium'; limit: number; offset: number },
+): Promise<{ rows: AdminUserRow[]; total: number }> {
+  const hasTier = opts.tier !== 'all' && ADMIN_TIERS.has(opts.tier);
+  const where = hasTier ? 'WHERE plan = $1' : '';
+  const countParams = hasTier ? [opts.tier] : [];
+
+  const countResult = await pool.query<{ total: string }>(
+    `SELECT COUNT(*)::text AS total FROM users ${where}`,
+    countParams,
+  );
+  const total = Number.parseInt(countResult.rows[0]?.total ?? '0', 10);
+
+  const limitIdx = hasTier ? '$2' : '$1';
+  const offsetIdx = hasTier ? '$3' : '$2';
+  const listParams = hasTier
+    ? [opts.tier, opts.limit, opts.offset]
+    : [opts.limit, opts.offset];
+
+  const result = await pool.query<{
+    id: string; email: string; full_name: string | null;
+    role: string; plan: string; subscription_status: string | null;
+    trial_ends_at: Date | null; deleted_at: Date | null; created_at: Date;
+  }>(
+    `SELECT id, email, full_name, role, plan, subscription_status,
+            trial_ends_at, deleted_at, created_at
+       FROM users
+       ${where}
+      ORDER BY created_at DESC
+      LIMIT ${limitIdx} OFFSET ${offsetIdx}`,
+    listParams,
+  );
+
+  const rows: AdminUserRow[] = result.rows.map((r) => ({
+    id: r.id,
+    email: r.email,
+    fullName: r.full_name,
+    role: r.role === 'admin' ? 'admin' : 'user',
+    plan: toPlan(r.plan),
+    subscriptionStatus: r.subscription_status,
+    trialEndsAt: r.trial_ends_at ? r.trial_ends_at.toISOString() : null,
+    deletedAt: r.deleted_at ? r.deleted_at.toISOString() : null,
+    createdAt: r.created_at.toISOString(),
+  }));
+  return { rows, total };
+}
+
+function toPlan(value: string): 'free' | 'pro' | 'premium' {
+  if (value === 'pro') return 'pro';
+  if (value === 'premium') return 'premium';
+  return 'free';
+}
