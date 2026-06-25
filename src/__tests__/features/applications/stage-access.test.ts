@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   enabledStagesFor,
   isStageEnabledFor,
+  canAdvanceStages,
   type StageViewer,
 } from '@/features/applications/stages/types/stage-access'
 import { STAGE_ORDER } from '@/features/applications/stages/types/stage'
@@ -34,5 +35,17 @@ describe('isStageEnabledFor', () => {
   })
   it('technical enabled for admin', () => {
     expect(isStageEnabledFor('technical', user({ role: 'admin' }))).toBe(true)
+  })
+})
+
+describe('canAdvanceStages', () => {
+  it('false when only applied is enabled (plain user)', () => {
+    expect(canAdvanceStages(enabledStagesFor(user()))).toBe(false)
+  })
+  it('false for a null viewer', () => {
+    expect(canAdvanceStages(enabledStagesFor(null))).toBe(false)
+  })
+  it('true for admin (full stage set)', () => {
+    expect(canAdvanceStages(enabledStagesFor(user({ role: 'admin' })))).toBe(true)
   })
 })
