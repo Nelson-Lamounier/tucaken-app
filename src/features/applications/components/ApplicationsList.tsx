@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   Target,
   Search,
@@ -15,8 +16,34 @@ import { CustomDropDown } from '@/components/ui/CustomDropDown'
 import { CommandPallete } from '@/components/ui/CommandPallete'
 import type { CommandPalleteItem } from '@/components/ui/CommandPallete'
 import { Pagination } from '@/components/ui/Pagination'
+import { useTailoredResumes, buildTailoredMap } from '../hooks/use-tailored-resumes'
+import { ResumePreviewDrawer } from '@/features/resumes/components/ResumePreviewDrawer'
+import { CoverLetterForm } from './CoverLetterForm'
+import { DashboardDrawer } from '@/components/ui/DashboardDrawer'
+import { resolveResumeId } from '../utils/promote-resume'
+import { getResumesFn, createResumeFn } from '@/server/resumes'
+import { updateApplicationCoverLetterFn } from '@/server/applications'
+import type { TailoredResumeSummary } from '@/server/applications'
+import { useToastStore } from '@/lib/stores/toast-store'
+import { adminKeys } from '@/lib/api/query-keys'
+import type { AdminResumeWithData } from '../hooks/use-resume-versions'
 
-export function ApplicationsList({ initialStage }: { initialStage?: string }) {
+type SelectedKind = 'preview-resume' | 'preview-cl' | 'edit-cl'
+interface Selected { slug: string; kind: SelectedKind }
+
+/** Build a typed AdminResumeWithData from a TailoredResumeSummary for the preview drawer. */
+function toDrawerResume(tr: TailoredResumeSummary): AdminResumeWithData {
+  return {
+    resumeId: tr.slug,
+    label: `${tr.targetCompany} — ${tr.targetRole}`,
+    isActive: false,
+    createdAt: tr.updatedAt,
+    updatedAt: tr.updatedAt,
+    data: tr.data as unknown as Record<string, unknown>,
+  }
+}
+
+export function ApplicationsList({ initialStage }: { readonly initialStage?: string }) {
   const navigate = useNavigate()
 
   const statusFilter = useApplicationsStore((s) => s.activeStatusFilter)
@@ -57,6 +84,37 @@ export function ApplicationsList({ initialStage }: { initialStage?: string }) {
     error,
   } = useApplications(statusFilter)
 
+  const { data: tailoredList } = useTailoredResumes()
+  const tailoredMap = buildTailoredMap(tailoredList)
+  const queryClient = useQueryClient()
+  const { addToast } = useToastStore()
+  const [selected, setSelected] = useState<Selected | null>(null)
+
+  const selectedTailored: TailoredResumeSummary | null = selected ? (tailoredMap.get(selected.slug) ?? null) : null
+
+  const handleEditResume = async (tr: TailoredResumeSummary) => {
+    try {
+      const id = await resolveResumeId(
+        { label: `${tr.targetCompany} — ${tr.targetRole}`, data: tr.data },
+        getResumesFn,
+        createResumeFn,
+      )
+      navigate({ to: '/resumes/edit/$id', params: { id } })
+    } catch (err) {
+      addToast('error', err instanceof Error ? err.message : 'Could not open the resume editor')
+    }
+  }
+
+  const handleSaveCoverLetter = async (content: string) => {
+    if (!selected || !selectedTailored?.coverLetter) return
+    const next = { ...selectedTailored.coverLetter, paragraphs: content.split('\n\n').filter(Boolean) }
+    await updateApplicationCoverLetterFn({ data: { slug: selected.slug, coverLetter: next } })
+    await queryClient.invalidateQueries({ queryKey: adminKeys.applications.all })
+    await queryClient.invalidateQueries({ queryKey: adminKeys.applications.tailoredResumes })
+    setSelected(null)
+    addToast('success', 'Cover letter updated.')
+  }
+
   // Client-side company name filter
   // We keep it just in case searchQuery is still populated externally, otherwise the Command Palette handles navigation
   const filteredApps = applications?.filter((app) => {
@@ -68,7 +126,7 @@ export function ApplicationsList({ initialStage }: { initialStage?: string }) {
       STATUS_LABELS[app.status].toLowerCase().includes(query) ||
       app.status.toLowerCase().includes(query)
     )
-  }) || []
+  }) ?? []
 
   const totalPages = Math.ceil(filteredApps.length / ITEMS_PER_PAGE)
   const paginatedApps = filteredApps.slice(
@@ -81,7 +139,13 @@ export function ApplicationsList({ initialStage }: { initialStage?: string }) {
     id: app.slug,
     name: app.targetCompany,
     description: `${app.targetRole} · ${STATUS_LABELS[app.status]}`,
-  })) || []
+  })) ?? []
+
+  const drawerResume = selected?.kind === 'preview-resume' && selectedTailored
+    ? toDrawerResume(selectedTailored)
+    : null
+
+  const isPreviewOpen = selected?.kind === 'preview-resume' || selected?.kind === 'preview-cl'
 
   return (
     <div className="px-4 py-8 sm:px-6 lg:px-8">
@@ -152,21 +216,30 @@ export function ApplicationsList({ initialStage }: { initialStage?: string }) {
         {!isLoading && !error && filteredApps.length > 0 && (
           <>
             {/* Column headers — aligned with ApplicationListRow's grid template. */}
-            <div className="hidden grid-cols-[1.5fr_1.5fr_14rem_9rem] items-center gap-4 border-b border-zinc-200 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-400 dark:border-white/10 dark:text-zinc-500 sm:grid">
+            <div className="hidden grid-cols-[1.5fr_1.5fr_14rem_9rem_auto] items-center gap-4 border-b border-zinc-200 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-400 dark:border-white/10 dark:text-zinc-500 sm:grid">
               <span>Company</span>
               <span>Position</span>
               <span>Stage</span>
               <span>Status</span>
+              <span className="justify-self-end">Documents</span>
             </div>
             {/* Rows — divided, new applications append under the current ones. */}
             <div className="divide-y divide-zinc-200 dark:divide-white/10">
-              {paginatedApps.map((app) => (
-                <ApplicationListRow
-                  key={app.slug}
-                  app={app}
-                  onClick={() => navigate({ to: '/applications/$slug', params: { slug: app.slug } })}
-                />
-              ))}
+              {paginatedApps.map((app) => {
+                const tr = tailoredMap.get(app.slug) ?? null
+                return (
+                  <ApplicationListRow
+                    key={app.slug}
+                    app={app}
+                    tailored={tr}
+                    onOpen={() => navigate({ to: '/applications/$slug', params: { slug: app.slug } })}
+                    onPreviewResume={() => setSelected({ slug: app.slug, kind: 'preview-resume' })}
+                    onEditResume={() => { if (tr) void handleEditResume(tr) }}
+                    onPreviewCoverLetter={() => setSelected({ slug: app.slug, kind: 'preview-cl' })}
+                    onEditCoverLetter={() => setSelected({ slug: app.slug, kind: 'edit-cl' })}
+                  />
+                )
+              })}
             </div>
             {totalPages > 1 && (
               <div className="border-t border-zinc-200 p-3 dark:border-white/10">
@@ -180,6 +253,33 @@ export function ApplicationsList({ initialStage }: { initialStage?: string }) {
           </>
         )}
       </div>
+
+      <ResumePreviewDrawer
+        isOpen={isPreviewOpen}
+        onClose={() => setSelected(null)}
+        resume={drawerResume}
+        coverLetter={selected?.kind === 'preview-cl' ? (selectedTailored?.coverLetter ?? null) : null}
+        coverLetterProfile={selectedTailored?.data.profile}
+        coverLetterCompany={selectedTailored?.targetCompany}
+        coverLetterRole={selectedTailored?.targetRole}
+        onDownload={() => {}}
+        isDownloading={false}
+      />
+
+      <DashboardDrawer
+        isOpen={selected?.kind === 'edit-cl'}
+        onClose={() => setSelected(null)}
+        title="Edit Cover Letter"
+        description={selectedTailored ? `${selectedTailored.targetCompany} — ${selectedTailored.targetRole}` : ''}
+      >
+        {selected?.kind === 'edit-cl' && selectedTailored?.coverLetter && (
+          <CoverLetterForm
+            initialContent={selectedTailored.coverLetter.paragraphs.join('\n\n')}
+            onSubmit={handleSaveCoverLetter}
+            onCancel={() => setSelected(null)}
+          />
+        )}
+      </DashboardDrawer>
     </div>
   )
 }
