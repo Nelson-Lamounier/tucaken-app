@@ -25,6 +25,7 @@ import { tryClaimSyncSlot } from '../lib/sync-state.js';
 import { getBatchApi } from '../lib/k8s.js';
 import { traceParentEnv, observabilityEnv, ingestionModelEnv, MODEL_JOB_BACKOFF_LIMIT } from '../lib/k8s-job-builder.js';
 import { buildIngestionJobSpec } from '../lib/ingestion-job.js';
+import { getCachedTierConfig } from '../lib/tier-config-cache.js';
 
 const REPO_FULL_NAME_RE = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/;
 const MAX_NAME_LEN = 63;
@@ -38,22 +39,6 @@ interface TriggerBody {
     readonly forceReindex?:  boolean;
 }
 
-function buildJobSpec(
-    cfg: AdminApiConfig,
-    image: string,
-    userId: string,
-    repoFullName: string,
-    forceReindex: boolean,
-    timestamp: number,
-    githubRepoId: number | null,
-): V1Job {
-    // Delegates to the shared builder (single source of truth). The admin path
-    // additionally mounts `ingestion-secrets`.
-    return buildIngestionJobSpec(cfg, image, userId, repoFullName, forceReindex, timestamp, {
-        extraSecretRefs: ['ingestion-secrets'],
-        githubRepoId,
-    });
-}
 
 /**
  * Resolve the immutable numeric GitHub repo id from the repositories row (PR4
@@ -201,7 +186,14 @@ export function createIngestionRouter(config: AdminApiConfig): Hono<AdminApiBind
         }
 
         const githubRepoId = await lookupGithubRepoId(pool, userId, repoFullName);
-        const job = buildJobSpec(config, ingestionImage, userId, repoFullName, forceReindex, Date.now(), githubRepoId);
+        // Fetch the live tier config so enrichment depth reflects DB-configured
+        // tiers (60 s cache — effectively free).
+        const tierConfig = await getCachedTierConfig(pool);
+        const job = buildIngestionJobSpec(config, ingestionImage, userId, repoFullName, forceReindex, Date.now(), {
+            extraSecretRefs: ['ingestion-secrets'],
+            githubRepoId,
+            tierConfig,
+        });
 
         try {
             // @kubernetes/client-node v1.x switched to options-object API.

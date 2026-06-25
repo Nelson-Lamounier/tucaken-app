@@ -507,15 +507,23 @@ async function dispatchIngestionJob(
         throw Object.assign(new Error('Ingestion image not yet configured'), { status: 502 });
     }
 
+    const pool = getPool(config);
+
     // Resolve the immutable numeric repo id so the worker can re-key by id across
     // a rename. May be NULL pre-backfill — the builder then omits the env var.
     const githubRepoId = await lookupGithubRepoId(config, userId, repoFullName);
+
+    // Fetch the live tier config so enrichment depth reflects DB-configured tiers
+    // (60 s cache — effectively free). Falls back to static map on failure via
+    // resolveEnrichmentEnv when tierConfig is null.
+    const tierConfig = await getCachedTierConfig(pool);
 
     // Shared builder = single source of truth (same spec as the admin trigger).
     // Resync path adds the per-user GITHUB_TOKEN + argocd compare-options.
     const job = buildIngestionJobSpec(config, image, userId, repoFullName, forceReindex, Date.now(), {
         githubToken,
         githubRepoId,
+        tierConfig,
         extraAnnotations: { 'argocd.argoproj.io/compare-options': 'IgnoreExtraneous' },
         ...(effectivePlan !== undefined ? { effectivePlan } : {}),
         ...(role          !== undefined ? { role }          : {}),

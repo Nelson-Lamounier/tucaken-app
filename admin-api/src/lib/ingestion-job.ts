@@ -4,8 +4,9 @@ import type { V1Job, V1Secret } from '@kubernetes/client-node';
 
 import type { AdminApiConfig } from './config.js';
 import { traceParentEnv, observabilityEnv, ingestionModelEnv, MODEL_JOB_BACKOFF_LIMIT } from './k8s-job-builder.js';
-import { entitlementsFor, enrichmentEnv } from './entitlements.js';
+import { entitlementsFor, entitlementsFromConfig, enrichmentEnv } from './entitlements.js';
 import type { EffectivePlan } from './repositories/users.js';
+import type { TierConfig } from './tier-config-shape.js';
 
 const MAX_NAME_LEN = 63;
 
@@ -13,11 +14,18 @@ const MAX_NAME_LEN = 63;
  * Map the user's EFFECTIVE plan (+ admin override) to the concrete enrichment
  * Job env vars. Premium (or a persisted admin) gets full per-chunk enrichment;
  * everyone else gets Tier-1 deterministic only. Fails closed to Tier-1.
+ *
+ * When `tierConfig` is provided, enrichment depth is derived from the live
+ * tier config (DB-backed, 60 s cache) instead of the static entitlements map.
  */
 export function resolveEnrichmentEnv(
     plan: EffectivePlan,
     role: string | null | undefined,
+    tierConfig?: TierConfig | null,
 ): Record<string, string> {
+    if (tierConfig != null) {
+        return enrichmentEnv(entitlementsFromConfig(tierConfig, plan, role).enrichment);
+    }
     return enrichmentEnv(entitlementsFor(plan, role).enrichment);
 }
 
@@ -52,6 +60,11 @@ export interface IngestionJobOptions {
     readonly effectivePlan?: EffectivePlan;
     /** The user's persisted role ('admin' grants full enrichment). Resolved server-side. */
     readonly role?: string | null;
+    /**
+     * Live tier config (DB-backed, 60 s cache). When present, enrichment depth
+     * is read from it instead of the static entitlements map.
+     */
+    readonly tierConfig?: TierConfig | null;
 }
 
 /** Deterministic name of the per-Job token Secret for a given ingestion Job. */
@@ -199,7 +212,7 @@ export function buildIngestionJobSpec(
                             // ENRICH_TIER1=1). Fails closed to Tier-1 when plan/role is absent.
                             // Note: ENRICHMENT_DISABLED=1 takes precedence over DEFER_ENRICHMENT
                             // because the worker checks ENRICHMENT_DISABLED first.
-                            ...Object.entries(resolveEnrichmentEnv(opts.effectivePlan ?? 'free', opts.role)).map(([name, value]) => ({ name, value })),
+                            ...Object.entries(resolveEnrichmentEnv(opts.effectivePlan ?? 'free', opts.role, opts.tierConfig)).map(([name, value]) => ({ name, value })),
                             // eu.* cross-region inference profile for BedrockChunkEnricher
                             // (on-demand Claude unsupported in eu-west-1).
                             { name: 'ENRICHMENT_MODEL_ID', value: process.env['ENRICHMENT_MODEL_ID'] ?? 'eu.anthropic.claude-haiku-4-5-20251001-v1:0' },

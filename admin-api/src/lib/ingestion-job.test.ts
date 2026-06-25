@@ -2,6 +2,8 @@
 import { describe, it, expect } from '@jest/globals';
 import type { AdminApiConfig } from './config.js';
 import { buildIngestionJobSpec, buildIngestionTokenSecret, buildRollupJobSpec, resolveEnrichmentEnv } from './ingestion-job.js';
+import { DEFAULT_TIER_CONFIG } from './tier-config-shape.js';
+import type { TierConfig } from './tier-config-shape.js';
 
 const cfg = {
     ingestionNamespace:      'ingestion',
@@ -143,5 +145,37 @@ describe('resolveEnrichmentEnv (plan + admin driven)', () => {
     });
     it('a missing role fails closed to Tier-1', () => {
         expect(resolveEnrichmentEnv('free', null)).toEqual({ ENRICHMENT_DISABLED: '1', ENRICH_TIER1: '1' });
+    });
+
+    // -------------------------------------------------------------------------
+    // Live tier config path
+    // -------------------------------------------------------------------------
+
+    it('uses tierConfig enrichment when provided: free tier overridden to full → returns full env', () => {
+        // Build a config where the free tier has enrichment = 'full' (DB override).
+        const overridden: TierConfig = {
+            tiers: DEFAULT_TIER_CONFIG.tiers.map((t) =>
+                t.id === 'free' ? { ...t, entitlements: { ...t.entitlements, enrichment: 'full' } } : t,
+            ),
+        };
+        // With live config: free tier now yields full enrichment.
+        expect(resolveEnrichmentEnv('free', null, overridden)).toEqual({ ENRICH_TIER1: '1' });
+    });
+
+    it('static path unchanged when no tierConfig: free tier still yields Tier-1 env', () => {
+        // Without a tierConfig the static map is used — free = tier1.
+        expect(resolveEnrichmentEnv('free', null)).toEqual({ ENRICHMENT_DISABLED: '1', ENRICH_TIER1: '1' });
+    });
+
+    it('passes tierConfig through buildIngestionJobSpec opts and reflects it in the job env', () => {
+        const overridden: TierConfig = {
+            tiers: DEFAULT_TIER_CONFIG.tiers.map((t) =>
+                t.id === 'free' ? { ...t, entitlements: { ...t.entitlements, enrichment: 'full' } } : t,
+            ),
+        };
+        const env = envOf({ effectivePlan: 'free', tierConfig: overridden });
+        // With the overridden config, free plan should yield full enrichment (no ENRICHMENT_DISABLED).
+        expect(env.has('ENRICHMENT_DISABLED')).toBe(false);
+        expect(env.get('ENRICH_TIER1')).toBe('1');
     });
 });
