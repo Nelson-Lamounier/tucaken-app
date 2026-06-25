@@ -53,7 +53,8 @@ import { Hono } from 'hono';
 import type { Pool } from 'pg';
 
 import { getJobImage, isImageConfigured, type AdminApiConfig } from '../lib/config.js';
-import { entitlementsFor } from '../lib/entitlements.js';
+import { entitlementsFromConfig } from '../lib/entitlements.js';
+import { getCachedTierConfig } from '../lib/tier-config-cache.js';
 import { buildPipelineJob, sanitizeLabel } from '../lib/k8s-job-builder.js';
 import { getBatchApi } from '../lib/k8s.js';
 import { getPool, withUser } from '../lib/pg.js';
@@ -196,7 +197,8 @@ export function createProjectsRouter(config: AdminApiConfig): Hono<AdminApiBindi
         const pool = getPool(config);
         const planStatus = await getUserPlanStatus(pool, uid);
         const role = planStatus?.role ?? null;
-        const projectCap = entitlementsFor(planStatus?.effectivePlan ?? 'free', role).projects;
+        const tierConfig = await getCachedTierConfig(pool);
+        const projectCap = entitlementsFromConfig(tierConfig, planStatus?.effectivePlan ?? 'free', role).projects;
         if (Number.isFinite(projectCap)) {
             const existing = await withUser(pool, uid, (db) => countUserProjects(db, uid));
             if (existing >= projectCap) {

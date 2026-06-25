@@ -51,6 +51,7 @@ import { createDraftsRouter } from './routes/drafts.js';
 import { createProfileRouter } from './routes/profile.js';
 import { startCaseStudyReconciler } from './lib/case-study-reconciler.js';
 import { createProjectsRouter } from './routes/projects.js';
+import { createTierConfigRouter } from './routes/tier-config.js';
 
 // ── Startup Validation ───────────────────────────────────────────────────────
 // loadConfig() throws immediately if any required env var is absent.
@@ -199,6 +200,7 @@ app.route('/api/admin/profile',        createProfileRouter(config));
 app.route('/api/admin/projects',       createProjectsRouter(config));
 app.route('/api/admin/users',          createAdminUsersRouter(config));
 app.route('/api/admin/role-ontology',  createRoleOntologyRouter(config));
+app.route('/api/admin/tier-config',    createTierConfigRouter(config));
 
 // ── 404 handler ──────────────────────────────────────────────────────────────
 app.notFound((ctx) => ctx.json({ error: 'Not found' }, 404));

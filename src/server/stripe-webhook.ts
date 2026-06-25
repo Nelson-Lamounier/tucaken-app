@@ -22,10 +22,12 @@
 // See `docs/billing-integration.md` ("Webhook events handled").
 
 import Stripe from 'stripe'
-import { stripe, tierForPriceId } from './stripe'
+import { stripe, tierForPriceIdFromConfig } from './stripe'
+import { apiFetch } from './_api-client'
 import { internalApiFetch } from './_internal-api-client'
 import { logger } from '@/lib/observability/logger'
 import type { PlanId } from '@/features/account/types'
+import type { TierConfig } from '@/features/billing/tier-config'
 
 export interface WebhookContext {
   /** Raw request body bytes — required for signature verification. */
@@ -278,7 +280,11 @@ async function onSubscriptionChanged(sub: Stripe.Subscription): Promise<void> {
   if (!(await linkIfIdentified(userId, customerId))) return
 
   const priceId = sub.items.data[0]?.price.id ?? null
-  const tier = priceId ? tierForPriceId(priceId) : null
+  // Webhook runs with no user session; apiFetch will fail auth and fall back
+  // to the env price→tier map inside tierForPriceIdFromConfig (known follow-up:
+  // expose tier-config on an unauthenticated/internal read path).
+  const tierConfig = await apiFetch<TierConfig>('/tier-config', { pathTemplate: '/tier-config' }).catch(() => null)
+  const tier = priceId ? tierForPriceIdFromConfig(tierConfig, priceId) : null
 
   // Stripe statuses we surface to UI verbatim (subset matched against
   // admin-api's CHECK constraint).

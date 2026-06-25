@@ -40,9 +40,17 @@ jest.unstable_mockModule('../lib/repositories/users.js', () => ({
   getUserPlanStatus: async () => ({ effectivePlan: 'premium', role: 'admin' }),
 }));
 
+const unlimitedEntitlements = { repos: Infinity, projects: Infinity, resumesPerMonth: Infinity, ingestionJobsPerMonth: Infinity, enrichment: 'full' };
 jest.unstable_mockModule('../lib/entitlements.js', () => ({
-  entitlementsFor: () => ({ repos: Infinity, projects: Infinity, resumesPerMonth: Infinity, ingestionJobsPerMonth: Infinity, enrichment: 'full' }),
+  entitlementsFor:         () => unlimitedEntitlements,
+  entitlementsFromConfig:  () => unlimitedEntitlements,
   isFullAccess: () => true,
+}));
+
+// Prevent getCachedTierConfig from querying the pool (which is a no-op stub here).
+jest.unstable_mockModule('../lib/tier-config-cache.js', () => ({
+  getCachedTierConfig: async () => ({ tiers: [] }),
+  bustTierConfigCache: () => {},
 }));
 
 // lib/types.js exports AdminApiBindings (type-only) and requireUserId (runtime).

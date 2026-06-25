@@ -45,6 +45,14 @@ jest.unstable_mockModule('../../src/lib/config.js', () => ({
     _resetJobImageCache:      jest.fn(),
 }));
 
+// tier-config-cache mock — returns DEFAULT_TIER_CONFIG so getCachedTierConfig
+// does not query the pool and does not consume seeded poolQueryMock responses.
+import { DEFAULT_TIER_CONFIG } from '../../src/lib/tier-config-shape.js';
+jest.unstable_mockModule('../../src/lib/tier-config-cache.js', () => ({
+    getCachedTierConfig: jest.fn().mockResolvedValue(DEFAULT_TIER_CONFIG),
+    bustTierConfigCache: jest.fn(),
+}));
+
 // K8s + GitHub App mocks - dispatch endpoints exercise these.
 const createNamespacedJobMock = jest.fn() as jest.Mock<() => Promise<void>>;
 createNamespacedJobMock.mockResolvedValue(undefined);

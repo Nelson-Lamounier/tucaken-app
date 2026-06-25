@@ -9,6 +9,7 @@
 
 import Stripe from 'stripe'
 import type { PlanId } from '@/features/account/types'
+import type { TierConfig } from '@/features/billing/tier-config'
 import { getAppOrigin } from './app-origin'
 
 // -----------------------------------------------------------------------------
@@ -76,4 +77,34 @@ function required(name: string): string {
  */
 export function appOrigin(): string {
   return getAppOrigin()
+}
+
+// -----------------------------------------------------------------------------
+// Config-aware lookups (admin-editable tier config, env fallback)
+// -----------------------------------------------------------------------------
+
+/**
+ * Resolves the Stripe monthly price ID for a paid tier, preferring the
+ * admin-editable config when a price ID is set there, and falling back to
+ * the env-var lookup when not.
+ *
+ * @throws {Error} Always throws for the free tier — it has no Stripe price.
+ */
+export function priceIdForTierFromConfig(config: TierConfig | null, tier: PlanId): string {
+  if (tier === 'free') throw new Error('Free tier has no Stripe price — do not call checkout.')
+  const entry = config?.tiers.find((t) => t.id === tier)
+  if (entry?.stripePriceIdMonthly) return entry.stripePriceIdMonthly
+  return priceIdForTier(tier)
+}
+
+/**
+ * Inverts a Stripe price ID back to a PlanId, preferring the admin-editable
+ * config and falling back to the env-var lookup.
+ *
+ * @returns The matching PlanId, or null if the price ID is unknown.
+ */
+export function tierForPriceIdFromConfig(config: TierConfig | null, priceId: string): PlanId | null {
+  const entry = config?.tiers.find((t) => t.stripePriceIdMonthly === priceId)
+  if (entry) return entry.id
+  return tierForPriceId(priceId)
 }

@@ -12,6 +12,7 @@
  * an authenticated, auditable privilege rather than an env-var allowlist.
  */
 import type { EffectivePlan } from './repositories/users.js';
+import { nullToInfinity, type TierConfig, type PlanId } from './tier-config-shape.js';
 
 export type { EffectivePlan };
 export type EnrichmentMode = 'tier1' | 'full';
@@ -58,6 +59,37 @@ export function isFullAccess(role: string | null | undefined): boolean {
 export function entitlementsFor(plan: EffectivePlan, role?: string | null): Entitlements {
     if (isFullAccess(role)) return ENTITLEMENTS.premium;
     return ENTITLEMENTS[plan];
+}
+
+const STORED_IDS = new Set<string>(['free', 'pro', 'premium']);
+
+function pickStoredId(plan: EffectivePlan): PlanId {
+    if (STORED_IDS.has(plan)) return plan as PlanId;
+    return 'premium'; // trial has no stored row → unlimited, matches static map
+}
+
+/**
+ * Entitlements derived from the live tier config. `trial` has no stored row,
+ * so it keeps the static UNLIMITED treatment via `pickStoredId` → 'premium'.
+ * Admin role still overrides to the premium row regardless of plan.
+ * `null` entitlement values in config map to `Infinity`.
+ */
+export function entitlementsFromConfig(
+    config: TierConfig,
+    plan: EffectivePlan,
+    role?: string | null,
+): Entitlements {
+    const targetId: PlanId = isFullAccess(role) ? 'premium' : pickStoredId(plan);
+    const entry = config.tiers.find((t) => t.id === targetId);
+    if (!entry) return ENTITLEMENTS[plan];
+    const e = entry.entitlements;
+    return {
+        repos: nullToInfinity(e.repos),
+        projects: nullToInfinity(e.projects),
+        resumesPerMonth: nullToInfinity(e.resumesPerMonth),
+        ingestionJobsPerMonth: nullToInfinity(e.ingestionJobsPerMonth),
+        enrichment: e.enrichment,
+    };
 }
 
 /** Worker env vars for an enrichment mode (consumed by the ingestion Job). */

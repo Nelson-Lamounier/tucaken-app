@@ -88,6 +88,20 @@ jest.unstable_mockModule('../../src/lib/k8s.js', () => ({
 }));
 
 // ---------------------------------------------------------------------------
+// tier-config-cache mock — returns DEFAULT_TIER_CONFIG synchronously so the
+// quota enforcement reads the same values as the static entitlementsFor map.
+// Without this, getCachedTierConfig would query the pool and consume one of
+// the test's seeded poolQueryMock responses, shifting every assertion.
+// ---------------------------------------------------------------------------
+
+import { DEFAULT_TIER_CONFIG } from '../../src/lib/tier-config-shape.js';
+
+jest.unstable_mockModule('../../src/lib/tier-config-cache.js', () => ({
+    getCachedTierConfig: jest.fn().mockResolvedValue(DEFAULT_TIER_CONFIG),
+    bustTierConfigCache: jest.fn(),
+}));
+
+// ---------------------------------------------------------------------------
 // config image resolver mock
 // ---------------------------------------------------------------------------
 
