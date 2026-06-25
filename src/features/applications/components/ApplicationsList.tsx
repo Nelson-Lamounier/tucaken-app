@@ -27,6 +27,8 @@ import type { TailoredResumeSummary } from '@/server/applications'
 import { useToastStore } from '@/lib/stores/toast-store'
 import { adminKeys } from '@/lib/api/query-keys'
 import type { AdminResumeWithData } from '../hooks/use-resume-versions'
+import { usePdfDownload } from '@/hooks/use-pdf-download'
+import { buildResumeDomForPdf, buildCoverLetterDomForPdf } from '@/lib/resumes/resume-dom-builder'
 
 type SelectedKind = 'preview-resume' | 'preview-cl' | 'edit-cl'
 interface Selected { slug: string; kind: SelectedKind }
@@ -88,6 +90,7 @@ export function ApplicationsList({ initialStage }: { readonly initialStage?: str
   const tailoredMap = buildTailoredMap(tailoredList)
   const queryClient = useQueryClient()
   const { addToast } = useToastStore()
+  const { generatePdf, downloading: isDownloadingPdf } = usePdfDownload()
   const [selected, setSelected] = useState<Selected | null>(null)
 
   const selectedTailored: TailoredResumeSummary | null = selected ? (tailoredMap.get(selected.slug) ?? null) : null
@@ -105,8 +108,35 @@ export function ApplicationsList({ initialStage }: { readonly initialStage?: str
     }
   }
 
+  const handlePreviewDownload = async () => {
+    if (!selected || !selectedTailored) return
+    const company = selectedTailored.targetCompany.replace(/\s+/g, '_')
+    const role = selectedTailored.targetRole.replace(/\s+/g, '_')
+    if (selected.kind === 'preview-resume') {
+      await generatePdf(
+        () => buildResumeDomForPdf(selectedTailored.data),
+        `Nelson_Lamounier_Resume_${company}_${role}.pdf`,
+      )
+      return
+    }
+    if (selected.kind === 'preview-cl') {
+      if (!selectedTailored.coverLetter) return
+      await generatePdf(
+        () =>
+          buildCoverLetterDomForPdf(
+            selectedTailored.coverLetter!,
+            selectedTailored.data.profile,
+            selectedTailored.targetCompany,
+            selectedTailored.targetRole,
+          ),
+        `Nelson_Lamounier_Cover_Letter_${company}.pdf`,
+      )
+    }
+  }
+
   const handleSaveCoverLetter = async (content: string) => {
     if (!selected || !selectedTailored?.coverLetter) return
+    // Paragraphs are split on blank lines (\n\n); an internal blank line within a paragraph will split it — round-trip assumption.
     const next = { ...selectedTailored.coverLetter, paragraphs: content.split('\n\n').filter(Boolean) }
     await updateApplicationCoverLetterFn({ data: { slug: selected.slug, coverLetter: next } })
     await queryClient.invalidateQueries({ queryKey: adminKeys.applications.all })
@@ -262,8 +292,8 @@ export function ApplicationsList({ initialStage }: { readonly initialStage?: str
         coverLetterProfile={selectedTailored?.data.profile}
         coverLetterCompany={selectedTailored?.targetCompany}
         coverLetterRole={selectedTailored?.targetRole}
-        onDownload={() => {}}
-        isDownloading={false}
+        onDownload={() => { void handlePreviewDownload() }}
+        isDownloading={isDownloadingPdf}
       />
 
       <DashboardDrawer
