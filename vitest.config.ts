@@ -19,6 +19,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['src/__tests__/**/*.test.ts', 'src/__tests__/**/*.test.tsx'],
+    setupFiles: ['src/__tests__/setup.ts'],
     env: {
       STRATEGIST_TABLE_NAME: 'test-strategist-table',
       ARTICLES_TABLE_NAME: 'test-articles-table',
