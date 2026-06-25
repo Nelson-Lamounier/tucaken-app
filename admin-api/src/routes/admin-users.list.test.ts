@@ -13,6 +13,8 @@ jest.unstable_mockModule('../lib/repositories/users.js', () => ({
   getAdminUserById: getAdminUserByIdMock,
   restoreSoftDeletedUser: jest.fn(),
   adminUpdateUser: jest.fn(),
+  softDeleteUser: jest.fn(),
+  hardDeleteUser: jest.fn(),
 }));
 jest.unstable_mockModule('../lib/pg.js', () => ({ getPool: () => ({}) }));
 

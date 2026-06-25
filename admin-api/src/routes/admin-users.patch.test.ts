@@ -4,6 +4,7 @@ const adminUpdateUserMock = jest.fn<() => Promise<boolean>>();
 jest.unstable_mockModule('../lib/repositories/users.js', () => ({
   listUsers: jest.fn(), getAdminUserById: jest.fn(),
   restoreSoftDeletedUser: jest.fn(), adminUpdateUser: adminUpdateUserMock,
+  softDeleteUser: jest.fn(), hardDeleteUser: jest.fn(),
 }));
 const connectMock = jest.fn(async () => ({
   query: jest.fn(async () => ({ rows: [], rowCount: 1 })),
