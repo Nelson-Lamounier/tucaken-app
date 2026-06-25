@@ -75,6 +75,8 @@ export const adminKeys = {
       ['admin', 'applications', 'detail', slug] as const,
     /** All scheduled interviews (calendar) */
     scheduledInterviews: ['admin', 'applications', 'scheduled-interviews'] as const,
+    /** Tailored resumes indexed by application slug */
+    tailoredResumes: ['admin', 'applications', 'tailored-resumes'] as const,
   },
 
   /** GitHub integration query keys */
