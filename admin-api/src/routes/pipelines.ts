@@ -14,6 +14,7 @@
 
 import { randomUUID } from 'node:crypto';
 
+import type { V1Job } from '@kubernetes/client-node';
 import { Hono } from 'hono';
 
 import { resolveDispatchMode } from '../lib/ab-free-tier.js';
@@ -29,6 +30,34 @@ import { insertPipelineRun, getPipelineRun } from '../lib/repositories/pipeline-
 import { getUserPlanStatus, checkAndIncrementResumeQuota, decrementResumeQuota } from '../lib/repositories/users.js';
 import { secondsUntilNextMonthUTC } from '../lib/retry-after.js';
 import type { AdminApiBindings } from '../lib/types.js';
+
+/**
+ * Resolve the article-pipeline image URI, or `null` when the admin-api-job-images
+ * Secret has not synced yet. Shared by the article-job and article-eval-job
+ * routes, which dispatch the same image. Logs the unresolved value on miss.
+ */
+function resolveArticlePipelineImage(logTag: string): string | null {
+  const image = getJobImage('article-pipeline');
+  if (!isImageConfigured(image)) {
+    console.error(`[${logTag}] image URI unresolved — admin-api-job-images Secret not yet synced`, { value: image });
+    return null;
+  }
+  return image;
+}
+
+/**
+ * Create a K8s Job, returning false (and logging) on failure. Shared dispatch
+ * scaffolding so each route does not re-implement the BatchV1 call + error path.
+ */
+async function createPipelineJob(namespace: string, job: V1Job, logTag: string): Promise<boolean> {
+  try {
+    await getBatchApi().createNamespacedJob({ namespace, body: job });
+    return true;
+  } catch (err: unknown) {
+    console.error(`[${logTag}] failed to create K8s Job`, err);
+    return false;
+  }
+}
 
 /**
  * Create the pipelines admin router.
@@ -61,9 +90,8 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
     const s3SourceKey = `drafts/${slug}.md`;
     const mode        = body.mode?.trim() || 'kb-augmented';
 
-    const articlePipelineImage = getJobImage('article-pipeline');
-    if (!isImageConfigured(articlePipelineImage)) {
-      console.error('[pipelines/article-job] image URI unresolved — admin-api-job-images Secret not yet synced', { value: articlePipelineImage });
+    const articlePipelineImage = resolveArticlePipelineImage('pipelines/article-job');
+    if (!articlePipelineImage) {
       return ctx.json({ error: 'Article pipeline image not yet configured — wait ~60s for ESO/kubelet sync' }, 502);
     }
 
@@ -137,9 +165,7 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
         envFromSecretRefs:   ['platform-rds-credentials'],
       });
 
-      try { await getBatchApi().createNamespacedJob({ namespace: config.articlePipelineNamespace, body: job }); }
-      catch (err: unknown) {
-        console.error('[pipelines/article-job] failed to create K8s Job', err);
+      if (!(await createPipelineJob(config.articlePipelineNamespace, job, 'pipelines/article-job'))) {
         return ctx.json({ error: 'Failed to schedule pipeline Job' }, 502);
       }
 
@@ -161,9 +187,8 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
     const userId = ctx.get('userId');
     if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
 
-    const articlePipelineImage = getJobImage('article-pipeline');
-    if (!isImageConfigured(articlePipelineImage)) {
-      console.error('[pipelines/article-eval-job] image URI unresolved — admin-api-job-images Secret not yet synced', { value: articlePipelineImage });
+    const articlePipelineImage = resolveArticlePipelineImage('pipelines/article-eval-job');
+    if (!articlePipelineImage) {
       return ctx.json({ error: 'Article pipeline image not yet configured — wait ~60s for ESO/kubelet sync' }, 502);
     }
 
@@ -204,9 +229,7 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
         envFromSecretRefs:   ['platform-rds-credentials'],
       });
 
-      try { await getBatchApi().createNamespacedJob({ namespace: config.articlePipelineNamespace, body: job }); }
-      catch (err: unknown) {
-        console.error('[pipelines/article-eval-job] failed to create K8s Job', err);
+      if (!(await createPipelineJob(config.articlePipelineNamespace, job, 'pipelines/article-eval-job'))) {
         return ctx.json({ error: 'Failed to schedule eval Job' }, 502);
       }
 
