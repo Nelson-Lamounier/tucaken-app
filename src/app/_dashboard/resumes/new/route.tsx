@@ -1,10 +1,10 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { adminKeys } from '@/lib/api/query-keys'
-import { ResumeForm } from '../features/resumes/components/ResumeForm'
-import { createResumeFn } from '../server/resumes'
+import { ResumeForm } from '../../../../features/resumes/components/ResumeForm'
+import { createResumeFn } from '../../../../server/resumes'
 import { useToastStore } from '@/lib/stores/toast-store'
-import { DashboardDrawer } from '../components/ui/DashboardDrawer'
+import { DashboardDrawer } from '../../../../components/ui/DashboardDrawer'
 
 export const Route = createFileRoute('/_dashboard/resumes/new')({
   component: CreateResumePage,

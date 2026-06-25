@@ -21,7 +21,6 @@ import { Route as CheckoutReturnRouteImport } from './app/checkout.return'
 import { Route as CheckoutTierRouteImport } from './app/checkout.$tier'
 import { Route as DashboardTestRouteImport } from './app/_dashboard.test'
 import { Route as DashboardSearchAnalyticsRouteImport } from './app/_dashboard.search-analytics'
-import { Route as DashboardResumesRouteImport } from './app/_dashboard.resumes'
 import { Route as DashboardResumeThemeRouteImport } from './app/_dashboard.resume-theme'
 import { Route as DashboardReportsRouteImport } from './app/_dashboard.reports'
 import { Route as DashboardOverviewRouteImport } from './app/_dashboard.overview'
@@ -31,21 +30,22 @@ import { Route as DashboardBillingRouteImport } from './app/_dashboard.billing'
 import { Route as DashboardArticlesRouteImport } from './app/_dashboard.articles'
 import { Route as DashboardAiAgentRouteImport } from './app/_dashboard.ai-agent'
 import { Route as DashboardSplatRouteImport } from './app/_dashboard.$'
+import { Route as DashboardResumesRouteRouteImport } from './app/_dashboard/resumes/route'
 import { Route as DashboardSettingsIndexRouteImport } from './app/_dashboard.settings.index'
 import { Route as DashboardProjectsIndexRouteImport } from './app/_dashboard/projects/index'
 import { Route as DashboardApplicationsIndexRouteImport } from './app/_dashboard/applications/index'
 import { Route as ArticlesPreviewSlugRouteImport } from './app/articles.preview.$slug'
 import { Route as DashboardSettingsGithubRouteImport } from './app/_dashboard.settings.github'
-import { Route as DashboardResumesNewRouteImport } from './app/_dashboard.resumes.new'
 import { Route as DashboardProjectsReviewRouteImport } from './app/_dashboard/projects/review'
 import { Route as DashboardProjectsIdRouteImport } from './app/_dashboard/projects/$id'
 import { Route as DashboardApplicationsNewRouteImport } from './app/_dashboard/applications/new'
 import { Route as DashboardApplicationsListRouteImport } from './app/_dashboard/applications/list'
 import { Route as DashboardApplicationsInterviewPrepRouteImport } from './app/_dashboard/applications/interview-prep'
 import { Route as DashboardApplicationsSlugRouteImport } from './app/_dashboard/applications/$slug'
+import { Route as DashboardResumesNewRouteRouteImport } from './app/_dashboard/resumes/new/route'
 import { Route as UUsernamePSlugRouteImport } from './app/u/$username/p/$slug'
-import { Route as DashboardResumesEditIdRouteImport } from './app/_dashboard.resumes.edit.$id'
 import { Route as DashboardProjectsIdEditRouteImport } from './app/_dashboard/projects/$id.edit'
+import { Route as DashboardResumesEditIdRouteRouteImport } from './app/_dashboard/resumes/edit.$id/route'
 
 const SignInRoute = SignInRouteImport.update({
   id: '/sign-in',
@@ -107,11 +107,6 @@ const DashboardSearchAnalyticsRoute =
     path: '/search-analytics',
     getParentRoute: () => DashboardRoute,
   } as any)
-const DashboardResumesRoute = DashboardResumesRouteImport.update({
-  id: '/resumes',
-  path: '/resumes',
-  getParentRoute: () => DashboardRoute,
-} as any)
 const DashboardResumeThemeRoute = DashboardResumeThemeRouteImport.update({
   id: '/resume-theme',
   path: '/resume-theme',
@@ -157,6 +152,11 @@ const DashboardSplatRoute = DashboardSplatRouteImport.update({
   path: '/$',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardResumesRouteRoute = DashboardResumesRouteRouteImport.update({
+  id: '/resumes',
+  path: '/resumes',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardSettingsIndexRoute = DashboardSettingsIndexRouteImport.update({
   id: '/settings/',
   path: '/settings/',
@@ -182,11 +182,6 @@ const DashboardSettingsGithubRoute = DashboardSettingsGithubRouteImport.update({
   id: '/settings/github',
   path: '/settings/github',
   getParentRoute: () => DashboardRoute,
-} as any)
-const DashboardResumesNewRoute = DashboardResumesNewRouteImport.update({
-  id: '/new',
-  path: '/new',
-  getParentRoute: () => DashboardResumesRoute,
 } as any)
 const DashboardProjectsReviewRoute = DashboardProjectsReviewRouteImport.update({
   id: '/projects/review',
@@ -222,21 +217,28 @@ const DashboardApplicationsSlugRoute =
     path: '/applications/$slug',
     getParentRoute: () => DashboardRoute,
   } as any)
+const DashboardResumesNewRouteRoute =
+  DashboardResumesNewRouteRouteImport.update({
+    id: '/new',
+    path: '/new',
+    getParentRoute: () => DashboardResumesRouteRoute,
+  } as any)
 const UUsernamePSlugRoute = UUsernamePSlugRouteImport.update({
   id: '/u/$username/p/$slug',
   path: '/u/$username/p/$slug',
   getParentRoute: () => rootRouteImport,
-} as any)
-const DashboardResumesEditIdRoute = DashboardResumesEditIdRouteImport.update({
-  id: '/edit/$id',
-  path: '/edit/$id',
-  getParentRoute: () => DashboardResumesRoute,
 } as any)
 const DashboardProjectsIdEditRoute = DashboardProjectsIdEditRouteImport.update({
   id: '/edit',
   path: '/edit',
   getParentRoute: () => DashboardProjectsIdRoute,
 } as any)
+const DashboardResumesEditIdRouteRoute =
+  DashboardResumesEditIdRouteRouteImport.update({
+    id: '/edit/$id',
+    path: '/edit/$id',
+    getParentRoute: () => DashboardResumesRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -244,6 +246,7 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof OnboardingRoute
   '/pricing': typeof PricingRoute
   '/sign-in': typeof SignInRouteWithChildren
+  '/resumes': typeof DashboardResumesRouteRouteWithChildren
   '/$': typeof DashboardSplatRoute
   '/ai-agent': typeof DashboardAiAgentRoute
   '/articles': typeof DashboardArticlesRoute
@@ -253,27 +256,26 @@ export interface FileRoutesByFullPath {
   '/overview': typeof DashboardOverviewRoute
   '/reports': typeof DashboardReportsRoute
   '/resume-theme': typeof DashboardResumeThemeRoute
-  '/resumes': typeof DashboardResumesRouteWithChildren
   '/search-analytics': typeof DashboardSearchAnalyticsRoute
   '/test': typeof DashboardTestRoute
   '/checkout/$tier': typeof CheckoutTierRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/github/callback': typeof GithubCallbackRoute
   '/sign-in/callback': typeof SignInCallbackRoute
+  '/resumes/new': typeof DashboardResumesNewRouteRoute
   '/applications/$slug': typeof DashboardApplicationsSlugRoute
   '/applications/interview-prep': typeof DashboardApplicationsInterviewPrepRoute
   '/applications/list': typeof DashboardApplicationsListRoute
   '/applications/new': typeof DashboardApplicationsNewRoute
   '/projects/$id': typeof DashboardProjectsIdRouteWithChildren
   '/projects/review': typeof DashboardProjectsReviewRoute
-  '/resumes/new': typeof DashboardResumesNewRoute
   '/settings/github': typeof DashboardSettingsGithubRoute
   '/articles/preview/$slug': typeof ArticlesPreviewSlugRoute
   '/applications/': typeof DashboardApplicationsIndexRoute
   '/projects/': typeof DashboardProjectsIndexRoute
   '/settings/': typeof DashboardSettingsIndexRoute
+  '/resumes/edit/$id': typeof DashboardResumesEditIdRouteRoute
   '/projects/$id/edit': typeof DashboardProjectsIdEditRoute
-  '/resumes/edit/$id': typeof DashboardResumesEditIdRoute
   '/u/$username/p/$slug': typeof UUsernamePSlugRoute
 }
 export interface FileRoutesByTo {
@@ -282,6 +284,7 @@ export interface FileRoutesByTo {
   '/onboarding': typeof OnboardingRoute
   '/pricing': typeof PricingRoute
   '/sign-in': typeof SignInRouteWithChildren
+  '/resumes': typeof DashboardResumesRouteRouteWithChildren
   '/$': typeof DashboardSplatRoute
   '/ai-agent': typeof DashboardAiAgentRoute
   '/articles': typeof DashboardArticlesRoute
@@ -291,27 +294,26 @@ export interface FileRoutesByTo {
   '/overview': typeof DashboardOverviewRoute
   '/reports': typeof DashboardReportsRoute
   '/resume-theme': typeof DashboardResumeThemeRoute
-  '/resumes': typeof DashboardResumesRouteWithChildren
   '/search-analytics': typeof DashboardSearchAnalyticsRoute
   '/test': typeof DashboardTestRoute
   '/checkout/$tier': typeof CheckoutTierRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/github/callback': typeof GithubCallbackRoute
   '/sign-in/callback': typeof SignInCallbackRoute
+  '/resumes/new': typeof DashboardResumesNewRouteRoute
   '/applications/$slug': typeof DashboardApplicationsSlugRoute
   '/applications/interview-prep': typeof DashboardApplicationsInterviewPrepRoute
   '/applications/list': typeof DashboardApplicationsListRoute
   '/applications/new': typeof DashboardApplicationsNewRoute
   '/projects/$id': typeof DashboardProjectsIdRouteWithChildren
   '/projects/review': typeof DashboardProjectsReviewRoute
-  '/resumes/new': typeof DashboardResumesNewRoute
   '/settings/github': typeof DashboardSettingsGithubRoute
   '/articles/preview/$slug': typeof ArticlesPreviewSlugRoute
   '/applications': typeof DashboardApplicationsIndexRoute
   '/projects': typeof DashboardProjectsIndexRoute
   '/settings': typeof DashboardSettingsIndexRoute
+  '/resumes/edit/$id': typeof DashboardResumesEditIdRouteRoute
   '/projects/$id/edit': typeof DashboardProjectsIdEditRoute
-  '/resumes/edit/$id': typeof DashboardResumesEditIdRoute
   '/u/$username/p/$slug': typeof UUsernamePSlugRoute
 }
 export interface FileRoutesById {
@@ -322,6 +324,7 @@ export interface FileRoutesById {
   '/onboarding': typeof OnboardingRoute
   '/pricing': typeof PricingRoute
   '/sign-in': typeof SignInRouteWithChildren
+  '/_dashboard/resumes': typeof DashboardResumesRouteRouteWithChildren
   '/_dashboard/$': typeof DashboardSplatRoute
   '/_dashboard/ai-agent': typeof DashboardAiAgentRoute
   '/_dashboard/articles': typeof DashboardArticlesRoute
@@ -331,27 +334,26 @@ export interface FileRoutesById {
   '/_dashboard/overview': typeof DashboardOverviewRoute
   '/_dashboard/reports': typeof DashboardReportsRoute
   '/_dashboard/resume-theme': typeof DashboardResumeThemeRoute
-  '/_dashboard/resumes': typeof DashboardResumesRouteWithChildren
   '/_dashboard/search-analytics': typeof DashboardSearchAnalyticsRoute
   '/_dashboard/test': typeof DashboardTestRoute
   '/checkout/$tier': typeof CheckoutTierRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/github/callback': typeof GithubCallbackRoute
   '/sign-in/callback': typeof SignInCallbackRoute
+  '/_dashboard/resumes/new': typeof DashboardResumesNewRouteRoute
   '/_dashboard/applications/$slug': typeof DashboardApplicationsSlugRoute
   '/_dashboard/applications/interview-prep': typeof DashboardApplicationsInterviewPrepRoute
   '/_dashboard/applications/list': typeof DashboardApplicationsListRoute
   '/_dashboard/applications/new': typeof DashboardApplicationsNewRoute
   '/_dashboard/projects/$id': typeof DashboardProjectsIdRouteWithChildren
   '/_dashboard/projects/review': typeof DashboardProjectsReviewRoute
-  '/_dashboard/resumes/new': typeof DashboardResumesNewRoute
   '/_dashboard/settings/github': typeof DashboardSettingsGithubRoute
   '/articles/preview/$slug': typeof ArticlesPreviewSlugRoute
   '/_dashboard/applications/': typeof DashboardApplicationsIndexRoute
   '/_dashboard/projects/': typeof DashboardProjectsIndexRoute
   '/_dashboard/settings/': typeof DashboardSettingsIndexRoute
+  '/_dashboard/resumes/edit/$id': typeof DashboardResumesEditIdRouteRoute
   '/_dashboard/projects/$id/edit': typeof DashboardProjectsIdEditRoute
-  '/_dashboard/resumes/edit/$id': typeof DashboardResumesEditIdRoute
   '/u/$username/p/$slug': typeof UUsernamePSlugRoute
 }
 export interface FileRouteTypes {
@@ -362,6 +364,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/pricing'
     | '/sign-in'
+    | '/resumes'
     | '/$'
     | '/ai-agent'
     | '/articles'
@@ -371,27 +374,26 @@ export interface FileRouteTypes {
     | '/overview'
     | '/reports'
     | '/resume-theme'
-    | '/resumes'
     | '/search-analytics'
     | '/test'
     | '/checkout/$tier'
     | '/checkout/return'
     | '/github/callback'
     | '/sign-in/callback'
+    | '/resumes/new'
     | '/applications/$slug'
     | '/applications/interview-prep'
     | '/applications/list'
     | '/applications/new'
     | '/projects/$id'
     | '/projects/review'
-    | '/resumes/new'
     | '/settings/github'
     | '/articles/preview/$slug'
     | '/applications/'
     | '/projects/'
     | '/settings/'
-    | '/projects/$id/edit'
     | '/resumes/edit/$id'
+    | '/projects/$id/edit'
     | '/u/$username/p/$slug'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -400,6 +402,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/pricing'
     | '/sign-in'
+    | '/resumes'
     | '/$'
     | '/ai-agent'
     | '/articles'
@@ -409,27 +412,26 @@ export interface FileRouteTypes {
     | '/overview'
     | '/reports'
     | '/resume-theme'
-    | '/resumes'
     | '/search-analytics'
     | '/test'
     | '/checkout/$tier'
     | '/checkout/return'
     | '/github/callback'
     | '/sign-in/callback'
+    | '/resumes/new'
     | '/applications/$slug'
     | '/applications/interview-prep'
     | '/applications/list'
     | '/applications/new'
     | '/projects/$id'
     | '/projects/review'
-    | '/resumes/new'
     | '/settings/github'
     | '/articles/preview/$slug'
     | '/applications'
     | '/projects'
     | '/settings'
-    | '/projects/$id/edit'
     | '/resumes/edit/$id'
+    | '/projects/$id/edit'
     | '/u/$username/p/$slug'
   id:
     | '__root__'
@@ -439,6 +441,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/pricing'
     | '/sign-in'
+    | '/_dashboard/resumes'
     | '/_dashboard/$'
     | '/_dashboard/ai-agent'
     | '/_dashboard/articles'
@@ -448,27 +451,26 @@ export interface FileRouteTypes {
     | '/_dashboard/overview'
     | '/_dashboard/reports'
     | '/_dashboard/resume-theme'
-    | '/_dashboard/resumes'
     | '/_dashboard/search-analytics'
     | '/_dashboard/test'
     | '/checkout/$tier'
     | '/checkout/return'
     | '/github/callback'
     | '/sign-in/callback'
+    | '/_dashboard/resumes/new'
     | '/_dashboard/applications/$slug'
     | '/_dashboard/applications/interview-prep'
     | '/_dashboard/applications/list'
     | '/_dashboard/applications/new'
     | '/_dashboard/projects/$id'
     | '/_dashboard/projects/review'
-    | '/_dashboard/resumes/new'
     | '/_dashboard/settings/github'
     | '/articles/preview/$slug'
     | '/_dashboard/applications/'
     | '/_dashboard/projects/'
     | '/_dashboard/settings/'
-    | '/_dashboard/projects/$id/edit'
     | '/_dashboard/resumes/edit/$id'
+    | '/_dashboard/projects/$id/edit'
     | '/u/$username/p/$slug'
   fileRoutesById: FileRoutesById
 }
@@ -572,13 +574,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSearchAnalyticsRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/_dashboard/resumes': {
-      id: '/_dashboard/resumes'
-      path: '/resumes'
-      fullPath: '/resumes'
-      preLoaderRoute: typeof DashboardResumesRouteImport
-      parentRoute: typeof DashboardRoute
-    }
     '/_dashboard/resume-theme': {
       id: '/_dashboard/resume-theme'
       path: '/resume-theme'
@@ -642,6 +637,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSplatRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/_dashboard/resumes': {
+      id: '/_dashboard/resumes'
+      path: '/resumes'
+      fullPath: '/resumes'
+      preLoaderRoute: typeof DashboardResumesRouteRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/_dashboard/settings/': {
       id: '/_dashboard/settings/'
       path: '/settings'
@@ -676,13 +678,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/settings/github'
       preLoaderRoute: typeof DashboardSettingsGithubRouteImport
       parentRoute: typeof DashboardRoute
-    }
-    '/_dashboard/resumes/new': {
-      id: '/_dashboard/resumes/new'
-      path: '/new'
-      fullPath: '/resumes/new'
-      preLoaderRoute: typeof DashboardResumesNewRouteImport
-      parentRoute: typeof DashboardResumesRoute
     }
     '/_dashboard/projects/review': {
       id: '/_dashboard/projects/review'
@@ -726,19 +721,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardApplicationsSlugRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/_dashboard/resumes/new': {
+      id: '/_dashboard/resumes/new'
+      path: '/new'
+      fullPath: '/resumes/new'
+      preLoaderRoute: typeof DashboardResumesNewRouteRouteImport
+      parentRoute: typeof DashboardResumesRouteRoute
+    }
     '/u/$username/p/$slug': {
       id: '/u/$username/p/$slug'
       path: '/u/$username/p/$slug'
       fullPath: '/u/$username/p/$slug'
       preLoaderRoute: typeof UUsernamePSlugRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/_dashboard/resumes/edit/$id': {
-      id: '/_dashboard/resumes/edit/$id'
-      path: '/edit/$id'
-      fullPath: '/resumes/edit/$id'
-      preLoaderRoute: typeof DashboardResumesEditIdRouteImport
-      parentRoute: typeof DashboardResumesRoute
     }
     '/_dashboard/projects/$id/edit': {
       id: '/_dashboard/projects/$id/edit'
@@ -747,21 +742,30 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardProjectsIdEditRouteImport
       parentRoute: typeof DashboardProjectsIdRoute
     }
+    '/_dashboard/resumes/edit/$id': {
+      id: '/_dashboard/resumes/edit/$id'
+      path: '/edit/$id'
+      fullPath: '/resumes/edit/$id'
+      preLoaderRoute: typeof DashboardResumesEditIdRouteRouteImport
+      parentRoute: typeof DashboardResumesRouteRoute
+    }
   }
 }
 
-interface DashboardResumesRouteChildren {
-  DashboardResumesNewRoute: typeof DashboardResumesNewRoute
-  DashboardResumesEditIdRoute: typeof DashboardResumesEditIdRoute
+interface DashboardResumesRouteRouteChildren {
+  DashboardResumesNewRouteRoute: typeof DashboardResumesNewRouteRoute
+  DashboardResumesEditIdRouteRoute: typeof DashboardResumesEditIdRouteRoute
 }
 
-const DashboardResumesRouteChildren: DashboardResumesRouteChildren = {
-  DashboardResumesNewRoute: DashboardResumesNewRoute,
-  DashboardResumesEditIdRoute: DashboardResumesEditIdRoute,
+const DashboardResumesRouteRouteChildren: DashboardResumesRouteRouteChildren = {
+  DashboardResumesNewRouteRoute: DashboardResumesNewRouteRoute,
+  DashboardResumesEditIdRouteRoute: DashboardResumesEditIdRouteRoute,
 }
 
-const DashboardResumesRouteWithChildren =
-  DashboardResumesRoute._addFileChildren(DashboardResumesRouteChildren)
+const DashboardResumesRouteRouteWithChildren =
+  DashboardResumesRouteRoute._addFileChildren(
+    DashboardResumesRouteRouteChildren,
+  )
 
 interface DashboardProjectsIdRouteChildren {
   DashboardProjectsIdEditRoute: typeof DashboardProjectsIdEditRoute
@@ -775,6 +779,7 @@ const DashboardProjectsIdRouteWithChildren =
   DashboardProjectsIdRoute._addFileChildren(DashboardProjectsIdRouteChildren)
 
 interface DashboardRouteChildren {
+  DashboardResumesRouteRoute: typeof DashboardResumesRouteRouteWithChildren
   DashboardSplatRoute: typeof DashboardSplatRoute
   DashboardAiAgentRoute: typeof DashboardAiAgentRoute
   DashboardArticlesRoute: typeof DashboardArticlesRoute
@@ -784,7 +789,6 @@ interface DashboardRouteChildren {
   DashboardOverviewRoute: typeof DashboardOverviewRoute
   DashboardReportsRoute: typeof DashboardReportsRoute
   DashboardResumeThemeRoute: typeof DashboardResumeThemeRoute
-  DashboardResumesRoute: typeof DashboardResumesRouteWithChildren
   DashboardSearchAnalyticsRoute: typeof DashboardSearchAnalyticsRoute
   DashboardTestRoute: typeof DashboardTestRoute
   DashboardApplicationsSlugRoute: typeof DashboardApplicationsSlugRoute
@@ -800,6 +804,7 @@ interface DashboardRouteChildren {
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardResumesRouteRoute: DashboardResumesRouteRouteWithChildren,
   DashboardSplatRoute: DashboardSplatRoute,
   DashboardAiAgentRoute: DashboardAiAgentRoute,
   DashboardArticlesRoute: DashboardArticlesRoute,
@@ -809,7 +814,6 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardOverviewRoute: DashboardOverviewRoute,
   DashboardReportsRoute: DashboardReportsRoute,
   DashboardResumeThemeRoute: DashboardResumeThemeRoute,
-  DashboardResumesRoute: DashboardResumesRouteWithChildren,
   DashboardSearchAnalyticsRoute: DashboardSearchAnalyticsRoute,
   DashboardTestRoute: DashboardTestRoute,
   DashboardApplicationsSlugRoute: DashboardApplicationsSlugRoute,
