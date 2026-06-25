@@ -35,6 +35,7 @@ jest.unstable_mockModule('../../src/lib/repositories/applications.js', () => ({
   updateInterviewStage:    jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
   advanceStatusOffAnalysis: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
   updateApplicationAnnotations: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  updateApplicationCoverLetterOverride: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 }));
 
 jest.unstable_mockModule('../../src/lib/repositories/interview-stages.js', () => ({

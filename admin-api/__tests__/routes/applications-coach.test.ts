@@ -76,6 +76,7 @@ jest.unstable_mockModule('../../src/lib/repositories/applications.js', () => ({
   advanceStatusOffAnalysis: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
   deleteApplication:       jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
   updateApplicationAnnotations: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  updateApplicationCoverLetterOverride: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 }));
 
 // ---------------------------------------------------------------------------
