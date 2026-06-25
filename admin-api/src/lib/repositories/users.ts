@@ -521,17 +521,50 @@ export type BillingPlan = 'free' | 'pro' | 'premium';
 export type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'canceled' | 'unpaid';
 
 /**
+ * The target user row does not exist (yet). Distinct from a conflict: the
+ * caller (Stripe webhook) should RETRY, because provisioning may simply be
+ * lagging — not skip the sync.
+ */
+export class UserNotFoundError extends Error {
+  constructor(public readonly userId: string) {
+    super(`User ${userId} not found`);
+    this.name = 'UserNotFoundError';
+  }
+}
+
+/**
+ * The user row already carries a *different* `stripe_customer_id`. A genuine
+ * billing anomaly (duplicate customer) that must not be silently overwritten;
+ * the caller should skip and leave it for manual reconciliation.
+ */
+export class StripeCustomerConflictError extends Error {
+  constructor(
+    public readonly userId: string,
+    public readonly existingCustomerId: string | null,
+    public readonly attemptedCustomerId: string,
+  ) {
+    super(
+      `User ${userId} already has stripe_customer_id ${existingCustomerId} (refusing to overwrite with ${attemptedCustomerId})`,
+    );
+    this.name = 'StripeCustomerConflictError';
+  }
+}
+
+/**
  * Idempotently attaches a Stripe customer ID to a user row.
  *
- * Called by the tucaken-app pre-checkout flow: when an authenticated user
- * first hits Checkout, we create a Stripe customer with their email, then
- * persist the resulting `cus_…` here so future upgrades reuse the same
- * customer record (one customer per user, forever).
+ * Called by the tucaken-app pre-checkout flow AND the Stripe webhook (which
+ * self-heals the link): when an authenticated user first hits Checkout, we
+ * create a Stripe customer with their email, then persist the resulting `cus_…`
+ * here so future upgrades reuse the same customer record (one customer per
+ * user, forever).
  *
  * Idempotent on (userId, customerId). If a row already has the same value,
- * this is a no-op. If a row has a *different* value, we throw — that
- * indicates a billing bug (duplicate customer) that should not be silently
- * overwritten.
+ * this is a no-op. Otherwise it throws a *typed* error so callers can react
+ * correctly: `UserNotFoundError` (retryable — provisioning may be lagging) vs
+ * `StripeCustomerConflictError` (a different customer already linked — skip,
+ * do not overwrite). Conflating the two as one status would let a webhook drop
+ * a legitimate sync for a not-yet-provisioned user.
  */
 export async function setStripeCustomerId(
   pool: Pick<import('pg').Pool, 'query'>,
@@ -553,10 +586,12 @@ export async function setStripeCustomerId(
       [userId],
     );
     if (row.rowCount === 0) {
-      throw new Error(`User ${userId} not found`);
+      throw new UserNotFoundError(userId);
     }
-    throw new Error(
-      `User ${userId} already has stripe_customer_id ${row.rows[0]!.stripe_customer_id} (refusing to overwrite with ${customerId})`,
+    throw new StripeCustomerConflictError(
+      userId,
+      row.rows[0]?.stripe_customer_id ?? null,
+      customerId,
     );
   }
 }

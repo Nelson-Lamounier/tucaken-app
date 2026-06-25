@@ -58,6 +58,16 @@ interface UserByCustomer {
   user: { id: string; email: string } | null
 }
 
+/** True when an InternalApiError (or any error carrying `status`) has `code`. */
+function isStatus(err: unknown, code: number): boolean {
+  return Boolean(
+    err &&
+      typeof err === 'object' &&
+      'status' in err &&
+      (err as { status: number }).status === code,
+  )
+}
+
 async function findUserByCustomer(customerId: string): Promise<UserByCustomer['user']> {
   try {
     const res = await internalApiFetch<UserByCustomer>(
@@ -67,11 +77,65 @@ async function findUserByCustomer(customerId: string): Promise<UserByCustomer['u
   } catch (err) {
     // 404 → no user linked yet (guest checkout case). Return null without
     // raising — caller will fall through to the pending-row path.
-    if (err && typeof err === 'object' && 'status' in err && (err as { status: number }).status === 404) {
-      return null
+    if (isStatus(err, 404)) return null
+    throw err
+  }
+}
+
+/**
+ * Idempotently link a user to their Stripe customer via admin-api. This is what
+ * makes the webhook self-healing: even when the best-effort pre-checkout persist
+ * (ensureStripeCustomerForUser) failed, the next event carrying the user
+ * identity repairs the link before any subscription patch — so a paying user can
+ * never be left with stripe_customer_id = null.
+ *
+ * `setStripeCustomerId` is idempotent (links when null, no-ops when already the
+ * same id). Returns false ONLY on a 409 conflict — the user is already linked to
+ * a DIFFERENT customer, a data anomaly we skip and leave for manual
+ * reconciliation rather than overwrite. Transient errors are rethrown so Stripe
+ * retries the event (at-least-once delivery -> eventual consistency).
+ */
+async function ensureCustomerLink(userId: string, customerId: string): Promise<boolean> {
+  try {
+    await internalApiFetch<{ ok: true }>('/api/internal/billing/customers', {
+      method: 'POST',
+      json: { userId, customerId },
+    })
+    return true
+  } catch (err) {
+    if (isStatus(err, 409)) {
+      logger.error(
+        { event: 'stripe_webhook_link_conflict', userId, customerId },
+        'webhook customer link conflict — user already linked to a different Stripe customer; skipping sync for manual reconciliation',
+      )
+      return false
     }
     throw err
   }
+}
+
+/**
+ * When the event carries a user identity, ensure the link before patching.
+ * Returns true when it is safe to proceed (no identity to act on, or link
+ * succeeded) and false when a 409 conflict means the caller should skip.
+ */
+async function linkIfIdentified(
+  userId: string | undefined,
+  customerId: string,
+): Promise<boolean> {
+  if (!userId) return true
+  return ensureCustomerLink(userId, customerId)
+}
+
+/**
+ * `current_period_end` as ISO 8601 (or null). Stripe SDK 22 moved this from the
+ * top-level Subscription to `items.data[*]`; read whichever is present.
+ */
+function periodEndIso(sub: Stripe.Subscription): string | null {
+  const top = (sub as unknown as { current_period_end?: number }).current_period_end
+  const item = sub.items.data[0]?.current_period_end
+  const epoch = top ?? item
+  return typeof epoch === 'number' ? new Date(epoch * 1000).toISOString() : null
 }
 
 async function patchSubscription(
@@ -163,8 +227,10 @@ async function onCheckoutCompleted(session: Stripe.Checkout.Session): Promise<vo
   }
 
   if (userId) {
-    // Authenticated path. PATCH directly — customer is already linked at
-    // pre-checkout time by ensureStripeCustomerForUser.
+    // Authenticated path. Self-heal the user<->customer link first (idempotent)
+    // so a failed pre-checkout persist can't leave a paying user unlinked, then
+    // PATCH the subscription. Skip on a 409 conflict (different customer).
+    if (!(await ensureCustomerLink(userId, customerId))) return
     await patchSubscription(customerId, {
       plan: tier,
       stripeSubscriptionId: subscriptionId,
@@ -203,6 +269,14 @@ async function onCheckoutCompleted(session: Stripe.Checkout.Session): Promise<vo
 async function onSubscriptionChanged(sub: Stripe.Subscription): Promise<void> {
   const customerId =
     typeof sub.customer === 'string' ? sub.customer : sub.customer.id
+
+  // Portal/renewal events also carry our userId in subscription metadata
+  // (set at checkout via subscription_data.metadata). Self-heal the link so
+  // these events sync even when the customer was never persisted. Skip on a
+  // 409 conflict (customer already linked to a different user).
+  const userId = sub.metadata?.['userId'] as string | undefined
+  if (!(await linkIfIdentified(userId, customerId))) return
+
   const priceId = sub.items.data[0]?.price.id ?? null
   const tier = priceId ? tierForPriceId(priceId) : null
 
@@ -223,17 +297,7 @@ async function onSubscriptionChanged(sub: Stripe.Subscription): Promise<void> {
   const isDeleted = sub.status === 'canceled'
   const planPatch: PlanId | undefined = isDeleted ? 'free' : (tier ?? undefined)
 
-  // Pull `current_period_end` from whichever surface the SDK exposes (top-level
-  // in older API versions, items.data[0] in newer ones). See
-  // src/server/billing.ts:subscriptionPeriodEnd for matching logic.
-  const topPeriodEnd = (sub as unknown as { current_period_end?: number })
-    .current_period_end
-  const itemPeriodEnd = sub.items.data[0]?.current_period_end
-  const periodEndSec = topPeriodEnd ?? itemPeriodEnd
-  const currentPeriodEnd =
-    typeof periodEndSec === 'number'
-      ? new Date(periodEndSec * 1000).toISOString()
-      : null
+  const currentPeriodEnd = periodEndIso(sub)
 
   await patchSubscription(customerId, {
     plan: planPatch,

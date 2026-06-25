@@ -25,6 +25,8 @@ import {
   findUserByStripeCustomerId,
   updateSubscriptionFromStripe,
   upsertPendingSubscription,
+  UserNotFoundError,
+  StripeCustomerConflictError,
 } from '../lib/repositories/users.js';
 import type { AdminApiBindings } from '../lib/types.js';
 
@@ -104,12 +106,24 @@ export function createInternalBillingRouter(
     try {
         await setStripeCustomerId(pool, userId, customerId);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'unknown';
-        logger.warn(
-          { event: 'stripe_customer_link_conflict', userId, customerId, err: msg },
-          'setStripeCustomerId rejected — conflicting existing value',
-        );
-        return ctx.json({ error: msg }, 409);
+        // Not-found is RETRYABLE (provisioning may lag) → 404 so the webhook
+        // rethrows and Stripe retries. A genuine conflict is a data anomaly the
+        // caller should skip → 409. Anything else is unexpected → rethrow (500).
+        if (err instanceof UserNotFoundError) {
+          logger.warn(
+            { event: 'stripe_customer_link_user_missing', userId, customerId },
+            'setStripeCustomerId: user row not found — retryable',
+          );
+          return ctx.json({ error: err.message }, 404);
+        }
+        if (err instanceof StripeCustomerConflictError) {
+          logger.warn(
+            { event: 'stripe_customer_link_conflict', userId, customerId, existing: err.existingCustomerId },
+            'setStripeCustomerId rejected — user already linked to a different customer',
+          );
+          return ctx.json({ error: err.message }, 409);
+        }
+        throw err;
       }
       logger.info(
         { event: 'stripe_customer_linked', userId, customerId },
