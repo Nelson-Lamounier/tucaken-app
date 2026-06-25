@@ -24,6 +24,18 @@ export interface PaymentMethodView {
   wallet: string | null
 }
 
+/** Read-only invoice view fetched live from Stripe. */
+export interface InvoiceView {
+  id: string
+  number: string | null
+  date: string                // ISO
+  amount: number              // major units
+  currency: string
+  status: 'paid' | 'open' | 'void' | 'uncollectible' | 'draft'
+  invoicePdf: string | null
+  hostedUrl: string | null
+}
+
 export interface BillingAddress {
   line1: string
   line2?: string

@@ -28,7 +28,7 @@ import { requireAuth, tryAuth } from './auth-guard'
 import { apiFetch } from './_api-client'
 import { internalApiFetch } from './_internal-api-client'
 import { logger } from '@/lib/observability/logger'
-import type { PlanId, PaymentMethodView } from '@/features/account/types'
+import type { PlanId, PaymentMethodView, InvoiceView } from '@/features/account/types'
 import { enforceBillingRateLimit } from './_rate-limit'
 
 // -----------------------------------------------------------------------------
@@ -144,6 +144,35 @@ export const getPaymentMethodFn = createServerFn({ method: 'GET' }).handler(
       expYear: pm.card.exp_year,
       wallet: pm.card.wallet?.type ?? null,
     }
+  },
+)
+
+// -----------------------------------------------------------------------------
+// Live read: invoice history
+// -----------------------------------------------------------------------------
+
+function toInvoiceView(inv: import('stripe').default.Invoice): InvoiceView {
+  const cents = inv.amount_paid || inv.amount_due
+  return {
+    id: inv.id ?? '',
+    number: inv.number ?? null,
+    date: new Date(inv.created * 1000).toISOString(),
+    amount: cents / 100,
+    currency: inv.currency,
+    status: inv.status ?? 'draft',
+    invoicePdf: inv.invoice_pdf ?? null,
+    hostedUrl: inv.hosted_invoice_url ?? null,
+  }
+}
+
+/** Live read of the most recent 12 invoices for the user's customer. */
+export const getInvoicesFn = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<InvoiceView[]> => {
+    await requireAuth()
+    const customerId = await requireCustomerId()
+    if (!customerId) return []
+    const list = await stripe().invoices.list({ customer: customerId, limit: 12 })
+    return list.data.map(toInvoiceView)
   },
 )
 

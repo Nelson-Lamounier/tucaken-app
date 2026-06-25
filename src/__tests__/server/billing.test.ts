@@ -157,3 +157,39 @@ describe('getPaymentMethodFn', () => {
     })
   })
 })
+
+const { getInvoicesFn } = await import('../../server/billing')
+
+describe('getInvoicesFn', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockRequireAuth.mockResolvedValue({ id: 'user-1', email: 'user@example.com' })
+  })
+
+  it('returns [] without calling Stripe when the user has no customer', async () => {
+    mockApiFetch.mockResolvedValue({ plan: { stripeCustomerId: null } })
+    const fn = getInvoicesFn as () => Promise<unknown[]>
+    await expect(fn()).resolves.toEqual([])
+    expect(mockInvoicesList).not.toHaveBeenCalled()
+  })
+
+  it('maps Stripe invoices to InvoiceView in major units', async () => {
+    mockApiFetch.mockResolvedValue({ plan: { stripeCustomerId: 'cus_1' } })
+    mockInvoicesList.mockResolvedValue({
+      data: [{
+        id: 'in_1', number: 'TUC-001', created: 1_700_000_000,
+        amount_paid: 1500, amount_due: 1500, currency: 'usd', status: 'paid',
+        invoice_pdf: 'https://stripe/pdf', hosted_invoice_url: 'https://stripe/hosted',
+      }],
+    })
+    const fn = getInvoicesFn as () => Promise<unknown[]>
+    const result = await fn()
+    expect(result).toEqual([{
+      id: 'in_1', number: 'TUC-001',
+      date: new Date(1_700_000_000 * 1000).toISOString(),
+      amount: 15, currency: 'usd', status: 'paid',
+      invoicePdf: 'https://stripe/pdf', hostedUrl: 'https://stripe/hosted',
+    }])
+    expect(mockInvoicesList).toHaveBeenCalledWith({ customer: 'cus_1', limit: 12 })
+  })
+})
