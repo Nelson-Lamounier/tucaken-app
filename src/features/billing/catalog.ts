@@ -18,9 +18,9 @@ export type BillingInterval = 'monthly' | 'annual'
 export interface Tier {
   id: PlanId
   name: string
-  /** Display price in USD per month. 0 = Free. */
+  /** Display price in EUR per month. 0 = Free. */
   priceMonthly: number
-  /** Display price in USD per year (usually ~10x monthly with discount). */
+  /** Display price in EUR per year (usually ~10x monthly with discount). */
   priceAnnual: number
   /** Marketing one-liner. */
   blurb: string
@@ -94,11 +94,11 @@ export function tierRank(id: PlanId): number {
   return TIERS.findIndex((t) => t.id === id)
 }
 
-/** Format a USD price for display ("$19" / "Free"). */
+/** Format a EUR price for display ("€19" / "Free"). */
 export function formatPrice(t: Tier, interval: BillingInterval = 'monthly'): string {
   if (t.free) return 'Free'
   const n = interval === 'monthly' ? t.priceMonthly : t.priceAnnual
-  return `$${n}`
+  return `€${n}`
 }
 
 /**

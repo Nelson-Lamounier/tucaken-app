@@ -122,7 +122,7 @@ function CheckoutRoute() {
 
           <p className="mt-4 text-xs text-zinc-500">
             By subscribing you agree to our terms. Your card will be charged
-            ${monthlyTotal} today and on the same date each month until you
+            €{monthlyTotal} today and on the same date each month until you
             cancel.
           </p>
         </div>
@@ -143,7 +143,7 @@ function CheckoutRoute() {
               Amount due today
             </dt>
             <dd className="mt-1 text-3xl font-bold tracking-tight text-white">
-              ${monthlyTotal}.00
+              €{monthlyTotal}.00
             </dd>
           </dl>
 
@@ -160,7 +160,7 @@ function CheckoutRoute() {
                 </p>
               </div>
               <p className="flex-none text-base font-medium text-white">
-                ${monthlyTotal}.00
+                €{monthlyTotal}.00
               </p>
             </li>
           </ul>
@@ -168,15 +168,15 @@ function CheckoutRoute() {
           <dl className="space-y-2.5 border-t border-white/10 pt-4 text-sm font-medium">
             <div className="flex items-center justify-between">
               <dt>Subtotal</dt>
-              <dd>${monthlyTotal}.00</dd>
+              <dd>€{monthlyTotal}.00</dd>
             </div>
             <div className="flex items-center justify-between">
               <dt>Taxes</dt>
-              <dd>{taxes ? `$${taxes}.00` : 'Calculated by Stripe'}</dd>
+              <dd>{taxes ? `€${taxes}.00` : 'Calculated by Stripe'}</dd>
             </div>
             <div className="flex items-center justify-between border-t border-white/10 pt-3 text-white">
               <dt className="text-base">Total today</dt>
-              <dd className="text-base">${monthlyTotal}.00</dd>
+              <dd className="text-base">€{monthlyTotal}.00</dd>
             </div>
           </dl>
 

@@ -15,9 +15,9 @@ import { TIERS, tierRank } from '@/features/billing/catalog'
 export interface PlanDefinition {
   id: PlanId
   name: string
-  /** Monthly USD price. */
+  /** Monthly EUR price. */
   price: number
-  /** Yearly USD price. */
+  /** Yearly EUR price. */
   yearly: number
   popular?: boolean
   blurb: string
