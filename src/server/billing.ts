@@ -366,6 +366,39 @@ function portalFlowData(
   }
 }
 
+/**
+ * Create a portal session, attaching `flow_data` when supplied. If Stripe
+ * rejects the flow — e.g. the Customer Portal is not configured to allow plan
+ * switching — fall back to a plain portal-home session so the button never
+ * hard-fails. A bare (no-flow) session is created directly.
+ */
+async function openPortalSession(
+  customer: string,
+  returnUrl: string,
+  flowData: NonNullable<Stripe.BillingPortal.SessionCreateParams['flow_data']> | undefined,
+): Promise<Stripe.BillingPortal.Session> {
+  if (!flowData) {
+    return stripe().billingPortal.sessions.create({ customer, return_url: returnUrl })
+  }
+  try {
+    return await stripe().billingPortal.sessions.create({
+      customer,
+      return_url: returnUrl,
+      flow_data: flowData,
+    })
+  } catch (err) {
+    logger.warn(
+      {
+        event: 'stripe_portal_flow_unsupported',
+        flow: flowData.type,
+        err: err instanceof Error ? err.message : 'unknown',
+      },
+      'portal flow_data rejected — falling back to portal home',
+    )
+    return stripe().billingPortal.sessions.create({ customer, return_url: returnUrl })
+  }
+}
+
 function safePortalReturnPath(returnPath: string): string {
   if (
     !returnPath.startsWith('/') ||
@@ -401,11 +434,11 @@ export const createPortalSessionFn = createServerFn({ method: 'POST' })
     }
 
     const flowData = portalFlowData(data.flow, me.plan.stripeSubscriptionId)
-    const portal = await stripe().billingPortal.sessions.create({
-      customer: data.customerId,
-      return_url: `${appOrigin()}${returnPath}`,
-      ...(flowData ? { flow_data: flowData } : {}),
-    })
+    const portal = await openPortalSession(
+      data.customerId,
+      `${appOrigin()}${returnPath}`,
+      flowData,
+    )
     return { url: portal.url }
   })
 
