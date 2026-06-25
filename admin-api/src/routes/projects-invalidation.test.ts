@@ -12,26 +12,37 @@ const invalidateProject = jest.fn(async (_id: string) => {});
 jest.unstable_mockModule('../lib/redis-cache.js', () => ({ invalidateProject }));
 
 jest.unstable_mockModule('../lib/repositories/projects.js', () => ({
-  listProjects:      async () => ({ total: 0, rows: [] }),
-  getProjectDetail:  async () => ({ id: PROJECT_ID }),
-  createProject:     async () => ({ id: 'new-id' }),
+  listProjects:       async () => ({ total: 0, rows: [] }),
+  getProjectDetail:   async () => ({ id: PROJECT_ID }),
+  createProject:      async () => ({ id: 'new-id' }),
+  // countUserProjects: 0 so the create handler never hits the cap in these tests
+  countUserProjects:  async () => 0,
   // patchProject: updated=1 so the handler doesn't 404-exit before invalidating
-  patchProject:      async () => ({ updated: 1 }),
+  patchProject:       async () => ({ updated: 1 }),
   // archiveProject: updated=1 so the handler doesn't 404-exit before invalidating
-  archiveProject:    async () => ({ updated: 1 }),
+  archiveProject:     async () => ({ updated: 1 }),
   // archiveSupersededDefaults returns the archived default ids (none in these tests)
   archiveSupersededDefaults: async () => [],
-  confirmProject:    async () => ({ updated: 1 }),
+  confirmProject:     async () => ({ updated: 1 }),
   // patchDecision: updated=1 so the handler doesn't 404-exit before invalidating
-  patchDecision:     async () => ({ updated: 1 }),
+  patchDecision:      async () => ({ updated: 1 }),
   // deleteDecision: deleted=1 so the handler doesn't 404-exit before invalidating
-  deleteDecision:    async () => ({ deleted: 1 }),
+  deleteDecision:     async () => ({ deleted: 1 }),
   // patchArchitecture: updated=1 so the handler doesn't 404-exit before invalidating
-  patchArchitecture: async () => ({ updated: 1 }),
+  patchArchitecture:  async () => ({ updated: 1 }),
   // mergeProjects returns counts only — affected ids come from the request body
-  mergeProjects:     async () => ({ componentsReassigned: 1, sourcesArchived: 1 }),
+  mergeProjects:      async () => ({ componentsReassigned: 1, sourcesArchived: 1 }),
   // splitProject returns the new project id as `newProjectId`
-  splitProject:      async () => ({ newProjectId: SPLIT_NEW_ID, componentsMoved: 1 }),
+  splitProject:       async () => ({ newProjectId: SPLIT_NEW_ID, componentsMoved: 1 }),
+}));
+
+jest.unstable_mockModule('../lib/repositories/users.js', () => ({
+  getUserPlanStatus: async () => ({ effectivePlan: 'premium', role: 'admin' }),
+}));
+
+jest.unstable_mockModule('../lib/entitlements.js', () => ({
+  entitlementsFor: () => ({ repos: Infinity, projects: Infinity, resumesPerMonth: Infinity, ingestionJobsPerMonth: Infinity, enrichment: 'full' }),
+  isFullAccess: () => true,
 }));
 
 // lib/types.js exports AdminApiBindings (type-only) and requireUserId (runtime).

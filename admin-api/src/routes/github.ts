@@ -59,12 +59,13 @@ import { ensureDefaultProject, cleanupOrphanedDefaultProjects, stampProjectInten
 import type { ProjectIntent } from '../lib/repositories/projects.js';
 import { secondsUntilNextMonthUTC } from '../lib/retry-after.js';
 import { AdminApiBindings, requireUserId } from '../lib/types.js';
+import { getUserPlanStatus } from '../lib/repositories/users.js';
+import type { EffectivePlan } from '../lib/repositories/users.js';
+import { entitlementsFor } from '../lib/entitlements.js';
 
 // Push events: skip re-index if a job was already triggered within this window.
 const PUSH_COOLDOWN_MS = 30 * 60 * 1000;
 
-// Free-tier monthly ingestion job cap.
-const FREE_PLAN_LIMIT = 3;
 
 // =============================================================================
 // DB HELPERS — all queries are scoped to userId (users.id UUID)
@@ -85,6 +86,16 @@ async function getConnection(pool: Pool, userId: string): Promise<OAuthRow | nul
         [userId],
     );
     return rows[0] ?? null;
+}
+
+async function countConnectedRepos(pool: Pool, userId: string): Promise<number> {
+    const { rows } = await pool.query<{ n: string }>(
+        `SELECT COUNT(*)::text AS n
+         FROM repositories
+         WHERE user_id = $1::uuid AND provider = 'github'`,
+        [userId],
+    );
+    return Number(rows[0]?.n ?? '0');
 }
 
 async function upsertConnection(
@@ -293,8 +304,8 @@ async function deleteRepository(pool: Pool, userId: string, fullName: string): P
 // QUOTA + DEBOUNCE HELPERS
 // =============================================================================
 
-function getPlanLimit(plan: string): number {
-    return plan === 'pro' ? Infinity : FREE_PLAN_LIMIT;
+function getPlanLimit(plan: EffectivePlan, role: string | null | undefined): number {
+    return entitlementsFor(plan, role).ingestionJobsPerMonth;
 }
 
 /**
@@ -387,22 +398,31 @@ async function lookupUserByInstallation(
  * whose content_hashes are already in RDS.
  */
 async function autoDispatchRepos(
-    config:       AdminApiConfig,
-    pool:         Pool,
-    userId:       string,
-    plan:         string,
-    repos:        Array<{ full_name: string; default_branch: string; github_repo_id?: number | null }>,
-    token:        string,
-    forceReindex: boolean,
+    config:        AdminApiConfig,
+    pool:          Pool,
+    userId:        string,
+    effectivePlan: EffectivePlan,
+    role:          string | null | undefined,
+    repos:         Array<{ full_name: string; default_branch: string; github_repo_id?: number | null }>,
+    token:         string,
+    forceReindex:  boolean,
 ): Promise<string[]> {
-    const limit   = getPlanLimit(plan);
+    const limit   = getPlanLimit(effectivePlan, role);
     const queued: string[] = [];
     // github_repo_id is NOT NULL post-085, so we must resolve a real id for every
     // repo. Build the installation name->id map once and fall back to it whenever
     // the row's id is absent.
     const idMap = await buildRepoIdMap(token);
 
-    for (const repo of repos) {
+    // Per-plan repository-count cap: free users auto-connecting many repos on
+    // install are limited to `repos` entitlement (e.g. 1 for free tier).
+    const repoCap = entitlementsFor(effectivePlan, role).repos;
+    const capped  = Number.isFinite(repoCap) ? repos.slice(0, repoCap) : repos;
+    if (capped.length < repos.length) {
+        console.log(`[github] plan cap: dispatching ${capped.length}/${repos.length} repos for ${userId}`);
+    }
+
+    for (const repo of capped) {
         const id = repo.github_repo_id ?? idMap.get(repo.full_name);
         if (id === null || id === undefined) {
             console.warn(`[github/auto-dispatch] no github_repo_id for ${repo.full_name} — skipping`);
@@ -420,7 +440,7 @@ async function autoDispatchRepos(
         await markSyncTriggered(pool, userId, repo.full_name);
 
         try {
-            await dispatchIngestionJob(config, userId, repo.full_name, token, forceReindex);
+            await dispatchIngestionJob(config, userId, repo.full_name, token, forceReindex, effectivePlan, role);
             queued.push(repo.full_name);
             console.log(`[github/auto-dispatch] queued ${repo.full_name} (forceReindex=${forceReindex})`);
         } catch (err) {
@@ -476,8 +496,8 @@ async function dispatchIngestionJob(
     repoFullName: string,
     githubToken: string,
     forceReindex = false,
-    email?: string,
-    enrichment?: 'premium' | 'free',
+    effectivePlan?: EffectivePlan,
+    role?: string | null,
 ): Promise<{ jobName: string }> {
     const image = getJobImage('ingestion');
     if (!isImageConfigured(image)) {
@@ -494,8 +514,8 @@ async function dispatchIngestionJob(
         githubToken,
         githubRepoId,
         extraAnnotations: { 'argocd.argoproj.io/compare-options': 'IgnoreExtraneous' },
-        ...(email      !== undefined ? { email }      : {}),
-        ...(enrichment !== undefined ? { enrichment } : {}),
+        ...(effectivePlan !== undefined ? { effectivePlan } : {}),
+        ...(role          !== undefined ? { role }          : {}),
     });
     const jobName = job.metadata?.name ?? '';
 
@@ -905,15 +925,13 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
 
         const token = await generateInstallationToken(appId, key, installationId);
 
-        const { rows: planRows } = await pool.query<{ plan: string }>(
-            `SELECT plan FROM users WHERE id = $1::uuid`,
-            [uid],
-        );
-        const plan = planRows[0]?.plan ?? 'free';
+        const installPlanStatus    = await getUserPlanStatus(pool, uid);
+        const installEffectivePlan = installPlanStatus?.effectivePlan ?? 'free';
+        const installRole          = installPlanStatus?.role ?? null;
 
         const idMap = await buildRepoIdMap(token);
         const queued = await autoDispatchRepos(
-            config, pool, uid, plan,
+            config, pool, uid, installEffectivePlan, installRole,
             connected.map(r => ({ full_name: r.full_name, default_branch: r.default_branch, github_repo_id: idMap.get(r.full_name) ?? null })),
             token,
             true, // forceReindex
@@ -1069,7 +1087,7 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         const conn = await getConnection(pool, uid);
         if (!conn?.installation_id) return ctx.json({ error: 'GitHub not connected' }, 400);
 
-        let body: { repoFullName?: string; defaultBranch?: string; forceReindex?: boolean; deferSync?: boolean; enrichment?: 'premium' | 'free'; projectIntent?: 'build' | 'link' | 'none'; targetProjectId?: string };
+        let body: { repoFullName?: string; defaultBranch?: string; forceReindex?: boolean; deferSync?: boolean; projectIntent?: 'build' | 'link' | 'none'; targetProjectId?: string };
         try { body = await ctx.req.json(); }
         catch { return ctx.json({ error: 'Body must be valid JSON' }, 400); }
 
@@ -1079,9 +1097,6 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         }
         const defaultBranch = body.defaultBranch?.trim() || 'main';
         const forceReindex  = body.forceReindex === true;
-        const enrichment    = body.enrichment === 'premium' || body.enrichment === 'free' ? body.enrichment : undefined;
-        // Email from verified Cognito JWT claim — used server-side to gate the enrichment toggle.
-        const callerEmail   = ctx.get('jwtPayload')?.['email'] as string | undefined;
 
         // Parse + validate the add-time project intent.
         // 'none' / absent -> undefined (back-compat: KB-only, no project action).
@@ -1105,11 +1120,6 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         // deferSync (onboarding queue): connect the repo as 'pending' only —
         // no quota consumed, no Job dispatched. POST /connected-repos/sync
         // dispatches the actual ingestion for every queued repo later.
-        // NOTE: the `enrichment` toggle choice is honoured ONLY on the direct
-        // (deferSync=false) dispatch below — the UI toggle uses that path. The
-        // deferred drain (and bulk resyncs) carry no per-repo choice and fall to
-        // the default; thread `enrichment` through them only if the toggle is
-        // ever extended to the onboarding queue.
         if (body.deferSync === true) {
             // github_repo_id is NOT NULL post-085, so the deferred connect must
             // resolve the numeric id too — one installation token, one repo list.
@@ -1136,16 +1146,36 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         }
 
         // Quota check before any DB write — fail fast without side effects.
-        const { rows: planRows } = await pool.query<{ plan: string }>(
-            `SELECT plan FROM users WHERE id = $1::uuid`,
-            [uid],
-        );
-        const plan  = planRows[0]?.plan ?? 'free';
-        const limit = getPlanLimit(plan);
+        // Also resolves effectivePlan + role for enrichment depth (server-side).
+        const planStatus    = await getUserPlanStatus(pool, uid);
+        const effectivePlan = planStatus?.effectivePlan ?? 'free';
+        const role          = planStatus?.role ?? null;
+        const limit = getPlanLimit(effectivePlan, role);
         const allowed = await checkAndIncrementQuota(pool, uid, limit);
         if (!allowed) {
             ctx.header('Retry-After', String(secondsUntilNextMonthUTC()));
-            return ctx.json({ error: `Monthly ingestion limit of ${FREE_PLAN_LIMIT} reached. Upgrade to Pro for unlimited syncs.` }, 429);
+            return ctx.json({ error: 'Monthly ingestion limit reached. Upgrade to Pro for unlimited syncs.' }, 429);
+        }
+
+        // Per-plan repository-count cap. Re-syncing an existing repo must stay
+        // allowed — only NEW connections beyond the cap are blocked.
+        const repoAlreadyConnected = await pool
+            .query<{ one: number }>(
+                `SELECT 1 AS one FROM repositories
+                 WHERE user_id = $1::uuid AND provider = 'github' AND full_name = $2
+                 LIMIT 1`,
+                [uid, repoFullName],
+            )
+            .then(r => (r.rowCount ?? 0) > 0);
+        const repoCap = entitlementsFor(effectivePlan, role).repos;
+        if (Number.isFinite(repoCap) && !repoAlreadyConnected) {
+            const already = await countConnectedRepos(pool, uid);
+            if (already >= repoCap) {
+                return ctx.json({
+                    error: `Your plan allows ${repoCap} repository${repoCap === 1 ? '' : 's'}. Upgrade for more.`,
+                    upgradeUrl: '/pricing',
+                }, 403);
+            }
         }
 
         // Insert repo row + mark pending before Job dispatch so the UI
@@ -1177,7 +1207,7 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
             }
             await markSyncTriggered(pool, uid, repoFullName);
 
-            const { jobName } = await dispatchIngestionJob(config, uid, repoFullName, githubToken, forceReindex, callerEmail, enrichment);
+            const { jobName } = await dispatchIngestionJob(config, uid, repoFullName, githubToken, forceReindex, effectivePlan, role);
 
             try {
                 await dispatchTechExtractJob(config, uid, repoFullName, githubToken, defaultBranch);
@@ -1217,15 +1247,13 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         if (pending.length === 0) return ctx.json({ started: 0 });
 
         const [appId, key] = requireGitHubConfig(config);
-        const { rows: planRows } = await pool.query<{ plan: string }>(
-            `SELECT plan FROM users WHERE id = $1::uuid`,
-            [uid],
-        );
-        const plan  = planRows[0]?.plan ?? 'free';
+        const pendingPlanStatus    = await getUserPlanStatus(pool, uid);
+        const pendingEffectivePlan = pendingPlanStatus?.effectivePlan ?? 'free';
+        const pendingRole          = pendingPlanStatus?.role ?? null;
         const token = await generateInstallationToken(appId, key, conn.installation_id);
         const idMap = await buildRepoIdMap(token);
         const queued = await autoDispatchRepos(
-            config, pool, uid, plan,
+            config, pool, uid, pendingEffectivePlan, pendingRole,
             pending.map(r => ({ full_name: r.full_name, default_branch: r.default_branch, github_repo_id: idMap.get(r.full_name) ?? null })),
             token, false,
         );
@@ -1375,6 +1403,11 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
 
         const [appId, key] = requireGitHubConfig(config);
 
+        // Resolve plan + role for enrichment depth (server-side, same as add-repo path).
+        const retryPlanStatus    = await getUserPlanStatus(pool, uid);
+        const retryEffectivePlan = retryPlanStatus?.effectivePlan ?? 'free';
+        const retryRole          = retryPlanStatus?.role ?? null;
+
         // Double-click guard: two retries racing would dispatch two Jobs that
         // race document_embeddings writes. The atomic claim makes the loser a
         // no-op. Retry charges no new quota, so there is nothing to refund.
@@ -1384,7 +1417,7 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         await markSyncTriggered(pool, uid, repoFullName);
 
         const token = await generateInstallationToken(appId, key, conn.installation_id);
-        const { jobName } = await dispatchIngestionJob(config, uid, repoFullName, token, true);
+        const { jobName } = await dispatchIngestionJob(config, uid, repoFullName, token, true, retryEffectivePlan, retryRole);
 
         try {
             // A user-initiated retry/re-sync force-re-extracts (parity with the
@@ -1579,10 +1612,13 @@ export function createGitHubWebhookRouter(config: AdminApiConfig): Hono {
                     const connected = await listConnectedRepos(pool, user.userId);
                     if (connected.length > 0) {
                         const [appId, key] = requireGitHubConfig(config);
+                        const webhookInstallPlanStatus    = await getUserPlanStatus(pool, user.userId);
+                        const webhookInstallEffectivePlan = webhookInstallPlanStatus?.effectivePlan ?? 'free';
+                        const webhookInstallRole          = webhookInstallPlanStatus?.role ?? null;
                         const token = await generateInstallationToken(appId, key, installationId);
                         const idMap = await buildRepoIdMap(token);
                         const queued = await autoDispatchRepos(
-                            config, pool, user.userId, user.plan,
+                            config, pool, user.userId, webhookInstallEffectivePlan, webhookInstallRole,
                             connected.map(r => ({ full_name: r.full_name, default_branch: r.default_branch, github_repo_id: idMap.get(r.full_name) ?? null })),
                             token,
                             false,
@@ -1647,8 +1683,11 @@ export function createGitHubWebhookRouter(config: AdminApiConfig): Hono {
                 }
             }
 
-            // Quota check
-            const limit   = getPlanLimit(user.plan);
+            // Quota check + resolve plan/role for enrichment depth.
+            const pushPlanStatus    = await getUserPlanStatus(pool, user.userId);
+            const pushEffectivePlan = pushPlanStatus?.effectivePlan ?? 'free';
+            const pushRole          = pushPlanStatus?.role ?? null;
+            const limit   = getPlanLimit(pushEffectivePlan, pushRole);
             const allowed = await checkAndIncrementQuota(pool, user.userId, limit);
             if (!allowed) {
                 console.log(`[github/webhook] push skipped — quota exceeded for user ${user.userId}`);
@@ -1675,6 +1714,7 @@ export function createGitHubWebhookRouter(config: AdminApiConfig): Hono {
                 const { jobName } = await dispatchIngestionJob(
                     config, user.userId, repoFullName, token,
                     false, // incremental — hash-dedup skips unchanged chunks
+                    pushEffectivePlan, pushRole,
                 );
                 console.log(`[github/webhook] push re-index queued for ${repoFullName}: job=${jobName}`);
             } catch (err) {

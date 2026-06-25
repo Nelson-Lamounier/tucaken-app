@@ -3,13 +3,13 @@
  * End-to-end tests for admin-api routes/github.ts
  *
  * Coverage:
- *   GET    /installation              — connected / not connected
- *   POST   /installation              — store installation, 400 on missing body
- *   DELETE /installation              — cascade delete + 404 when not connected
- *   GET    /repos                     — list via installation token
- *   GET    /connected-repos           — list with sync status join
- *   POST   /connected-repos           — insert + mark pending + dispatch Job
- *   DELETE /connected-repos/:fullName — delete repo + cascade embeddings
+ *   GET    /installation              - connected / not connected
+ *   POST   /installation              - store installation, 400 on missing body
+ *   DELETE /installation              - cascade delete + 404 when not connected
+ *   GET    /repos                     - list via installation token
+ *   GET    /connected-repos           - list with sync status join
+ *   POST   /connected-repos           - insert + mark pending + dispatch Job
+ *   DELETE /connected-repos/:fullName - delete repo + cascade embeddings
  *
  * Mocks: pg pool, github-app helpers, k8s BatchApi, config image resolver.
  * No real network calls or DB connections are made.
@@ -18,7 +18,7 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 
 // ---------------------------------------------------------------------------
-// github-app mock — replace all exported functions
+// github-app mock - replace all exported functions
 // ---------------------------------------------------------------------------
 
 const mockGenerateInstallationToken = jest.fn<() => Promise<string>>().mockResolvedValue('ghs_test_token');
@@ -47,8 +47,8 @@ poolQueryMock.mockResolvedValue({ rows: [] });
 
 // connectRepoWithDefaultProject() acquires a client via pool.connect() and runs
 // its repo-insert + default-project transaction on THAT client (not poolQueryMock).
-// The txClient is fully self-contained — it answers BEGIN/COMMIT, the repo
-// INSERT…RETURNING id, and the project_repositories guard itself, and never
+// The txClient is fully self-contained - it answers BEGIN/COMMIT, the repo
+// INSERT...RETURNING id, and the project_repositories guard itself, and never
 // delegates to poolQueryMock. The guard reports an existing link so
 // ensureDefaultProject no-ops (these E2E tests assert the route's own
 // non-transaction DB sequence on poolQueryMock, not project creation).
@@ -214,7 +214,7 @@ beforeEach(() => {
 
 describe('GET /installation', () => {
     it('returns 404 when user has no GitHub connection', async () => {
-        seedQuery([]);   // getConnection → empty
+        seedQuery([]);   // getConnection -> empty
 
         const res  = await buildApp().request('/installation');
         const body = await res.json() as { error: string };
@@ -260,8 +260,8 @@ describe('POST /installation', () => {
         expect(mockGetInstallationInfo).not.toHaveBeenCalled();
     });
 
-    it('fetches account info and upserts connection (fresh install — no auto-dispatch)', async () => {
-        // Fresh install: getConnection → null, then upsertConnection.
+    it('fetches account info and upserts connection (fresh install - no auto-dispatch)', async () => {
+        // Fresh install: getConnection -> null, then upsertConnection.
         // No auto-dispatch on fresh install (user picks repos via UI picker).
         const res = await buildApp().request('/installation', {
             method:  'POST',
@@ -291,14 +291,14 @@ describe('POST /installation', () => {
 
 describe('DELETE /installation', () => {
     it('returns 404 when user is not connected', async () => {
-        seedQuery([]);   // getConnection → empty
+        seedQuery([]);   // getConnection -> empty
 
         const res = await buildApp().request('/installation', { method: 'DELETE' });
         expect(res.status).toBe(404);
         expect(poolQueryMock).toHaveBeenCalledTimes(1);
     });
 
-    it('cascade-deletes embeddings → sync_state → repos → oauth in order', async () => {
+    it('cascade-deletes embeddings -> sync_state -> repos -> oauth in order', async () => {
         seedQuery([connectedRow]);   // getConnection
 
         const res  = await buildApp().request('/installation', { method: 'DELETE' });
@@ -459,10 +459,10 @@ describe('GET /connected-repos', () => {
 });
 
 // ===========================================================================
-// GET /connected-repos — read-time reconciliation of stuck repos
+// GET /connected-repos - read-time reconciliation of stuck repos
 // ===========================================================================
 
-describe('GET /connected-repos — reconciliation', () => {
+describe('GET /connected-repos - reconciliation', () => {
     const REPO = 'Nelson-Lamounier/cdk-monitoring';
     const ANNOTATION = 'ingestion.tucaken.io/repo-full-name';
 
@@ -479,7 +479,7 @@ describe('GET /connected-repos — reconciliation', () => {
     it('flips a syncing repo to error when its Job terminally failed', async () => {
         poolQueryMock.mockResolvedValueOnce({ rows: [activeRow('syncing', new Date())] }); // listConnectedRepos #1
         listNamespacedJobMock.mockResolvedValueOnce({ items: [failedJob('BackoffLimitExceeded')] });
-        poolQueryMock.mockResolvedValueOnce({ rows: [], rowCount: 1 });                     // UPDATE → error
+        poolQueryMock.mockResolvedValueOnce({ rows: [], rowCount: 1 });                     // UPDATE -> error
         poolQueryMock.mockResolvedValueOnce({ rows: [{ ...connectedRepoRow, sync_status: 'error', error_message: "Indexing didn't finish for this repository. Please try again." }] }); // re-read
 
         const res  = await buildApp().request('/connected-repos');
@@ -487,7 +487,7 @@ describe('GET /connected-repos — reconciliation', () => {
 
         expect(res.status).toBe(200);
         expect(body.repos[0]!['syncStatus']).toBe('error');
-        // User-facing copy only — no internal reason codes leaked.
+        // User-facing copy only - no internal reason codes leaked.
         expect(String(body.repos[0]!['errorMessage'])).toMatch(/didn't finish/i);
         expect(String(body.repos[0]!['errorMessage'])).not.toMatch(/BackoffLimit|DeadlineExceeded|k8s|job/i);
         // The error message written to the DB is the friendly constant.
@@ -526,7 +526,7 @@ describe('GET /connected-repos — reconciliation', () => {
         const body = await res.json() as { repos: Array<Record<string, unknown>> };
 
         expect(body.repos[0]!['syncStatus']).toBe('syncing');
-        // Only the initial list — no UPDATE, no re-read.
+        // Only the initial list - no UPDATE, no re-read.
         expect(poolQueryMock).toHaveBeenCalledTimes(1);
     });
 
@@ -581,7 +581,7 @@ describe('GET /connected-repos — reconciliation', () => {
 
 describe('POST /connected-repos', () => {
     it('returns 400 when GitHub is not connected', async () => {
-        seedQuery([]);   // getConnection → empty
+        seedQuery([]);   // getConnection -> empty
 
         const res = await buildApp().request('/connected-repos', {
             method:  'POST',
@@ -608,16 +608,17 @@ describe('POST /connected-repos', () => {
 
     it('inserts repo, marks pending, generates token, dispatches Job', async () => {
         seedQuery([connectedRow]);       // 1. getConnection
-        seedQuery([]);                   // 2. isSyncInFlight SELECT (empty → not in flight)
-        seedQuery([]);                   // 3. plan SELECT (empty rows → defaults to 'free')
-        seedQuery([{ count: 1 }]);       // 4. quota INSERT…RETURNING: count=1 → allowed
-        seedQuery([{ repo_full_name: 'Nelson-Lamounier/cdk-monitoring' }]); // 5. tryClaimSyncSlot → claim won
+        seedQuery([]);                   // 2. isSyncInFlight SELECT (empty -> not in flight)
+        seedQuery([{ plan: 'pro', role: 'user', trial_started_at: null, trial_ends_at: null, subscription_status: 'active', stripe_customer_id: null, stripe_subscription_id: null, cancel_at_period_end: false, current_period_end: null, effective_plan: 'pro', trial_days_remaining: null }]); // 3. getUserPlanStatus -> pro plan (unlimited repos)
+        // 4. quota INSERT SKIPPED - pro plan has Infinity limit, checkAndIncrementQuota returns true immediately
+        seedQuery([{ one: 1 }]);         // 4. repoAlreadyConnected SELECT -> already connected (skips countConnectedRepos)
+        seedQuery([{ repo_full_name: 'Nelson-Lamounier/cdk-monitoring' }]); // 5. tryClaimSyncSlot -> claim won
         // The repo INSERT now runs inside connectRepoWithDefaultProject on a
-        // dedicated transaction client (BEGIN/INSERT…RETURNING/guard/COMMIT) — it
+        // dedicated transaction client (BEGIN/INSERT...RETURNING/guard/COMMIT) - it
         // does NOT go through poolQueryMock.
         seedQuery([]);                          // 6. markSyncTriggered
-        seedQuery([{ github_repo_id: '555' }]); // 7. dispatchIngestionJob → github_repo_id lookup
-        seedQuery([{ github_repo_id: '555' }]); // 8. dispatchTechExtractJob → github_repo_id lookup
+        seedQuery([{ github_repo_id: '555' }]); // 7. dispatchIngestionJob -> github_repo_id lookup
+        seedQuery([{ github_repo_id: '555' }]); // 8. dispatchTechExtractJob -> github_repo_id lookup
 
         const res  = await buildApp().request('/connected-repos', {
             method:  'POST',
@@ -632,11 +633,11 @@ describe('POST /connected-repos', () => {
         expect(body.jobName).toMatch(/^ingestion-/);
         expect(body.jobName.length).toBeLessThanOrEqual(63);
 
-        // getConnection (1) + isSyncInFlight SELECT (1) + plan SELECT (1)
-        // + quota INSERT…RETURNING (1, atomic) + tryClaimSyncSlot (1)
-        // + markSyncTriggered (1) + github_repo_id lookup ×2 (ingestion +
-        // tech-extract dispatch). The repo INSERT runs on the transaction
-        // client (pool.connect()), not poolQueryMock.
+        // getConnection (1) + isSyncInFlight (1) + getUserPlanStatus (1)
+        // + repoAlreadyConnected SELECT (1) + tryClaimSyncSlot (1)
+        // + markSyncTriggered (1) + github_repo_id lookup x2 (ingestion +
+        // tech-extract dispatch). quota INSERT is skipped (pro=Infinity limit).
+        // The repo INSERT runs on the transaction client (pool.connect()), not poolQueryMock.
         expect(poolQueryMock).toHaveBeenCalledTimes(8);
 
         // Installation token generated for this user's installation
@@ -645,7 +646,7 @@ describe('POST /connected-repos', () => {
         // K8s Jobs created: 1 ingestion + 1 tech-extract (shadow-mode, additive)
         expect(createNamespacedJobMock).toHaveBeenCalledTimes(2);
 
-        // Job spec must inject per-user GITHUB_TOKEN — via secretKeyRef, NEVER plaintext.
+        // Job spec must inject per-user GITHUB_TOKEN - via secretKeyRef, NEVER plaintext.
         const jobArg = (createNamespacedJobMock.mock.calls[0] as unknown as [{ body: { spec: { template: { spec: { containers: Array<{ env: Array<{ name: string; value?: string; valueFrom?: { secretKeyRef?: { name: string; key: string } } }> }> } } } } }])[0];
         const tokenEnv = jobArg.body.spec.template.spec.containers[0]!.env.find(e => e.name === 'GITHUB_TOKEN')!;
         expect(tokenEnv.value).toBeUndefined();                       // no plaintext in the Job spec
@@ -667,7 +668,7 @@ describe('POST /connected-repos', () => {
 
         // Dual-write: the repositories INSERT (on the transaction client) carries
         // the immutable github_repo_id resolved from listInstallationRepos
-        // (cdk-monitoring → id 1) as the 4th param.
+        // (cdk-monitoring -> id 1) as the 4th param.
         const insertCall = txClient.query.mock.calls.find(
             c => typeof c[0] === 'string' && /INSERT INTO repositories/i.test(c[0]),
         );
@@ -680,12 +681,13 @@ describe('POST /connected-repos', () => {
 
     it('stamps unsanitized user-id + repo-full-name annotations for reconciliation', async () => {
         seedQuery([connectedRow]);       // getConnection
-        seedQuery([]);                   // isSyncInFlight → not in flight
-        seedQuery([]);                   // plan SELECT → 'free'
-        seedQuery([{ count: 1 }]);       // quota INSERT…RETURNING → allowed
-        seedQuery([{ repo_full_name: 'Nelson-Lamounier/cdk-monitoring' }]); // tryClaimSyncSlot → claim won
+        seedQuery([]);                   // isSyncInFlight -> not in flight
+        seedQuery([{ plan: 'pro', role: 'user', trial_started_at: null, trial_ends_at: null, subscription_status: 'active', stripe_customer_id: null, stripe_subscription_id: null, cancel_at_period_end: false, current_period_end: null, effective_plan: 'pro', trial_days_remaining: null }]); // getUserPlanStatus -> pro plan
+        // quota INSERT SKIPPED - pro plan has Infinity limit
+        seedQuery([{ one: 1 }]);         // repoAlreadyConnected SELECT
+        seedQuery([{ repo_full_name: 'Nelson-Lamounier/cdk-monitoring' }]); // tryClaimSyncSlot -> claim won
         seedQuery([]);                          // markSyncTriggered
-        seedQuery([{ github_repo_id: '555' }]); // dispatchIngestionJob → github_repo_id lookup
+        seedQuery([{ github_repo_id: '555' }]); // dispatchIngestionJob -> github_repo_id lookup
 
         await buildApp().request('/connected-repos', {
             method:  'POST',
@@ -701,7 +703,7 @@ describe('POST /connected-repos', () => {
     it('deferSync:true connects as pending (resolving the id) without quota or Job dispatch', async () => {
         seedQuery([connectedRow]);   // 1. getConnection
         // The repo INSERT runs on the transaction client (connectRepoWithDefaultProject),
-        // not poolQueryMock. 2. markRepoPending → default { rows: [] }.
+        // not poolQueryMock. 2. markRepoPending -> default { rows: [] }.
 
         const res  = await buildApp().request('/connected-repos', {
             method:  'POST',
@@ -713,7 +715,7 @@ describe('POST /connected-repos', () => {
         expect(res.status).toBe(202);
         expect(body).toEqual({ status: 'queued', repoFullName: 'Nelson-Lamounier/cdk-monitoring', jobName: null });
 
-        // getConnection + markRepoPending only — no plan SELECT, no quota INSERT,
+        // getConnection + markRepoPending only - no plan SELECT, no quota INSERT,
         // no markSyncTriggered. The repo INSERT is on the transaction client.
         expect(poolQueryMock).toHaveBeenCalledTimes(2);
         const calls = poolQueryMock.mock.calls.map(c => (c[0] as string));
@@ -722,7 +724,7 @@ describe('POST /connected-repos', () => {
 
         // Post-085 the defer path MUST resolve a non-null github_repo_id, so it now
         // generates one installation token + lists installation repos once. The repo
-        // INSERT carries the resolved id (cdk-monitoring → 1) as the 4th param.
+        // INSERT carries the resolved id (cdk-monitoring -> 1) as the 4th param.
         expect(mockGenerateInstallationToken).toHaveBeenCalledTimes(1);
         expect(mockListInstallationRepos).toHaveBeenCalledTimes(1);
         const insertCall = txClient.query.mock.calls.find(
@@ -730,7 +732,7 @@ describe('POST /connected-repos', () => {
         );
         expect((insertCall?.[1] as unknown[])?.[3]).toBe(1);
 
-        // Still no Job — sync is deferred to POST /connected-repos/sync.
+        // Still no Job - sync is deferred to POST /connected-repos/sync.
         expect(createNamespacedJobMock).not.toHaveBeenCalled();
     });
 
@@ -749,7 +751,7 @@ describe('POST /connected-repos', () => {
 
         expect(res.status).toBe(404);
         expect(body.error).toMatch(/not found in your GitHub installation/i);
-        // No repo INSERT — a NULL github_repo_id would be rejected by the DB post-085.
+        // No repo INSERT - a NULL github_repo_id would be rejected by the DB post-085.
         const insertCall = txClient.query.mock.calls.find(
             c => typeof c[0] === 'string' && /INSERT INTO repositories/i.test(c[0]),
         );
@@ -758,10 +760,11 @@ describe('POST /connected-repos', () => {
 
     it('non-defer returns 404 + refunds quota when the repo is not in the installation (no insert)', async () => {
         seedQuery([connectedRow]);       // 1. getConnection
-        seedQuery([]);                   // 2. isSyncInFlight → not in flight
-        seedQuery([]);                   // 3. plan SELECT → free
-        seedQuery([{ count: 1 }]);       // 4. quota INSERT…RETURNING → allowed
-        // 5. decrementQuota (refund) → default { rows: [] }
+        seedQuery([]);                   // 2. isSyncInFlight -> not in flight
+        seedQuery([{ plan: 'free', role: 'user', trial_started_at: null, trial_ends_at: null, subscription_status: null, stripe_customer_id: null, stripe_subscription_id: null, cancel_at_period_end: false, current_period_end: null, effective_plan: 'free', trial_days_remaining: null }]); // 3. getUserPlanStatus -> free plan (finite quota, so quota INSERT runs)
+        seedQuery([{ count: 1 }]);       // 4. quota INSERT...RETURNING -> allowed (limit=3 for free)
+        seedQuery([{ one: 1 }]);         // 5. repoAlreadyConnected SELECT -> already connected (skips countConnectedRepos)
+        // 6. decrementQuota (refund) -> default { rows: [] }
         mockListInstallationRepos.mockResolvedValueOnce([
             { id: 1, full_name: 'Nelson-Lamounier/cdk-monitoring', owner: { login: 'Nelson-Lamounier' }, name: 'cdk-monitoring', default_branch: 'develop', private: false, updated_at: '2026-04-29T00:00:00Z' },
         ]);
@@ -776,7 +779,7 @@ describe('POST /connected-repos', () => {
         expect(res.status).toBe(404);
         expect(body.error).toMatch(/not found in your GitHub installation/i);
 
-        // Quota was incremented (INSERT) then refunded (decrement) — assert the
+        // Quota was incremented (INSERT) then refunded (decrement) - assert the
         // decrement ran so the user keeps their monthly credit.
         const calls = poolQueryMock.mock.calls.map(c => String(c[0]));
         expect(calls.some(s => /usage_quotas/i.test(s) && /count\s*-\s*1|GREATEST/i.test(s))).toBe(true);
@@ -796,7 +799,7 @@ describe('POST /connected-repos', () => {
 
 describe('POST /connected-repos/sync', () => {
     it('returns 400 when GitHub is not connected', async () => {
-        seedQuery([]);   // getConnection → empty
+        seedQuery([]);   // getConnection -> empty
 
         const res = await buildApp().request('/connected-repos/sync', { method: 'POST' });
         expect(res.status).toBe(400);
@@ -806,7 +809,7 @@ describe('POST /connected-repos/sync', () => {
 
     it('returns { started: 0 } when no repos are queued', async () => {
         seedQuery([connectedRow]);   // 1. getConnection
-        seedQuery([]);               // 2. pending-repos SELECT → none
+        seedQuery([]);               // 2. pending-repos SELECT -> none
 
         const res  = await buildApp().request('/connected-repos/sync', { method: 'POST' });
         const body = await res.json() as { started: number };
@@ -823,15 +826,14 @@ describe('POST /connected-repos/sync', () => {
             { full_name: 'Nelson-Lamounier/cdk-monitoring',      default_branch: 'develop' },
             { full_name: 'Nelson-Lamounier/kubernetes-bootstrap', default_branch: 'develop' },
         ]);
-        seedQuery([]);                 // 3. plan SELECT → free
-        seedQuery([{ count: 1 }]);     // 4. quota INSERT…RETURNING repo 1 → allowed
-        seedQuery([]); seedQuery([]);  // 5-6 markPending/markTriggered repo 1 (repo INSERT is on the tx client)
-        seedQuery([{ github_repo_id: '1' }]); // 7. dispatchIngestionJob repo 1 → github_repo_id lookup
-        seedQuery([{ github_repo_id: '1' }]); // 8. dispatchTechExtractJob repo 1 → github_repo_id lookup
-        seedQuery([{ count: 2 }]);     // 9. quota INSERT…RETURNING repo 2 → allowed
-        seedQuery([]); seedQuery([]);  // 10-11 markPending/markTriggered repo 2 (repo INSERT is on the tx client)
-        seedQuery([{ github_repo_id: '2' }]); // 12. dispatchIngestionJob repo 2 → github_repo_id lookup
-        seedQuery([{ github_repo_id: '2' }]); // 13. dispatchTechExtractJob repo 2 → github_repo_id lookup
+        seedQuery([{ plan: 'pro', role: 'user', trial_started_at: null, trial_ends_at: null, subscription_status: 'active', stripe_customer_id: null, stripe_subscription_id: null, cancel_at_period_end: false, current_period_end: null, effective_plan: 'pro', trial_days_remaining: null }]); // 3. getUserPlanStatus -> pro plan (unlimited repos)
+        // quota INSERT SKIPPED for each repo - pro plan has Infinity limit
+        seedQuery([]); seedQuery([]);  // 4-5 markPending/markTriggered repo 1 (repo INSERT is on the tx client)
+        seedQuery([{ github_repo_id: '1' }]); // 6. dispatchIngestionJob repo 1 -> github_repo_id lookup
+        seedQuery([{ github_repo_id: '1' }]); // 7. dispatchTechExtractJob repo 1 -> github_repo_id lookup
+        seedQuery([]); seedQuery([]);  // 8-9 markPending/markTriggered repo 2 (repo INSERT is on the tx client)
+        seedQuery([{ github_repo_id: '2' }]); // 10. dispatchIngestionJob repo 2 -> github_repo_id lookup
+        seedQuery([{ github_repo_id: '2' }]); // 11. dispatchTechExtractJob repo 2 -> github_repo_id lookup
 
         const res  = await buildApp().request('/connected-repos/sync', { method: 'POST' });
         const body = await res.json() as { started: number };
@@ -855,7 +857,7 @@ describe('POST /connected-repos/sync', () => {
 
 describe('POST /connected-repos/:fullName/retry', () => {
     it('400 when GitHub is not connected', async () => {
-        seedQuery([]); // getConnection → empty
+        seedQuery([]); // getConnection -> empty
         const res = await buildApp().request('/connected-repos/octo%2Fapp/retry', { method: 'POST' });
         expect(res.status).toBe(400);
     });
@@ -868,7 +870,7 @@ describe('POST /connected-repos/:fullName/retry', () => {
 
     it('404 when the repo is not connected to this user', async () => {
         seedQuery([connectedRow]); // getConnection
-        seedQuery([]);             // ownership SELECT → none
+        seedQuery([]);             // ownership SELECT -> none
         const res = await buildApp().request('/connected-repos/octo%2Fapp/retry', { method: 'POST' });
         expect(res.status).toBe(404);
     });
@@ -876,10 +878,11 @@ describe('POST /connected-repos/:fullName/retry', () => {
     it('re-dispatches without touching usage_quotas (no double charge)', async () => {
         seedQuery([connectedRow]);                       // 1. getConnection
         seedQuery([{ full_name: 'octo/app' }]);          // 2. ownership SELECT
-        seedQuery([{ repo_full_name: 'octo/app' }]);     // 3. tryClaimSyncSlot → claim won
-        seedQuery([]);                                   // 4. markSyncTriggered
-        seedQuery([{ github_repo_id: '555' }]);          // 5. dispatchIngestionJob → github_repo_id lookup
-        seedQuery([{ github_repo_id: '555' }]);          // 6. dispatchTechExtractJob → github_repo_id lookup
+        seedQuery([{ plan: 'pro', role: 'user', trial_started_at: null, trial_ends_at: null, subscription_status: 'active', stripe_customer_id: null, stripe_subscription_id: null, cancel_at_period_end: false, current_period_end: null, effective_plan: 'pro', trial_days_remaining: null }]); // 3. getUserPlanStatus (plan + role for enrichment depth; no quota charged on retry)
+        seedQuery([{ repo_full_name: 'octo/app' }]);     // 4. tryClaimSyncSlot -> claim won
+        seedQuery([]);                                   // 5. markSyncTriggered
+        seedQuery([{ github_repo_id: '555' }]);          // 6. dispatchIngestionJob -> github_repo_id lookup
+        seedQuery([{ github_repo_id: '555' }]);          // 7. dispatchTechExtractJob -> github_repo_id lookup
 
         const res  = await buildApp().request('/connected-repos/octo%2Fapp/retry', { method: 'POST' });
         const body = await res.json() as { status: string; repoFullName: string; jobName: string };
@@ -910,7 +913,7 @@ describe('POST /connected-repos/:fullName/retry', () => {
 
 describe('PATCH /connected-repos/:fullName/featured', () => {
     it('enables: is_featured TRUE + feature_rank from MAX+1, 200', async () => {
-        // Pool mock: UPDATE … RETURNING feature_rank resolves { rows:[{feature_rank:4}], rowCount:1 }
+        // Pool mock: UPDATE ... RETURNING feature_rank resolves { rows:[{feature_rank:4}], rowCount:1 }
         poolQueryMock.mockResolvedValueOnce({ rows: [{ feature_rank: 4 }], rowCount: 1 });
 
         const app = buildApp();
@@ -1005,10 +1008,10 @@ describe('DELETE /connected-repos/:fullName', () => {
 });
 
 // ===========================================================================
-// POST /webhook — repository.renamed / transferred
+// POST /webhook - repository.renamed / transferred
 // ===========================================================================
 
-describe('POST /webhook — repository.renamed', () => {
+describe('POST /webhook - repository.renamed', () => {
     const WEBHOOK_SECRET = 'whsec_test';
 
     const webhookConfig = { ...testConfig, githubWebhookSecret: WEBHOOK_SECRET } as const;
@@ -1035,9 +1038,9 @@ describe('POST /webhook — repository.renamed', () => {
     }
 
     it('reconciles the repo label: 200 + UPDATE repositories carries the new name', async () => {
-        // 1. lookupUserByInstallation → known user.
+        // 1. lookupUserByInstallation -> known user.
         seedQuery([{ user_id: TEST_USER_UUID, plan: 'free' }]);
-        // 2. reconcileRepoName anchor SELECT → stored OLD name (so a rename is needed).
+        // 2. reconcileRepoName anchor SELECT -> stored OLD name (so a rename is needed).
         seedQuery([{ full_name: 'Nelson-Lamounier/old-name' }]);
         // The transaction (BEGIN/UPDATEs/COMMIT) runs on the txClient via pool.connect().
 
@@ -1067,9 +1070,9 @@ describe('POST /webhook — repository.renamed', () => {
     });
 
     it('handles transferred: 200 + UPDATE repositories carries the new owner name', async () => {
-        // 1. lookupUserByInstallation → known user.
+        // 1. lookupUserByInstallation -> known user.
         seedQuery([{ user_id: TEST_USER_UUID, plan: 'free' }]);
-        // 2. reconcileRepoName anchor SELECT → stored OLD name (so a rename is needed).
+        // 2. reconcileRepoName anchor SELECT -> stored OLD name (so a rename is needed).
         seedQuery([{ full_name: 'old-owner/repo' }]);
 
         const res = await postEvent('repository', {
@@ -1094,7 +1097,7 @@ describe('POST /webhook — repository.renamed', () => {
     });
 
     it('unknown installation: 200 and no reconcile (no UPDATE, no transaction)', async () => {
-        // lookupUserByInstallation → no rows: reconcile must not run.
+        // lookupUserByInstallation -> no rows: reconcile must not run.
         seedQuery([]);
 
         const res = await postEvent('repository', {

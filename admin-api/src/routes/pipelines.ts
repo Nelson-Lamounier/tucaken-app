@@ -19,12 +19,15 @@ import { Hono } from 'hono';
 import { resolveDispatchMode } from '../lib/ab-free-tier.js';
 import type { AdminApiConfig } from '../lib/config.js';
 import { getJobImage, isImageConfigured, isAssetsBucketConfigured } from '../lib/config.js';
+import { entitlementsFor } from '../lib/entitlements.js';
 import { buildPipelineJob, sanitizeLabel } from '../lib/k8s-job-builder.js';
 import { getBatchApi } from '../lib/k8s.js';
 import { getPool, withUser } from '../lib/pg.js';
 import { upsertApplication } from '../lib/repositories/applications.js';
 import { upsertArticle } from '../lib/repositories/articles.js';
 import { insertPipelineRun, getPipelineRun } from '../lib/repositories/pipeline-runs.js';
+import { getUserPlanStatus, checkAndIncrementResumeQuota, decrementResumeQuota } from '../lib/repositories/users.js';
+import { secondsUntilNextMonthUTC } from '../lib/retry-after.js';
 import type { AdminApiBindings } from '../lib/types.js';
 
 /**
@@ -183,7 +186,27 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
     const applicationId = randomUUID();
     const pipelineRunId = randomUUID();
 
-    return withUser(getPool(config), userId, async (db) => {
+    const pool = getPool(config);
+
+    return withUser(pool, userId, async (db) => {
+      // ── Quota guard: enforce per-plan monthly resume-generation limit ──────
+      // Run plan-status read and quota writes on the superuser pool (pool), not
+      // the RLS-scoped tucaken_app connection (db). Every other caller of
+      // getUserPlanStatus uses the superuser pool; the ingestion quota likewise
+      // runs on the raw pool. The quota SQL scopes by user_id=$1 explicitly, so
+      // RLS is not needed for correctness here.
+      const planStatus = await getUserPlanStatus(pool, userId);
+      const role = planStatus?.role ?? null;
+      const cap = entitlementsFor(planStatus?.effectivePlan ?? 'free', role).resumesPerMonth;
+      const allowed = await checkAndIncrementResumeQuota(pool, userId, cap);
+      if (!allowed) {
+        ctx.header('Retry-After', String(secondsUntilNextMonthUTC()));
+        return ctx.json({
+          error: 'Free tier allows 1 resume generation per month. Upgrade for unlimited.',
+          upgradeUrl: '/pricing',
+        }, 429);
+      }
+
       // Create the job_applications row before dispatching the K8s Job so the
       // pipeline can UPDATE kanban_status as it progresses.
       try {
@@ -200,6 +223,7 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
         });
       } catch (err: unknown) {
         console.error('[pipelines/strategist-job] failed to insert job_application', err);
+        await decrementResumeQuota(pool, userId).catch(() => {});
         return ctx.json({ error: 'Failed to create application record' }, 500);
       }
 
@@ -236,6 +260,7 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
         });
       } catch (err: unknown) {
         console.error('[pipelines/strategist-job] failed to insert pipeline_run', err);
+        await decrementResumeQuota(pool, userId).catch(() => {});
         return ctx.json({ error: 'Failed to record pipeline run' }, 500);
       }
 
@@ -274,6 +299,7 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
       try { await getBatchApi().createNamespacedJob({ namespace: config.strategistPipelineNamespace, body: job }); }
       catch (err: unknown) {
         console.error('[pipelines/strategist-job] failed to create K8s Job', err);
+        await decrementResumeQuota(pool, userId).catch(() => {});
         return ctx.json({ error: 'Failed to schedule pipeline Job' }, 502);
       }
 
