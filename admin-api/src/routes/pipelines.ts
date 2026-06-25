@@ -122,6 +122,11 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
           { name: 'USER_ID',          value: userId },
           { name: 'MODE',             value: mode },
           { name: 'RESEARCH_MODEL',   value: config.researchModel },
+          // Ground the research agent on the user KB (pgvector) rather than the
+          // legacy Bedrock KB. USER_ID above is required by the pgvector path and
+          // is already set; without this env the agent defaults to 'bedrock-kb',
+          // which has no KNOWLEDGE_BASE_ID here and so retrieves nothing.
+          { name: 'RESEARCH_RETRIEVAL_SOURCE', value: config.researchRetrievalSource },
           { name: 'FOUNDATION_MODEL', value: config.foundationModel },
           { name: 'QA_MODEL',         value: config.foundationModel },
           { name: 'AWS_REGION',       value: config.awsRegion },
