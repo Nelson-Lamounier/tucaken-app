@@ -45,7 +45,6 @@ import { Route as DashboardApplicationsSlugRouteImport } from './app/_dashboard/
 import { Route as DashboardResumesNewRouteRouteImport } from './app/_dashboard/resumes/new/route'
 import { Route as UUsernamePSlugRouteImport } from './app/u/$username/p/$slug'
 import { Route as DashboardProjectsIdEditRouteImport } from './app/_dashboard/projects/$id.edit'
-import { Route as DashboardResumesEditIdRouteRouteImport } from './app/_dashboard/resumes/edit.$id/route'
 
 const SignInRoute = SignInRouteImport.update({
   id: '/sign-in',
@@ -233,12 +232,6 @@ const DashboardProjectsIdEditRoute = DashboardProjectsIdEditRouteImport.update({
   path: '/edit',
   getParentRoute: () => DashboardProjectsIdRoute,
 } as any)
-const DashboardResumesEditIdRouteRoute =
-  DashboardResumesEditIdRouteRouteImport.update({
-    id: '/edit/$id',
-    path: '/edit/$id',
-    getParentRoute: () => DashboardResumesRouteRoute,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -274,7 +267,6 @@ export interface FileRoutesByFullPath {
   '/applications/': typeof DashboardApplicationsIndexRoute
   '/projects/': typeof DashboardProjectsIndexRoute
   '/settings/': typeof DashboardSettingsIndexRoute
-  '/resumes/edit/$id': typeof DashboardResumesEditIdRouteRoute
   '/projects/$id/edit': typeof DashboardProjectsIdEditRoute
   '/u/$username/p/$slug': typeof UUsernamePSlugRoute
 }
@@ -312,7 +304,6 @@ export interface FileRoutesByTo {
   '/applications': typeof DashboardApplicationsIndexRoute
   '/projects': typeof DashboardProjectsIndexRoute
   '/settings': typeof DashboardSettingsIndexRoute
-  '/resumes/edit/$id': typeof DashboardResumesEditIdRouteRoute
   '/projects/$id/edit': typeof DashboardProjectsIdEditRoute
   '/u/$username/p/$slug': typeof UUsernamePSlugRoute
 }
@@ -352,7 +343,6 @@ export interface FileRoutesById {
   '/_dashboard/applications/': typeof DashboardApplicationsIndexRoute
   '/_dashboard/projects/': typeof DashboardProjectsIndexRoute
   '/_dashboard/settings/': typeof DashboardSettingsIndexRoute
-  '/_dashboard/resumes/edit/$id': typeof DashboardResumesEditIdRouteRoute
   '/_dashboard/projects/$id/edit': typeof DashboardProjectsIdEditRoute
   '/u/$username/p/$slug': typeof UUsernamePSlugRoute
 }
@@ -392,7 +382,6 @@ export interface FileRouteTypes {
     | '/applications/'
     | '/projects/'
     | '/settings/'
-    | '/resumes/edit/$id'
     | '/projects/$id/edit'
     | '/u/$username/p/$slug'
   fileRoutesByTo: FileRoutesByTo
@@ -430,7 +419,6 @@ export interface FileRouteTypes {
     | '/applications'
     | '/projects'
     | '/settings'
-    | '/resumes/edit/$id'
     | '/projects/$id/edit'
     | '/u/$username/p/$slug'
   id:
@@ -469,7 +457,6 @@ export interface FileRouteTypes {
     | '/_dashboard/applications/'
     | '/_dashboard/projects/'
     | '/_dashboard/settings/'
-    | '/_dashboard/resumes/edit/$id'
     | '/_dashboard/projects/$id/edit'
     | '/u/$username/p/$slug'
   fileRoutesById: FileRoutesById
@@ -742,24 +729,15 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardProjectsIdEditRouteImport
       parentRoute: typeof DashboardProjectsIdRoute
     }
-    '/_dashboard/resumes/edit/$id': {
-      id: '/_dashboard/resumes/edit/$id'
-      path: '/edit/$id'
-      fullPath: '/resumes/edit/$id'
-      preLoaderRoute: typeof DashboardResumesEditIdRouteRouteImport
-      parentRoute: typeof DashboardResumesRouteRoute
-    }
   }
 }
 
 interface DashboardResumesRouteRouteChildren {
   DashboardResumesNewRouteRoute: typeof DashboardResumesNewRouteRoute
-  DashboardResumesEditIdRouteRoute: typeof DashboardResumesEditIdRouteRoute
 }
 
 const DashboardResumesRouteRouteChildren: DashboardResumesRouteRouteChildren = {
   DashboardResumesNewRouteRoute: DashboardResumesNewRouteRoute,
-  DashboardResumesEditIdRouteRoute: DashboardResumesEditIdRouteRoute,
 }
 
 const DashboardResumesRouteRouteWithChildren =

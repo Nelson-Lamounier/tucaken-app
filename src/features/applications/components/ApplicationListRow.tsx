@@ -26,7 +26,7 @@ export function ApplicationListRow({
       <Link
         to="/applications/$slug"
         params={{ slug: app.slug }}
-        className="contents text-left"
+        className="contents"
       >
         <span className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">{app.targetCompany}</span>
         <span className="truncate text-sm text-zinc-500 dark:text-zinc-400">{app.targetRole}</span>

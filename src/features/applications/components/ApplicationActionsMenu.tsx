@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useState, useCallback, type ReactNode } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import type { ApplicationDetail, ApplicationStatus, InterviewStage } from '@/lib/types/applications.types'
@@ -13,7 +13,6 @@ import { buildResumeDomForPdf, buildCoverLetterDomForPdf } from '@/lib/resumes/r
 import { usePdfDownload } from '@/hooks/use-pdf-download'
 import type { ResumeData } from '@/lib/resumes/resume-data'
 import { ResumeBuilderDrawer } from './ResumeBuilderDrawer'
-import { useCallback } from 'react'
 
 const PUBLISH_ALLOWED_EMAILS = new Set(['lamounier_88@hotmail.com'])
 

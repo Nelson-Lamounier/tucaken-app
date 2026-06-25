@@ -28,7 +28,7 @@ function CreateResumePage() {
   function handleClose() {
     setIsOpen(false)
     setTimeout(() => {
-      navigate({ to: '/resumes' })
+      navigate({ to: '/applications/list' })
     }, 400)
   }
   const navigate = useNavigate({ from: Route.fullPath })
@@ -41,7 +41,7 @@ function CreateResumePage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: adminKeys.resumes.all })
       addToast('success', 'Resume created successfully.')
-      navigate({ to: '/resumes' })
+      navigate({ to: '/applications/list' })
     },
     onError: (err: Error) => addToast('error', err.message),
   })
