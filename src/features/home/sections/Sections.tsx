@@ -5,6 +5,8 @@ import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import { useState, type ReactNode } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
+import NumberFlow from '@number-flow/react'
+import type { Tier } from '@/features/billing/catalog'
 import { MagneticButton } from '../lib/MagneticButton'
 import { Marquee } from '../lib/Marquee'
 import { KineticText } from '../lib/KineticText'
@@ -29,6 +31,77 @@ function Section({ children, id, className = '' }: { children: ReactNode; id?: s
 
 function Eyebrow({ children }: { children: ReactNode }) {
   return <div className="mb-3 font-mono text-[11px] uppercase tracking-[0.18em] text-teal-400">{children}</div>
+}
+
+export type Frequency = 'monthly' | 'annually'
+
+const FREQUENCY_LABEL: Record<Frequency, string> = {
+  monthly: 'Monthly',
+  annually: 'Annually',
+}
+
+export function BillingToggle({
+  value,
+  onChange,
+}: {
+  value: Frequency
+  onChange: (v: Frequency) => void
+}) {
+  const options: Frequency[] = ['monthly', 'annually']
+  return (
+    <div className="mt-10 flex justify-center">
+      <div
+        role="radiogroup"
+        aria-label="Billing frequency"
+        className="grid grid-cols-2 gap-x-1 rounded-full p-1 font-mono text-[11px] uppercase tracking-widest inset-ring inset-ring-white/10"
+      >
+        {options.map((opt) => {
+          const active = value === opt
+          return (
+            <button
+              key={opt}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => onChange(opt)}
+              className="relative cursor-pointer rounded-full px-4 py-1.5"
+            >
+              {active && (
+                <motion.span
+                  layoutId="billing-pill"
+                  className="absolute inset-0 rounded-full bg-teal-500"
+                  style={{ willChange: 'transform' }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+                />
+              )}
+              <span className={active ? 'relative text-zinc-950' : 'relative text-zinc-400'}>
+                {FREQUENCY_LABEL[opt]}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+export function TierPrice({ tier, isYearly }: { tier: Tier; isYearly: boolean }) {
+  if (tier.free) {
+    return <p className="mt-6 text-4xl font-semibold tracking-tight text-white">Free</p>
+  }
+  const value = isYearly ? tier.priceAnnual : tier.priceMonthly
+  return (
+    <p className="mt-6 flex items-baseline gap-x-1">
+      <NumberFlow
+        value={value}
+        format={{ style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }}
+        className="text-4xl font-semibold tracking-tight text-white"
+      />
+      <span className="text-sm/6 font-semibold text-zinc-500">
+        {isYearly ? '/year' : '/month'}
+      </span>
+    </p>
+  )
 }
 
 export function ComparisonSection() {
