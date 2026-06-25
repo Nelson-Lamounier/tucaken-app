@@ -11,7 +11,7 @@
 // to the client.
 
 import type { PlanId } from '@/features/account/types'
-import type { TierConfig } from '@/features/billing/tier-config'
+import type { TierConfig, PublicTierConfig } from '@/features/billing/tier-config'
 
 export type BillingInterval = 'monthly' | 'annual'
 
@@ -106,6 +106,26 @@ export function formatPrice(t: Tier, interval: BillingInterval = 'monthly'): str
  * billing UIs consume. Returns the static `TIERS` when no config is present.
  */
 export function tiersFromConfig(config: TierConfig | null | undefined): readonly Tier[] {
+  if (!config) return TIERS
+  return config.tiers.map((t) => ({
+    id: t.id,
+    name: t.name,
+    priceMonthly: t.priceMonthly,
+    priceAnnual: t.priceAnnual,
+    blurb: t.blurb,
+    features: [...t.features],
+    cta: t.cta,
+    highlighted: t.highlighted || undefined,
+    free: t.free || undefined,
+  }))
+}
+
+/**
+ * Map the public (display-only) tier projection into `Tier[]` for the
+ * unauthenticated pricing surfaces. Returns the static `TIERS` when no config
+ * is present (loading or fetch failure).
+ */
+export function tiersFromPublic(config: PublicTierConfig | null | undefined): readonly Tier[] {
   if (!config) return TIERS
   return config.tiers.map((t) => ({
     id: t.id,

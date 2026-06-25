@@ -15,6 +15,8 @@ import { Hono } from 'hono';
 import type { AdminApiConfig } from '../lib/config.js';
 import { getPool } from '../lib/pg.js';
 import { userExistsByEmail } from '../lib/repositories/users.js';
+import { getCachedTierConfig } from '../lib/tier-config-cache.js';
+import { toPublicTierConfig } from '../lib/tier-config-shape.js';
 
 const EMAIL_EXISTS_LIMIT = 10;
 const EMAIL_EXISTS_WINDOW_MS = 15 * 60_000;
@@ -87,6 +89,13 @@ export function createPublicRouter(config: AdminApiConfig): Hono {
 
     const exists = await userExistsByEmail(getPool(config), email);
     return ctx.json({ exists });
+  });
+
+  // Display-only tier config for the public pricing surfaces. No auth, no
+  // entitlements or Stripe price IDs — see toPublicTierConfig.
+  router.get('/tier-config', async (ctx) => {
+    const cfg = await getCachedTierConfig(getPool(config));
+    return ctx.json(toPublicTierConfig(cfg));
   });
 
   return router;

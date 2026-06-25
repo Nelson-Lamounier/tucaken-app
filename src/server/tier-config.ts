@@ -18,7 +18,11 @@ import { createServerFn } from '@tanstack/react-start'
 import { apiFetch } from './_api-client'
 import { requireAdmin, requireAuth } from './auth-guard'
 import { stripe } from './stripe'
-import { TierConfigSchema, type TierConfig } from '@/features/billing/tier-config'
+import {
+  TierConfigSchema,
+  type TierConfig,
+  type PublicTierConfig,
+} from '@/features/billing/tier-config'
 
 // -----------------------------------------------------------------------------
 // GET /api/admin/tier-config
@@ -28,6 +32,28 @@ export const getTierConfigFn = createServerFn({ method: 'GET' }).handler(
   async (): Promise<TierConfig> => {
     await requireAuth()
     return apiFetch<TierConfig>('/tier-config')
+  },
+)
+
+// -----------------------------------------------------------------------------
+// GET /api/public/tier-config — unauthenticated, display-only projection.
+// Feeds the public pricing surfaces (home + /pricing) so admin price edits are
+// reflected without exposing entitlements or Stripe price IDs.
+//
+// Uses a raw fetch (not apiFetch) because the marketing pages are anonymous:
+// apiFetch requires the `__session` cookie and throws without it. Mirrors the
+// public `email-exists` call in auth.ts.
+// -----------------------------------------------------------------------------
+
+const ADMIN_API_URL = process.env['ADMIN_API_URL'] ?? 'http://admin-api.admin-api:3002'
+
+export const getPublicTierConfigFn = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<PublicTierConfig> => {
+    const res = await fetch(`${ADMIN_API_URL}/api/public/tier-config`)
+    if (!res.ok) {
+      throw new Error(`public tier-config fetch failed [${res.status}]`)
+    }
+    return (await res.json()) as PublicTierConfig
   },
 )
 

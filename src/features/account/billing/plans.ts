@@ -10,7 +10,7 @@
 // expected by that component.
 
 import type { PlanId } from '../types'
-import { TIERS, tierRank } from '@/features/billing/catalog'
+import { TIERS, tierRank, type Tier } from '@/features/billing/catalog'
 
 export interface PlanDefinition {
   id: PlanId
@@ -24,14 +24,19 @@ export interface PlanDefinition {
   features: string[]
 }
 
-export const PLANS: PlanDefinition[] = TIERS.map((t) => ({
-  id: t.id,
-  name: t.name,
-  price: t.priceMonthly,
-  yearly: t.priceAnnual,
-  popular: t.highlighted,
-  blurb: t.blurb,
-  features: t.features,
-}))
+/** Re-shape display `Tier[]` into the legacy `PlanDefinition[]` PlanSection uses. */
+export function plansFromTiers(tiers: readonly Tier[]): PlanDefinition[] {
+  return tiers.map((t) => ({
+    id: t.id,
+    name: t.name,
+    price: t.priceMonthly,
+    yearly: t.priceAnnual,
+    popular: t.highlighted,
+    blurb: t.blurb,
+    features: [...t.features],
+  }))
+}
+
+export const PLANS: PlanDefinition[] = plansFromTiers(TIERS)
 
 export const planRank = tierRank
