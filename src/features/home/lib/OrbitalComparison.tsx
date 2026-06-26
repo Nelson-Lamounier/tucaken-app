@@ -86,7 +86,7 @@ function OrbitalNode({
             onToggle()
           }}
           className={cn(
-            'grid h-12 w-12 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 transition-colors',
+            'absolute left-0 top-0 grid h-12 w-12 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 transition-colors',
             expanded
               ? 'border-teal-400 bg-teal-400 text-zinc-950'
               : 'border-white/30 bg-zinc-900 text-white hover:border-teal-400/60',
@@ -94,7 +94,7 @@ function OrbitalNode({
         >
           <Icon size={18} />
         </button>
-        <div className="-translate-x-1/2 whitespace-nowrap text-center font-mono text-[11px] uppercase tracking-widest text-white/70">
+        <div className="absolute left-0 top-7 -translate-x-1/2 whitespace-nowrap text-center font-mono text-[11px] uppercase tracking-widest text-white/70">
           {item.label}
         </div>
       </div>
@@ -208,7 +208,7 @@ export function OrbitalComparison({ items }: { items: readonly ComparisonItem[] 
             <div
               aria-hidden="true"
               data-testid="orbit-ring-outer"
-              className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-dashed border-teal-400/25"
+              className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border border-teal-400/15"
               style={{ width: 2 * OUTER_RADIUS, height: 2 * OUTER_RADIUS }}
             />
             {items.map((item, i) => (
