@@ -197,6 +197,66 @@ describe('github server functions', () => {
       )
       expect(result).toEqual(response)
     })
+
+    it('forwards projectIntent "build" so onboarding can request a project', async () => {
+      mockResponse({ status: 'queued', repoFullName: 'owner/repo', jobName: null })
+
+      const handler = queueConnectedRepoFn as (input: {
+        data: { repoFullName: string; defaultBranch?: string; projectIntent?: 'build' | 'link' | 'none'; targetProjectId?: string }
+      }) => Promise<unknown>
+      await handler({ data: { repoFullName: 'owner/repo', defaultBranch: 'main', projectIntent: 'build' } })
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/github/connected-repos`,
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            repoFullName: 'owner/repo',
+            defaultBranch: 'main',
+            deferSync: true,
+            projectIntent: 'build',
+          }),
+        }),
+      )
+    })
+
+    it('forwards projectIntent "link" with targetProjectId', async () => {
+      mockResponse({ status: 'queued', repoFullName: 'owner/repo', jobName: null })
+
+      const handler = queueConnectedRepoFn as (input: {
+        data: { repoFullName: string; defaultBranch?: string; projectIntent?: 'build' | 'link' | 'none'; targetProjectId?: string }
+      }) => Promise<unknown>
+      await handler({ data: { repoFullName: 'owner/repo', defaultBranch: 'main', projectIntent: 'link', targetProjectId: 'proj-1' } })
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/github/connected-repos`,
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            repoFullName: 'owner/repo',
+            defaultBranch: 'main',
+            deferSync: true,
+            projectIntent: 'link',
+            targetProjectId: 'proj-1',
+          }),
+        }),
+      )
+    })
+
+    it('omits projectIntent when not provided (back-compat KB-only queue)', async () => {
+      mockResponse({ status: 'queued', repoFullName: 'owner/repo', jobName: null })
+
+      const handler = queueConnectedRepoFn as (input: { data: { repoFullName: string; defaultBranch?: string } }) => Promise<unknown>
+      await handler({ data: { repoFullName: 'owner/repo', defaultBranch: 'main' } })
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${BASE}/github/connected-repos`,
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ repoFullName: 'owner/repo', defaultBranch: 'main', deferSync: true }),
+        }),
+      )
+    })
   })
 
   describe('startConnectedReposSyncFn', () => {

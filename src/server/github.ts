@@ -78,6 +78,11 @@ export const triggerGitHubIngestionFn = createServerFn({ method: 'POST' })
 const queueSchema = z.object({
   repoFullName:  z.string().min(1),
   defaultBranch: z.string().optional(),
+  // Add-time project intent captured by ProjectIntentModal during onboarding.
+  // admin-api stamps it on the repo's default project even with deferSync, so
+  // the deferred sync can build/link a Project once it completes.
+  projectIntent:   z.enum(['build', 'link', 'none']).optional(),
+  targetProjectId: z.string().optional(),
 })
 
 // Connect a repo WITHOUT dispatching the sync job (onboarding queue).
@@ -94,6 +99,8 @@ export const queueConnectedRepoFn = createServerFn({ method: 'POST' })
           repoFullName:  data.repoFullName,
           defaultBranch: data.defaultBranch,
           deferSync:     true,
+          ...(data.projectIntent   ? { projectIntent:   data.projectIntent }   : {}),
+          ...(data.targetProjectId ? { targetProjectId: data.targetProjectId } : {}),
         }),
       },
     )
