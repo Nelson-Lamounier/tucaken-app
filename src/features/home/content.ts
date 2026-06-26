@@ -19,12 +19,20 @@ export const steps = [
   { n: '03', t: 'Get a resume recruiters can verify', d: 'Every claim links to real evidence from your work.', emp: true },
 ] as const
 
-export const comparison = [
-  { q: 'What is your evidence for this claim?', o: '"It seemed like a reasonable thing to say."', t: 'Points to your specific commit, file, or architecture decision.' },
-  { q: 'Can you tailor for a Kubernetes role?', o: 'Generic Kubernetes language.', t: 'Pulls your actual K8s work — the cluster you ran, the issues you solved.' },
-  { q: 'What if my repos have thin docs?', o: 'Generates plausible content anyway.', t: 'Tells you which repos need better docs and how to improve them.' },
-  { q: 'Will this resume sound like me?', o: 'Trained on millions of generic resumes.', t: 'Trained on the documentation you wrote about systems you built.' },
-] as const
+export type ComparisonItem = {
+  label: string
+  icon: string
+  q: string
+  o: string
+  t: string
+}
+
+export const comparison: readonly ComparisonItem[] = [
+  { label: 'Evidence', icon: 'FileSearch', q: 'What is your evidence for this claim?', o: '"It seemed like a reasonable thing to say."', t: 'Points to your specific commit, file, or architecture decision.' },
+  { label: 'Tailoring', icon: 'Target', q: 'Can you tailor for a Kubernetes role?', o: 'Generic Kubernetes language.', t: 'Pulls your actual K8s work — the cluster you ran, the issues you solved.' },
+  { label: 'Thin docs', icon: 'FileWarning', q: 'What if my repos have thin docs?', o: 'Generates plausible content anyway.', t: 'Tells you which repos need better docs and how to improve them.' },
+  { label: 'Sounds like you', icon: 'Fingerprint', q: 'Will this resume sound like me?', o: 'Trained on millions of generic resumes.', t: 'Trained on the documentation you wrote about systems you built.' },
+]
 
 export const founder = {
   name: 'Nelson',

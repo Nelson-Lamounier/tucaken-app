@@ -15,6 +15,7 @@ import { tiersFromPublic } from '@/features/billing/catalog'
 import { getPublicTierConfigFn } from '@/server/tier-config'
 import { SparkleField } from '../lib/SparkleField'
 import { tierCtaTarget } from '../lib/pricing-cta'
+import { OrbitalComparison } from '../lib/OrbitalComparison'
 
 function Section({ children, id, className = '' }: { children: ReactNode; id?: string; className?: string }) {
   return (
@@ -111,31 +112,17 @@ export function ComparisonSection() {
     <Section className="border-t border-white/5">
       <div className="mx-auto max-w-5xl">
         <Eyebrow>Why Tucaken</Eyebrow>
-        <KineticText as="h2" text="What other AI resume tools can't say." className="text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl" />
-        <div className="mt-10 overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/50">
-          <div className="grid grid-cols-12 border-b border-white/10 bg-white/[0.03] font-mono text-[11px] uppercase tracking-widest text-zinc-400">
-            <div className="col-span-5 px-5 py-3">You ask</div>
-            <div className="col-span-3 border-l border-white/10 px-5 py-3 text-zinc-500">Other tools</div>
-            <div className="gradient-sweep-anim col-span-4 border-l border-white/10 bg-[linear-gradient(110deg,transparent,rgba(45,212,191,0.18),transparent)] px-5 py-3 text-teal-300">Tucaken</div>
-          </div>
-          {comparison.map((row, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, x: -16 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.06 }}
-              style={{ willChange: 'transform, opacity' }}
-              className={['grid grid-cols-12 text-sm', i < comparison.length - 1 ? 'border-b border-white/5' : ''].join(' ')}
-            >
-              <div className="col-span-5 px-5 py-5 font-medium text-white">{row.q}</div>
-              <div className="col-span-3 border-l border-white/10 px-5 py-5 text-zinc-500">{row.o}</div>
-              <div className="col-span-4 border-l border-white/10 bg-teal-500/[0.04] px-5 py-5 text-zinc-100">
-                <span className="text-teal-400">✓ </span>
-                {row.t}
-              </div>
-            </motion.div>
-          ))}
+        <KineticText
+          as="h2"
+          text="What other AI resume tools can't say."
+          className="text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl"
+        />
+        <p className="mt-4 max-w-xl text-pretty text-sm text-zinc-400 md:text-base">
+          Tap a node to see how Tucaken answers — grounded in your real work, not
+          generic filler.
+        </p>
+        <div className="mt-8">
+          <OrbitalComparison items={comparison} />
         </div>
       </div>
     </Section>
@@ -163,13 +150,20 @@ export function FounderSection() {
               <div className="font-mono text-xs text-zinc-400">{founder.role}</div>
             </div>
           </div>
-          <blockquote className="mt-6 whitespace-pre-line text-[17px] leading-relaxed text-zinc-200">
+          <motion.blockquote
+            initial={reduce ? false : { opacity: 0, y: 12 }}
+            whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-60px' }}
+            transition={{ duration: 0.5, ease: 'easeOut' }}
+            style={reduce ? undefined : { willChange: 'transform, opacity' }}
+            className="mt-6 whitespace-pre-line text-[17px] leading-relaxed text-zinc-200"
+          >
             "{founder.quote}"
-          </blockquote>
+          </motion.blockquote>
           <div className="mt-6 flex items-center gap-3 font-mono text-xs">
-            <a className="text-zinc-400 hover:text-teal-300" href="#">linkedin.com/in/nelson</a>
+            <a className="text-zinc-400 transition-colors hover:text-teal-300" href="#">linkedin.com/in/nelson</a>
             <span className="text-zinc-700">·</span>
-            <a className="text-zinc-400 hover:text-teal-300" href="#">github.com/nelson</a>
+            <a className="text-zinc-400 transition-colors hover:text-teal-300" href="#">github.com/nelson</a>
           </div>
         </div>
       </div>
