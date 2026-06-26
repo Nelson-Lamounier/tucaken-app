@@ -39,6 +39,24 @@ describe('OrbitalComparison', () => {
     expect(second.getAttribute('aria-expanded')).toBe('true')
   })
 
+  it('opens the clicked node detail in the centre card', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event')
+    const { within } = await import('@testing-library/react')
+    render(<OrbitalComparison items={items} />)
+    await userEvent.click(screen.getAllByRole('button')[0])
+    const card = screen.getByTestId('orbit-detail-card')
+    expect(within(card).getByText(items[0].q)).toBeTruthy()
+    expect(within(card).getByText(items[0].t, { exact: false })).toBeTruthy()
+  })
+
+  it('hides the infinity hub while a card is open', async () => {
+    const { default: userEvent } = await import('@testing-library/user-event')
+    render(<OrbitalComparison items={items} />)
+    expect(screen.getByTestId('infinity-hub')).toBeTruthy()
+    await userEvent.click(screen.getAllByRole('button')[0])
+    expect(screen.queryByTestId('infinity-hub')).toBeNull()
+  })
+
   it('shows every item q/o/t in the accessible static list', () => {
     render(<OrbitalComparison items={items} />)
     for (const item of items) {
@@ -53,5 +71,21 @@ describe('OrbitalComparison', () => {
     render(<OrbitalComparison items={items} />)
     expect(screen.queryAllByRole('button')).toHaveLength(0)
     expect(screen.getByText('Q-evidence?')).toBeTruthy()
+  })
+
+  it('renders the outer orbit-path outline ring', () => {
+    render(<OrbitalComparison items={items} />)
+    expect(screen.getByTestId('orbit-ring-outer')).toBeTruthy()
+  })
+
+  it('renders an infinity-symbol path at the hub', () => {
+    render(<OrbitalComparison items={items} />)
+    const hub = screen.getByTestId('infinity-hub')
+    expect(hub.querySelector('path')).not.toBeNull()
+  })
+
+  it('still renders one node button per item with the scroll wrapper', () => {
+    render(<OrbitalComparison items={items} />)
+    expect(screen.getAllByRole('button')).toHaveLength(items.length)
   })
 })

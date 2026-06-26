@@ -11,14 +11,17 @@ import { FounderSection } from '@/features/home/sections/Sections'
 import { founder } from '@/features/home/content'
 
 describe('FounderSection', () => {
-  it('renders the founder name and quote', () => {
-    const { container } = render(<FounderSection />)
+  it('renders the founder name and role', () => {
+    render(<FounderSection />)
     expect(screen.getByText(founder.name)).toBeTruthy()
-    expect(container.textContent).toContain('I built Tucaken because')
+    expect(screen.getByText(founder.role)).toBeTruthy()
   })
 
-  it('renders the quote inside a blockquote element', () => {
+  it('renders the quote inside a blockquote with the highlighted phrase', () => {
     const { container } = render(<FounderSection />)
     expect(container.querySelector('blockquote')).not.toBeNull()
+    expect(container.textContent).toContain('I built Tucaken Resumes because')
+    const strong = container.querySelector('strong')
+    expect(strong?.textContent).toBe('Tucaken Resumes')
   })
 })

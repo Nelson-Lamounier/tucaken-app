@@ -92,18 +92,6 @@
 .marquee-anim[data-reverse='true'] {
   animation-direction: reverse;
 }
-@keyframes orbit-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-@keyframes orbit-counter-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(-360deg); }
-}
-.orbit-spin-anim { animation: orbit-spin 48s linear infinite; will-change: transform; }
-.orbit-counter-spin-anim { animation: orbit-counter-spin 48s linear infinite; will-change: transform; }
-.orbit-spin-anim[data-paused='true'],
-.orbit-counter-spin-anim[data-paused='true'] { animation-play-state: paused; }
 /* Auth brand-panel lines (reference "Background Paths" behaviour, pure CSS).
    Each <path> is normalised with pathLength=1: it draws itself in once
    (stroke-dashoffset 1 -> 0, dasharray = the whole 0..1 length) and then breathes
@@ -122,6 +110,6 @@
   animation: auth-path-flow 12s linear infinite;
 }
 @media (prefers-reduced-motion: reduce) {
-  .belt-scroll-anim, .scan-sweep-anim, .item-state-anim, .pipe-pulse-anim, .node-glow-anim, .gradient-sweep-anim, .marquee-anim, .orbit-spin-anim, .orbit-counter-spin-anim { animation: none !important; }
+  .belt-scroll-anim, .scan-sweep-anim, .item-state-anim, .pipe-pulse-anim, .node-glow-anim, .gradient-sweep-anim, .marquee-anim { animation: none !important; }
   .auth-paths path { animation: none !important; stroke-dasharray: none !important; }
 }

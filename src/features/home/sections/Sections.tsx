@@ -11,6 +11,7 @@ import { MagneticButton } from '../lib/MagneticButton'
 import { Marquee } from '../lib/Marquee'
 import { KineticText } from '../lib/KineticText'
 import { comparison, founder, faq } from '../content'
+import { highlightParts } from '../lib/highlight'
 import { tiersFromPublic } from '@/features/billing/catalog'
 import { getPublicTierConfigFn } from '@/server/tier-config'
 import { SparkleField } from '../lib/SparkleField'
@@ -131,41 +132,43 @@ export function ComparisonSection() {
 
 export function FounderSection() {
   const reduce = useReducedMotion() ?? false
+  const parts = highlightParts(founder.quote, 'Tucaken Resumes')
   return (
     <Section className="border-t border-white/5">
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto flex max-w-2xl flex-col items-center text-center">
         <Eyebrow>Built by a user, for users</Eyebrow>
-        <div className="mt-8 rounded-3xl border border-white/10 bg-gradient-to-br from-zinc-900/80 to-zinc-950/80 p-8 backdrop-blur-md md:p-10">
-          <div className="flex items-start gap-5">
-            <motion.div
-              animate={reduce ? undefined : { opacity: [0.85, 1, 0.85] }}
-              transition={reduce ? undefined : { duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-              style={reduce ? undefined : { willChange: 'opacity' }}
-              className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-gradient-to-br from-teal-400 to-emerald-600 font-mono text-lg font-bold text-white"
-            >
-              N
-            </motion.div>
-            <div>
-              <div className="text-base font-semibold text-white">{founder.name}</div>
-              <div className="font-mono text-xs text-zinc-400">{founder.role}</div>
-            </div>
-          </div>
-          <motion.blockquote
-            initial={reduce ? false : { opacity: 0, y: 12 }}
-            whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-60px' }}
-            transition={{ duration: 0.5, ease: 'easeOut' }}
-            style={reduce ? undefined : { willChange: 'transform, opacity' }}
-            className="mt-6 whitespace-pre-line text-[17px] leading-relaxed text-zinc-200"
-          >
-            "{founder.quote}"
-          </motion.blockquote>
-          <div className="mt-6 flex items-center gap-3 font-mono text-xs">
-            <a className="text-zinc-400 transition-colors hover:text-teal-300" href="#">linkedin.com/in/nelson</a>
-            <span className="text-zinc-700">·</span>
-            <a className="text-zinc-400 transition-colors hover:text-teal-300" href="#">github.com/nelson</a>
-          </div>
-        </div>
+
+        <motion.blockquote
+          initial={reduce ? false : { opacity: 0, y: 12 }}
+          whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-60px' }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+          style={reduce ? undefined : { willChange: 'transform, opacity' }}
+          className="mt-6 text-balance text-xl leading-relaxed text-zinc-100 sm:text-2xl"
+        >
+          &ldquo;
+          {parts.map((part, i) =>
+            part.highlight ? (
+              <strong key={`${part.text}-${i}`} className="font-semibold text-teal-300">
+                {part.text}
+              </strong>
+            ) : (
+              <span key={`${part.text}-${i}`}>{part.text}</span>
+            ),
+          )}
+          &rdquo;
+        </motion.blockquote>
+
+        <motion.div
+          initial={reduce ? false : { opacity: 0, y: 8 }}
+          whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-60px' }}
+          transition={{ duration: 0.5, ease: 'easeOut', delay: 0.15 }}
+          style={reduce ? undefined : { willChange: 'transform, opacity' }}
+        >
+          <div className="mt-6 font-medium text-zinc-300">{founder.name}</div>
+          <div className="mt-1.5 text-sm text-zinc-500">{founder.role}</div>
+        </motion.div>
       </div>
     </Section>
   )
