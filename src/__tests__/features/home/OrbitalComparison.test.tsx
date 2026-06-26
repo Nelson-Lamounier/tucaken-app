@@ -71,4 +71,9 @@ describe('OrbitalComparison', () => {
     const hub = screen.getByTestId('infinity-hub')
     expect(hub.querySelector('path')).not.toBeNull()
   })
+
+  it('still renders one node button per item with the scroll wrapper', () => {
+    render(<OrbitalComparison items={items} />)
+    expect(screen.getAllByRole('button')).toHaveLength(items.length)
+  })
 })

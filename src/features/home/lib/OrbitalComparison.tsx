@@ -3,8 +3,8 @@
 // Radial comparison orbital: nodes orbit a teal Tucaken hub on lg+ (CSS-transform
 // spin, no per-frame React re-render); an accessible static list is shown on
 // mobile and under reduced motion. Only the real q/o/t data is rendered.
-import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
-import { useState } from 'react'
+import { motion, AnimatePresence, useReducedMotion, useScroll, useTransform } from 'motion/react'
+import { useRef, useState } from 'react'
 import { FileSearch, Target, FileWarning, Fingerprint, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { nodeAngles, nodeTransform } from './orbital-geometry'
@@ -14,6 +14,7 @@ const ICONS: Record<string, LucideIcon> = { FileSearch, Target, FileWarning, Fin
 const OUTER_RADIUS = 200
 const INNER_RADIUS = 120
 const INNER_DOTS = 6
+const SCROLL_SCALE_RANGE = [0.82, 1.06] as const
 
 // Lemniscate (figure-eight) traced by the hub.
 const INFINITY_PATH =
@@ -171,6 +172,12 @@ function InfinityHub() {
 export function OrbitalComparison({ items }: { items: readonly ComparisonItem[] }) {
   const reduce = useReducedMotion() ?? false
   const [activeId, setActiveId] = useState<string | null>(null)
+  const orbitRef = useRef<HTMLDivElement>(null)
+  const { scrollYProgress } = useScroll({
+    target: reduce ? undefined : orbitRef,
+    offset: ['start end', 'end start'],
+  })
+  const scale = useTransform(scrollYProgress, [0, 1], [...SCROLL_SCALE_RANGE])
   const angles = nodeAngles(items.length)
   const activeItem = items.find((x) => x.label === activeId) ?? null
   const paused = activeId !== null
@@ -185,10 +192,12 @@ export function OrbitalComparison({ items }: { items: readonly ComparisonItem[] 
         <ComparisonList items={items} />
       </div>
 
-      <div
-        className="group/orbit relative hidden h-[520px] w-full lg:block"
-        onClick={() => setActiveId(null)}
-      >
+      <div ref={orbitRef} className="hidden lg:block">
+        <motion.div
+          style={{ scale, willChange: 'transform' }}
+          className="group/orbit relative h-[520px] w-full"
+          onClick={() => setActiveId(null)}
+        >
         <OrbitRing diameter={2 * OUTER_RADIUS} className="border-teal-400/15" testId="orbit-ring-outer" />
         <OrbitRing diameter={2 * INNER_RADIUS} className="border-white/5" testId="orbit-ring-inner" />
         <InnerRing paused={paused} />
@@ -231,6 +240,7 @@ export function OrbitalComparison({ items }: { items: readonly ComparisonItem[] 
             </motion.div>
           )}
         </AnimatePresence>
+        </motion.div>
       </div>
     </div>
   )
