@@ -49,6 +49,12 @@
   --chart-series-2: #fbbf24; /* amber-400 */
 }
 
+/* Motion+ Curtains page-transition panels (staggerWipe on the sign-in CTAs).
+   Brand teal so the cover reads on-brand rather than the default. */
+.motion-curtain {
+  background-color: #14b8a6; /* teal-500 */
+}
+
 /* System-wide type pairing: Geist for headings, Inter for body. Body inherits
    --font-sans (Inter) via Tailwind's preflight; headings opt into Geist here so
    every h1–h6 picks it up without per-component classes. Use `font-heading` /

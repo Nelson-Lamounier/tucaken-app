@@ -19,6 +19,8 @@ WORKDIR /app
 
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY admin-api/package.json ./admin-api/
+# Vendored gated motion-plus tarball (file: dep) — must exist before install.
+COPY vendor/ ./vendor/
 
 RUN yarn install --immutable
 

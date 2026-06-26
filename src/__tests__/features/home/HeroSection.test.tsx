@@ -2,16 +2,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
-const navigateMock = vi.fn()
-vi.mock('@tanstack/react-router', () => ({
-  useNavigate: () => navigateMock,
+const transitionMock = vi.fn()
+vi.mock('@/contexts/PageTransition', () => ({
+  usePageTransition: () => ({ transitionTo: transitionMock, isPending: false }),
 }))
 
 import { HeroSection } from '@/features/home/sections/HeroSection'
 import { hero } from '@/features/home/content'
 
 describe('HeroSection', () => {
-  beforeEach(() => navigateMock.mockReset())
+  beforeEach(() => transitionMock.mockReset())
 
   it('renders eyebrow, headline lead, founder note and the primary CTA', () => {
     const { container } = render(<HeroSection />)
@@ -28,10 +28,10 @@ describe('HeroSection', () => {
     }
   })
 
-  it('primary CTA navigates to /sign-in', async () => {
+  it('primary CTA triggers a page transition to /sign-in', async () => {
     const { default: userEvent } = await import('@testing-library/user-event')
     render(<HeroSection />)
     await userEvent.click(screen.getByRole('button', { name: /connect github/i }))
-    expect(navigateMock).toHaveBeenCalledWith({ to: '/sign-in' })
+    expect(transitionMock).toHaveBeenCalledWith('/sign-in')
   })
 })

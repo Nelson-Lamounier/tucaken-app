@@ -14396,7 +14396,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"motion-dom@npm:^12.19.0, motion-dom@npm:^12.23.23, motion-dom@npm:^12.42.0":
+"motion-dom@npm:^12.24.11, motion-dom@npm:^12.25.0, motion-dom@npm:^12.42.0":
   version: 12.42.0
   resolution: "motion-dom@npm:12.42.0"
   dependencies:
@@ -14405,25 +14405,25 @@ __metadata:
   languageName: node
   linkType: hard
 
-"motion-plus-dom@npm:^1.5.1, motion-plus-dom@npm:^1.5.4":
-  version: 1.6.0
-  resolution: "motion-plus-dom@npm:1.6.0"
+"motion-plus-dom@npm:^2.12.0":
+  version: 2.12.0
+  resolution: "motion-plus-dom@npm:2.12.0"
   dependencies:
-    motion: "npm:^12.23.24"
-    motion-dom: "npm:^12.23.23"
+    motion: "npm:^12.25.0"
+    motion-dom: "npm:^12.24.11"
+    motion-utils: "npm:^12.24.10"
+  checksum: 10c0/8e9e2935c5db60727e13cce80328c777340ddd7a6dad78599f7bb6bf85bc64e4a9973b760426f8bc317327ff2d030a3f875407c3f30c1570cddc12d13b36f0a3
+  languageName: node
+  linkType: hard
+
+"motion-plus@file:./vendor/motion-plus-2.12.0.tgz::locator=tucaken-app%40workspace%3A.":
+  version: 2.12.0
+  resolution: "motion-plus@file:./vendor/motion-plus-2.12.0.tgz#./vendor/motion-plus-2.12.0.tgz::hash=317208&locator=tucaken-app%40workspace%3A."
+  dependencies:
+    motion: "npm:^12.25.0"
+    motion-dom: "npm:^12.25.0"
+    motion-plus-dom: "npm:^2.12.0"
     motion-utils: "npm:^12.23.6"
-  checksum: 10c0/6100b0249b79ceb4983b4b1a40313091897ab829f5a95a3e56da4bc47f58fe9645937aa38cfc5664d7c434f60dc59e94bfa203cd83e6dc3ebc9a1cf6d021d2ec
-  languageName: node
-  linkType: hard
-
-"motion-plus-react@npm:^1.5.1":
-  version: 1.5.4
-  resolution: "motion-plus-react@npm:1.5.4"
-  dependencies:
-    motion: "npm:^12.19.0"
-    motion-dom: "npm:^12.19.0"
-    motion-plus-dom: "npm:^1.5.4"
-    motion-utils: "npm:^12.19.0"
   peerDependencies:
     react: ^18.0.0 || ^19.0.0
     react-dom: ^18.0.0 || ^19.0.0
@@ -14432,36 +14432,18 @@ __metadata:
       optional: true
     react-dom:
       optional: true
-  checksum: 10c0/859ea4e684ba0020d802c77dcc62dd1bb29b1a17524253ff0d24a7fbf7f174e9b469bd68623f7a06e810ab404cd4e564b1824276929d7da2d486ee1f7826be16
+  checksum: 10c0/e9bbe29a40f5908ff02ef11ca50a47c1bd802cc0ed89637d1eac5c2fbf3681ea0b879a141fa1292163bd51d80eee7d49b975a320b282728aeea455a5aac578da
   languageName: node
   linkType: hard
 
-"motion-plus@npm:^1.5.1":
-  version: 1.5.1
-  resolution: "motion-plus@npm:1.5.1"
-  dependencies:
-    motion-plus-dom: "npm:^1.5.1"
-    motion-plus-react: "npm:^1.5.1"
-  peerDependencies:
-    react: ^18.0.0 || ^19.0.0
-    react-dom: ^18.0.0 || ^19.0.0
-  peerDependenciesMeta:
-    react:
-      optional: true
-    react-dom:
-      optional: true
-  checksum: 10c0/861160f80c82e61f4e9791b70b327e0ceccdc1619217116c0d73ee80472bbadc84ffe9bb26880aa0b20fae0b622914bbb90a577b4eb0700366d3ead6c37821b2
-  languageName: node
-  linkType: hard
-
-"motion-utils@npm:^12.19.0, motion-utils@npm:^12.23.6, motion-utils@npm:^12.39.0":
+"motion-utils@npm:^12.23.6, motion-utils@npm:^12.24.10, motion-utils@npm:^12.39.0":
   version: 12.39.0
   resolution: "motion-utils@npm:12.39.0"
   checksum: 10c0/6d7a2a2cc0797b72410a666a9cc1c201c8e39bf9669670464e433fe1e72af5f0217154c869867b34fbadf3664cf222c0d022bbc4eed7927f201ae971918e7440
   languageName: node
   linkType: hard
 
-"motion@npm:^12.19.0, motion@npm:^12.23.24, motion@npm:^12.38.0":
+"motion@npm:^12.25.0, motion@npm:^12.38.0":
   version: 12.42.0
   resolution: "motion@npm:12.42.0"
   dependencies:
@@ -17546,7 +17528,7 @@ __metadata:
     lucide-react: "npm:^0.545.0"
     mermaid: "npm:^11.15.0"
     motion: "npm:^12.38.0"
-    motion-plus: "npm:^1.5.1"
+    motion-plus: "file:./vendor/motion-plus-2.12.0.tgz"
     next-themes: "npm:^0.4.6"
     pino: "npm:^9.5.0"
     prom-client: "npm:^15.1.3"
