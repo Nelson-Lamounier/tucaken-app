@@ -37,9 +37,13 @@
 
 :root {
   --accent: #0d9488; /* teal-600 */
+  /* Second categorical chart series (e.g. Resumes in the activity bar chart),
+     paired against --accent. Amber for warm/cool contrast vs teal. */
+  --chart-series-2: #f59e0b; /* amber-500 */
 }
 .dark {
   --accent: #2dd4bf; /* teal-400 */
+  --chart-series-2: #fbbf24; /* amber-400 */
 }
 
 @keyframes belt-scroll {

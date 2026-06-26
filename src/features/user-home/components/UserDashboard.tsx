@@ -1,9 +1,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { Link } from '@tanstack/react-router'
 import { DashboardPage } from '@/components/layouts/DashboardPage'
-import { Button } from '@/components/ui/Button'
 import { useGitHubConnectedRepos } from '@/features/github/hooks/use-github-connected-repos'
 import { useProfileSummary } from '@/features/profile/hooks/use-profile-summary'
 import { adminKeys } from '@/lib/api/query-keys'
@@ -14,7 +12,8 @@ import { MirrorPanel } from '@/features/profile/components/MirrorPanel'
 import { DirectionPanel } from '@/features/profile/components/DirectionPanel'
 import { ReconciliationPanel } from '@/features/profile/components/ReconciliationPanel'
 import { KbScorePanel } from './KbScorePanel'
-import { KbQualityPanel } from './KbQualityPanel'
+import { KbOverviewPanel } from './KbOverviewPanel'
+import { RepoBreakdownPanel } from './RepoBreakdownPanel'
 import { ActivityPanel } from './ActivityPanel'
 import { KbStatsPanel } from './KbStatsPanel'
 import { KbSetupChecklist } from './KbSetupChecklist'
@@ -56,11 +55,6 @@ export function UserDashboard() {
     <DashboardPage
       title="Knowledge Base"
       description="Your AI agent's data health at a glance."
-      actions={
-        <Link to="/ai-agent">
-          <Button variant="primary">Run AI Agent</Button>
-        </Link>
-      }
     >
       <div className="space-y-8">
         {/* Hero band. The Resume-Readiness diagnostic is not yet trustworthy for
@@ -73,9 +67,16 @@ export function UserDashboard() {
           </div>
         ) : (
           <div className="space-y-6">
-            <KbStatsPanel tiles={heroTiles} />
-            <KbQualityPanel />
             <ActivityPanel />
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3 md:items-start">
+              <KbOverviewPanel stats={stats} />
+              <RepoBreakdownPanel />
+              <CareerDataBreakdown
+                entries={entries}
+                latestImport={latestImport}
+                isLoading={loadingEntries || loadingImports}
+              />
+            </div>
           </div>
         )}
 
@@ -118,11 +119,6 @@ export function UserDashboard() {
 
           <aside className="flex flex-col gap-6">
             <KbSetupChecklist stats={stats} />
-            <CareerDataBreakdown
-              entries={entries}
-              latestImport={latestImport}
-              isLoading={loadingEntries || loadingImports}
-            />
             <ResumeFilesList imports={imports} isLoading={loadingImports} />
             <KbActivityFeed imports={imports} repos={repos} />
           </aside>
