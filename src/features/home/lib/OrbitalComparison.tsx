@@ -198,12 +198,19 @@ export function OrbitalComparison({ items }: { items: readonly ComparisonItem[] 
           className="group/orbit relative h-[520px] w-full"
           onClick={() => setActiveId(null)}
         >
-        <OrbitRing diameter={2 * OUTER_RADIUS} className="border-teal-400/15" testId="orbit-ring-outer" />
         <OrbitRing diameter={2 * INNER_RADIUS} className="border-white/5" testId="orbit-ring-inner" />
         <InnerRing paused={paused} />
 
         <div className="absolute left-1/2 top-1/2">
           <div className="orbit-spin-anim group-hover/orbit:[animation-play-state:paused]" data-paused={paused ? 'true' : undefined}>
+            {/* Outer ring rides the same rotating group as the nodes, so ring +
+                CTAs turn as one. A dashed teal stroke makes the rotation read. */}
+            <div
+              aria-hidden="true"
+              data-testid="orbit-ring-outer"
+              className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-dashed border-teal-400/25"
+              style={{ width: 2 * OUTER_RADIUS, height: 2 * OUTER_RADIUS }}
+            />
             {items.map((item, i) => (
               <OrbitalNode
                 key={item.label}
