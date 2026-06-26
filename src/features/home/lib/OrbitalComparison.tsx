@@ -150,6 +150,7 @@ function InfinityHub() {
     <svg
       viewBox="0 0 100 50"
       aria-hidden="true"
+      data-testid="infinity-hub"
       className="h-8 w-12"
       style={{ filter: 'drop-shadow(0 0 6px rgba(45,212,191,0.6))' }}
     >
