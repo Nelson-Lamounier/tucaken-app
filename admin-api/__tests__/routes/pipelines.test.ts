@@ -25,10 +25,15 @@ jest.unstable_mockModule('../../src/lib/k8s.js', () => ({
   _resetBatchApi:  () => {},
 }));
 
+// Shared RLS-tx db.query mock so tests can drive the strategist dispatch gate
+// (which reads the user's latest pipeline_run). Defaults to "no prior run".
+const dbQueryMock = jest.fn<(...args: unknown[]) => Promise<{ rows: unknown[] }>>()
+  .mockResolvedValue({ rows: [] });
+
 jest.unstable_mockModule('../../src/lib/pg.js', () => ({
   getPool:    () => ({ query: poolQueryMock }),
-  withUser:   async (_pool: unknown, _userId: string, fn: (db: { query: jest.Mock }) => Promise<unknown>) =>
-    fn({ query: jest.fn() }),
+  withUser:   async (_pool: unknown, _userId: string, fn: (db: { query: typeof dbQueryMock }) => Promise<unknown>) =>
+    fn({ query: dbQueryMock }),
   _resetPool: () => {},
 }));
 
@@ -192,6 +197,7 @@ describe('POST /strategist-job - K8s Job strategist pipeline', () => {
     jest.clearAllMocks();
     createNamespacedJobMock.mockResolvedValue({});
     insertPipelineRunMock.mockResolvedValue(undefined);
+    dbQueryMock.mockResolvedValue({ rows: [] }); // dispatch gate: no prior run by default
     poolQueryMock.mockResolvedValue({ rows: [{ plan: 'pro', role: 'user', trial_started_at: null, trial_ends_at: null, subscription_status: 'active', stripe_customer_id: null, stripe_subscription_id: null, cancel_at_period_end: false, current_period_end: null, effective_plan: 'pro', trial_days_remaining: null }] });
   });
 
@@ -237,12 +243,79 @@ describe('POST /strategist-job - K8s Job strategist pipeline', () => {
     expect(envMap['TARGET_COMPANY']).toBe('Acme');
     expect(envMap['TARGET_ROLE']).toBe('Senior Engineer');
     expect(envMap['JOB_DESCRIPTION']).toBe('Build cool stuff');
-    expect(envMap['MODE']).toBe('standard');
+    // Pro plan gets the light 'free' analysis pipeline — only premium gets
+    // 'standard'. Mode is derived from the effective plan, not the request body.
+    expect(envMap['MODE']).toBe('free');
     // Matcher runs on Sonnet (strategistResearchModel), decoupled from the
     // article pipeline's Haiku researchModel.
     expect(envMap['RESEARCH_MODEL']).toBe('eu.anthropic.claude-sonnet-4-6');
     // Filter-then-rank flag forwarded from admin-api env; defaults to 'off' (fail-open).
     expect(envMap['RETRIEVAL_PREFILTER']).toBe('off');
+  });
+
+  it('dispatches MODE=standard only for a premium effective plan', async () => {
+    poolQueryMock.mockResolvedValue({ rows: [{ plan: 'premium', role: 'user', trial_started_at: null, trial_ends_at: null, subscription_status: 'active', stripe_customer_id: null, stripe_subscription_id: null, cancel_at_period_end: false, current_period_end: null, effective_plan: 'premium', trial_days_remaining: null }] });
+    const app = await buildAuthedApp();
+    const res = await app.request('/strategist-job', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(validBody),
+    });
+    expect(res.status).toBe(202);
+    const callArgs = createNamespacedJobMock.mock.calls[0] as unknown as [{ body: { spec: { template: { spec: { containers: Array<{ env: Array<{ name: string; value: string }> }> } } } } }];
+    const env = callArgs[0].body.spec.template.spec.containers[0]!.env;
+    const envMap = Object.fromEntries(env.map(e => [e.name, e.value]));
+    expect(envMap['MODE']).toBe('standard');
+  });
+
+  it('ignores a request-body mode override — a pro user cannot request standard', async () => {
+    const app = await buildAuthedApp();
+    const res = await app.request('/strategist-job', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...validBody, mode: 'standard' }),
+    });
+    expect(res.status).toBe(202);
+    const callArgs = createNamespacedJobMock.mock.calls[0] as unknown as [{ body: { spec: { template: { spec: { containers: Array<{ env: Array<{ name: string; value: string }> }> } } } } }];
+    const env = callArgs[0].body.spec.template.spec.containers[0]!.env;
+    const envMap = Object.fromEntries(env.map(e => [e.name, e.value]));
+    expect(envMap['MODE']).toBe('free');
+  });
+
+  it('rejects an oversized job description with 400 (no Job dispatched)', async () => {
+    const app = await buildAuthedApp();
+    const res = await app.request('/strategist-job', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...validBody, jobDescription: 'x'.repeat(100_001) }),
+    });
+    expect(res.status).toBe(400);
+    expect(createNamespacedJobMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 when the user already has an in-flight analysis', async () => {
+    // Dispatch gate sees a recent non-terminal strategist run for this user.
+    dbQueryMock.mockResolvedValue({ rows: [{ status: 'analysing', age_sec: 30 }] });
+    const app = await buildAuthedApp();
+    const res = await app.request('/strategist-job', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(validBody),
+    });
+    expect(res.status).toBe(409);
+    expect(createNamespacedJobMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 429 when re-triggering within the throttle window', async () => {
+    dbQueryMock.mockResolvedValue({ rows: [{ status: 'complete', age_sec: 3 }] });
+    const app = await buildAuthedApp();
+    const res = await app.request('/strategist-job', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(validBody),
+    });
+    expect(res.status).toBe(429);
+    expect(createNamespacedJobMock).not.toHaveBeenCalled();
   });
 
   it('forwards RETRIEVAL_PREFILTER=on into the Job env when set on admin-api', async () => {

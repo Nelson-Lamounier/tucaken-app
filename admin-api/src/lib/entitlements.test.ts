@@ -1,5 +1,25 @@
 /** @format */
-import { ENTITLEMENTS, isFullAccess, entitlementsFor, enrichmentEnv } from './entitlements.js';
+import { ENTITLEMENTS, isFullAccess, entitlementsFor, enrichmentEnv, analysisModeFor } from './entitlements.js';
+
+describe('analysisModeFor', () => {
+    it('only premium gets the full standard analysis pipeline', () => {
+        expect(analysisModeFor('premium')).toBe('standard');
+    });
+    it('free and pro both get the light free pipeline', () => {
+        expect(analysisModeFor('free')).toBe('free');
+        expect(analysisModeFor('pro')).toBe('free');
+    });
+    it('legacy trial falls to the light free pipeline (trials decommissioned)', () => {
+        expect(analysisModeFor('trial')).toBe('free');
+    });
+    it('full-access admins get standard regardless of plan', () => {
+        expect(analysisModeFor('free', 'admin')).toBe('standard');
+        expect(analysisModeFor('pro', 'admin')).toBe('standard');
+    });
+    it('a non-admin role does not unlock standard', () => {
+        expect(analysisModeFor('free', 'user')).toBe('free');
+    });
+});
 
 describe('ENTITLEMENTS', () => {
     it('free is the only metered tier; pro/premium are unlimited', () => {

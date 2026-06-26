@@ -61,6 +61,22 @@ export function entitlementsFor(plan: EffectivePlan, role?: string | null): Enti
     return ENTITLEMENTS[plan];
 }
 
+/** The JD-analysis pipeline tier (strategist MODE env) a plan unlocks. */
+export type AnalysisMode = 'free' | 'standard';
+
+/**
+ * Which JD-analysis pipeline a user's plan unlocks. The full 'standard'
+ * research pipeline (fit rating, verified matches, gaps, ATS, cover letter) is
+ * the PREMIUM differentiator — only premium (and full-access admins) get it.
+ * Free, pro, and any legacy trial get the lighter 'free' pipeline. This is the
+ * single source of truth for the dispatch fork; do not key the MODE off an A/B
+ * allowlist or the request body.
+ */
+export function analysisModeFor(plan: EffectivePlan, role?: string | null): AnalysisMode {
+    if (isFullAccess(role)) return 'standard';
+    return plan === 'premium' ? 'standard' : 'free';
+}
+
 const STORED_IDS = new Set<string>(['free', 'pro', 'premium']);
 
 function pickStoredId(plan: EffectivePlan): PlanId {
