@@ -11,6 +11,7 @@ import { FormInput } from '@/components/ui/Field'
 import { Button } from '@/components/ui/Button'
 import { ResumeMenuSelect } from './ResumeMenuSelect'
 import { TierActions } from './TierActions'
+import { NoProjectAnalysisNotice } from './NoProjectAnalysisNotice'
 import { adminKeys } from '@/lib/api/query-keys'
 import { getMeFn } from '@/server/me'
 
@@ -157,6 +158,8 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
           <ResumeMenuSelect resumeId={resumeId} onChange={onResumeChange} />
         </div>
       </div>
+
+      <NoProjectAnalysisNotice />
 
       <form
         className="p-6 sm:p-8"
