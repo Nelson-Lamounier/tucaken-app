@@ -7,6 +7,9 @@ import { useToastStore } from '@/lib/stores/toast-store'
 interface QueueVariables {
   readonly repoFullName:  string
   readonly defaultBranch?: string
+  /** Project intent captured at add-time: build a new project, link to existing, or kb-only. */
+  readonly projectIntent?: 'build' | 'link' | 'none'
+  readonly targetProjectId?: string
 }
 
 // Queues a repo (deferSync) — connects it as 'pending' without dispatching
