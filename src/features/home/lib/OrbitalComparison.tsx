@@ -186,6 +186,12 @@ export function OrbitalComparison({ items }: { items: readonly ComparisonItem[] 
     return () => controls.stop()
   }, [reduce, activeId, rotation])
 
+  // Close an open node as soon as the user scrolls on, so the centre card never
+  // lingers detached from the section. No-op when nothing is open.
+  useEffect(() => {
+    return scrollYProgress.on('change', () => setActiveId(null))
+  }, [scrollYProgress])
+
   const handleToggle = (index: number, label: string) => {
     if (activeId === label) {
       setActiveId(null)
