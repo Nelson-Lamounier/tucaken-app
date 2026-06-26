@@ -60,4 +60,9 @@ describe('OrbitalComparison', () => {
     expect(screen.getByTestId('orbit-ring-outer')).toBeTruthy()
     expect(screen.getByTestId('orbit-ring-inner')).toBeTruthy()
   })
+
+  it('renders the inner ring decorative dots', () => {
+    render(<OrbitalComparison items={items} />)
+    expect(screen.getAllByTestId('orbit-inner-dot')).toHaveLength(6)
+  })
 })

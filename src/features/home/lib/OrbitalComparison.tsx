@@ -13,6 +13,7 @@ import type { ComparisonItem } from '../content'
 const ICONS: Record<string, LucideIcon> = { FileSearch, Target, FileWarning, Fingerprint }
 const OUTER_RADIUS = 200
 const INNER_RADIUS = 120
+const INNER_DOTS = 6
 
 function ComparisonDetail({ item }: { item: ComparisonItem }) {
   return (
@@ -118,6 +119,28 @@ function OrbitRing({
   )
 }
 
+function InnerRing({ paused }: { paused: boolean }) {
+  const angles = nodeAngles(INNER_DOTS)
+  return (
+    <div className="absolute left-1/2 top-1/2" aria-hidden="true">
+      <div
+        className="orbit-spin-slow-anim group-hover/orbit:[animation-play-state:paused]"
+        style={{ willChange: 'transform' }}
+        data-paused={paused ? 'true' : undefined}
+      >
+        {angles.map((a) => (
+          <span
+            key={a}
+            data-testid="orbit-inner-dot"
+            className="absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-teal-400/50"
+            style={{ transform: nodeTransform(a, INNER_RADIUS) }}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function OrbitalComparison({ items }: { items: readonly ComparisonItem[] }) {
   const reduce = useReducedMotion() ?? false
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -141,6 +164,7 @@ export function OrbitalComparison({ items }: { items: readonly ComparisonItem[] 
       >
         <OrbitRing diameter={2 * OUTER_RADIUS} className="border-teal-400/15" testId="orbit-ring-outer" />
         <OrbitRing diameter={2 * INNER_RADIUS} className="border-white/5" testId="orbit-ring-inner" />
+        <InnerRing paused={paused} />
 
         <div className="absolute left-1/2 top-1/2">
           <div className="orbit-spin-anim group-hover/orbit:[animation-play-state:paused]" data-paused={paused ? 'true' : undefined}>
