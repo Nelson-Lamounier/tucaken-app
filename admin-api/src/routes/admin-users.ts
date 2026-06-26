@@ -56,7 +56,11 @@ const DeleteBody = z.object({
   reason: z.string().max(500).optional(),
 });
 
-const PRIVILEGED_ROLES = new Set(['admin', 'super_admin']);
+// getAdminUserById normalises role to 'admin' | 'user' — no 'super_admin' role
+// exists in the schema today, so this guard only needs to reject 'admin'. If a
+// 'super_admin' role is ever added, widen the normalisation in getAdminUserById
+// AND extend this Set together, or the guard would silently let it through.
+const PRIVILEGED_ROLES = new Set(['admin']);
 
 async function firstCognitoSub(
   pool: import('pg').Pool,
