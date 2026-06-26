@@ -1,8 +1,14 @@
 // src/__tests__/features/home/OrbitalComparison.test.tsx
 /** @vitest-environment happy-dom */
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
-import { MotionConfig } from 'motion/react'
+
+const motionMock = vi.hoisted(() => ({ reduce: false }))
+vi.mock('motion/react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('motion/react')>()
+  return { ...actual, useReducedMotion: () => motionMock.reduce }
+})
+
 import { OrbitalComparison } from '@/features/home/lib/OrbitalComparison'
 import type { ComparisonItem } from '@/features/home/content'
 
@@ -11,7 +17,7 @@ const items: ComparisonItem[] = [
   { label: 'Tailoring', icon: 'Target', q: 'Q-tailoring?', o: 'O-tailoring', t: 'T-tailoring' },
 ]
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); motionMock.reduce = false })
 
 describe('OrbitalComparison', () => {
   it('renders a node button per item with its label', () => {
@@ -43,11 +49,8 @@ describe('OrbitalComparison', () => {
   })
 
   it('renders only the static list under reduced motion (no node buttons)', () => {
-    render(
-      <MotionConfig reducedMotion="always">
-        <OrbitalComparison items={items} />
-      </MotionConfig>,
-    )
+    motionMock.reduce = true
+    render(<OrbitalComparison items={items} />)
     expect(screen.queryAllByRole('button')).toHaveLength(0)
     expect(screen.getByText('Q-evidence?')).toBeTruthy()
   })

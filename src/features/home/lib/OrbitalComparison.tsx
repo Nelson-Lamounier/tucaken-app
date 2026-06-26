@@ -3,7 +3,7 @@
 // Radial comparison orbital: nodes orbit a teal Tucaken hub on lg+ (CSS-transform
 // spin, no per-frame React re-render); an accessible static list is shown on
 // mobile and under reduced motion. Only the real q/o/t data is rendered.
-import { motion, AnimatePresence, useReducedMotionConfig } from 'motion/react'
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import { useState } from 'react'
 import { FileSearch, Target, FileWarning, Fingerprint, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -96,7 +96,7 @@ function OrbitalNode({
 }
 
 export function OrbitalComparison({ items }: { items: readonly ComparisonItem[] }) {
-  const reduce = useReducedMotionConfig() ?? false
+  const reduce = useReducedMotion() ?? false
   const [activeId, setActiveId] = useState<string | null>(null)
   const angles = nodeAngles(items.length)
   const activeItem = items.find((x) => x.label === activeId) ?? null
