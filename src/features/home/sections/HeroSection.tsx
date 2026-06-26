@@ -2,8 +2,8 @@
 // src/features/home/sections/HeroSection.tsx
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'motion/react'
-import { useNavigate } from '@tanstack/react-router'
 import { ArrowRight } from 'lucide-react'
+import { usePageTransition } from '@/contexts/PageTransition'
 import { RippleButton } from '../lib/RippleButton'
 import { hero } from '../content'
 
@@ -180,7 +180,7 @@ function RotatingWord() {
 }
 
 export function HeroSection() {
-  const navigate = useNavigate()
+  const { transitionTo } = usePageTransition()
   const canvasRef = useBeamCanvas()
 
   return (
@@ -210,7 +210,7 @@ export function HeroSection() {
           </p>
 
           <div className="flex items-center justify-center">
-            <RippleButton onClick={() => navigate({ to: '/sign-in' })}>
+            <RippleButton onClick={() => transitionTo('/sign-in')}>
               {hero.primaryCta} <ArrowRight className="h-4 w-4" />
             </RippleButton>
           </div>

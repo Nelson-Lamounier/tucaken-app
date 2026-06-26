@@ -2,8 +2,8 @@
 // src/features/home/HomePage.tsx
 // Single-page Tucaken Home — energetic + spotlight + 3D resume + floating repos.
 import { useState } from 'react'
-import { Link, useNavigate } from '@tanstack/react-router'
 import { MotionConfig, useScroll, useMotionValueEvent } from 'motion/react'
+import { usePageTransition } from '@/contexts/PageTransition'
 import { RippleButton } from './lib/RippleButton'
 import { LandingCursor } from './lib/LandingCursor'
 import { ScrollProgress } from './lib/ScrollProgress'
@@ -19,7 +19,7 @@ import { ScrollStorySection } from './sections/ScrollStorySection'
 import logo from '@/images/logo-horizontal-resume-flat-teal.png'
 
 function Header() {
-  const navigate = useNavigate()
+  const { transitionTo, isPending } = usePageTransition()
   const [scrolled, setScrolled] = useState(false)
   const { scrollY } = useScroll()
   useMotionValueEvent(scrollY, 'change', (y) => setScrolled(y > 24))
@@ -41,10 +41,15 @@ function Header() {
           <a href="#faq" className="transition-colors hover:text-white">FAQ</a>
         </nav>
         <div className="flex items-center gap-4">
-          <Link to="/sign-in" className="hidden text-base font-normal uppercase tracking-wide text-zinc-300 transition-colors hover:text-white md:block">
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => transitionTo('/sign-in')}
+            className="hidden text-base font-normal uppercase tracking-wide text-zinc-300 transition-colors hover:text-white disabled:opacity-60 md:block"
+          >
             Sign in
-          </Link>
-          <RippleButton onClick={() => navigate({ to: '/sign-in' })}>Try free</RippleButton>
+          </button>
+          <RippleButton onClick={() => transitionTo('/sign-in')}>Try free</RippleButton>
         </div>
       </div>
     </header>
