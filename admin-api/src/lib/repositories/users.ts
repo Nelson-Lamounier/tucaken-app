@@ -76,6 +76,17 @@ export async function userExistsByEmail(pool: Pool, email: string): Promise<bool
  * Returns the stable users.id UUID for downstream query scoping.
  */
 /**
+ * Free-trial switch. Trials are DECOMMISSIONED: a new free user now gets the
+ * standard free limits immediately (1 repo / 3 ingestion jobs per month) with no
+ * trial window. Flip to `true` to re-enable the 14-day trial — that is the only
+ * change needed; the assignment logic below stays behind this flag.
+ */
+const TRIALS_ENABLED = false;
+
+/** Days of free trial granted on signup when TRIALS_ENABLED is true. */
+const TRIAL_DAYS = 14;
+
+/**
  * Transactional core of upsertUser. The caller is responsible for the
  * surrounding BEGIN/COMMIT/ROLLBACK and for releasing the client.
  *
@@ -133,11 +144,15 @@ export async function upsertUserInTransaction(
       [user.fullName ?? null, user.avatarUrl ?? null, userId],
     );
   } else {
-    // ── Step 3: brand-new user — create users row + start 14-day trial ───
+    // ── Step 3: brand-new user — create users row ────────────────────────
     //
-    // Admin accounts (role='admin') skip the trial — they get free access
-    // permanently. The trial_started_at / trial_ends_at columns stay NULL.
+    // Trials are decommissioned (TRIALS_ENABLED=false), so trial_started_at /
+    // trial_ends_at stay NULL and the user is effective-free immediately. Admin
+    // accounts (role='admin') never get a trial regardless of the flag.
     const isAdmin = (user.role ?? 'user') === 'admin';
+    const grantTrial = TRIALS_ENABLED && !isAdmin;
+    const trialStart = grantTrial ? new Date() : null;
+    const trialEnd   = grantTrial ? new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000) : null;
     const inserted = await client.query<{ id: string }>(
       `INSERT INTO users
              (email, full_name, avatar_url, auth_provider, role,
@@ -153,8 +168,8 @@ export async function upsertUserInTransaction(
         user.avatarUrl ?? null,
         user.provider,
         user.role ?? 'user',
-        isAdmin ? null : new Date(),
-        isAdmin ? null : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+        trialStart,
+        trialEnd,
       ],
     );
     const row = inserted.rows[0];
@@ -162,8 +177,8 @@ export async function upsertUserInTransaction(
     userId = row.id;
     isNew  = true;
 
-    // Audit: record trial start for non-admin users
-    if (!isAdmin) {
+    // Audit: record trial start only when a trial was actually granted.
+    if (grantTrial) {
       await client.query(
         `INSERT INTO plan_events (user_id, event_type, from_plan, to_plan, reason)
          VALUES ($1, 'trial_started', NULL, 'free', 'new_user_signup')`,

@@ -20,19 +20,7 @@ export function isFreeTierAllowed(email: string | null | undefined): boolean {
     return allowlist().has(email.trim().toLowerCase());
 }
 
-/**
- * Resolve the mode to actually dispatch. Free is permitted ONLY for an
- * allowlisted email; any other free request is downgraded to standard
- * (fail-safe — never reject). Standard always passes through.
- */
-export function resolveDispatchMode(
-    requestedMode: string,
-    email: string | null | undefined,
-): { mode: 'free' | 'standard'; downgraded: boolean } {
-    if (requestedMode === 'free') {
-        return isFreeTierAllowed(email)
-            ? { mode: 'free', downgraded: false }
-            : { mode: 'standard', downgraded: true };
-    }
-    return { mode: 'standard', downgraded: false };
-}
+// NOTE: the JD-analysis dispatch MODE is no longer resolved from this allowlist.
+// It is derived authoritatively from the user's effective plan — see
+// `analysisModeFor` in entitlements.ts (free/pro → 'free', premium → 'standard').
+// `isFreeTierAllowed` is retained only for the `/me` `abFreeTier` UI flag.

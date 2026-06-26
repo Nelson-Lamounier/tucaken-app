@@ -17,10 +17,10 @@ import { randomUUID } from 'node:crypto';
 import type { V1Job } from '@kubernetes/client-node';
 import { Hono } from 'hono';
 
-import { resolveDispatchMode } from '../lib/ab-free-tier.js';
 import type { AdminApiConfig } from '../lib/config.js';
 import { getJobImage, isImageConfigured, isAssetsBucketConfigured } from '../lib/config.js';
-import { entitlementsFromConfig } from '../lib/entitlements.js';
+import { analysisModeFor, entitlementsFromConfig } from '../lib/entitlements.js';
+import { claimStrategistDispatch } from '../lib/strategist-dispatch-gate.js';
 import { getCachedTierConfig } from '../lib/tier-config-cache.js';
 import { buildPipelineJob, sanitizeLabel } from '../lib/k8s-job-builder.js';
 import { getBatchApi } from '../lib/k8s.js';
@@ -66,6 +66,9 @@ async function createPipelineJob(namespace: string, job: V1Job, logTag: string):
  * @param config - Resolved application configuration
  * @returns Hono router with pipeline trigger routes
  */
+/** Minimum gap between a user's strategist runs — throttles rapid re-triggers. */
+const STRATEGIST_MIN_DISPATCH_INTERVAL_SEC = 15;
+
 export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
   const router = new Hono<AdminApiBindings>();
 
@@ -257,24 +260,19 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
     for (const [k, v] of Object.entries({ targetCompany, targetRole, jobDescription })) {
       if (!v) return ctx.json({ error: `"${k}" is required` }, 400);
     }
-    const requestedMode = body.mode?.trim() || 'standard';
-    const email = ctx.get('jwtPayload')?.['email'] as string | undefined;
-    const { mode, downgraded } = resolveDispatchMode(requestedMode, email);
-    if (downgraded) {
-      console.warn('[pipelines/strategist-job] free-tier dispatch downgraded — not allowlisted', { userId });
-    }
-
     const resumeId = body.resumeId?.trim() || '';
 
-    // Guard against K8s env-var 128KB limit — truncate at 100KB with a warning.
+    // Reject oversized job descriptions rather than silently truncating (a
+    // truncated JD yields a degraded analysis the user never asked for, and an
+    // unbounded body is an abuse vector). The 100KB cap keeps us under the K8s
+    // env-var 128KB limit with headroom for the other env vars.
     const MAX_JD_BYTES = 100_000;
     const jdBytes = Buffer.byteLength(jobDescription!, 'utf8');
-    const truncatedJd = jdBytes > MAX_JD_BYTES
-      ? (() => {
-          console.warn('[pipelines/strategist-job] job description truncated', { originalBytes: jdBytes });
-          return jobDescription!.substring(0, MAX_JD_BYTES);
-        })()
-      : jobDescription!;
+    if (jdBytes > MAX_JD_BYTES) {
+      return ctx.json({
+        error: `Job description is too long (${Math.ceil(jdBytes / 1000)}KB; max ${MAX_JD_BYTES / 1000}KB). Please shorten it.`,
+      }, 400);
+    }
 
     const strategistPipelineImage = getJobImage('job-strategist');
     if (!isImageConfigured(strategistPipelineImage)) {
@@ -296,6 +294,11 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
       // RLS is not needed for correctness here.
       const planStatus = await getUserPlanStatus(pool, userId);
       const role = planStatus?.role ?? null;
+      // Authoritative analysis tier, derived from the user's effective plan —
+      // NOT the request body or any A/B allowlist. Only premium (and full-access
+      // admins) get the full 'standard' research pipeline; free/pro/trial get
+      // the lighter 'free' pipeline.
+      const mode = analysisModeFor(planStatus?.effectivePlan ?? 'free', role);
       const tierConfig = await getCachedTierConfig(pool);
       const cap = entitlementsFromConfig(tierConfig, planStatus?.effectivePlan ?? 'free', role).resumesPerMonth;
       const allowed = await checkAndIncrementResumeQuota(pool, userId, cap);
@@ -305,6 +308,20 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
           error: 'Free tier allows 1 resume generation per month. Upgrade for unlimited.',
           upgradeUrl: '/pricing',
         }, 429);
+      }
+
+      // ── Abuse guard: one in-flight analysis per user + a short throttle ─────
+      // Race-safe via a per-user advisory lock inside THIS transaction, so a
+      // burst of concurrent triggers (multiple tabs/devices/scripts) cannot each
+      // spawn a Job. Refund the quota credit we just took on any rejection.
+      const gate = await claimStrategistDispatch(db, userId, STRATEGIST_MIN_DISPATCH_INTERVAL_SEC);
+      if (gate !== 'ok') {
+        await decrementResumeQuota(pool, userId).catch(() => {});
+        if (gate === 'in_flight') {
+          return ctx.json({ error: 'An analysis is already running. Wait for it to finish before starting another.' }, 409);
+        }
+        ctx.header('Retry-After', String(STRATEGIST_MIN_DISPATCH_INTERVAL_SEC));
+        return ctx.json({ error: 'You are starting analyses too quickly. Please wait a few seconds and try again.' }, 429);
       }
 
       // Create the job_applications row before dispatching the K8s Job so the
@@ -381,7 +398,7 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
           { name: 'USER_ID',            value: userId },
           { name: 'TARGET_COMPANY',     value: targetCompany! },
           { name: 'TARGET_ROLE',        value: targetRole! },
-          { name: 'JOB_DESCRIPTION',    value: truncatedJd },
+          { name: 'JOB_DESCRIPTION',    value: jobDescription! },
           { name: 'MODE',               value: mode },
           // Matcher runs on Sonnet (config.strategistResearchModel), NOT the
           // shared article-pipeline Haiku — nuanced structured brief, unstable
@@ -401,6 +418,9 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
       catch (err: unknown) {
         console.error('[pipelines/strategist-job] failed to create K8s Job', err);
         await decrementResumeQuota(pool, userId).catch(() => {});
+        // Mark the just-inserted run failed so the in-flight guard does not lock
+        // the user out of retrying (the row commits with this tx).
+        await db.query(`UPDATE pipeline_runs SET status = 'failed', error_message = 'dispatch_failed', updated_at = NOW() WHERE id = $1`, [pipelineRunId]).catch(() => {});
         return ctx.json({ error: 'Failed to schedule pipeline Job' }, 502);
       }
 
