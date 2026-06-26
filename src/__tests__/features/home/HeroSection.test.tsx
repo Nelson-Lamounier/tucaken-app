@@ -8,35 +8,30 @@ vi.mock('@tanstack/react-router', () => ({
 }))
 
 import { HeroSection } from '@/features/home/sections/HeroSection'
-import { hero, repos } from '@/features/home/content'
+import { hero } from '@/features/home/content'
 
 describe('HeroSection', () => {
   beforeEach(() => navigateMock.mockReset())
 
-  it('renders eyebrow, headline, founder note and both CTAs', () => {
+  it('renders eyebrow, headline lead, founder note and the primary CTA', () => {
     const { container } = render(<HeroSection />)
     expect(screen.getByText(hero.eyebrow)).toBeTruthy()
-    // KineticText splits headline into per-word spans — check container text content
-    expect(container.textContent).toMatch(/already proves/i)
+    expect(container.textContent).toContain(hero.headlineLead)
     expect(screen.getByText(hero.founderNote)).toBeTruthy()
-    expect(screen.getByRole('button', { name: new RegExp(hero.primaryCta, 'i') })).toBeTruthy()
-    expect(screen.getByRole('button', { name: new RegExp(hero.secondaryCta, 'i') })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /connect github/i })).toBeTruthy()
   })
 
-  it('both CTAs navigate to /sign-in', async () => {
+  it('renders every rotating headline word', () => {
+    const { container } = render(<HeroSection />)
+    for (const word of hero.rotatingWords) {
+      expect(container.textContent).toContain(word)
+    }
+  })
+
+  it('primary CTA navigates to /sign-in', async () => {
     const { default: userEvent } = await import('@testing-library/user-event')
     render(<HeroSection />)
-    await userEvent.click(screen.getByRole('button', { name: new RegExp(hero.primaryCta, 'i') }))
-    await userEvent.click(screen.getByRole('button', { name: new RegExp(hero.secondaryCta, 'i') }))
-    expect(navigateMock).toHaveBeenCalledTimes(2)
+    await userEvent.click(screen.getByRole('button', { name: /connect github/i }))
     expect(navigateMock).toHaveBeenCalledWith({ to: '/sign-in' })
-  })
-
-  it('renders repo marquee bands with repo card content', () => {
-    const { container } = render(<HeroSection />)
-    // Marquee bands are present
-    expect(container.querySelectorAll('.marquee-anim').length).toBeGreaterThan(0)
-    // At least one repo name from the repos content is rendered
-    expect(container.textContent).toContain(repos[0].name)
   })
 })

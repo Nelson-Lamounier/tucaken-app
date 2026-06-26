@@ -1,9 +1,12 @@
 @import "tailwindcss";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/geist";
 @plugin "@tailwindcss/typography";
 @config "../typography.ts";
 
 @theme {
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-sans: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-heading: 'Geist Variable', 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
 
   --text-xs: 0.8125rem;
   --text-xs--line-height: 1.5rem;
@@ -44,6 +47,16 @@
 .dark {
   --accent: #2dd4bf; /* teal-400 */
   --chart-series-2: #fbbf24; /* amber-400 */
+}
+
+/* System-wide type pairing: Geist for headings, Inter for body. Body inherits
+   --font-sans (Inter) via Tailwind's preflight; headings opt into Geist here so
+   every h1–h6 picks it up without per-component classes. Use `font-heading` /
+   `font-sans` utilities to override locally where needed. */
+@layer base {
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+  }
 }
 
 @keyframes belt-scroll {

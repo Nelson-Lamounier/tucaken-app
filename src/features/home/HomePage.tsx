@@ -4,7 +4,8 @@
 import { useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { MotionConfig, useScroll, useMotionValueEvent } from 'motion/react'
-import { MagneticButton } from './lib/MagneticButton'
+import { RippleButton } from './lib/RippleButton'
+import { LandingCursor } from './lib/LandingCursor'
 import { ScrollProgress } from './lib/ScrollProgress'
 import { HeroSection } from './sections/HeroSection'
 import {
@@ -15,7 +16,7 @@ import {
   FooterSection,
 } from './sections/Sections'
 import { ScrollStorySection } from './sections/ScrollStorySection'
-import logo from '@/images/logo.png'
+import logo from '@/images/logo-horizontal-resume-flat-teal.png'
 
 function Header() {
   const navigate = useNavigate()
@@ -26,24 +27,24 @@ function Header() {
   return (
     <header
       className={[
-        'sticky top-0 z-30 border-b px-6 backdrop-blur-md transition-all duration-300 md:px-12',
-        scrolled ? 'border-zinc-200/80 bg-white/95 py-2' : 'border-transparent bg-white/80 py-3',
+        'fixed inset-x-0 top-0 z-30 border-b px-4 transition-all duration-300 md:px-6',
+        scrolled ? 'border-white/10 bg-zinc-950/85 py-2 backdrop-blur-md' : 'border-transparent bg-transparent py-3',
       ].join(' ')}
     >
-      <div className="mx-auto flex max-w-6xl items-center justify-between">
+      <div className="flex w-full items-center justify-between">
         <div className="flex items-center">
-          <img src={logo} alt="Tucaken" className={['w-auto transition-all', scrolled ? 'h-14' : 'h-18'].join(' ')} />
+          <img src={logo} alt="Tucaken" className={['w-auto transition-all', scrolled ? 'h-12' : 'h-15'].join(' ')} />
         </div>
-        <nav className="hidden items-center gap-6 font-mono text-xs text-zinc-500 md:flex">
-          <a href="#how" className="hover:text-zinc-900">How it works</a>
-          <a href="#pricing" className="hover:text-zinc-900">Pricing</a>
-          <a href="#faq" className="hover:text-zinc-900">FAQ</a>
+        <nav className="hidden items-center gap-8 text-base font-normal uppercase tracking-wide text-zinc-300 md:flex">
+          <a href="#how" className="transition-colors hover:text-white">How it works</a>
+          <a href="#pricing" className="transition-colors hover:text-white">Pricing</a>
+          <a href="#faq" className="transition-colors hover:text-white">FAQ</a>
         </nav>
-        <div className="flex items-center gap-2">
-          <Link to="/sign-in" className="hidden font-mono text-xs text-zinc-500 hover:text-zinc-900 md:block">
+        <div className="flex items-center gap-4">
+          <Link to="/sign-in" className="hidden text-base font-normal uppercase tracking-wide text-zinc-300 transition-colors hover:text-white md:block">
             Sign in
           </Link>
-          <MagneticButton primary onClick={() => navigate({ to: '/sign-in' })}>Try free</MagneticButton>
+          <RippleButton onClick={() => navigate({ to: '/sign-in' })}>Try free</RippleButton>
         </div>
       </div>
     </header>
@@ -59,6 +60,7 @@ export function HomePage() {
   return (
     <MotionConfig reducedMotion="user">
       <div className="dark min-h-screen bg-zinc-950 text-white antialiased">
+        <LandingCursor />
         <ScrollProgress />
         <Header />
         <HeroSection />

@@ -139,6 +139,37 @@ rg -n "<probable-component-name>" src/components src/features
   retrofitted en masse. When you substantially touch a component, bring its radius
   in line with `rounded-md` in the same change.
 
+### Typography — Geist headings, Inter body (system-wide)
+
+The font pairing is **Geist for headings, Inter for body**, self-hosted via
+`@fontsource-variable/geist` and `@fontsource-variable/inter` (variable fonts —
+one file per family covers all weights; never add per-weight static imports).
+Both are imported at the top of `src/styles.css`; do **not** add Google Fonts
+`<link>`s or any third-party font request (it breaks CSP and adds a network
+round-trip).
+
+Tokens live in the `@theme` block of `src/styles.css`:
+
+- `--font-sans` → `'Inter Variable'` — the **body default**. Applied app-wide by
+  Tailwind preflight; the `font-sans` utility resolves to it.
+- `--font-heading` → `'Geist Variable'` — **headings**. A base-layer rule sets
+  `h1–h6 { font-family: var(--font-heading) }`, and Tailwind auto-emits a
+  `font-heading` utility from the token.
+
+Rules for new/edited UI:
+
+- **Don't hard-code font families** (`font-['Geist']`, inline `fontFamily`, raw
+  `@font-face`). Use the tokens/utilities only.
+- Semantic headings (`<h1>`–`<h6>`) get Geist automatically — no class needed.
+- For **non-heading text that should read as a heading** (a styled `<div>`/
+  `<span>` title, kinetic/animated text, marketing display copy), add the
+  `font-heading` utility explicitly so it uses Geist.
+- For **body, UI chrome, labels, inputs, mono-adjacent prose**, leave the default
+  (Inter via `--font-sans`); only add `font-sans` to override a Geist context.
+- New tokens or weight ranges go in the `@theme` block, never inline.
+- Both fonts must render correctly in light and dark mode (they're colour-agnostic,
+  but verify weight/contrast on the dark surfaces this app uses).
+
 ## Animation — Motion for React
 
 Project rule file: `.claude/rules/motion-react.md` (authoritative; this section summarises).

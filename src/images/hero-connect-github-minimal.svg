@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 720" role="img" aria-labelledby="title desc">
+  <title id="title">Minimal connect GitHub illustration</title>
+  <desc id="desc">A transparent 2D vector illustration showing GitHub connected to repositories, architecture decisions, and shipped features.</desc>
+  <defs>
+    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="170%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="24" stdDeviation="24" flood-color="#020617" flood-opacity="0.34" />
+      <feDropShadow dx="0" dy="0" stdDeviation="16" flood-color="#14b8a6" flood-opacity="0.16" />
+    </filter>
+    <linearGradient id="connector" x1="282" y1="0" x2="1126" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5eead4" stop-opacity="0.1" />
+      <stop offset="0.5" stop-color="#5eead4" stop-opacity="0.95" />
+      <stop offset="1" stop-color="#5eead4" stop-opacity="0.1" />
+    </linearGradient>
+    <style>
+      .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      }
+
+      .sans {
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+    </style>
+  </defs>
+
+  <g opacity="0.22">
+    <path d="M214 124 H1226" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4 18" />
+    <path d="M214 596 H1226" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4 18" />
+    <path d="M306 96 V624" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4 18" />
+    <path d="M1134 96 V624" stroke="#e2e8f0" stroke-width="1" stroke-dasharray="4 18" />
+  </g>
+
+  <g fill="none" stroke="url(#connector)" stroke-linecap="round">
+    <path d="M468 360 C566 238 642 232 720 304" stroke-width="4" />
+    <path d="M468 360 C574 360 638 360 760 360" stroke-width="5" />
+    <path d="M468 360 C566 482 642 488 720 416" stroke-width="4" />
+  </g>
+
+  <g opacity="0.86">
+    <circle cx="584" cy="276" r="6" fill="#5eead4" />
+    <circle cx="642" cy="360" r="7" fill="#5eead4" />
+    <circle cx="584" cy="444" r="6" fill="#5eead4" />
+  </g>
+
+  <g transform="translate(236 222)" filter="url(#softGlow)">
+    <rect width="264" height="276" rx="42" fill="#f8fafc" />
+    <rect x="1" y="1" width="262" height="274" rx="41" fill="none" stroke="#ccfbf1" stroke-width="2" />
+    <circle cx="132" cy="90" r="48" fill="#0f766e" opacity="0.12" />
+    <path d="M104 106 C111 84 153 84 160 106" stroke="#0f766e" stroke-width="8" stroke-linecap="round" />
+    <circle cx="132" cy="70" r="18" stroke="#0f766e" stroke-width="8" />
+
+    <g transform="translate(48 150)">
+      <rect width="168" height="54" rx="27" fill="#0f172a" />
+      <path d="M31 18 V36 M31 18 H58 M58 18 V28 M31 28 H46 M46 28 V36" stroke="#5eead4" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+      <text class="mono" x="106" y="35" fill="#ccfbf1" font-size="20" letter-spacing="0" text-anchor="middle">GitHub</text>
+    </g>
+
+    <text class="mono" x="132" y="238" fill="#64748b" font-size="18" letter-spacing="0" text-anchor="middle">connected</text>
+  </g>
+
+  <g transform="translate(730 142)" filter="url(#softGlow)">
+    <rect width="332" height="132" rx="32" fill="#f8fafc" />
+    <rect x="1" y="1" width="330" height="130" rx="31" fill="none" stroke="#ccfbf1" stroke-width="2" />
+    <path d="M54 48 H116 C128 48 136 56 136 68 V94 H38 V64 C38 55 45 48 54 48 Z" fill="#0f766e" opacity="0.12" />
+    <path d="M38 68 H136 V94 H38 Z M51 48 H83 L95 62 H136" stroke="#0f766e" stroke-width="5" stroke-linejoin="round" />
+    <text class="sans" x="180" y="61" fill="#0f172a" font-size="25" font-weight="730" letter-spacing="0">Repositories</text>
+    <text class="mono" x="180" y="94" fill="#64748b" font-size="17" letter-spacing="0">read structure</text>
+  </g>
+
+  <g transform="translate(790 294)" filter="url(#softGlow)">
+    <rect width="372" height="132" rx="32" fill="#f8fafc" />
+    <rect x="1" y="1" width="370" height="130" rx="31" fill="none" stroke="#ccfbf1" stroke-width="2" />
+    <rect x="40" y="32" width="72" height="82" rx="14" fill="#0f766e" opacity="0.12" />
+    <path d="M56 50 H96 M56 68 H96 M56 86 H84" stroke="#0f766e" stroke-width="5" stroke-linecap="round" />
+    <path d="M100 32 V52 H120" stroke="#0f766e" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+    <text class="sans" x="166" y="61" fill="#0f172a" font-size="25" font-weight="730" letter-spacing="0">Architecture decisions</text>
+    <text class="mono" x="166" y="94" fill="#64748b" font-size="17" letter-spacing="0">ADR context</text>
+  </g>
+
+  <g transform="translate(730 446)" filter="url(#softGlow)">
+    <rect width="332" height="132" rx="32" fill="#f8fafc" />
+    <rect x="1" y="1" width="330" height="130" rx="31" fill="none" stroke="#ccfbf1" stroke-width="2" />
+    <circle cx="78" cy="66" r="43" fill="#0f766e" opacity="0.12" />
+    <path d="M57 66 L72 82 L101 48" stroke="#0f766e" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+    <text class="sans" x="154" y="61" fill="#0f172a" font-size="25" font-weight="730" letter-spacing="0">Shipped features</text>
+    <text class="mono" x="154" y="94" fill="#64748b" font-size="17" letter-spacing="0">release history</text>
+  </g>
+</svg>
