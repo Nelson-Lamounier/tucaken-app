@@ -1,18 +1,21 @@
 "use client"
 // src/features/home/lib/OrbitalComparison.tsx
-// Radial comparison orbital: nodes orbit a teal Tucaken hub on lg+ (CSS-transform
-// spin, no per-frame React re-render); an accessible static list is shown on
-// mobile and under reduced motion. Only the real q/o/t data is rendered.
-import { motion, AnimatePresence, useReducedMotion, useScroll, useTransform, animate, svgEffect, motionValue } from 'motion/react'
+// Radial comparison orbital: nodes orbit a teal Tucaken hub driven by a
+// rotation MotionValue (no CSS spin); click snaps the node to the top and
+// opens a centre card (spin pauses, infinity hidden); scroll flies nodes in
+// from outside onto the ring. An accessible static list shows on mobile and
+// under reduced motion.
+import { motion, AnimatePresence, useReducedMotion, useScroll, useTransform, useMotionValue, animate, svgEffect, motionValue } from 'motion/react'
+import type { MotionValue } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
 import { FileSearch, Target, FileWarning, Fingerprint, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { nodeAngles, nodeTransform } from './orbital-geometry'
+import { baseNodeAngle, nodeX, nodeY, rotationToTop, shortestEquivalentAngle } from './orbital-geometry'
 import type { ComparisonItem } from '../content'
 
 const ICONS: Record<string, LucideIcon> = { FileSearch, Target, FileWarning, Fingerprint }
 const OUTER_RADIUS = 200
-const SCROLL_SCALE_RANGE = [0.82, 1.06] as const
+const FLY_IN_RADIUS = 520
 
 // Infinity (lemniscate) path traced by the hub, in a 0 0 24 24 viewBox.
 const INFINITY_PATH = 'M6 16c5 0 7-8 12-8a4 4 0 0 1 0 8c-5 0-7-8-12-8a4 4 0 1 0 0 8'
@@ -56,46 +59,47 @@ function ComparisonList({ items }: { items: readonly ComparisonItem[] }) {
 
 function OrbitalNode({
   item,
-  transform,
+  baseAngle,
+  rotation,
+  radius,
   expanded,
-  paused,
   onToggle,
 }: {
   item: ComparisonItem
-  transform: string
+  baseAngle: number
+  rotation: MotionValue<number>
+  radius: MotionValue<number>
   expanded: boolean
-  paused: boolean
   onToggle: () => void
 }) {
   const Icon = ICONS[item.icon] ?? FileSearch
+  const x = useTransform(() => nodeX(baseAngle, rotation.get(), radius.get()))
+  const y = useTransform(() => nodeY(baseAngle, rotation.get(), radius.get()))
   return (
-    <div className="absolute" style={{ transform, willChange: 'transform' }}>
-      <div
-        className="orbit-counter-spin-anim group-hover/orbit:[animation-play-state:paused]"
-        style={{ willChange: 'transform' }}
-        data-paused={paused ? 'true' : undefined}
+    <motion.div
+      className="absolute left-1/2 top-1/2"
+      style={{ x, y, willChange: 'transform' }}
+    >
+      <button
+        type="button"
+        aria-expanded={expanded}
+        onClick={(e) => {
+          e.stopPropagation()
+          onToggle()
+        }}
+        className={cn(
+          'absolute left-0 top-0 grid h-12 w-12 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 transition-colors',
+          expanded
+            ? 'border-teal-400 bg-teal-400 text-zinc-950'
+            : 'border-white/30 bg-zinc-900 text-white hover:border-teal-400/60',
+        )}
       >
-        <button
-          type="button"
-          aria-expanded={expanded}
-          onClick={(e) => {
-            e.stopPropagation()
-            onToggle()
-          }}
-          className={cn(
-            'absolute left-0 top-0 grid h-12 w-12 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 transition-colors',
-            expanded
-              ? 'border-teal-400 bg-teal-400 text-zinc-950'
-              : 'border-white/30 bg-zinc-900 text-white hover:border-teal-400/60',
-          )}
-        >
-          <Icon size={18} />
-        </button>
-        <div className="absolute left-0 top-7 -translate-x-1/2 whitespace-nowrap text-center font-mono text-[11px] uppercase tracking-widest text-white/70">
-          {item.label}
-        </div>
+        <Icon size={18} />
+      </button>
+      <div className="absolute left-0 top-7 -translate-x-1/2 whitespace-nowrap text-center font-mono text-[11px] uppercase tracking-widest text-white/70">
+        {item.label}
       </div>
-    </div>
+    </motion.div>
   )
 }
 
@@ -160,14 +164,37 @@ export function OrbitalComparison({ items }: { items: readonly ComparisonItem[] 
   const reduce = useReducedMotion() ?? false
   const [activeId, setActiveId] = useState<string | null>(null)
   const orbitRef = useRef<HTMLDivElement>(null)
+  const rotation = useMotionValue(0)
   const { scrollYProgress } = useScroll({
     target: reduce ? undefined : orbitRef,
     offset: ['start end', 'end start'],
   })
-  const scale = useTransform(scrollYProgress, [0, 1], [...SCROLL_SCALE_RANGE])
-  const angles = nodeAngles(items.length)
+  // Nodes fly in from outside (FLY_IN_RADIUS) and settle on the ring by the
+  // scroll midpoint; useTransform clamps past 0.5 so they stay on the ring.
+  const radius = useTransform(scrollYProgress, [0, 0.5], [FLY_IN_RADIUS, OUTER_RADIUS])
   const activeItem = items.find((x) => x.label === activeId) ?? null
-  const paused = activeId !== null
+
+  // Continuous spin while nothing is open; stopped on cleanup (and never started
+  // under reduced motion or while a node is anchored open).
+  useEffect(() => {
+    if (reduce || activeId !== null) return
+    const controls = animate(rotation, rotation.get() + 360, {
+      duration: 48,
+      ease: 'linear',
+      repeat: Infinity,
+    })
+    return () => controls.stop()
+  }, [reduce, activeId, rotation])
+
+  const handleToggle = (index: number, label: string) => {
+    if (activeId === label) {
+      setActiveId(null)
+      return
+    }
+    const target = shortestEquivalentAngle(rotationToTop(index, items.length), rotation.get())
+    animate(rotation, target, { type: 'spring', stiffness: 120, damping: 20 })
+    setActiveId(label)
+  }
 
   if (reduce) {
     return <ComparisonList items={items} />
@@ -179,59 +206,56 @@ export function OrbitalComparison({ items }: { items: readonly ComparisonItem[] 
         <ComparisonList items={items} />
       </div>
 
-      <div ref={orbitRef} className="relative hidden lg:block">
-        <motion.div
-          style={{ scale, willChange: 'transform' }}
-          className="group/orbit relative h-[520px] w-full"
-          onClick={() => setActiveId(null)}
-        >
-        <div className="absolute left-1/2 top-1/2">
-          <div className="orbit-spin-anim group-hover/orbit:[animation-play-state:paused]" data-paused={paused ? 'true' : undefined}>
-            {/* Outer ring rides the same rotating group as the nodes, so ring +
-                CTAs turn as one. A dashed teal stroke makes the rotation read. */}
-            <div
-              aria-hidden="true"
-              data-testid="orbit-ring-outer"
-              className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border border-teal-400/15"
-              style={{ width: 2 * OUTER_RADIUS, height: 2 * OUTER_RADIUS }}
-            />
-            {items.map((item, i) => (
-              <OrbitalNode
-                key={item.label}
-                item={item}
-                transform={nodeTransform(angles[i], OUTER_RADIUS)}
-                expanded={activeId === item.label}
-                paused={paused}
-                onToggle={() => setActiveId(activeId === item.label ? null : item.label)}
-              />
-            ))}
-          </div>
-        </div>
-
+      <div
+        ref={orbitRef}
+        className="relative hidden h-[520px] w-full lg:block"
+        onClick={() => setActiveId(null)}
+      >
         <div
           aria-hidden="true"
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-        >
-          <InfinityHub />
-        </div>
+          data-testid="orbit-ring-outer"
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-teal-400/15"
+          style={{ width: 2 * OUTER_RADIUS, height: 2 * OUTER_RADIUS }}
+        />
+
+        {items.map((item, i) => (
+          <OrbitalNode
+            key={item.label}
+            item={item}
+            baseAngle={baseNodeAngle(i, items.length)}
+            rotation={rotation}
+            radius={radius}
+            expanded={activeId === item.label}
+            onToggle={() => handleToggle(i, item.label)}
+          />
+        ))}
+
+        {activeId === null && (
+          <div
+            aria-hidden="true"
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+          >
+            <InfinityHub />
+          </div>
+        )}
 
         <AnimatePresence>
           {activeItem && (
             <motion.div
               key={activeItem.label}
-              initial={{ opacity: 0, y: 12, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 12, scale: 0.96 }}
+              data-testid="orbit-detail-card"
+              initial={{ opacity: 0, scale: 0.94 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.94 }}
               transition={{ type: 'spring', stiffness: 260, damping: 24 }}
               style={{ willChange: 'transform, opacity' }}
               onClick={(e) => e.stopPropagation()}
-              className="absolute bottom-0 left-1/2 w-80 -translate-x-1/2 rounded-md border border-white/15 bg-zinc-950/90 p-5 backdrop-blur-lg"
+              className="absolute left-1/2 top-1/2 w-80 -translate-x-1/2 -translate-y-1/2 rounded-md border border-white/15 bg-zinc-950/90 p-5 backdrop-blur-lg"
             >
               <ComparisonDetail item={activeItem} />
             </motion.div>
           )}
         </AnimatePresence>
-        </motion.div>
       </div>
     </div>
   )
