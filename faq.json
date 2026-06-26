@@ -1,0 +1,253 @@
+{
+  "version": "1.0",
+  "product": "Tucaken",
+  "release": "v1",
+  "updated": "2026-06-26",
+  "locale": "en-GB",
+  "currency": "EUR",
+  "notes": "Source of truth for the application FAQ. Add new items under the relevant category, or add new categories. Each item: id (stable, kebab-case), question, answer, status ('published' | 'needs_confirmation'). Prices live in pricingTiers and are intentionally null until confirmed — do not hardcode amounts in answers.",
+  "pricingTiers": [
+    {
+      "id": "free",
+      "name": "Free",
+      "priceMonthlyEur": 0,
+      "includes": {
+        "repositories": 1,
+        "projects": 1,
+        "tailoredResumesPerMonth": 1,
+        "syncJobsPerMonth": 3,
+        "enrichment": "standard",
+        "customDomain": false,
+        "prioritySupport": false
+      }
+    },
+    {
+      "id": "pro",
+      "name": "Pro",
+      "priceMonthlyEur": null,
+      "includes": {
+        "repositories": "unlimited",
+        "projects": "unlimited",
+        "tailoredResumesPerMonth": "unlimited",
+        "syncJobsPerMonth": "unlimited",
+        "enrichment": "standard",
+        "customDomain": true,
+        "prioritySupport": true
+      }
+    },
+    {
+      "id": "premium",
+      "name": "Premium",
+      "priceMonthlyEur": null,
+      "includes": {
+        "repositories": "unlimited",
+        "projects": "unlimited",
+        "tailoredResumesPerMonth": "unlimited",
+        "syncJobsPerMonth": "unlimited",
+        "enrichment": "deep",
+        "customDomain": true,
+        "prioritySupport": true
+      }
+    }
+  ],
+  "categories": [
+    {
+      "id": "getting-started",
+      "title": "Getting started",
+      "items": [
+        {
+          "id": "what-is-tucaken",
+          "question": "What is Tucaken?",
+          "answer": "Tucaken turns your real code into a job-tailored, evidence-backed resume. You connect your GitHub account, Tucaken builds a Knowledge Base from your repositories and any resumes you upload, then generates a resume tailored to a specific job description using only the skills it can prove from your actual work.",
+          "status": "published"
+        },
+        {
+          "id": "how-it-works",
+          "question": "How does it work, step by step?",
+          "answer": "1) Connect your GitHub account and choose which repositories to sync. 2) Tucaken ingests them into your Knowledge Base and extracts a per-skill evidence ledger (verified, partial or gap). 3) Paste a job description. 4) Tucaken generates a tailored resume grounded in your verified evidence. 5) Iterate with gap analysis, an ATS check and interview coaching.",
+          "status": "published"
+        },
+        {
+          "id": "do-i-need-to-be-a-developer",
+          "question": "Do I need to be a developer to use it?",
+          "answer": "Tucaken is built for developers — its core advantage is reading your code to prove your skills. You can also upload an existing resume to enrich your profile, but the strongest results come from connecting repositories.",
+          "status": "published"
+        }
+      ]
+    },
+    {
+      "id": "github",
+      "title": "GitHub connection",
+      "items": [
+        {
+          "id": "is-github-read-only",
+          "question": "Is the GitHub connection read-only?",
+          "answer": "Yes. Tucaken only reads your repositories — it never writes, commits or changes anything in them. Access uses short-lived tokens (valid for one hour) that are never stored.",
+          "status": "published"
+        },
+        {
+          "id": "what-does-it-read",
+          "question": "What does Tucaken read from my repositories?",
+          "answer": "Repository code and metadata (names, branches, last-updated), used to build your Knowledge Base and extract skill evidence.",
+          "status": "published"
+        },
+        {
+          "id": "choose-repositories",
+          "question": "Can I choose which repositories are used?",
+          "answer": "Yes. After connecting, you pick exactly which repositories to sync. You can connect public and private repositories you have access to.",
+          "status": "published"
+        },
+        {
+          "id": "will-it-modify-code",
+          "question": "Will it modify my code or open pull requests?",
+          "answer": "No. The connection is strictly read-only.",
+          "status": "published"
+        }
+      ]
+    },
+    {
+      "id": "plans-pricing",
+      "title": "Plans & pricing",
+      "items": [
+        {
+          "id": "how-many-tiers",
+          "question": "How many plans are there?",
+          "answer": "Three: Free, Pro and Premium. Free lets you connect one repository, run up to three syncs a month and generate one tailored resume per month, with PDF and web export. Pro and Premium lift those limits to unlimited and add a custom domain on web resumes and priority support; Premium additionally runs deep AI enrichment on repository sync. Current prices are shown on the pricing page.",
+          "status": "needs_confirmation"
+        },
+        {
+          "id": "is-there-a-free-plan",
+          "question": "Is there a free plan?",
+          "answer": "Yes — Free lets you connect one repository and generate one tailored resume per month, with PDF and web export. No card required.",
+          "status": "published"
+        },
+        {
+          "id": "how-much-does-it-cost",
+          "question": "How much does Tucaken cost?",
+          "answer": "Free is €0. Pro and Premium are paid monthly subscriptions — see the pricing page for current amounts. (Prices to be confirmed before launch.)",
+          "status": "needs_confirmation"
+        },
+        {
+          "id": "is-there-a-trial",
+          "question": "Is there a trial?",
+          "answer": "To be confirmed: state what the trial unlocks and for how long before launch.",
+          "status": "needs_confirmation"
+        }
+      ]
+    },
+    {
+      "id": "billing-cancellation",
+      "title": "Billing & cancellation",
+      "items": [
+        {
+          "id": "can-i-cancel",
+          "question": "Can I cancel anytime?",
+          "answer": "Yes. You cancel from the billing portal; your subscription stays active until the end of the current billing period, then automatically reverts to Free. You keep paid features until that date.",
+          "status": "published"
+        },
+        {
+          "id": "undo-cancellation",
+          "question": "Can I undo a cancellation?",
+          "answer": "Yes — you can resume a cancelled subscription any time before the period ends, and nothing changes.",
+          "status": "published"
+        },
+        {
+          "id": "upgrade-downgrade",
+          "question": "Can I upgrade or downgrade?",
+          "answer": "Yes, from the billing portal, where you can also update your payment method and view invoices.",
+          "status": "published"
+        },
+        {
+          "id": "refund-policy",
+          "question": "Do I get a refund if I cancel?",
+          "answer": "Cancellation takes effect at the end of your billing period rather than immediately. To be confirmed: state your refund policy before launch.",
+          "status": "needs_confirmation"
+        },
+        {
+          "id": "payments-handled",
+          "question": "How are payments handled?",
+          "answer": "Securely through Stripe. Tucaken never sees or stores your card details.",
+          "status": "published"
+        }
+      ]
+    },
+    {
+      "id": "data-privacy",
+      "title": "Your data & privacy",
+      "items": [
+        {
+          "id": "what-data-stored",
+          "question": "What data does Tucaken store?",
+          "answer": "Your profile (name, email, avatar), the repositories you sync, resumes you upload, extracted career entries and your skill-evidence ledger, plus your plan and billing status.",
+          "status": "published"
+        },
+        {
+          "id": "is-my-data-used-for-training",
+          "question": "Is my code or resume shared with anyone or used to train models?",
+          "answer": "No. Your uploaded resumes and indexed code are used only to build your Knowledge Base and tailor your resumes. There is no secondary use, sharing or selling.",
+          "status": "published"
+        },
+        {
+          "id": "delete-account",
+          "question": "Can I delete my account?",
+          "answer": "Yes. Deleting your account cancels any active subscription immediately, disables sign-in and removes your access. To be confirmed: your data-retention wording (records are retained for audit and compliance rather than instantly purged).",
+          "status": "needs_confirmation"
+        },
+        {
+          "id": "data-residency",
+          "question": "Where is my data processed?",
+          "answer": "The AI pipeline runs on AWS in the EU region. To be confirmed: the exact region and residency statement you want to publish.",
+          "status": "needs_confirmation"
+        }
+      ]
+    },
+    {
+      "id": "accounts-sign-in",
+      "title": "Accounts & sign-in",
+      "items": [
+        {
+          "id": "how-do-i-sign-in",
+          "question": "How do I sign in?",
+          "answer": "With email and password, or via Google or GitHub. Sign-in is handled securely through AWS Cognito.",
+          "status": "published"
+        },
+        {
+          "id": "sign-in-vs-connect",
+          "question": "Do I sign in with GitHub and connect GitHub separately?",
+          "answer": "You can sign in with GitHub, and you separately authorise repository access for the Knowledge Base — these are two distinct steps.",
+          "status": "published"
+        }
+      ]
+    },
+    {
+      "id": "how-tailoring-works",
+      "title": "How tailoring works",
+      "items": [
+        {
+          "id": "what-ai-powers-it",
+          "question": "What AI powers Tucaken?",
+          "answer": "A multi-agent pipeline built on Anthropic's Claude models (via AWS Bedrock) reads your code and job description, verifies your skills against evidence, and writes the tailored resume.",
+          "status": "published"
+        },
+        {
+          "id": "why-only-proven-skills",
+          "question": "Why does Tucaken only use proven skills?",
+          "answer": "To keep your resume honest and defensible. Each claim is backed by evidence from your code, documented projects or career history — so you can stand behind every line in an interview.",
+          "status": "published"
+        },
+        {
+          "id": "what-do-i-get-out",
+          "question": "What do I actually get out?",
+          "answer": "A tailored resume (PDF and web), a gap-analysis report (verified, partial or gap per skill), an ATS keyword check, job-match insight, and stage-based interview coaching.",
+          "status": "published"
+        },
+        {
+          "id": "what-can-i-upload",
+          "question": "What can I upload?",
+          "answer": "You can import an existing resume to enrich your profile. To be confirmed: the accepted file formats (for example PDF) for the published answer.",
+          "status": "needs_confirmation"
+        }
+      ]
+    }
+  ]
+}
