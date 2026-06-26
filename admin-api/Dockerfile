@@ -18,6 +18,9 @@ COPY package.json yarn.lock .yarnrc.yml ./
 COPY tsconfig.base.json ./
 COPY admin-api/package.json  admin-api/
 COPY admin-api/tsconfig.json admin-api/
+# Vendored gated motion-plus tarball (root file: dep) — Yarn resolves the whole
+# lockfile during focus install, so the tarball must exist even here.
+COPY vendor/ ./vendor/
 
 # Install all deps including devDependencies (needed for tsc).
 # Yarn Berry v4 flag: omit --production to get devDeps; --production for prod-only.
