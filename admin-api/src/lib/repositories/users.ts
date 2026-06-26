@@ -435,6 +435,7 @@ export async function findUsersForHardDelete(
     deletedAt:            Date;
     stripeCustomerId:     string | null;
     stripeSubscriptionId: string | null;
+    cognitoSub:           string | null;
   }>
 > {
   const result = await pool.query<{
@@ -443,11 +444,13 @@ export async function findUsersForHardDelete(
     deleted_at:            Date;
     stripe_customer_id:    string | null;
     stripe_subscription_id: string | null;
+    cognito_sub:           string | null;
   }>(
-    `SELECT id, email, deleted_at, stripe_customer_id, stripe_subscription_id
-       FROM users
-      WHERE deleted_at IS NOT NULL
-        AND deleted_at < NOW() - ($1 || ' days')::INTERVAL`,
+    `SELECT u.id, u.email, u.deleted_at, u.stripe_customer_id, u.stripe_subscription_id,
+            (SELECT ui.cognito_sub FROM user_identities ui WHERE ui.user_id = u.id LIMIT 1) AS cognito_sub
+       FROM users u
+      WHERE u.deleted_at IS NOT NULL
+        AND u.deleted_at < NOW() - ($1 || ' days')::INTERVAL`,
     [String(graceDays)],
   );
   return result.rows.map((r) => ({
@@ -456,6 +459,7 @@ export async function findUsersForHardDelete(
     deletedAt:            r.deleted_at,
     stripeCustomerId:     r.stripe_customer_id,
     stripeSubscriptionId: r.stripe_subscription_id,
+    cognitoSub:           r.cognito_sub,
   }));
 }
 

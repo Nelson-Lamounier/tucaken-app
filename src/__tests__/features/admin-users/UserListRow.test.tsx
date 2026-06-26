@@ -22,16 +22,16 @@ function noop() {}
 
 describe('UserListRow', () => {
   it('renders email and plan', () => {
-    render(<UserListRow user={base} onView={noop} onEdit={noop} onRestore={noop} />)
+    render(<UserListRow user={base} onView={noop} onEdit={noop} onRestore={noop} onDelete={noop} onDisconnect={noop} />)
     expect(screen.getByText('a@x.com')).toBeTruthy()
     expect(screen.getByText('Pro')).toBeTruthy()
   })
 
   it('shows Restore only for a deleted user', () => {
-    const { rerender } = render(<UserListRow user={base} onView={noop} onEdit={noop} onRestore={noop} />)
+    const { rerender } = render(<UserListRow user={base} onView={noop} onEdit={noop} onRestore={noop} onDelete={noop} onDisconnect={noop} />)
     expect(screen.queryByLabelText('Restore user')).toBeFalsy()
     rerender(
-      <UserListRow user={{ ...base, deletedAt: '2026-02-01' }} onView={noop} onEdit={noop} onRestore={noop} />,
+      <UserListRow user={{ ...base, deletedAt: '2026-02-01' }} onView={noop} onEdit={noop} onRestore={noop} onDelete={noop} onDisconnect={noop} />,
     )
     expect(screen.getByLabelText('Restore user')).toBeTruthy()
   })

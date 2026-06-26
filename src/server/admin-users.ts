@@ -74,6 +74,37 @@ export const restoreAdminUserFn = createServerFn({ method: 'POST' })
     )
   })
 
+export const deleteAdminUserSchema = z.object({
+  id: z.string().uuid(),
+  mode: z.enum(['soft', 'hard']),
+  reason: z.string().max(500).optional(),
+})
+
+export const deleteAdminUserFn = createServerFn({ method: 'POST' })
+  .inputValidator(deleteAdminUserSchema)
+  .handler(async ({ data }) => {
+    await requireAdmin()
+    const { id, mode, reason } = data
+    return apiFetch<
+      | { ok: true; mode: 'soft'; alreadyDeleted: boolean }
+      | { ok: true; mode: 'hard'; outcome: { githubUninstall: string; cognitoDeleted: boolean; dbDeleted: boolean } }
+    >(`/users/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      pathTemplate: '/users/:id',
+      body: JSON.stringify({ mode, ...(reason ? { reason } : {}) }),
+    })
+  })
+
+export const disconnectAdminUserGithubFn = createServerFn({ method: 'POST' })
+  .inputValidator(idSchema)
+  .handler(async ({ data }) => {
+    await requireAdmin()
+    return apiFetch<{ ok: true; disconnected: boolean; githubUninstall: string }>(
+      `/users/${encodeURIComponent(data.id)}/github`,
+      { method: 'DELETE', pathTemplate: '/users/:id/github' },
+    )
+  })
+
 const repoDetailSchema = z.object({ id: z.string().uuid(), repo: z.string().min(1) })
 
 /** Admin: a user's synced repositories with their RAG (KB-quality + retrieval) metrics. */
