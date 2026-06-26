@@ -226,7 +226,7 @@ export function OrbitalComparison({ items }: { items: readonly ComparisonItem[] 
 
         <div
           aria-hidden="true"
-          className="absolute left-1/2 top-1/2 grid h-16 w-16 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-gradient-to-br from-teal-400 to-emerald-600"
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
         >
           <InfinityHub />
         </div>
