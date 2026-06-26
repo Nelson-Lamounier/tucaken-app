@@ -37,7 +37,7 @@ export const comparison: readonly ComparisonItem[] = [
 export const founder = {
   name: 'Nelson',
   role: 'DevOps engineer · Dublin',
-  quote: 'I built Tucaken because every resume tool I tried produced something that did not sound like me. I had years of real work in my GitHub that no tool could read. Tucaken is the tool I built for myself — I use it for my own job search every day.',
+  quote: 'I built Tucaken Resumes because every resume tool I tried produced something that did not sound like me. I had years of real work in my GitHub that no tool could read. Tucaken is the tool I built for myself — I use it for my own job search every day.',
 }
 
 export const pricing = [
