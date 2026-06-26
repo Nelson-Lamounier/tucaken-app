@@ -11,7 +11,8 @@ import { nodeAngles, nodeTransform } from './orbital-geometry'
 import type { ComparisonItem } from '../content'
 
 const ICONS: Record<string, LucideIcon> = { FileSearch, Target, FileWarning, Fingerprint }
-const RADIUS = 200
+const OUTER_RADIUS = 200
+const INNER_RADIUS = 120
 
 function ComparisonDetail({ item }: { item: ComparisonItem }) {
   return (
@@ -95,6 +96,28 @@ function OrbitalNode({
   )
 }
 
+function OrbitRing({
+  diameter,
+  className,
+  testId,
+}: {
+  diameter: number
+  className: string
+  testId: string
+}) {
+  return (
+    <div
+      aria-hidden="true"
+      data-testid={testId}
+      className={cn(
+        'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border',
+        className,
+      )}
+      style={{ width: diameter, height: diameter }}
+    />
+  )
+}
+
 export function OrbitalComparison({ items }: { items: readonly ComparisonItem[] }) {
   const reduce = useReducedMotion() ?? false
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -116,13 +139,16 @@ export function OrbitalComparison({ items }: { items: readonly ComparisonItem[] 
         className="group/orbit relative hidden h-[520px] w-full lg:block"
         onClick={() => setActiveId(null)}
       >
+        <OrbitRing diameter={2 * OUTER_RADIUS} className="border-teal-400/15" testId="orbit-ring-outer" />
+        <OrbitRing diameter={2 * INNER_RADIUS} className="border-white/5" testId="orbit-ring-inner" />
+
         <div className="absolute left-1/2 top-1/2">
           <div className="orbit-spin-anim group-hover/orbit:[animation-play-state:paused]" data-paused={paused ? 'true' : undefined}>
             {items.map((item, i) => (
               <OrbitalNode
                 key={item.label}
                 item={item}
-                transform={nodeTransform(angles[i], RADIUS)}
+                transform={nodeTransform(angles[i], OUTER_RADIUS)}
                 expanded={activeId === item.label}
                 paused={paused}
                 onToggle={() => setActiveId(activeId === item.label ? null : item.label)}

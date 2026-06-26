@@ -54,4 +54,10 @@ describe('OrbitalComparison', () => {
     expect(screen.queryAllByRole('button')).toHaveLength(0)
     expect(screen.getByText('Q-evidence?')).toBeTruthy()
   })
+
+  it('renders the outer and inner orbit-path outline rings', () => {
+    render(<OrbitalComparison items={items} />)
+    expect(screen.getByTestId('orbit-ring-outer')).toBeTruthy()
+    expect(screen.getByTestId('orbit-ring-inner')).toBeTruthy()
+  })
 })
