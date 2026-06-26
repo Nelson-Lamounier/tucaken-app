@@ -16,7 +16,7 @@ export function Card({ as, className, children }: CardProps) {
   return (
     <Tag
       className={cn(
-        'rounded-2xl bg-white ring-1 ring-zinc-200 shadow-sm',
+        'rounded-md bg-white ring-1 ring-zinc-200 shadow-sm',
         'dark:bg-white/2 dark:ring-0 dark:inset-ring dark:inset-ring-white/10 dark:shadow-none',
         className,
       )}
