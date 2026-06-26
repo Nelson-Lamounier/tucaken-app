@@ -65,4 +65,9 @@ describe('OrbitalComparison', () => {
     render(<OrbitalComparison items={items} />)
     expect(screen.getAllByTestId('orbit-inner-dot')).toHaveLength(6)
   })
+
+  it('renders an infinity-symbol path at the hub', () => {
+    const { container } = render(<OrbitalComparison items={items} />)
+    expect(container.querySelector('svg path')).not.toBeNull()
+  })
 })

@@ -15,6 +15,10 @@ const OUTER_RADIUS = 200
 const INNER_RADIUS = 120
 const INNER_DOTS = 6
 
+// Lemniscate (figure-eight) traced by the hub.
+const INFINITY_PATH =
+  'M 50 25 C 50 10 75 10 75 25 C 75 40 50 40 50 25 C 50 10 25 10 25 25 C 25 40 50 40 50 25'
+
 function ComparisonDetail({ item }: { item: ComparisonItem }) {
   return (
     <div className="text-left">
@@ -141,6 +145,28 @@ function InnerRing({ paused }: { paused: boolean }) {
   )
 }
 
+function InfinityHub() {
+  return (
+    <svg
+      viewBox="0 0 100 50"
+      aria-hidden="true"
+      className="h-8 w-12"
+      style={{ filter: 'drop-shadow(0 0 6px rgba(45,212,191,0.6))' }}
+    >
+      <motion.path
+        d={INFINITY_PATH}
+        fill="none"
+        stroke="#2dd4bf"
+        strokeWidth={4}
+        strokeLinecap="round"
+        initial={{ pathLength: 0 }}
+        animate={{ pathLength: 1 }}
+        transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+      />
+    </svg>
+  )
+}
+
 export function OrbitalComparison({ items }: { items: readonly ComparisonItem[] }) {
   const reduce = useReducedMotion() ?? false
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -185,7 +211,7 @@ export function OrbitalComparison({ items }: { items: readonly ComparisonItem[] 
           aria-hidden="true"
           className="absolute left-1/2 top-1/2 grid h-16 w-16 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-gradient-to-br from-teal-400 to-emerald-600"
         >
-          <div className="h-7 w-7 rounded-full bg-white/80 backdrop-blur-md" />
+          <InfinityHub />
         </div>
 
         <AnimatePresence>
