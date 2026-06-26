@@ -32,6 +32,6 @@ describe('HeroSection', () => {
     const { default: userEvent } = await import('@testing-library/user-event')
     render(<HeroSection />)
     await userEvent.click(screen.getByRole('button', { name: /connect github/i }))
-    expect(transitionMock).toHaveBeenCalledWith('/sign-in')
+    expect(transitionMock).toHaveBeenCalledWith({ to: '/sign-in' })
   })
 })

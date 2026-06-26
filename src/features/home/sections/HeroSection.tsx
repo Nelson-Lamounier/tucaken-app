@@ -210,7 +210,7 @@ export function HeroSection() {
           </p>
 
           <div className="flex items-center justify-center">
-            <RippleButton onClick={() => transitionTo('/sign-in')}>
+            <RippleButton onClick={() => transitionTo({ to: '/sign-in' })}>
               {hero.primaryCta} <ArrowRight className="h-4 w-4" />
             </RippleButton>
           </div>

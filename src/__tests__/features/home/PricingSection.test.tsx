@@ -3,8 +3,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
-const navigateMock = vi.fn()
-vi.mock('@tanstack/react-router', () => ({ useNavigate: () => navigateMock }))
+const transitionMock = vi.fn()
+vi.mock('@/contexts/PageTransition', () => ({
+  usePageTransition: () => ({ transitionTo: transitionMock, isPending: false }),
+}))
+vi.mock('@tanstack/react-router', () => ({ Link: ({ children }: { children?: unknown }) => children }))
 vi.mock('@tanstack/react-query', () => ({ useQuery: () => ({ data: undefined }) }))
 vi.mock('@/server/tier-config', () => ({ getPublicTierConfigFn: vi.fn() }))
 // NumberFlow is a custom-element wrapper; stub it to a plain span so digits
@@ -22,7 +25,7 @@ const byId = (id: string) => {
   return t
 }
 
-beforeEach(() => navigateMock.mockReset())
+beforeEach(() => transitionMock.mockReset())
 
 describe('TierPrice', () => {
   it('renders "Free" for the free tier', () => {
@@ -69,18 +72,18 @@ describe('PricingSection', () => {
     }
   })
 
-  it('free tier CTA navigates to sign-in', async () => {
+  it('free tier CTA transitions to sign-in', async () => {
     const { default: userEvent } = await import('@testing-library/user-event')
     render(<PricingSection />)
     await userEvent.click(screen.getByRole('button', { name: new RegExp(byId('free').cta, 'i') }))
-    expect(navigateMock).toHaveBeenCalledWith({ to: '/sign-in' })
+    expect(transitionMock).toHaveBeenCalledWith({ to: '/sign-in' })
   })
 
-  it('paid tier CTA navigates to checkout with its id', async () => {
+  it('paid tier CTA transitions to checkout with its id', async () => {
     const { default: userEvent } = await import('@testing-library/user-event')
     render(<PricingSection />)
     await userEvent.click(screen.getByRole('button', { name: new RegExp(byId('pro').cta, 'i') }))
-    expect(navigateMock).toHaveBeenCalledWith({ to: '/checkout/$tier', params: { tier: 'pro' } })
+    expect(transitionMock).toHaveBeenCalledWith({ to: '/checkout/$tier', params: { tier: 'pro' } })
   })
 
   it('toggling to annually swaps the displayed prices', async () => {
