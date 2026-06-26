@@ -192,7 +192,7 @@ export function OrbitalComparison({ items }: { items: readonly ComparisonItem[] 
         <ComparisonList items={items} />
       </div>
 
-      <div ref={orbitRef} className="hidden lg:block">
+      <div ref={orbitRef} className="relative hidden lg:block">
         <motion.div
           style={{ scale, willChange: 'transform' }}
           className="group/orbit relative h-[520px] w-full"
