@@ -13,7 +13,9 @@
  * against TierConfigSchema before forwarding.
  */
 
+import { randomUUID } from 'node:crypto'
 import Stripe from 'stripe'
+import { z } from 'zod'
 import { createServerFn } from '@tanstack/react-start'
 import { apiFetch } from './_api-client'
 import { requireAdmin, requireAuth } from './auth-guard'
@@ -23,6 +25,7 @@ import {
   type TierConfig,
   type PublicTierConfig,
 } from '@/features/billing/tier-config'
+import { toMinorUnits, ALLOWED_PRICE_CURRENCIES } from '@/features/billing/money'
 
 // -----------------------------------------------------------------------------
 // GET /api/admin/tier-config
@@ -95,3 +98,43 @@ export const listStripePricesFn = createServerFn({ method: 'GET' }).handler(asyn
     productName: extractProductName(p.product),
   }))
 })
+
+// -----------------------------------------------------------------------------
+// Create a Stripe Product + monthly Price for a paid tier (admin-only).
+//
+// The created objects land in whatever MODE the deployment's STRIPE_SECRET_KEY
+// is: a test key creates test objects, a live key creates live objects — so a
+// test deployment never touches the live account. Returns the new price id so
+// the editor can map the tier to it.
+// -----------------------------------------------------------------------------
+
+const CreateTierPriceInput = z.object({
+  tier: z.enum(['pro', 'premium']),
+  /** Display amount in major units (e.g. 35 for EUR 35.00). */
+  amount: z.number().positive(),
+  currency: z.enum(ALLOWED_PRICE_CURRENCIES),
+})
+
+export const createTierStripePriceFn = createServerFn({ method: 'POST' })
+  .inputValidator(CreateTierPriceInput)
+  .handler(async ({ data }): Promise<{ priceId: string; productId: string; unitAmount: number; currency: string }> => {
+    await requireAdmin()
+    const unitAmount = toMinorUnits(data.amount)
+    const name = data.tier === 'pro' ? 'Tucaken Pro' : 'Tucaken Premium'
+
+    const product = await stripe().products.create(
+      { name },
+      { idempotencyKey: randomUUID() },
+    )
+    const price = await stripe().prices.create(
+      {
+        product: product.id,
+        unit_amount: unitAmount,
+        currency: data.currency,
+        recurring: { interval: 'month' },
+      },
+      { idempotencyKey: randomUUID() },
+    )
+
+    return { priceId: price.id, productId: product.id, unitAmount, currency: data.currency }
+  })

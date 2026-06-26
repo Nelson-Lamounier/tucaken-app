@@ -23,6 +23,16 @@ vi.mock('@/server/resume-imports', () => ({
   updateCareerEntryFn:   vi.fn(() => Promise.resolve(undefined)),
 }))
 
+// The readiness diagnostic is now admin-only; getMeFn drives the role gate.
+const getMeMock = vi.fn()
+vi.mock('@/server/me', () => ({ getMeFn: () => getMeMock() }))
+
+// User-path panels (KB-quality + activity) — resolve to empty data.
+vi.mock('@/server/activity', () => ({
+  getKbHealthFn:      vi.fn(() => Promise.resolve({ repositories: [], totals: { repoCount: 0, files: 0, chunks: 0, embedded: 0, avgKbQuality: null } })),
+  getDailyActivityFn: vi.fn(() => Promise.resolve({ days: [], totals: { applications: 0, resumes: 0 } })),
+}))
+
 import { ReviewStep } from '@/features/onboarding/components/steps/ReviewStep'
 
 function renderWithClient(ui: React.ReactElement) {
@@ -37,6 +47,8 @@ describe('ReviewStep', () => {
     navigateMock.mockReset()
     useProfileSummaryMock.mockReset()
     useProfileSummaryMock.mockReturnValue({ data: undefined })
+    getMeMock.mockReset()
+    getMeMock.mockResolvedValue({ plan: { role: 'user' } })
   })
 
   it('renders the all-set finish screen when no importId is present', () => {
@@ -61,7 +73,8 @@ describe('ReviewStep', () => {
     expect(navigateMock).not.toHaveBeenCalled()
   })
 
-  it('renders the DiagnosticPanel overall score in the review path', async () => {
+  it('renders the DiagnosticPanel overall score for admins in the review path', async () => {
+    getMeMock.mockResolvedValue({ plan: { role: 'admin' } })
     useProfileSummaryMock.mockReturnValue({
       data: {
         diagnostic: {
@@ -81,5 +94,13 @@ describe('ReviewStep', () => {
     renderWithClient(<ReviewStep importId="import-123" />)
     expect(await screen.findByText('78')).toBeTruthy()
     expect(screen.getByText('/100')).toBeTruthy()
+  })
+
+  it('hides the diagnostic from non-admins and shows the KB-quality panel instead', async () => {
+    getMeMock.mockResolvedValue({ plan: { role: 'user' } })
+    useProfileSummaryMock.mockReturnValue({ data: { diagnostic: { overall: 78, components: {}, methodology: { version: 1, weights: {}, notes: '' } } } })
+    renderWithClient(<ReviewStep importId="import-123" />)
+    expect((await screen.findAllByText('Chunks generated')).length).toBeGreaterThan(0)
+    expect(screen.queryByText('/100')).toBeNull()
   })
 })

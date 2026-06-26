@@ -351,10 +351,48 @@ async function onInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void> {
 
 // ─── Top-level dispatch ──────────────────────────────────────────────────────
 
+/**
+ * Idempotency guard. Claims the event id via admin-api; returns true when this
+ * is a duplicate delivery that should be skipped.
+ *
+ * Fails OPEN: if the dedupe call errors (table absent before the migration
+ * lands, transient network), we return false and process the event anyway. The
+ * conditional writes in the subscription sync remain the safety net — dropping
+ * a real billing event would be worse than a rare reprocess.
+ */
+async function isDuplicateEvent(eventId: string, type: string): Promise<boolean> {
+  try {
+    const res = await internalApiFetch<{ alreadyProcessed: boolean }>(
+      '/api/internal/billing/webhook-seen',
+      { method: 'POST', json: { eventId, type } },
+    )
+    return res.alreadyProcessed
+  } catch (err) {
+    logger.warn(
+      {
+        event: 'stripe_dedupe_check_failed',
+        id: eventId,
+        type,
+        err: err instanceof Error ? err.message : 'unknown',
+      },
+      '[stripe] webhook dedupe check failed — processing anyway (fail-open)',
+    )
+    return false
+  }
+}
+
 export async function handleStripeWebhook(ctx: WebhookContext): Promise<{
   received: true
 }> {
   const event = verifyEvent(ctx)
+
+  if (await isDuplicateEvent(event.id, event.type)) {
+    logger.info(
+      { event: 'stripe_duplicate_event', id: event.id, type: event.type },
+      '[stripe] duplicate event skipped',
+    )
+    return { received: true }
+  }
 
   switch (event.type) {
     case 'checkout.session.completed':

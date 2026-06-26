@@ -9,6 +9,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import type { AdminUserSummary, AdminUserDetail } from '@/features/admin-users/types'
+import type { RepoRagSummary, UserDiagnosticResult } from '@/lib/types/rag.types'
 import { requireAdmin } from './auth-guard'
 import { apiFetch } from './_api-client'
 
@@ -101,5 +102,42 @@ export const disconnectAdminUserGithubFn = createServerFn({ method: 'POST' })
     return apiFetch<{ ok: true; disconnected: boolean; githubUninstall: string }>(
       `/users/${encodeURIComponent(data.id)}/github`,
       { method: 'DELETE', pathTemplate: '/users/:id/github' },
+    )
+  })
+
+const repoDetailSchema = z.object({ id: z.string().uuid(), repo: z.string().min(1) })
+
+/** Admin: a user's synced repositories with their RAG (KB-quality + retrieval) metrics. */
+export const getUserRepositoriesFn = createServerFn({ method: 'GET' })
+  .inputValidator(idSchema)
+  .handler(async ({ data }) => {
+    await requireAdmin()
+    const body = await apiFetch<{ repositories: RepoRagSummary[] }>(
+      `/users/${encodeURIComponent(data.id)}/repositories`,
+      { pathTemplate: '/users/:id/repositories' },
+    )
+    return body.repositories
+  })
+
+/** Admin: a single repo's RAG detail (scores + breakdowns). */
+export const getUserRepositoryFn = createServerFn({ method: 'GET' })
+  .inputValidator(repoDetailSchema)
+  .handler(async ({ data }) => {
+    await requireAdmin()
+    const body = await apiFetch<{ repository: RepoRagSummary }>(
+      `/users/${encodeURIComponent(data.id)}/repositories/${encodeURIComponent(data.repo)}`,
+      { pathTemplate: '/users/:id/repositories/:repo' },
+    )
+    return body.repository
+  })
+
+/** Admin: an arbitrary user's full readiness diagnostic (every metric the panel shows). */
+export const getUserDiagnosticFn = createServerFn({ method: 'GET' })
+  .inputValidator(idSchema)
+  .handler(async ({ data }) => {
+    await requireAdmin()
+    return apiFetch<UserDiagnosticResult>(
+      `/users/${encodeURIComponent(data.id)}/diagnostic`,
+      { pathTemplate: '/users/:id/diagnostic' },
     )
   })

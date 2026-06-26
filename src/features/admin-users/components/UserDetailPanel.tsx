@@ -4,6 +4,7 @@ import { Dialog, DialogPanel, DialogBackdrop } from '@headlessui/react'
 import { Loader2 } from 'lucide-react'
 import { useAdminUser } from '../hooks/use-admin-users'
 import { PlanBadge, RoleBadge } from './PlanBadge'
+import { UserRagSection } from './UserRagSection'
 
 interface Props {
   readonly userId: string | null
@@ -27,7 +28,7 @@ export function UserDetailPanel({ userId, open, onClose }: Props) {
     <Dialog open={open} onClose={onClose} className="relative z-50">
       <DialogBackdrop className="fixed inset-0 bg-zinc-900/40 backdrop-blur-sm dark:bg-zinc-900/60" />
       <div className="fixed inset-y-0 right-0 flex max-w-full">
-        <DialogPanel className="w-screen max-w-md overflow-y-auto border-l border-zinc-200 bg-white p-6 dark:border-white/10 dark:bg-zinc-900">
+        <DialogPanel className="w-screen max-w-xl overflow-y-auto border-l border-zinc-200 bg-white p-6 dark:border-white/10 dark:bg-zinc-900">
           {isLoading && (
             <div className="flex items-center justify-center py-16">
               <Loader2 className="size-8 animate-spin text-violet-400" />
@@ -62,6 +63,8 @@ export function UserDetailPanel({ userId, open, onClose }: Props) {
                   </div>
                 </div>
               )}
+              <UserRagSection userId={user.id} />
+
               <div className="mt-6 flex justify-end">
                 <button type="button" onClick={onClose} className="rounded-md px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-white/10">
                   Close

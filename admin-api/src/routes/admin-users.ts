@@ -40,6 +40,11 @@ import {
   restoreSoftDeletedUser,
   softDeleteUser,
 } from '../lib/repositories/users.js';
+import {
+  getUserRepositories,
+  getUserRepository,
+  getUserDiagnostic,
+} from '../lib/repositories/user-rag.js';
 import type { AdminApiBindings } from '../lib/types.js';
 import { requireUserId } from '../lib/types.js';
 
@@ -335,6 +340,49 @@ export function createAdminUsersRouter(
     }
     logger.warn({ event: 'admin_user_updated', userId, patch: parsed.data, updated }, 'admin updated user');
     return ctx.json({ ok: true, updated });
+  });
+
+  /**
+   * GET /api/admin/users/:userId/repositories
+   *
+   * A user's synced repositories with their RAG metrics (KB-quality + retrieval
+   * scores and breakdowns). Admin support-tool surface — read-only.
+   */
+  router.get('/:userId/repositories', async (ctx) => {
+    const userId = ctx.req.param('userId');
+    if (!UUID_RE.test(userId)) return ctx.json({ error: 'Invalid userId' }, 400);
+    const repositories = await getUserRepositories(getPool(config), userId);
+    return ctx.json({ repositories });
+  });
+
+  /**
+   * GET /api/admin/users/:userId/repositories/:repo
+   *
+   * Single repo's RAG detail (kb_quality + retrieval scores + breakdowns).
+   * `:repo` is the URL-encoded repo_full_name (owner%2Fname).
+   */
+  router.get('/:userId/repositories/:repo', async (ctx) => {
+    const userId = ctx.req.param('userId');
+    if (!UUID_RE.test(userId)) return ctx.json({ error: 'Invalid userId' }, 400);
+    const repoFullName = decodeURIComponent(ctx.req.param('repo'));
+    const repository = await getUserRepository(getPool(config), userId, repoFullName);
+    if (!repository) return ctx.json({ error: 'NotFound', repo: repoFullName }, 404);
+    return ctx.json({ repository });
+  });
+
+  /**
+   * GET /api/admin/users/:userId/diagnostic
+   *
+   * The full Resume-Readiness diagnostic for an arbitrary user (the user-facing
+   * /profile/summary only returns the caller's own rollup). Admin keeps the
+   * complete readiness panel — overall score + all five sub-metrics + blockers.
+   */
+  router.get('/:userId/diagnostic', async (ctx) => {
+    const userId = ctx.req.param('userId');
+    if (!UUID_RE.test(userId)) return ctx.json({ error: 'Invalid userId' }, 400);
+    const result = await getUserDiagnostic(getPool(config), userId);
+    if (!result) return ctx.json({ error: 'No profile yet', userId }, 404);
+    return ctx.json(result);
   });
 
   return router;

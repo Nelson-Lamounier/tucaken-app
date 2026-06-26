@@ -69,10 +69,14 @@ export function PlanSection({ billing, onUpdateBilling }: Props) {
     }
     setPortalLoading(id)
     try {
+      // Deep-link straight into Stripe's plan-change screen (or cancellation
+      // when downgrading to Free) instead of the portal home.
+      const flow = id === 'free' ? 'cancel' : 'update'
       const { url } = await createPortalSessionFn({
         data: {
           customerId: billing.stripeCustomerId,
           returnPath: '/billing',
+          flow,
         },
       })
       window.location.assign(url)
