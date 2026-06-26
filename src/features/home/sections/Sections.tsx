@@ -11,7 +11,8 @@ import type { Tier } from '@/features/billing/catalog'
 import { MagneticButton } from '../lib/MagneticButton'
 import { Marquee } from '../lib/Marquee'
 import { KineticText } from '../lib/KineticText'
-import { comparison, founder, faq } from '../content'
+import { comparison, founder } from '../content'
+import { faqCategories } from '../lib/faq'
 import { highlightParts } from '../lib/highlight'
 import { tiersFromPublic } from '@/features/billing/catalog'
 import { getPublicTierConfigFn } from '@/server/tier-config'
@@ -273,41 +274,56 @@ export function PricingSection() {
 }
 
 
+// Composite id (category:item) of the first published item — open by default.
+const FIRST_FAQ = faqCategories[0]?.items[0]
+const FIRST_OPEN = FIRST_FAQ ? `${faqCategories[0].id}:${FIRST_FAQ.id}` : null
+
 export function FAQSection() {
-  const [open, setOpen] = useState<number>(0)
+  const [open, setOpen] = useState<string | null>(FIRST_OPEN)
   return (
     <Section id="faq" className="border-t border-white/5">
       <div className="mx-auto max-w-3xl">
         <Eyebrow>Frequently asked</Eyebrow>
-        <h2 className="text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl">Last objections, handled.</h2>
-        <div className="mt-10 divide-y divide-white/5 rounded-2xl border border-white/10 bg-white/[0.02]">
-          {faq.map((f, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => setOpen(open === i ? -1 : i)}
-              className="block w-full px-5 py-4 text-left"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <span className="font-medium text-white">{f.q}</span>
-                <span className={['font-mono text-lg text-zinc-500 transition-transform', open === i ? 'rotate-45' : ''].join(' ')}>+</span>
+        <h2 className="text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl">Questions, answered.</h2>
+        <div className="mt-10 space-y-8">
+          {faqCategories.map((cat) => (
+            <div key={cat.id}>
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">{cat.title}</h3>
+              <div className="divide-y divide-white/5 rounded-2xl border border-white/10 bg-white/[0.02]">
+                {cat.items.map((item) => {
+                  const id = `${cat.id}:${item.id}`
+                  const isOpen = open === id
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setOpen(isOpen ? null : id)}
+                      className="block w-full px-5 py-4 text-left"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-medium text-white">{item.question}</span>
+                        <span className={['font-mono text-lg text-zinc-500 transition-transform', isOpen ? 'rotate-45' : ''].join(' ')}>+</span>
+                      </div>
+                      <AnimatePresence initial={false}>
+                        {isOpen ? (
+                          <motion.p
+                            key="a"
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+                            style={{ overflow: 'hidden', willChange: 'opacity' }}
+                            className="mt-3 text-sm leading-relaxed text-zinc-400"
+                          >
+                            {item.answer}
+                          </motion.p>
+                        ) : null}
+                      </AnimatePresence>
+                    </button>
+                  )
+                })}
               </div>
-              <AnimatePresence initial={false}>
-                {open === i ? (
-                  <motion.p
-                    key="a"
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ type: 'spring', stiffness: 120, damping: 20 }}
-                    style={{ overflow: 'hidden', willChange: 'opacity' }}
-                    className="mt-3 text-sm leading-relaxed text-zinc-400"
-                  >
-                    {f.a}
-                  </motion.p>
-                ) : null}
-              </AnimatePresence>
-            </button>
+            </div>
           ))}
         </div>
       </div>

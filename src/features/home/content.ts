@@ -63,13 +63,6 @@ export const pricing = [
   { name: 'Pro', price: '€12', period: 'per month', items: ['Unlimited repositories (incl. private)', 'Unlimited resumes & cover letters', 'Per-phase interview coaching', 'Application tracker'], cta: 'Go Pro', hl: true },
 ] as const
 
-export const faq = [
-  { q: 'Will recruiters know my resume was AI-generated?', a: 'The output is grounded in your actual work, so it sounds like you wrote it about systems you built. No generic AI tone. Always review and edit before sending.' },
-  { q: 'What if my repos are private or thin on docs?', a: 'Tucaken works on private repos via secure GitHub OAuth. For thin docs, it shows a quality score per repo and suggests improvements.' },
-  { q: 'How is this different from ChatGPT?', a: 'ChatGPT cannot read your repositories. Tucaken reads your actual code and writes from there.' },
-  { q: 'Is my code data safe?', a: 'Tucaken only reads documentation and metadata — README files, commit messages, architecture docs. Source code is not stored. GitHub access is read-only and revocable.' },
-] as const
-
 export const interviewedAt = ['AWS', 'Google', 'Stripe', 'Cloudflare', 'Datadog', 'Vercel'] as const
 
 export const repos = [
