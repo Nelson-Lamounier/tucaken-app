@@ -9,10 +9,20 @@ import type { DailyActivity } from '@/lib/types/rag.types'
 
 /**
  * User activity panel — applications + resumes generated per day over the last
- * 30 days, as grouped bars, with running totals. Data: GET /activity/daily.
+ * 30 days, as grouped bars with a baseline axis, a max gridline and running
+ * totals. Series are colour-separated (teal = applications, amber = resumes)
+ * so the two metrics read distinctly. Data: GET /activity/daily.
  */
 
 const activityKey = ['user', 'activity', 'daily', 30] as const
+
+// Categorical series colours (tokens flip for dark mode in styles.css).
+const APPLICATIONS_COLOUR = 'bg-[var(--accent)]'
+const RESUMES_COLOUR = 'bg-[var(--chart-series-2)]'
+
+function formatDay(date: string): string {
+  return new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
 
 function Legend({ colour, label }: { readonly colour: string; readonly label: string }) {
   return (
@@ -24,10 +34,10 @@ function Legend({ colour, label }: { readonly colour: string; readonly label: st
 }
 
 function Bar({ value, max, colour }: { readonly value: number; readonly max: number; readonly colour: string }) {
-  const h = max === 0 ? 0 : Math.max(value > 0 ? 4 : 0, (value / max) * 100)
+  const h = max === 0 ? 0 : Math.max(value > 0 ? 3 : 0, (value / max) * 100)
   return (
     <motion.span
-      className={`w-1/2 max-w-2 self-end rounded-sm ${colour}`}
+      className={`min-w-0 flex-1 self-end rounded-t-sm ${colour}`}
       style={{ height: `${h}%`, transformOrigin: 'bottom', willChange: 'transform' }}
       initial={{ scaleY: 0 }}
       animate={{ scaleY: 1 }}
@@ -39,9 +49,49 @@ function Bar({ value, max, colour }: { readonly value: number; readonly max: num
 function DayBars({ day, max }: { readonly day: DailyActivity; readonly max: number }) {
   const title = `${day.date}: ${day.applications} application(s), ${day.resumes} resume(s)`
   return (
-    <div className="flex h-full flex-1 items-end justify-center gap-0.5" title={title}>
-      <Bar value={day.applications} max={max} colour="bg-[var(--accent)]" />
-      <Bar value={day.resumes} max={max} colour="bg-emerald-500/80 dark:bg-emerald-400/80" />
+    <div className="flex h-full flex-1 items-end justify-center gap-px" title={title}>
+      <Bar value={day.applications} max={max} colour={APPLICATIONS_COLOUR} />
+      <Bar value={day.resumes} max={max} colour={RESUMES_COLOUR} />
+    </div>
+  )
+}
+
+/** Grouped-bar chart with a y-axis (max/0), a mid gridline and a baseline. */
+function ActivityChart({ days, max }: { readonly days: readonly DailyActivity[]; readonly max: number }) {
+  const first = days.at(0)
+  const last = days.at(-1)
+  return (
+    <div className="flex gap-2">
+      {/* y-axis scale */}
+      <div className="flex h-32 shrink-0 flex-col justify-between py-px text-[10px] tabular-nums text-zinc-400">
+        <span>{max}</span>
+        <span>0</span>
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="relative h-32">
+          {/* gridlines */}
+          <div aria-hidden className="pointer-events-none absolute inset-0">
+            <span className="absolute inset-x-0 top-0 border-t border-dashed border-zinc-200 dark:border-white/10" />
+            <span className="absolute inset-x-0 top-1/2 border-t border-dashed border-zinc-200/60 dark:border-white/5" />
+          </div>
+          {/* bars */}
+          <div className="flex h-full items-end gap-px">
+            {days.map((d) => (
+              <DayBars key={d.date} day={d} max={max} />
+            ))}
+          </div>
+        </div>
+
+        {/* baseline axis */}
+        <div className="border-t border-zinc-300 dark:border-white/20" aria-hidden />
+
+        {/* x-axis range */}
+        <div className="mt-1 flex justify-between text-[10px] tabular-nums text-zinc-400">
+          <span>{first ? formatDay(first.date) : ''}</span>
+          <span>{last ? formatDay(last.date) : ''}</span>
+        </div>
+      </div>
     </div>
   )
 }
@@ -70,8 +120,8 @@ export function ActivityPanel() {
           <span className="text-xs text-zinc-500 dark:text-zinc-400">Last 30 days</span>
         </div>
         <div className="flex gap-3">
-          <Legend colour="bg-[var(--accent)]" label="Applications" />
-          <Legend colour="bg-emerald-500/80 dark:bg-emerald-400/80" label="Resumes" />
+          <Legend colour={APPLICATIONS_COLOUR} label="Applications" />
+          <Legend colour={RESUMES_COLOUR} label="Resumes" />
         </div>
       </div>
 
@@ -93,11 +143,7 @@ export function ActivityPanel() {
           No applications or resumes generated in the last 30 days.
         </p>
       ) : (
-        <div className="flex h-28 items-end gap-px">
-          {days.map((d) => (
-            <DayBars key={d.date} day={d} max={max} />
-          ))}
-        </div>
+        <ActivityChart days={days} max={max} />
       )}
     </Card>
   )

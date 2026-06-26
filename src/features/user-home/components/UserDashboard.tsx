@@ -73,9 +73,9 @@ export function UserDashboard() {
           </div>
         ) : (
           <div className="space-y-6">
+            <ActivityPanel />
             <KbStatsPanel tiles={heroTiles} />
             <KbQualityPanel />
-            <ActivityPanel />
           </div>
         )}
 
