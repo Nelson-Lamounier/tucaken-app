@@ -4,6 +4,7 @@
 
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 vi.mock('@tanstack/react-router', () => ({
@@ -14,9 +15,11 @@ vi.mock('@tanstack/react-router', () => ({
 }))
 
 const listProjectsMock = vi.fn()
+const confirmProjectMock = vi.fn()
 vi.mock('@/server/projects', () => ({
   listProjectsFn:     (args: unknown) => listProjectsMock(args),
   getProjectDetailFn: vi.fn(),
+  confirmProjectFn:   (args: unknown) => confirmProjectMock(args),
 }))
 
 import { ProjectsIndex } from '@/features/projects/components/index/ProjectsIndex'
@@ -60,7 +63,10 @@ function makeProject(overrides: Partial<ProjectSummary> = {}): ProjectSummary {
 }
 
 describe('ProjectsIndex', () => {
-  beforeEach(() => listProjectsMock.mockReset())
+  beforeEach(() => {
+    listProjectsMock.mockReset()
+    confirmProjectMock.mockReset()
+  })
 
   it('renders skeleton placeholders while loading', () => {
     listProjectsMock.mockReturnValueOnce(new Promise(() => {}))
@@ -87,6 +93,40 @@ describe('ProjectsIndex', () => {
     renderWithClient()
     await waitFor(() => screen.getByText('Alpha'))
     expect(screen.getByText('Beta')).toBeTruthy()
+  })
+
+  it('offers a Build a project action for a lone single-repo default', async () => {
+    const def = makeProject({
+      name:              'solo-repo',
+      is_user_confirmed: false,
+      is_ai_suggested:   false,
+      post_sync_action:  null,
+      case_study_status: null,
+    })
+    listProjectsMock.mockResolvedValue({ total: 1, limit: 100, offset: 0, items: [def] })
+    confirmProjectMock.mockResolvedValue({ confirmed: true, projectId: def.id })
+
+    renderWithClient()
+
+    const buildBtn = await screen.findByRole('button', { name: /build a project/i })
+    await userEvent.click(buildBtn)
+
+    await waitFor(() => expect(confirmProjectMock).toHaveBeenCalledWith({ data: def.id }))
+  })
+
+  it('shows only the connect-another CTA when multiple defaults exist (clustering path)', async () => {
+    listProjectsMock.mockResolvedValue({
+      total: 2,
+      limit: 100,
+      offset: 0,
+      items: [
+        makeProject({ name: 'repo-a', is_user_confirmed: false, is_ai_suggested: false, case_study_status: null }),
+        makeProject({ name: 'repo-b', is_user_confirmed: false, is_ai_suggested: false, case_study_status: null }),
+      ],
+    })
+    renderWithClient()
+    await waitFor(() => screen.getByText(/create your first project/i))
+    expect(screen.queryByRole('button', { name: /build a project/i })).toBeNull()
   })
 
   it('renders error state when query fails', async () => {

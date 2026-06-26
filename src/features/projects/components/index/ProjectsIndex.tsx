@@ -4,8 +4,10 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { FolderOpen, FolderPlus, Github, Sparkles } from 'lucide-react'
 import { CommandPallete, type CommandPalleteItem } from '@/components/ui/CommandPallete'
 import { projectsQueries } from '../../server/queries'
+import { useConfirmProject } from '../../server/mutations'
 import { PROJECT_TYPE_LABELS, type ProjectSummary } from '../../lib/types'
 import { partitionProjects } from '../../lib/classify'
+import { useToastStore } from '@/lib/stores/toast-store'
 import { ProjectCard } from './ProjectCard'
 import { PendingProjectCard } from './PendingProjectCard'
 import { ProjectFilterBar, type ProjectFilterValue } from './ProjectFilterBar'
@@ -54,10 +56,18 @@ export function ProjectsIndex() {
   // the right next step. If there are pending-setup projects, surface them so
   // the user knows setup is in progress rather than seeing nothing.
   if (curated.length === 0) {
+    // A lone synced repo can be turned into a project directly (no second repo
+    // required) — confirming its default project queues the case study. With
+    // two or more defaults, the clustering/connect-another path fits better.
+    const loneDefault = defaults.length === 1 ? defaults[0] : undefined
     return (
       <div className="space-y-4">
         {pending.length > 0 && <PendingSection projects={pending} />}
-        <NoCuratedState proposalCount={proposals.length} repoCount={defaults.length} />
+        <NoCuratedState
+          proposalCount={proposals.length}
+          repoCount={defaults.length}
+          buildableDefault={loneDefault ? { id: loneDefault.id, name: loneDefault.name } : undefined}
+        />
       </div>
     )
   }
@@ -185,18 +195,21 @@ function EmptyState() {
 }
 
 /**
- * Repos are synced but no project has been curated yet. Two paths:
+ * Repos are synced but no project has been curated yet. Three paths:
  *  - AI proposals exist → send the user to review/accept them.
- *  - Only raw defaults (e.g. a single repo) → invite them to connect another
- *    repo so Tucaken can group them, with a link to review once ≥2 exist.
+ *  - Exactly one raw default → let them build a project from that single repo
+ *    directly (confirming its default project queues the case study).
+ *  - Two or more raw defaults → invite them to connect/group via clustering.
  * Either way the user is never shown the raw per-repo defaults as "projects".
  */
 function NoCuratedState({
   proposalCount,
   repoCount,
+  buildableDefault,
 }: {
   readonly proposalCount: number
   readonly repoCount: number
+  readonly buildableDefault?: { id: string; name: string }
 }) {
   const hasProposals = proposalCount > 0
   return (
@@ -212,24 +225,81 @@ function NoCuratedState({
             : `You've synced ${repoCount} repositor${repoCount === 1 ? 'y' : 'ies'}. Connect another so Tucaken can group related repos into a project — or build one from your existing work.`}
         </p>
       </div>
-      {hasProposals ? (
-        <Link
-          to="/projects/review"
-          className="inline-flex items-center gap-1.5 rounded-full bg-teal-500/90 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-teal-400"
+      <NoCuratedCta
+        hasProposals={hasProposals}
+        proposalCount={proposalCount}
+        buildableDefault={buildableDefault}
+      />
+    </div>
+  )
+}
+
+/**
+ * The call-to-action(s) for the empty Projects state. Guard clauses keep the
+ * three mutually-exclusive paths flat (no nested ternaries): review proposals,
+ * build from a lone repo, or connect another repo.
+ */
+function NoCuratedCta({
+  hasProposals,
+  proposalCount,
+  buildableDefault,
+}: {
+  readonly hasProposals: boolean
+  readonly proposalCount: number
+  readonly buildableDefault?: { id: string; name: string }
+}) {
+  const { addToast } = useToastStore()
+  const confirm = useConfirmProject()
+
+  if (hasProposals) {
+    return (
+      <Link
+        to="/projects/review"
+        className="inline-flex items-center gap-1.5 rounded-full bg-teal-500/90 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-teal-400"
+      >
+        <Sparkles className="size-3.5" />
+        Review {proposalCount} proposal{proposalCount === 1 ? '' : 's'}
+      </Link>
+    )
+  }
+
+  if (buildableDefault) {
+    const onBuild = () => {
+      confirm.mutate(buildableDefault.id, {
+        onSuccess: () => addToast('success', 'Building your project — the case study is generating.'),
+        onError:   (err: Error) => addToast('error', `Couldn't start your project: ${err.message}`),
+      })
+    }
+    return (
+      <div className="flex flex-col items-center gap-2">
+        <button
+          type="button"
+          onClick={onBuild}
+          disabled={confirm.isPending}
+          className="inline-flex items-center gap-1.5 rounded-full bg-teal-500/90 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-teal-400 disabled:opacity-50"
         >
-          <Sparkles className="size-3.5" />
-          Review {proposalCount} proposal{proposalCount === 1 ? '' : 's'}
-        </Link>
-      ) : (
+          <FolderPlus className="size-3.5" />
+          {confirm.isPending ? 'Starting…' : 'Build a project'}
+        </button>
         <a
           href="/settings/github"
-          className="inline-flex items-center gap-1.5 rounded-full bg-teal-500/90 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-teal-400"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-400 transition-colors hover:text-zinc-200"
         >
           <Github className="size-3.5" />
-          Connect another repository
+          or connect another repository
         </a>
-      )}
-    </div>
+      </div>
+    )
+  }
+
+  return (
+    <a
+      href="/settings/github"
+      className="inline-flex items-center gap-1.5 rounded-full bg-teal-500/90 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-teal-400"
+    >
+      <Github className="size-3.5" />
+      Connect another repository
+    </a>
   )
 }
 
