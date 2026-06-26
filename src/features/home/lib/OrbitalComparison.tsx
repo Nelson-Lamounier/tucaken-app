@@ -67,7 +67,7 @@ function OrbitalNode({
   return (
     <div className="absolute" style={{ transform, willChange: 'transform' }}>
       <div
-        className="orbit-counter-spin-anim"
+        className="orbit-counter-spin-anim group-hover/orbit:[animation-play-state:paused]"
         style={{ willChange: 'transform' }}
         data-paused={paused ? 'true' : undefined}
       >
@@ -113,11 +113,11 @@ export function OrbitalComparison({ items }: { items: readonly ComparisonItem[] 
       </div>
 
       <div
-        className="relative hidden h-[520px] w-full lg:block"
+        className="group/orbit relative hidden h-[520px] w-full lg:block"
         onClick={() => setActiveId(null)}
       >
         <div className="absolute left-1/2 top-1/2">
-          <div className="orbit-spin-anim" data-paused={paused ? 'true' : undefined}>
+          <div className="orbit-spin-anim group-hover/orbit:[animation-play-state:paused]" data-paused={paused ? 'true' : undefined}>
             {items.map((item, i) => (
               <OrbitalNode
                 key={item.label}
