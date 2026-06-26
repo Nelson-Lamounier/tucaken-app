@@ -12,8 +12,6 @@ import type { ComparisonItem } from '../content'
 
 const ICONS: Record<string, LucideIcon> = { FileSearch, Target, FileWarning, Fingerprint }
 const OUTER_RADIUS = 200
-const INNER_RADIUS = 120
-const INNER_DOTS = 6
 const SCROLL_SCALE_RANGE = [0.82, 1.06] as const
 
 // Infinity (lemniscate) path traced by the hub, in a 0 0 24 24 viewBox.
@@ -96,50 +94,6 @@ function OrbitalNode({
         <div className="absolute left-0 top-7 -translate-x-1/2 whitespace-nowrap text-center font-mono text-[11px] uppercase tracking-widest text-white/70">
           {item.label}
         </div>
-      </div>
-    </div>
-  )
-}
-
-function OrbitRing({
-  diameter,
-  className,
-  testId,
-}: {
-  diameter: number
-  className: string
-  testId: string
-}) {
-  return (
-    <div
-      aria-hidden="true"
-      data-testid={testId}
-      className={cn(
-        'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border',
-        className,
-      )}
-      style={{ width: diameter, height: diameter }}
-    />
-  )
-}
-
-function InnerRing({ paused }: { paused: boolean }) {
-  const angles = nodeAngles(INNER_DOTS)
-  return (
-    <div className="absolute left-1/2 top-1/2" aria-hidden="true">
-      <div
-        className="orbit-spin-slow-anim group-hover/orbit:[animation-play-state:paused]"
-        style={{ willChange: 'transform' }}
-        data-paused={paused ? 'true' : undefined}
-      >
-        {angles.map((a) => (
-          <span
-            key={a}
-            data-testid="orbit-inner-dot"
-            className="absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-teal-400/50"
-            style={{ transform: nodeTransform(a, INNER_RADIUS) }}
-          />
-        ))}
       </div>
     </div>
   )
@@ -231,9 +185,6 @@ export function OrbitalComparison({ items }: { items: readonly ComparisonItem[] 
           className="group/orbit relative h-[520px] w-full"
           onClick={() => setActiveId(null)}
         >
-        <OrbitRing diameter={2 * INNER_RADIUS} className="border-white/5" testId="orbit-ring-inner" />
-        <InnerRing paused={paused} />
-
         <div className="absolute left-1/2 top-1/2">
           <div className="orbit-spin-anim group-hover/orbit:[animation-play-state:paused]" data-paused={paused ? 'true' : undefined}>
             {/* Outer ring rides the same rotating group as the nodes, so ring +

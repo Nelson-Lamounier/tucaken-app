@@ -55,15 +55,9 @@ describe('OrbitalComparison', () => {
     expect(screen.getByText('Q-evidence?')).toBeTruthy()
   })
 
-  it('renders the outer and inner orbit-path outline rings', () => {
+  it('renders the outer orbit-path outline ring', () => {
     render(<OrbitalComparison items={items} />)
     expect(screen.getByTestId('orbit-ring-outer')).toBeTruthy()
-    expect(screen.getByTestId('orbit-ring-inner')).toBeTruthy()
-  })
-
-  it('renders the inner ring decorative dots', () => {
-    render(<OrbitalComparison items={items} />)
-    expect(screen.getAllByTestId('orbit-inner-dot')).toHaveLength(6)
   })
 
   it('renders an infinity-symbol path at the hub', () => {
