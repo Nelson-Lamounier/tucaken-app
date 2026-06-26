@@ -150,13 +150,20 @@ export function FounderSection() {
               <div className="font-mono text-xs text-zinc-400">{founder.role}</div>
             </div>
           </div>
-          <blockquote className="mt-6 whitespace-pre-line text-[17px] leading-relaxed text-zinc-200">
+          <motion.blockquote
+            initial={reduce ? false : { opacity: 0, y: 12 }}
+            whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-60px' }}
+            transition={{ duration: 0.5, ease: 'easeOut' }}
+            style={reduce ? undefined : { willChange: 'transform, opacity' }}
+            className="mt-6 whitespace-pre-line text-[17px] leading-relaxed text-zinc-200"
+          >
             "{founder.quote}"
-          </blockquote>
+          </motion.blockquote>
           <div className="mt-6 flex items-center gap-3 font-mono text-xs">
-            <a className="text-zinc-400 hover:text-teal-300" href="#">linkedin.com/in/nelson</a>
+            <a className="text-zinc-400 transition-colors hover:text-teal-300" href="#">linkedin.com/in/nelson</a>
             <span className="text-zinc-700">·</span>
-            <a className="text-zinc-400 hover:text-teal-300" href="#">github.com/nelson</a>
+            <a className="text-zinc-400 transition-colors hover:text-teal-300" href="#">github.com/nelson</a>
           </div>
         </div>
       </div>
