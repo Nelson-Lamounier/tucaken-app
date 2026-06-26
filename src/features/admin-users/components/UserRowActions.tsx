@@ -1,4 +1,4 @@
-import { Eye, ShieldCheck, RotateCcw } from 'lucide-react'
+import { Eye, ShieldCheck, RotateCcw, Unplug, Trash2 } from 'lucide-react'
 import type { AdminUserSummary } from '../types'
 
 const BTN =
@@ -9,9 +9,11 @@ interface Props {
   readonly onView: () => void
   readonly onEdit: () => void
   readonly onRestore: () => void
+  readonly onDelete: () => void
+  readonly onDisconnect: () => void
 }
 
-export function UserRowActions({ user, onView, onEdit, onRestore }: Props) {
+export function UserRowActions({ user, onView, onEdit, onRestore, onDelete, onDisconnect }: Props) {
   return (
     <div className="flex items-center justify-end gap-1">
       <button type="button" aria-label="View user" title="View user" className={BTN} onClick={onView}>
@@ -37,6 +39,24 @@ export function UserRowActions({ user, onView, onEdit, onRestore }: Props) {
           <RotateCcw className="size-4" />
         </button>
       )}
+      <button
+        type="button"
+        aria-label="Disconnect GitHub"
+        title="Disconnect GitHub"
+        className={BTN}
+        onClick={onDisconnect}
+      >
+        <Unplug className="size-4" />
+      </button>
+      <button
+        type="button"
+        aria-label="Delete user"
+        title="Delete user"
+        className={`${BTN} hover:text-red-600`}
+        onClick={onDelete}
+      >
+        <Trash2 className="size-4" />
+      </button>
     </div>
   )
 }

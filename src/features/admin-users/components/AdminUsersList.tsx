@@ -11,6 +11,7 @@ import { TIER_FILTER_OPTIONS } from './AdminUserTypes'
 import { UserListRow } from './UserListRow'
 import { UserDetailPanel } from './UserDetailPanel'
 import { ChangeRolePlanModal } from './ChangeRolePlanModal'
+import { DeleteUserModal } from './DeleteUserModal'
 import type { AdminUserSummary, UserTier } from '../types'
 
 const ITEMS_PER_PAGE = 10
@@ -68,6 +69,8 @@ interface ListBodyProps {
   readonly onView: (user: AdminUserSummary) => void
   readonly onEdit: (user: AdminUserSummary) => void
   readonly onRestore: (user: AdminUserSummary) => void
+  readonly onDelete: (user: AdminUserSummary) => void
+  readonly onDisconnect: (user: AdminUserSummary) => void
   readonly onPageChange: (page: number) => void
   readonly hasResults: boolean
 }
@@ -81,6 +84,8 @@ function ListBody({
   onView,
   onEdit,
   onRestore,
+  onDelete,
+  onDisconnect,
   onPageChange,
   hasResults,
 }: ListBodyProps) {
@@ -128,6 +133,8 @@ function ListBody({
             onView={onView}
             onEdit={onEdit}
             onRestore={onRestore}
+            onDelete={onDelete}
+            onDisconnect={onDisconnect}
           />
         ))}
       </div>
@@ -153,6 +160,8 @@ export function AdminUsersList() {
   const [currentPage, setCurrentPage] = useState(1)
   const [detailUserId, setDetailUserId] = useState<string | null>(null)
   const [editUser, setEditUser] = useState<AdminUserSummary | null>(null)
+  const [deleteUser, setDeleteUser] = useState<AdminUserSummary | null>(null)
+  const [disconnectUser, setDisconnectUser] = useState<AdminUserSummary | null>(null)
 
   const { data: users, isLoading, error } = useAdminUsers(tierFilter)
   const { mutate: restoreUser } = useRestoreAdminUser()
@@ -209,6 +218,8 @@ export function AdminUsersList() {
           onView={(u) => setDetailUserId(u.id)}
           onEdit={(u) => setEditUser(u)}
           onRestore={(u) => restoreUser({ id: u.id })}
+          onDelete={(u) => setDeleteUser(u)}
+          onDisconnect={(u) => setDisconnectUser(u)}
           onPageChange={setCurrentPage}
           hasResults={filtered.length > 0}
         />
@@ -221,6 +232,12 @@ export function AdminUsersList() {
       />
       {editUser && (
         <ChangeRolePlanModal user={editUser} open onClose={() => setEditUser(null)} />
+      )}
+      {deleteUser && (
+        <DeleteUserModal variant="delete" user={deleteUser} open onClose={() => setDeleteUser(null)} />
+      )}
+      {disconnectUser && (
+        <DeleteUserModal variant="disconnect" user={disconnectUser} open onClose={() => setDisconnectUser(null)} />
       )}
     </div>
   )
