@@ -25,21 +25,34 @@ const BEAMS_PER_LAYER = 8
 // Brand teal-400 (#2dd4bf) so the beams read on-palette, not raw cyan.
 const BEAM_RGB = '45,212,191'
 
-function createBeam(width: number, height: number, layer: number): Beam {
-  const angle = -35 + Math.random() * 10
+// Deterministic PRNG (mulberry32) for the decorative beam placement. Avoids
+// Math.random — the values are purely visual, not security-sensitive — and keeps
+// the field stable across renders.
+function makeRng(seed: number): () => number {
+  let a = seed >>> 0
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0
+    let t = Math.imul(a ^ (a >>> 15), 1 | a)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+function createBeam(width: number, height: number, layer: number, rng: () => number): Beam {
+  const angle = -35 + rng() * 10
   const baseSpeed = 0.2 + layer * 0.2
   const baseOpacity = 0.08 + layer * 0.05
   const baseWidth = 10 + layer * 5
   return {
-    x: Math.random() * width,
-    y: Math.random() * height,
+    x: rng() * width,
+    y: rng() * height,
     width: baseWidth,
     length: height * 2.5,
     angle,
-    speed: baseSpeed + Math.random() * 0.2,
-    opacity: baseOpacity + Math.random() * 0.1,
-    pulse: Math.random() * Math.PI * 2,
-    pulseSpeed: 0.01 + Math.random() * 0.015,
+    speed: baseSpeed + rng() * 0.2,
+    opacity: baseOpacity + rng() * 0.1,
+    pulse: rng() * Math.PI * 2,
+    pulseSpeed: 0.01 + rng() * 0.015,
     layer,
   }
 }
@@ -56,12 +69,13 @@ function useBeamCanvas() {
     if (!ctx) return
 
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const rng = makeRng(0x9e3779b9)
 
     const seedBeams = (w: number, h: number) => {
       beamsRef.current = []
       for (let layer = 1; layer <= LAYERS; layer++) {
         for (let i = 0; i < BEAMS_PER_LAYER; i++) {
-          beamsRef.current.push(createBeam(w, h, layer))
+          beamsRef.current.push(createBeam(w, h, layer, rng))
         }
       }
     }
@@ -114,7 +128,7 @@ function useBeamCanvas() {
         beam.pulse += beam.pulseSpeed
         if (beam.y + beam.length < -50) {
           beam.y = h + 50
-          beam.x = Math.random() * w
+          beam.x = rng() * w
         }
       }
       paint()
