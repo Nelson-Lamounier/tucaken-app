@@ -3,8 +3,8 @@
 // Radial comparison orbital: nodes orbit a teal Tucaken hub on lg+ (CSS-transform
 // spin, no per-frame React re-render); an accessible static list is shown on
 // mobile and under reduced motion. Only the real q/o/t data is rendered.
-import { motion, AnimatePresence, useReducedMotion, useScroll, useTransform } from 'motion/react'
-import { useRef, useState } from 'react'
+import { motion, AnimatePresence, useReducedMotion, useScroll, useTransform, animate, svgEffect, motionValue } from 'motion/react'
+import { useEffect, useRef, useState } from 'react'
 import { FileSearch, Target, FileWarning, Fingerprint, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { nodeAngles, nodeTransform } from './orbital-geometry'
@@ -16,9 +16,8 @@ const INNER_RADIUS = 120
 const INNER_DOTS = 6
 const SCROLL_SCALE_RANGE = [0.82, 1.06] as const
 
-// Lemniscate (figure-eight) traced by the hub.
-const INFINITY_PATH =
-  'M 50 25 C 50 10 75 10 75 25 C 75 40 50 40 50 25 C 50 10 25 10 25 25 C 25 40 50 40 50 25'
+// Infinity (lemniscate) path traced by the hub, in a 0 0 24 24 viewBox.
+const INFINITY_PATH = 'M6 16c5 0 7-8 12-8a4 4 0 0 1 0 8c-5 0-7-8-12-8a4 4 0 1 0 0 8'
 
 function ComparisonDetail({ item }: { item: ComparisonItem }) {
   return (
@@ -147,23 +146,57 @@ function InnerRing({ paused }: { paused: boolean }) {
 }
 
 function InfinityHub() {
+  const pathRef = useRef<SVGPathElement>(null)
+
+  useEffect(() => {
+    const path = pathRef.current
+    // svgEffect needs SVG path geometry (getTotalLength); skip in environments
+    // that lack it (e.g. SSR is already handled by useEffect, this covers jsdom).
+    if (!path || typeof path.getTotalLength !== 'function') return
+    // A 25%-length window (pathLength) whose start (pathOffset) slides 0 -> 1 on
+    // a linear loop, tracing a segment continuously around the infinity symbol.
+    const pathOffset = motionValue(0)
+    const cleanup = svgEffect(path, {
+      opacity: motionValue(1),
+      pathLength: motionValue(0.25),
+      pathOffset,
+    })
+    const controls = animate(pathOffset, 1, {
+      duration: 2,
+      repeat: Infinity,
+      ease: 'linear',
+    })
+    return () => {
+      controls.stop()
+      cleanup()
+    }
+  }, [])
+
   return (
     <svg
-      viewBox="0 0 100 50"
+      viewBox="0 0 24 24"
       aria-hidden="true"
       data-testid="infinity-hub"
-      className="h-8 w-12"
-      style={{ filter: 'drop-shadow(0 0 6px rgba(45,212,191,0.6))' }}
+      className="h-16 w-16"
+      style={{ filter: 'drop-shadow(0 0 5px rgba(45,212,191,0.6))' }}
     >
-      <motion.path
+      <path
         d={INFINITY_PATH}
         fill="none"
-        stroke="#2dd4bf"
-        strokeWidth={4}
+        className="stroke-teal-400/15"
+        strokeWidth={1.25}
         strokeLinecap="round"
-        initial={{ pathLength: 0 }}
-        animate={{ pathLength: 1 }}
-        transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+        strokeLinejoin="round"
+      />
+      <path
+        ref={pathRef}
+        d={INFINITY_PATH}
+        fill="none"
+        className="stroke-teal-400"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity={0}
       />
     </svg>
   )
