@@ -44,12 +44,12 @@ function Header() {
           <button
             type="button"
             disabled={isPending}
-            onClick={() => transitionTo('/sign-in')}
+            onClick={() => transitionTo({ to: '/sign-in' })}
             className="hidden text-base font-normal uppercase tracking-wide text-zinc-300 transition-colors hover:text-white disabled:opacity-60 md:block"
           >
             Sign in
           </button>
-          <RippleButton onClick={() => transitionTo('/sign-in')}>Try free</RippleButton>
+          <RippleButton onClick={() => transitionTo({ to: '/sign-in' })}>Try free</RippleButton>
         </div>
       </div>
     </header>

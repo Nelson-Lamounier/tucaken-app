@@ -3,7 +3,8 @@
 // Re-usable below-the-fold sections (Problem, HowItWorks, Comparison, Founder, Pricing, FAQ, Footer).
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
 import { useState, type ReactNode } from 'react'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
+import { usePageTransition } from '@/contexts/PageTransition'
 import { Github, Linkedin, Mail, ArrowUpRight } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import NumberFlow from '@number-flow/react'
@@ -177,7 +178,7 @@ export function FounderSection() {
 }
 
 export function PricingSection() {
-  const navigate = useNavigate()
+  const { transitionTo } = usePageTransition()
   const [frequency, setFrequency] = useState<Frequency>('monthly')
   const isYearly = frequency === 'annually'
   // Live, admin-editable tier display. Falls back to the static TIERS catalog
@@ -247,7 +248,7 @@ export function PricingSection() {
               <MagneticButton
                 primary={t.highlighted}
                 className="mt-7 w-full"
-                onClick={() => navigate(tierCtaTarget(t))}
+                onClick={() => transitionTo(tierCtaTarget(t))}
               >
                 {t.cta}
               </MagneticButton>
