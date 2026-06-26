@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 720" role="img" aria-labelledby="title desc">
+  <title id="title">Minimal GitHub migration pull request illustration</title>
+  <desc id="desc">A transparent 2D vector-style event-driven migration diagram with four pipeline stages and migration pull request metrics.</desc>
+  <defs>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="150%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#0f172a" flood-opacity="0.14" />
+    </filter>
+    <linearGradient id="tealLine" x1="235" y1="0" x2="1040" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0f766e" stop-opacity="0.36" />
+      <stop offset="0.5" stop-color="#14b8a6" />
+      <stop offset="1" stop-color="#0f766e" stop-opacity="0.36" />
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#14b8a6" />
+    </marker>
+    <style>
+      .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      }
+
+      .sans {
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+    </style>
+  </defs>
+
+  <g fill="none" opacity="0.34">
+    <path d="M151 281 C211 281 209 334 274 334" stroke="#94a3b8" stroke-width="2" />
+    <path d="M151 340 C223 340 229 365 294 365" stroke="#14b8a6" stroke-width="2" />
+    <path d="M151 399 C223 399 233 396 304 396" stroke="#94a3b8" stroke-width="2" />
+    <circle cx="151" cy="281" r="4" fill="#94a3b8" />
+    <circle cx="151" cy="340" r="4" fill="#14b8a6" />
+    <circle cx="151" cy="399" r="4" fill="#94a3b8" />
+  </g>
+
+  <g class="mono" font-size="20" letter-spacing="0" text-anchor="middle">
+    <text x="720" y="153" fill="#64748b">event-driven migration · ADR-007</text>
+  </g>
+
+  <g filter="url(#softShadow)">
+    <path d="M384 342 H1038" stroke="url(#tealLine)" stroke-width="4" stroke-linecap="round" marker-end="url(#arrow)" />
+    <circle cx="505" cy="342" r="7" fill="#14b8a6" />
+    <circle cx="685" cy="342" r="7" fill="#14b8a6" />
+    <circle cx="865" cy="342" r="7" fill="#14b8a6" />
+
+    <g transform="translate(286 262)">
+      <rect width="124" height="124" rx="28" fill="#0f172a" stroke="#14b8a6" stroke-width="2" />
+      <path d="M41 34 V78 M41 34 H77 M77 34 V52 M41 55 H62 M62 55 V78" stroke="#5eead4" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+      <circle cx="41" cy="34" r="6" fill="#0f172a" stroke="#5eead4" stroke-width="4" />
+      <circle cx="77" cy="52" r="6" fill="#0f172a" stroke="#5eead4" stroke-width="4" />
+      <circle cx="62" cy="78" r="6" fill="#0f172a" stroke="#5eead4" stroke-width="4" />
+      <text class="mono" x="62" y="160" fill="#334155" font-size="22" text-anchor="middle">ingest</text>
+    </g>
+
+    <g transform="translate(466 262)">
+      <rect width="124" height="124" rx="28" fill="#0f172a" stroke="#14b8a6" stroke-width="2" />
+      <path d="M38 42 H86 M38 62 H86 M38 82 H86" stroke="#5eead4" stroke-width="6" stroke-linecap="round" />
+      <path d="M37 42 C31 42 31 54 37 54 H82 C88 54 88 42 82 42 M37 62 C31 62 31 74 37 74 H82 C88 74 88 62 82 62 M37 82 C31 82 31 94 37 94 H82 C88 94 88 82 82 82" stroke="#2dd4bf" stroke-width="3" stroke-linecap="round" />
+      <text class="mono" x="62" y="160" fill="#334155" font-size="22" text-anchor="middle">queue</text>
+    </g>
+
+    <g transform="translate(646 262)">
+      <rect width="124" height="124" rx="28" fill="#0f172a" stroke="#14b8a6" stroke-width="2" />
+      <path d="M62 35 L69 45 L82 43 L85 57 L96 64 L88 76 L90 90 L76 92 L67 102 L55 95 L42 98 L38 84 L27 77 L35 65 L33 51 L47 49 Z" stroke="#5eead4" stroke-width="4" stroke-linejoin="round" />
+      <circle cx="62" cy="67" r="15" stroke="#2dd4bf" stroke-width="5" />
+      <text class="mono" x="62" y="160" fill="#334155" font-size="22" text-anchor="middle">worker</text>
+    </g>
+
+    <g transform="translate(826 262)">
+      <rect width="124" height="124" rx="28" fill="#0f172a" stroke="#14b8a6" stroke-width="2" />
+      <ellipse cx="62" cy="43" rx="29" ry="13" stroke="#5eead4" stroke-width="5" />
+      <path d="M33 43 V82 C33 89 46 95 62 95 C78 95 91 89 91 82 V43" stroke="#5eead4" stroke-width="5" stroke-linejoin="round" />
+      <path d="M33 63 C33 70 46 76 62 76 C78 76 91 70 91 63" stroke="#2dd4bf" stroke-width="4" />
+      <text class="mono" x="62" y="160" fill="#334155" font-size="22" text-anchor="middle">store</text>
+    </g>
+  </g>
+
+  <g class="sans" text-anchor="middle">
+    <text x="720" y="532" font-size="78" font-weight="760" letter-spacing="0">
+      <tspan fill="#0f172a">83 PRs</tspan>
+      <tspan fill="#94a3b8"> · </tspan>
+      <tspan fill="#0f766e">99.95%</tspan>
+    </text>
+    <text x="720" y="584" fill="#64748b" font-size="28" font-weight="500" letter-spacing="0">
+      6 months, legacy → event-sourced
+    </text>
+  </g>
+
+  <g transform="translate(1092 316)" opacity="0.9">
+    <rect x="0" y="0" width="160" height="52" rx="26" fill="#ecfdf5" stroke="#14b8a6" stroke-width="1.5" />
+    <circle cx="32" cy="26" r="9" fill="#10b981" />
+    <path d="M56 26 H132" stroke="#0f766e" stroke-width="3" stroke-linecap="round" />
+    <text class="mono" x="94" y="86" fill="#64748b" font-size="18" text-anchor="middle">verified</text>
+  </g>
+</svg>

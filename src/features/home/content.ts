@@ -1,22 +1,40 @@
 // src/features/home/content.ts
 export const hero = {
-  eyebrow: 'For developers in active job search',
-  primaryCta: 'Try it free with your GitHub',
-  secondaryCta: 'See a live demo',
-  sub: 'Tucaken reads your actual code, your real architecture decisions, and your shipped projects — then writes a resume that recruiters can verify. No more generic AI fluff. No more resumes that read nothing like the engineer who wrote them.',
-  founderNote: 'Built by a DevOps engineer who used it to land his next role.',
+  eyebrow: 'Try for free',
+  headlineLead: 'GenAI resumes that are',
+  rotatingWords: ['evidence-backed', 'matched to the job', 'ready in minutes', 'honest about your skills'],
+  primaryCta: 'Connect GitHub — see your evidence',
+  secondaryCta: 'How it works',
+  sub: 'Connect your GitHub with read-only access. Tucaken verifies the skills your code actually proves, matches them to any job description, and writes a tailored resume in minutes. Apply to the right roles with real evidence behind every claim, not generic AI guesswork.',
+  ctaNote: 'No credit card required · revoke access anytime',
+  founderNote: 'Built by an engineer using it for his own job search.',
 }
 
 export const problems = [
-  { real: 'Your GitHub has 47 commits this month proving you can scale Kubernetes clusters.', deflated: 'Your resume just says "experienced with containerisation."' },
-  { real: 'You spent 6 months migrating a legacy system to event-driven architecture.', deflated: 'Your resume just says "implemented modern patterns."' },
-  { real: 'Recruiters scan resumes for 6 seconds.', deflated: 'They never see what you actually built.' },
+  {
+    real: 'Your GitHub shows 47 commits this month scaling Kubernetes clusters in production.',
+    says: 'Your resume reduces it to',
+    struck: '"experienced with containerisation"',
+    cost: 'so the proof of what you can really do never gets read.',
+  },
+  {
+    real: 'You rebuilt a monolith into event-driven microservices over six months. 83 pull requests, zero downtime at cutover.',
+    says: 'Your resume flattens it to',
+    struck: '"implemented modern patterns"',
+    cost: 'and recruiters skim straight past the proof.',
+  },
+  {
+    real: 'A recruiter spends about six seconds scanning your resume before they decide.',
+    says: 'All they register is',
+    struck: '"a results driven team player"',
+    cost: 'while the systems you designed, scaled and shipped stay invisible.',
+  },
 ] as const
 
 export const steps = [
-  { n: '01', t: 'Connect your GitHub', d: 'Tucaken reads your repositories, your architecture decisions, your shipped features.' },
-  { n: '02', t: 'Paste a job description', d: 'Tucaken matches the requirements against what you have actually built.' },
-  { n: '03', t: 'Get a resume recruiters can verify', d: 'Every claim links to real evidence from your work.', emp: true },
+  { n: '01', t: 'Connect your GitHub', d: 'Connect your GitHub account with read-only access and choose which repositories to sync. Tucaken AI scans your code for skills, keywords and architecture decisions, ingests it into your Knowledge Base, and extracts a per-skill evidence ledger: verified, partial or gap.' },
+  { n: '02', t: 'Paste a job description', d: 'Paste any job description and Tucaken AI reads it into a clear list of required skills, then matches each one against your verified GitHub evidence. You see exactly where you are a strong fit, where you partially match and where the gaps are, before you apply.' },
+  { n: '03', t: 'Get a resume recruiters can verify', d: 'Tucaken AI writes a job-tailored resume where every skill and bullet links back to real evidence in your code. Recruiters can verify each claim, so you apply with proof instead of buzzwords.', emp: true },
 ] as const
 
 export type ComparisonItem = {

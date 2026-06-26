@@ -12,6 +12,12 @@ export interface StorySlide {
   title: string
   body: string
   mock: MockKind
+  /** How-it-works slides only: the step number, rendered as a large numeral. */
+  num?: string
+  /** Problem slides only: the resume cliche that flattens the achievement. */
+  says?: string
+  struck?: string
+  cost?: string
 }
 
 const PROBLEM_MOCKS: MockKind[] = ['commit', 'architecture', 'skim']
@@ -23,14 +29,18 @@ export function buildStorySlides(): StorySlide[] {
     phase: 'problem',
     eyebrow: 'The problem',
     title: p.real,
-    body: p.deflated,
+    body: `${p.says} ${p.struck} ${p.cost}`,
+    says: p.says,
+    struck: p.struck,
+    cost: p.cost,
     mock: PROBLEM_MOCKS[i % PROBLEM_MOCKS.length],
   }))
   const stepSlides: StorySlide[] = steps.map((s, i) => ({
     id: `how-${s.n}`,
     phase: 'how',
     eyebrow: 'How it works',
-    title: `${s.n} · ${s.t}`,
+    title: s.t,
+    num: s.n,
     body: s.d,
     mock: STEP_MOCKS[i % STEP_MOCKS.length],
   }))
