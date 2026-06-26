@@ -19,29 +19,7 @@ import { Pagination } from '@/components/ui/Pagination'
 import { getTailoredResumesFn, type TailoredResumeSummary } from '@/server/applications'
 import { adminKeys } from '@/lib/api/query-keys'
 import { ResumeBuilderDrawer } from './ResumeBuilderDrawer'
-import { ResumePreviewDrawer } from '@/features/resumes/components/ResumePreviewDrawer'
-import type { AdminResumeWithData } from '../hooks/use-resume-versions'
-
-/**
- * Build a minimal AdminResumeWithData for ResumePreviewDrawer.
- * The drawer renderer only reads `label` and `data`; the remaining
- * fields (resumeId, isActive, createdAt, updatedAt) are resume-store
- * fields that do not exist on a TailoredResumeSummary. We supply
- * placeholder values so the type is satisfied without `as any`.
- */
-function buildPreviewResume(
-  p: { tr: TailoredResumeSummary; kind: 'resume' | 'cover' },
-): AdminResumeWithData | null {
-  if (p.kind !== 'resume') return null
-  return {
-    resumeId: p.tr.slug,
-    label: `${p.tr.targetCompany} — ${p.tr.targetRole}`,
-    isActive: false,
-    createdAt: p.tr.updatedAt,
-    updatedAt: p.tr.updatedAt,
-    data: p.tr.data as unknown as Record<string, unknown>,
-  }
-}
+import { ApplicationResumePreviewDrawer } from './ApplicationResumePreviewDrawer'
 
 export function ApplicationsList({ initialStage }: { initialStage?: string }) {
   const navigate = useNavigate()
@@ -221,16 +199,11 @@ export function ApplicationsList({ initialStage }: { initialStage?: string }) {
       </div>
 
       {preview && (
-        <ResumePreviewDrawer
+        <ApplicationResumePreviewDrawer
           isOpen
           onClose={() => setPreview(null)}
-          resume={buildPreviewResume(preview)}
-          coverLetter={preview.kind === 'cover' ? preview.tr.coverLetter : null}
-          coverLetterProfile={preview.tr.data.profile}
-          coverLetterCompany={preview.tr.targetCompany}
-          coverLetterRole={preview.tr.targetRole}
-          onDownload={() => { /* download handled in detail menu; preview-only here */ }}
-          isDownloading={false}
+          tr={preview.tr}
+          kind={preview.kind}
         />
       )}
       {editTarget && (
