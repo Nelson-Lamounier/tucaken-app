@@ -170,6 +170,45 @@ Rules for new/edited UI:
 - Both fonts must render correctly in light and dark mode (they're colour-agnostic,
   but verify weight/contrast on the dark surfaces this app uses).
 
+### Dashboard layout — size-slot system (mandatory for dashboards)
+
+Dashboards are composed from **size-based layout containers**, never ad-hoc
+`grid-cols-*` on the page. The container owns the layout rule; panels stay
+unchanged and inherit correct width/height/reflow. This keeps every dashboard
+standard across users (no white-space gaps when data is sparse), responsive by
+default, and extensible — you add a panel to the slot that matches its size
+without hand-tuning a grid. Reference implementation:
+`src/features/user-home/components/UserDashboard.tsx` and the primitives beside
+it; tokens in `src/styles.css` (`.panel-grid`, `.split-layout`).
+
+**The three slots (where to add a panel):**
+
+| Slot | Size | Primitive | Behaviour | Add a panel here when… |
+| --- | --- | --- | --- | --- |
+| **X** | Large | `PanelStack` (full-width band) | One panel per row, full width; new panels append to the **bottom** | the panel needs the **full width** (hero, activity, wide chart) |
+| **Y** | Medium | `PanelGrid` | Equal-height cards that **wrap to the next row**; the row stretches so cards stay the same height | a **medium card** that sits in a multi-up row |
+| **Z** | Small | `PanelStack` (sidebar slot of `SplitLayout`) | A **list** that grows down/up, one compact widget per row | a **small/compact** widget for the rail |
+
+**`SplitLayout`** places a wide main column (`1fr`) beside a fixed-width sidebar
+rail (default 340px), collapsing to one column below `xl` (1280px). The main
+column and the sidebar are each a `PanelStack`.
+
+**Rules:**
+
+- **Never** put business panels directly in a raw `grid`/`flex` on the page —
+  use `PanelStack` / `PanelGrid` / `SplitLayout`. Layout lives in the container,
+  not the panel.
+- **Don't modify panel internals to fix layout.** If a panel looks wrong in its
+  slot, it's either in the wrong slot or needs its own (separately reviewed)
+  change.
+- **Equal-height (`PanelGrid`) panels must carry a text title** so a data-sparse
+  panel still reads as intentional when its cell is taller than its content.
+- **Auto-fit `minmax(min(100%, <min>), 1fr)`** is the column rule (the `min()`
+  guard prevents horizontal overflow on narrow screens); `auto-fit` (not
+  `auto-fill`) so present cards fill the row with no trailing empty tracks.
+- New dashboards replicate this system. The reusable cross-project version lives
+  in the `dashboard-layout` skill (`~/.claude/skills/dashboard-layout/`).
+
 ## Animation — Motion for React
 
 Project rule file: `.claude/rules/motion-react.md` (authoritative; this section summarises).

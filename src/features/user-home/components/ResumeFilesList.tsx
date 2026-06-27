@@ -2,6 +2,7 @@
 
 import { Link } from '@tanstack/react-router'
 import { FileText, CheckCircle2, Loader2, AlertCircle } from 'lucide-react'
+import { Card } from '@/components/ui/Card'
 import type { ResumeImportRecord } from '@/server/resume-imports'
 
 const MAX_VISIBLE = 3
@@ -18,14 +19,10 @@ export function ResumeFilesList({ imports, isLoading }: ResumeFilesListProps) {
   let content: React.ReactNode
 
   if (isLoading) {
-    content = (
-      <div className="rounded-xl border border-zinc-200 py-8 text-center text-xs text-zinc-500 dark:border-white/10 dark:text-zinc-600">
-        Loading resume files…
-      </div>
-    )
+    content = <p className="px-6 py-6 text-sm text-zinc-500">Loading resume files…</p>
   } else if (imports.length === 0) {
     content = (
-      <div className="rounded-xl border border-dashed border-zinc-300 py-10 text-center dark:border-white/10">
+      <div className="px-6 py-8 text-center">
         <FileText className="mx-auto mb-2 size-7 text-zinc-400 dark:text-zinc-700" />
         <p className="text-sm text-zinc-500">No resume files uploaded yet</p>
         <Link
@@ -40,7 +37,7 @@ export function ResumeFilesList({ imports, isLoading }: ResumeFilesListProps) {
   } else {
     content = (
       <>
-        <ul className="divide-y divide-zinc-200 rounded-xl border border-zinc-200 dark:divide-white/6 dark:border-white/10">
+        <ul className="flex flex-col divide-y divide-zinc-200 dark:divide-white/5">
           {visible.map((imp) => {
             const isOk     = imp.status === 'completed' || imp.status === 'ready_for_review'
             const isFailed = imp.status === 'failed'
@@ -56,7 +53,7 @@ export function ResumeFilesList({ imports, isLoading }: ResumeFilesListProps) {
             else               { badgeLabel = 'Processing' }
 
             return (
-              <li key={imp.id} className="flex items-center gap-3 px-4 py-3">
+              <li key={imp.id} className="flex items-center gap-3 px-6 py-3">
                 {isOk     && <CheckCircle2 className="size-4 shrink-0 text-emerald-500 dark:text-emerald-400" />}
                 {isFailed && <AlertCircle  className="size-4 shrink-0 text-red-500 dark:text-red-400" />}
                 {!isOk && !isFailed && (
@@ -84,7 +81,7 @@ export function ResumeFilesList({ imports, isLoading }: ResumeFilesListProps) {
         </ul>
 
         {overflow > 0 && (
-          <div className="text-right">
+          <div className="border-t border-zinc-200 px-6 py-3 text-right dark:border-white/5">
             <Link
               to="/settings/github"
               search={{ tab: 'resumes' }}
@@ -99,12 +96,9 @@ export function ResumeFilesList({ imports, isLoading }: ResumeFilesListProps) {
   }
 
   return (
-    <section className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Resume Files</h3>
-          <p className="mt-0.5 text-xs text-zinc-500">PDFs processed to seed your knowledge base</p>
-        </div>
+    <Card as="section" className="flex flex-col overflow-hidden">
+      <div className="flex items-center justify-between gap-3 border-b border-zinc-200 px-6 py-4 dark:border-white/5">
+        <h3 className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">Resume Files</h3>
         <Link
           to="/settings/github"
           search={{ tab: 'resumes' }}
@@ -114,6 +108,6 @@ export function ResumeFilesList({ imports, isLoading }: ResumeFilesListProps) {
         </Link>
       </div>
       {content}
-    </section>
+    </Card>
   )
 }

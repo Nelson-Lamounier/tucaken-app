@@ -2,7 +2,6 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'motion/react'
-import { GitBranch } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { getKbHealthFn } from '@/server/activity'
 import type { RepoRagSummary } from '@/lib/types/rag.types'
@@ -32,7 +31,7 @@ function RepoBar({ repo, max, index }: { readonly repo: RepoRagSummary; readonly
   const pct = Math.max(2, (chunks / max) * 100)
   const qpct = repo.kbQualityScore == null ? null : Math.round(repo.kbQualityScore * 100)
   return (
-    <li className="flex items-center gap-3 py-3">
+    <li className="flex items-center gap-3 px-6 py-2">
       <span className="w-28 shrink-0 truncate text-sm font-medium text-zinc-700 dark:text-zinc-200" title={repo.repoFullName}>
         {shortRepo(repo.repoFullName)}
       </span>
@@ -58,37 +57,40 @@ function RepoBar({ repo, max, index }: { readonly repo: RepoRagSummary; readonly
 export function RepoBreakdownPanel() {
   const { data, isLoading } = useQuery({ queryKey: kbQualityKey, queryFn: getKbHealthFn })
 
-  if (isLoading) {
-    return (
-      <Card as="section" className="p-6">
-        <p className="text-sm text-zinc-500">Calculating per-repository quality…</p>
-      </Card>
-    )
-  }
-
   const repositories = data?.repositories ?? []
   const repoCount = data?.totals?.repoCount ?? 0
   const max = Math.max(1, ...repositories.map(r => r.chunkCount ?? 0))
 
-  return (
-    <Card as="section" className="p-6">
-      <div className="mb-5 flex items-center gap-2">
-        <GitBranch className="size-5 text-accent" />
-        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Per repository</h3>
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">Chunks and quality across {repoCount} repositories</span>
-      </div>
+  let body: React.ReactNode
+  if (isLoading) {
+    body = <p className="px-6 py-6 text-sm text-zinc-500">Calculating per-repository quality…</p>
+  } else if (repositories.length === 0) {
+    body = (
+      <p className="px-6 py-6 text-sm text-zinc-500 dark:text-zinc-400">
+        No synced repositories yet — connect a repo to build your Knowledge Base.
+      </p>
+    )
+  } else {
+    body = (
+      <ul className="no-scrollbar flex min-h-0 flex-1 flex-col divide-y divide-zinc-200 overflow-y-auto dark:divide-white/5">
+        {repositories.map((r, i) => (
+          <RepoBar key={r.repoFullName} repo={r} max={max} index={i} />
+        ))}
+      </ul>
+    )
+  }
 
-      {repositories.length === 0 ? (
-        <p className="py-4 text-sm text-zinc-500 dark:text-zinc-400">
-          No synced repositories yet — connect a repo to build your Knowledge Base.
-        </p>
-      ) : (
-        <ul className="divide-y divide-zinc-100 dark:divide-white/5">
-          {repositories.map((r, i) => (
-            <RepoBar key={r.repoFullName} repo={r} max={max} index={i} />
-          ))}
-        </ul>
-      )}
+  return (
+    <Card as="section" className="flex h-full max-h-64 flex-col overflow-hidden">
+      <div className="flex items-center justify-between gap-3 border-b border-zinc-200 px-6 py-4 dark:border-white/5">
+        <h3 className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">Per repository</h3>
+        {!isLoading && (
+          <span className="text-[11px] font-medium tabular-nums text-zinc-500">
+            {repoCount} {repoCount === 1 ? 'repo' : 'repos'}
+          </span>
+        )}
+      </div>
+      {body}
     </Card>
   )
 }

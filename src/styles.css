@@ -137,3 +137,41 @@
   .belt-scroll-anim, .scan-sweep-anim, .item-state-anim, .pipe-pulse-anim, .node-glow-anim, .gradient-sweep-anim, .marquee-anim { animation: none !important; }
   .floating-paths path { animation: none !important; stroke-dasharray: none !important; }
 }
+/* Knowledge Base dashboard layout primitives. Each container owns ONE layout
+   rule, so panels inherit correct width/height/reflow and new panels can be
+   added without hand-tuning a grid. min(100%, --panel-min) stops auto-fit
+   overflowing the viewport on narrow screens. */
+
+/* Medium card band: equal-height cards that wrap to new rows as width shrinks.
+   Default align-items: stretch keeps every card in a row the same height, so a
+   sparse card still fills its cell (keep a text title so it reads clean). */
+.panel-grid {
+  display: grid;
+  gap: 1.5rem; /* = gap-6 */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--panel-min, 300px)), 1fr));
+}
+.panel-grid > * {
+  min-width: 0; /* let truncating children shrink instead of blowing out the track */
+}
+
+/* Wide main column beside a fixed sidebar rail; one column below xl. */
+.split-layout {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+@media (min-width: 1280px) {
+  .split-layout {
+    grid-template-columns: 1fr var(--aside-w, 340px);
+  }
+}
+
+/* Hide the scrollbar gutter while keeping scroll behaviour (used on capped
+   panels and drawers). Firefox + WebKit. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

@@ -13,7 +13,7 @@ interface Step {
 /** Onboarding nudge for the Health Rail. Every step's done-state is derived
  *  from real KbStats — no separate persistence. Distinct from the readiness
  *  *signals* (which grade quality); this grades *setup completeness*. */
-export function KbSetupChecklist({ stats }: { readonly stats: KbStats }) {
+export function KbSetupChecklist({ stats, hasProject }: { readonly stats: KbStats; readonly hasProject: boolean }) {
   const steps: Step[] = [
     {
       label: 'Connect a repository',
@@ -34,6 +34,11 @@ export function KbSetupChecklist({ stats }: { readonly stats: KbStats }) {
       label: 'Knowledge base ready',
       done: stats.isReady,
       detail: stats.isReady ? 'Agent has data to work with' : 'Complete a step above',
+    },
+    {
+      label: 'Generate a project',
+      done: hasProject,
+      detail: hasProject ? 'Project ready to tailor' : 'Generate one from a repository',
     },
   ]
   const doneCount = steps.filter(s => s.done).length
