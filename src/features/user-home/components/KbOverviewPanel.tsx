@@ -45,12 +45,12 @@ export function KbOverviewPanel({ stats }: KbOverviewPanelProps) {
   ]
 
   return (
-    <Card as="section" className="flex h-full flex-col overflow-hidden">
+    <Card as="section" className="@container flex h-full max-h-64 flex-col overflow-hidden">
       <div className="flex items-center border-b border-zinc-200 px-6 py-4 dark:border-white/5">
         <h3 className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">Knowledge Base</h3>
       </div>
 
-      <div className="grid flex-1 grid-cols-2 gap-x-4 gap-y-3 p-4">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-x-4 gap-y-3 overflow-y-auto p-4 @sm:grid-cols-2 @2xl:grid-cols-3">
         {metrics.map((m, i) => {
           const Icon = m.icon
           return (

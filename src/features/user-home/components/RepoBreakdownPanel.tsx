@@ -72,7 +72,7 @@ export function RepoBreakdownPanel() {
     )
   } else {
     body = (
-      <ul className="flex flex-1 flex-col divide-y divide-zinc-200 dark:divide-white/5">
+      <ul className="flex min-h-0 flex-1 flex-col divide-y divide-zinc-200 overflow-y-auto dark:divide-white/5">
         {repositories.map((r, i) => (
           <RepoBar key={r.repoFullName} repo={r} max={max} index={i} />
         ))}
@@ -81,7 +81,7 @@ export function RepoBreakdownPanel() {
   }
 
   return (
-    <Card as="section" className="flex h-full flex-col overflow-hidden">
+    <Card as="section" className="flex h-full max-h-64 flex-col overflow-hidden">
       <div className="flex items-center justify-between gap-3 border-b border-zinc-200 px-6 py-4 dark:border-white/5">
         <h3 className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">Per repository</h3>
         {!isLoading && (

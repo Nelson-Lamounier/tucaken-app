@@ -28,7 +28,7 @@ interface CareerDataBreakdownProps {
 
 function PanelShell({ children }: { readonly children: React.ReactNode }) {
   return (
-    <Card as="section" className="flex h-full flex-col overflow-hidden">
+    <Card as="section" className="flex h-full max-h-64 flex-col overflow-hidden">
       <div className="flex items-center justify-between gap-3 border-b border-zinc-200 px-6 py-4 dark:border-white/5">
         <h3 className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">Career Data</h3>
         <Link
@@ -109,7 +109,7 @@ export function CareerDataBreakdown({ entries, latestImport, isLoading }: Career
 
   return (
     <PanelShell>
-      <dl className="flex flex-1 flex-col divide-y divide-zinc-200 dark:divide-white/5">
+      <dl className="flex min-h-0 flex-1 flex-col divide-y divide-zinc-200 overflow-y-auto dark:divide-white/5">
         {rows.map(row => (
           <CountRow key={row.type} label={row.label} count={row.count} max={max} />
         ))}
