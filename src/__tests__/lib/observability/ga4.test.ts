@@ -9,7 +9,7 @@ beforeEach(() => {
   vi.resetModules()
   document.head.innerHTML = ''
   window.dataLayer = []
-  ;(window as unknown as Record<string, unknown>).gtag = undefined
+  window.gtag = undefined
 })
 
 afterEach(() => {
