@@ -92,23 +92,23 @@ export function UserDashboard() {
           </PanelStack>
         )}
 
-        {/* Y — Medium / equal-height card grid (non-admin). Add a medium card
-            here; it wraps to the next row and the row stretches to equal height. */}
-        {!isAdmin && (
-          <PanelGrid min={300}>
-            <RepoBreakdownPanel />
-            <CareerDataBreakdown
-              entries={entries}
-              latestImport={latestImport}
-              isLoading={loadingEntries || loadingImports}
-            />
-          </PanelGrid>
-        )}
-
-        {/* Main reading column (left) + small sidebar rail (right). */}
+        {/* Main reading column (left) + small sidebar rail (right). The overview
+            row sits at the top of the main column so it shares Profile
+            Intelligence's width; the sidebar runs alongside it. */}
         <SplitLayout
           main={
             <PanelStack>
+              {/* Y — Medium / equal-height card grid (non-admin). */}
+              {!isAdmin && (
+                <PanelGrid min={300}>
+                  <RepoBreakdownPanel />
+                  <CareerDataBreakdown
+                    entries={entries}
+                    latestImport={latestImport}
+                    isLoading={loadingEntries || loadingImports}
+                  />
+                </PanelGrid>
+              )}
               {profileSummary && (
                 <section className="space-y-3">
                   <div>
