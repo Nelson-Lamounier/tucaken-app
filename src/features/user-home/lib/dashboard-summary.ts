@@ -93,8 +93,8 @@ export function deriveDashboardSummary(input: SummaryInput): DashboardSummary {
   if (!hasProject) {
     return {
       greeting: `You're all set up, ${who} — brilliant work!`,
-      summary: 'Create your first project from a job description and Tucaken will build a tailored resume for it.',
-      action: { label: 'Create a project', target: 'projects' },
+      summary: 'Generate your first project from a repository, and Tucaken will build a tailored resume from any job description you give it.',
+      action: { label: 'Generate a project', target: 'projects' },
     }
   }
 

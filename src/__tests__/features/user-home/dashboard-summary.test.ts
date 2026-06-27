@@ -52,9 +52,10 @@ describe('deriveDashboardSummary — rule chain (first unmet step wins)', () => 
     expect(r.greeting).toMatch(/almost there/i)
   })
 
-  it('6. set up but no project, nudges to create a project (the key case)', () => {
+  it('6. set up but no project, nudges to generate a project (the key case)', () => {
     const r = deriveDashboardSummary({ email, hasProject: false, stats: baseStats() })
-    expect(r.action).toEqual({ label: 'Create a project', target: 'projects' })
+    expect(r.action).toEqual({ label: 'Generate a project', target: 'projects' })
+    expect(r.summary).toMatch(/repository/i)
     expect(r.summary).toMatch(/job description/i)
   })
 
