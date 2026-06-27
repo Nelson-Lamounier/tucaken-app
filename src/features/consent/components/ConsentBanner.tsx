@@ -21,9 +21,9 @@ export function ConsentBanner({ onManage }: ConsentBannerProps) {
       {!decided && (
         <motion.div
           data-testid="consent-banner"
-          role="dialog"
+          role="region"
           aria-label="Cookie consent"
-          aria-live="polite"
+          aria-describedby="consent-banner-desc"
           initial={{ y: 24, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 24, opacity: 0 }}
@@ -31,7 +31,7 @@ export function ConsentBanner({ onManage }: ConsentBannerProps) {
           style={{ willChange: 'transform, opacity' }}
           className="fixed inset-x-0 bottom-0 z-50 mx-auto mb-4 w-[min(48rem,calc(100%-2rem))] rounded-md border border-zinc-300 bg-zinc-50 p-4 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
         >
-          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+          <p id="consent-banner-desc" className="text-sm text-zinc-700 dark:text-zinc-300">
             Tucaken uses cookies to understand how the site is used and to improve
             it. Analytics cookies are only set with your consent. See our{' '}
             <a

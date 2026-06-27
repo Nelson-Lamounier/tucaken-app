@@ -23,8 +23,8 @@ describe('ConsentBanner', () => {
 
   it('hides once a decision has been made', () => {
     useConsentStore.setState({ decided: true })
-    const { container } = render(<ConsentBanner onManage={() => {}} />)
-    expect(container.querySelector('[data-testid="consent-banner"]')).toBeNull()
+    render(<ConsentBanner onManage={() => {}} />)
+    expect(screen.queryByTestId('consent-banner')).toBeNull()
   })
 
   it('Accept all grants analytics', () => {
