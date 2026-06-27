@@ -81,49 +81,45 @@ export function UserDashboard() {
           </div>
         )}
 
-        {/* Main column + health rail */}
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_340px] xl:items-start">
-          <main className="flex min-w-0 flex-col gap-8">
-            {profileSummary && (
-              <section className="space-y-3">
-                <div>
-                  <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Profile Intelligence</h3>
-                  <p className="mt-0.5 text-xs text-zinc-500">
-                    What your data says about you — expand any panel for the full read
-                  </p>
-                </div>
-                <AnimatedTabs
-                  items={[
-                    {
-                      id: 'mirror',
-                      title: 'Profile mirror',
-                      content: <MirrorPanel summary={profileSummary} />,
-                    },
-                    {
-                      id: 'direction',
-                      title: 'Career direction',
-                      content: <DirectionPanel summary={profileSummary} />,
-                    },
-                    {
-                      id: 'reconciliation',
-                      title: 'Résumé reconciliation',
-                      content: (
-                        <ReconciliationPanel summary={profileSummary} hasResume={entries.length > 0} />
-                      ),
-                    },
-                  ]}
-                />
-              </section>
-            )}
-            <RepoProfileCards repos={repos} isLoading={loadingRepos} />
-          </main>
-
-          <aside className="flex flex-col gap-6">
-            <KbSetupChecklist stats={stats} />
-            <ResumeFilesList imports={imports} isLoading={loadingImports} />
-            <KbActivityFeed imports={imports} repos={repos} />
-          </aside>
-        </div>
+        {/* Working panels — one auto-fit flow so an absent panel reflows the rest
+            instead of stranding a tall column for users with sparse data. */}
+        <PanelFlow min={340}>
+          {profileSummary && (
+            <section className="space-y-3">
+              <div>
+                <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Profile Intelligence</h3>
+                <p className="mt-0.5 text-xs text-zinc-500">
+                  What your data says about you — expand any panel for the full read
+                </p>
+              </div>
+              <AnimatedTabs
+                items={[
+                  {
+                    id: 'mirror',
+                    title: 'Profile mirror',
+                    content: <MirrorPanel summary={profileSummary} />,
+                  },
+                  {
+                    id: 'direction',
+                    title: 'Career direction',
+                    content: <DirectionPanel summary={profileSummary} />,
+                  },
+                  {
+                    id: 'reconciliation',
+                    title: 'Résumé reconciliation',
+                    content: (
+                      <ReconciliationPanel summary={profileSummary} hasResume={entries.length > 0} />
+                    ),
+                  },
+                ]}
+              />
+            </section>
+          )}
+          <RepoProfileCards repos={repos} isLoading={loadingRepos} />
+          <KbSetupChecklist stats={stats} />
+          <ResumeFilesList imports={imports} isLoading={loadingImports} />
+          <KbActivityFeed imports={imports} repos={repos} />
+        </PanelFlow>
 
         <KbQuickActions />
       </div>
