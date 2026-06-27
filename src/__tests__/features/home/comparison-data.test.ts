@@ -1,7 +1,23 @@
 import { describe, it, expect } from 'vitest'
 import { comparison } from '@/features/home/content'
 
-const KNOWN_ICONS = new Set(['FileSearch', 'Target', 'FileWarning', 'Fingerprint'])
+// Mirror of the ICONS map in OrbitalComparison.tsx — keep in sync.
+const KNOWN_ICONS = new Set([
+  'FileSearch',
+  'Target',
+  'FileWarning',
+  'Fingerprint',
+  'Lock',
+  'ListChecks',
+  'ScanSearch',
+  'MessagesSquare',
+  'FileDown',
+  'LayoutTemplate',
+  'LayoutDashboard',
+  'FileText',
+  'Sparkles',
+  'Clock',
+])
 
 describe('comparison data', () => {
   it('every item carries label, icon, q, o, t', () => {

@@ -1,7 +1,7 @@
 "use client"
 // Left split column (desktop only): Tucaken logo + founder quote over the
 // FloatingPaths backdrop.
-import { FloatingPaths } from './FloatingPaths'
+import { FloatingPaths } from '@/components/ui/FloatingPaths'
 import { founder } from '@/features/home/content'
 import logoTeal from '@/images/logo-horizontal-resume-flat-teal.png'
 

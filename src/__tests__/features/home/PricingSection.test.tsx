@@ -39,10 +39,9 @@ describe('TierPrice', () => {
     expect(screen.getByText('/month')).toBeTruthy()
   })
 
-  it('shows annual price + /year when yearly', () => {
+  it('shows "Coming soon" for annual billing (not charged in v1)', () => {
     render(<TierPrice tier={byId('pro')} isYearly={true} />)
-    expect(screen.getByText('190')).toBeTruthy()
-    expect(screen.getByText('/year')).toBeTruthy()
+    expect(screen.getByText(/coming soon/i)).toBeTruthy()
   })
 })
 
@@ -86,11 +85,10 @@ describe('PricingSection', () => {
     expect(transitionMock).toHaveBeenCalledWith({ to: '/checkout/$tier', params: { tier: 'pro' } })
   })
 
-  it('toggling to annually swaps the displayed prices', async () => {
+  it('toggling to annually shows "Coming soon" (annual not charged in v1)', async () => {
     const { default: userEvent } = await import('@testing-library/user-event')
     render(<PricingSection />)
-    expect(screen.getByText(String(byId('pro').priceMonthly))).toBeTruthy()
     await userEvent.click(screen.getByRole('radio', { name: /annually/i }))
-    expect(screen.getByText(String(byId('pro').priceAnnual))).toBeTruthy()
+    expect(screen.getAllByText(/coming soon/i).length).toBeGreaterThan(0)
   })
 })
