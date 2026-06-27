@@ -37,7 +37,7 @@ export const useConsentStore = create<ConsentState & ConsentActions>()(
       // Force re-consent if a persisted record predates the current version.
       migrate: (persisted, version) => {
         if (version !== CONSENT_VERSION) return { ...INITIAL_STATE }
-        return persisted as ConsentState & ConsentActions
+        return { ...INITIAL_STATE, ...(persisted as Partial<ConsentState>) }
       },
       partialize: (state) => ({
         analytics: state.analytics,

@@ -53,4 +53,19 @@ describe('useConsentStore', () => {
     expect(raw).toBeTruthy()
     expect(raw).toContain('"analytics":"granted"')
   })
+
+  it('stale persisted version forces re-consent and discards old grants', async () => {
+    const staleVersion = CONSENT_VERSION - 1
+    const staleBlob = JSON.stringify({
+      state: { analytics: 'granted', marketing: 'granted', decided: true, version: staleVersion },
+      version: staleVersion,
+    })
+    localStorage.setItem('tucaken-consent', staleBlob)
+
+    await useConsentStore.persist.rehydrate()
+
+    const s = useConsentStore.getState()
+    expect(s.decided).toBe(false)
+    expect(s.analytics).toBeUndefined()
+  })
 })
