@@ -151,6 +151,8 @@
   min-width: 0; /* let truncating children shrink instead of blowing out the track */
 }
 @supports (grid-template-rows: masonry) {
+  /* Visual packing may diverge from DOM order under masonry; tab/reading order
+     stays DOM order, and the non-masonry baseline keeps order intact everywhere. */
   .panel-flow {
     grid-template-rows: masonry;
   }
