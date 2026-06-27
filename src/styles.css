@@ -136,3 +136,22 @@
   .belt-scroll-anim, .scan-sweep-anim, .item-state-anim, .pipe-pulse-anim, .node-glow-anim, .gradient-sweep-anim, .marquee-anim { animation: none !important; }
   .auth-paths path { animation: none !important; stroke-dasharray: none !important; }
 }
+/* Knowledge Base dashboard — auto-fit panel flow. Panels reflow to fill the row:
+   auto-fit collapses empty tracks so an absent/short panel never strands a column,
+   and min(100%, --panel-min) stops the track overflowing on narrow screens.
+   Native masonry (CSS Grid Lanes) tightens vertical packing where supported —
+   Safari today, Chromium/Firefox as they ship — as progressive enhancement, no JS. */
+.panel-flow {
+  display: grid;
+  gap: 1.5rem; /* = gap-6 */
+  align-items: start;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--panel-min, 320px)), 1fr));
+}
+.panel-flow > * {
+  min-width: 0; /* let truncating children shrink instead of blowing out the track */
+}
+@supports (grid-template-rows: masonry) {
+  .panel-flow {
+    grid-template-rows: masonry;
+  }
+}
