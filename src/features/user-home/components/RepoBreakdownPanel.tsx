@@ -31,7 +31,7 @@ function RepoBar({ repo, max, index }: { readonly repo: RepoRagSummary; readonly
   const pct = Math.max(2, (chunks / max) * 100)
   const qpct = repo.kbQualityScore == null ? null : Math.round(repo.kbQualityScore * 100)
   return (
-    <li className="flex items-center gap-3 px-6 py-3">
+    <li className="flex items-center gap-3 px-6 py-2">
       <span className="w-28 shrink-0 truncate text-sm font-medium text-zinc-700 dark:text-zinc-200" title={repo.repoFullName}>
         {shortRepo(repo.repoFullName)}
       </span>

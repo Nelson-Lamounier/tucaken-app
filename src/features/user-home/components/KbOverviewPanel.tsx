@@ -50,7 +50,7 @@ export function KbOverviewPanel({ stats }: KbOverviewPanelProps) {
         <h3 className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">Knowledge Base</h3>
       </div>
 
-      <div className="grid flex-1 grid-cols-2 gap-x-4 gap-y-4 p-6">
+      <div className="grid flex-1 grid-cols-2 gap-x-4 gap-y-3 p-4">
         {metrics.map((m, i) => {
           const Icon = m.icon
           return (
