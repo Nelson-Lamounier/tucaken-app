@@ -1,8 +1,8 @@
 "use client"
 // src/features/home/sections/Sections.tsx
 // Re-usable below-the-fold sections (Problem, HowItWorks, Comparison, Founder, Pricing, FAQ, Footer).
-import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
-import { useState, type ReactNode } from 'react'
+import { motion, AnimatePresence, useReducedMotion, useInView } from 'motion/react'
+import { useRef, useState, type ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import { usePageTransition } from '@/contexts/PageTransition'
 import { Github, Linkedin, Mail, ArrowUpRight } from 'lucide-react'
@@ -12,7 +12,8 @@ import type { Tier } from '@/features/billing/catalog'
 import { MagneticButton } from '../lib/MagneticButton'
 import { Marquee } from '../lib/Marquee'
 import { KineticText } from '../lib/KineticText'
-import { comparison, founder } from '../content'
+import { comparison, founder, hero, stats } from '../content'
+import { StatCard } from '@/components/ui/StatCard'
 import { faqCategories } from '../lib/faq'
 import { highlightParts } from '../lib/highlight'
 import { tiersFromPublic } from '@/features/billing/catalog'
@@ -92,21 +93,28 @@ export function BillingToggle({
   )
 }
 
-export function TierPrice({ tier, isYearly }: { tier: Tier; isYearly: boolean }) {
+export function TierPrice({ tier, isYearly, revealed = true }: { tier: Tier; isYearly: boolean; revealed?: boolean }) {
   if (tier.free) {
     return <p className="mt-6 text-4xl font-semibold tracking-tight text-white">Free</p>
   }
-  const value = isYearly ? tier.priceAnnual : tier.priceMonthly
+  // Annual billing is not charged in v1 — keep the toggle working but show that
+  // the yearly plan is on the way rather than a chargeable price.
+  if (isYearly) {
+    return (
+      <p className="mt-6 flex items-baseline gap-x-2">
+        <span className="text-3xl font-semibold tracking-tight text-white">Coming soon</span>
+        <span className="text-sm/6 font-medium text-zinc-500">annual billing</span>
+      </p>
+    )
+  }
   return (
     <p className="mt-6 flex items-baseline gap-x-1">
       <NumberFlow
-        value={value}
+        value={revealed ? tier.priceMonthly : 0}
         format={{ style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }}
         className="text-4xl font-semibold tracking-tight text-white"
       />
-      <span className="text-sm/6 font-semibold text-zinc-500">
-        {isYearly ? '/year' : '/month'}
-      </span>
+      <span className="text-sm/6 font-semibold text-zinc-500">/month</span>
     </p>
   )
 }
@@ -114,20 +122,60 @@ export function TierPrice({ tier, isYearly }: { tier: Tier; isYearly: boolean })
 export function ComparisonSection() {
   return (
     <Section id="why" className="border-t border-white/5">
-      <div className="mx-auto max-w-5xl">
+      {/* Header sits above the orbit (z-10) so the nodes fly in from behind it. */}
+      <div className="relative z-10 mx-auto max-w-5xl text-center">
         <Eyebrow>Why Tucaken</Eyebrow>
         <KineticText
           as="h2"
           text="What other AI resume tools can't say."
-          className="text-balance text-3xl font-semibold tracking-tight text-white md:text-5xl"
+          className="text-balance text-4xl font-bold leading-[1.08] tracking-tight text-white lg:text-5xl"
         />
-        <p className="mt-4 max-w-xl text-pretty text-sm text-zinc-400 md:text-base">
+        <p className="mx-auto mt-4 max-w-md text-pretty text-sm text-zinc-400 md:text-base">
           Tap a node to see how Tucaken answers — grounded in your real work, not
           generic filler.
         </p>
-        <div className="mt-8">
-          <OrbitalComparison items={comparison} />
-        </div>
+      </div>
+      {/* Wider than the header so the side card has room beside the orbit ring;
+          z-0 keeps the flying-in nodes behind the header. */}
+      <div className="relative z-0 mx-auto mt-20 max-w-7xl md:mt-24">
+        <OrbitalComparison items={comparison} />
+      </div>
+    </Section>
+  )
+}
+
+export function ValuePropSection() {
+  const reduce = useReducedMotion() ?? false
+  const parts = highlightParts(hero.sub, 'real evidence behind every claim')
+  return (
+    <Section id="value" className="border-t border-white/5">
+      <div className="mx-auto flex max-w-5xl flex-col items-center text-center">
+        <Eyebrow>How Tucaken works</Eyebrow>
+
+        <motion.p
+          initial={reduce ? false : { opacity: 0, y: 12 }}
+          whileInView={reduce ? undefined : { opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-60px' }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+          style={reduce ? undefined : { willChange: 'transform, opacity' }}
+          className="mt-6 text-balance font-heading text-lg leading-relaxed text-zinc-100 sm:text-xl"
+        >
+          {parts.map((part, i) =>
+            part.highlight ? (
+              <strong key={`${part.text}-${i}`} className="font-semibold text-teal-300">
+                {part.text}
+              </strong>
+            ) : (
+              <span key={`${part.text}-${i}`}>{part.text}</span>
+            ),
+          )}
+        </motion.p>
+      </div>
+
+      <div className="mx-auto mt-16 grid max-w-5xl gap-12 px-2 sm:grid-cols-3 sm:gap-20">
+        {stats.map((stat) => (
+          <StatCard key={stat.label} value={stat.value} suffix={stat.suffix} label={stat.label} />
+        ))}
       </div>
     </Section>
   )
@@ -138,7 +186,7 @@ export function FounderSection() {
   const parts = highlightParts(founder.quote, 'Tucaken Resumes')
   return (
     <Section id="founder" className="border-t border-white/5">
-      <div className="mx-auto flex max-w-2xl flex-col items-center text-center">
+      <div className="mx-auto flex max-w-5xl flex-col items-center text-center">
         <Eyebrow>Built by a user, for users</Eyebrow>
 
         <motion.blockquote
@@ -147,7 +195,7 @@ export function FounderSection() {
           viewport={{ once: true, margin: '-60px' }}
           transition={{ duration: 0.5, ease: 'easeOut' }}
           style={reduce ? undefined : { willChange: 'transform, opacity' }}
-          className="mt-6 text-balance text-xl leading-relaxed text-zinc-100 sm:text-2xl"
+          className="mt-6 text-balance font-heading text-lg leading-relaxed text-zinc-100 sm:text-xl"
         >
           &ldquo;
           {parts.map((part, i) =>
@@ -188,13 +236,18 @@ export function PricingSection() {
     queryFn: getPublicTierConfigFn,
   })
   const tiers = tiersFromPublic(publicConfig)
+  // Roll the prices up from 0 once the grid scrolls into view (NumberFlow digit
+  // animation). Reduced-motion users skip straight to the real figure.
+  const gridRef = useRef<HTMLDivElement>(null)
+  const reduce = useReducedMotion() ?? false
+  const priceRevealed = useInView(gridRef, { once: true }) || reduce
   return (
     <Section id="pricing" className="overflow-hidden border-t border-white/5">
       {/* Reveal backdrop: twinkling sparkles + a soft teal glow, behind cards. */}
       <SparkleField className="z-0" />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-[10%] top-0 z-0 h-full"
+        className="pointer-events-none absolute inset-0 z-0"
         style={{
           backgroundImage:
             'radial-gradient(circle at 50% 30%, rgba(45,212,191,0.16) 0%, transparent 70%)',
@@ -217,7 +270,7 @@ export function PricingSection() {
 
         <BillingToggle value={frequency} onChange={setFrequency} />
 
-        <div className="isolate mx-auto mt-10 grid max-w-md grid-cols-1 gap-6 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+        <div ref={gridRef} className="isolate mx-auto mt-10 grid max-w-md grid-cols-1 gap-6 lg:mx-0 lg:max-w-none lg:grid-cols-3">
           {tiers.map((t) => (
             <motion.div
               key={t.id}
@@ -228,7 +281,7 @@ export function PricingSection() {
               whileHover={{ y: -6 }}
               transition={{ type: 'spring', stiffness: 120, damping: 16 }}
               style={{ willChange: 'transform, opacity' }}
-              className="group/tier relative rounded-3xl bg-white/[0.02] p-8 ring-1 ring-white/10 data-featured:ring-2 data-featured:ring-teal-500/60 xl:p-10"
+              className="group/tier relative rounded-lg bg-white/[0.02] p-6 ring-1 ring-white/10 data-featured:ring-2 data-featured:ring-teal-500/60 sm:rounded-xl sm:p-8 xl:p-10"
             >
               {t.highlighted && (
                 <div className="gradient-sweep-anim absolute -top-3 right-6 rounded-full bg-[linear-gradient(110deg,#14b8a6,#34d399,#14b8a6)] px-3 py-0.5 font-mono text-[10px] uppercase tracking-widest text-zinc-950">
@@ -243,7 +296,7 @@ export function PricingSection() {
               </h3>
               <p className="mt-3 text-sm/6 text-zinc-300">{t.blurb}</p>
 
-              <TierPrice tier={t} isYearly={isYearly} />
+              <TierPrice tier={t} isYearly={isYearly} revealed={priceRevealed} />
 
               <MagneticButton
                 primary={t.highlighted}

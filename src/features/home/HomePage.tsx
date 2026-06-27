@@ -9,6 +9,7 @@ import { LandingCursor } from './lib/LandingCursor'
 import { ScrollProgress } from './lib/ScrollProgress'
 import { HeroSection } from './sections/HeroSection'
 import {
+  ValuePropSection,
   ComparisonSection,
   FounderSection,
   PricingSection,
@@ -69,6 +70,7 @@ export function HomePage() {
         <ScrollProgress />
         <Header />
         <HeroSection />
+        <ValuePropSection />
         <ScrollStorySection />
         <ComparisonSection />
         <FounderSection />

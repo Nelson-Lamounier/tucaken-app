@@ -115,26 +115,27 @@
 .marquee-anim[data-reverse='true'] {
   animation-direction: reverse;
 }
-/* Auth brand-panel lines (reference "Background Paths" behaviour, pure CSS).
-   Each <path> is normalised with pathLength=1: it draws itself in once
-   (stroke-dashoffset 1 -> 0, dasharray = the whole 0..1 length) and then breathes
-   in opacity on a loop. No marching dash, so nothing flows in a single direction.
-   Per-line animationDelay (set inline) staggers both so the field feels organic.
-   Runs off the JS main thread, so it never starves the auth form. */
-@keyframes auth-path-flow {
+/* Flowing-line backdrop (reference "Background Paths" behaviour, pure CSS).
+   Shared by the auth brand panel and the home hero. Each <path> is normalised
+   with pathLength=1: it draws itself in once (stroke-dashoffset 1 -> 0,
+   dasharray = the whole 0..1 length) and then breathes in opacity on a loop. No
+   marching dash, so nothing flows in a single direction. Per-line animationDelay
+   (set inline) staggers both so the field feels organic. Runs off the JS main
+   thread, so it never starves the page. */
+@keyframes floating-path-flow {
   to { stroke-dashoffset: -1; }
 }
-.auth-paths path {
+.floating-paths path {
   /* pathLength=1 → a half-drawn segment travels along each line. A continuous
      loop keeps it always moving; per-line delay/duration/direction (set inline)
      break the lockstep so adjacent lines flow at different speeds and in
      opposite directions — organic, not a single-direction march. */
   stroke-dasharray: 0.5 0.5;
-  animation: auth-path-flow 12s linear infinite;
+  animation: floating-path-flow 12s linear infinite;
 }
 @media (prefers-reduced-motion: reduce) {
   .belt-scroll-anim, .scan-sweep-anim, .item-state-anim, .pipe-pulse-anim, .node-glow-anim, .gradient-sweep-anim, .marquee-anim { animation: none !important; }
-  .auth-paths path { animation: none !important; stroke-dasharray: none !important; }
+  .floating-paths path { animation: none !important; stroke-dasharray: none !important; }
 }
 /* Knowledge Base dashboard layout primitives. Each container owns ONE layout
    rule, so panels inherit correct width/height/reflow and new panels can be

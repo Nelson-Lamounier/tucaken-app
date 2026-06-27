@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildFloatingPaths } from '@/features/auth/components/floating-paths-util'
+import { buildFloatingPaths } from '@/components/ui/floating-paths-util'
 
 describe('buildFloatingPaths', () => {
   it('returns 36 deterministic path descriptors', () => {
