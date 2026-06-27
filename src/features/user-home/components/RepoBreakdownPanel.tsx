@@ -72,7 +72,7 @@ export function RepoBreakdownPanel() {
     )
   } else {
     body = (
-      <ul className="flex min-h-0 flex-1 flex-col divide-y divide-zinc-200 overflow-y-auto dark:divide-white/5">
+      <ul className="no-scrollbar flex min-h-0 flex-1 flex-col divide-y divide-zinc-200 overflow-y-auto dark:divide-white/5">
         {repositories.map((r, i) => (
           <RepoBar key={r.repoFullName} repo={r} max={max} index={i} />
         ))}

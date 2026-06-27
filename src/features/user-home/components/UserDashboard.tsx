@@ -96,7 +96,6 @@ export function UserDashboard() {
             here; it wraps to the next row and the row stretches to equal height. */}
         {!isAdmin && (
           <PanelGrid min={300}>
-            <KbOverviewPanel stats={stats} />
             <RepoBreakdownPanel />
             <CareerDataBreakdown
               entries={entries}
@@ -148,6 +147,7 @@ export function UserDashboard() {
             /* Z — Small / sidebar list. Add a small, compact widget here; the
                list grows downward. */
             <PanelStack>
+              <KbOverviewPanel stats={stats} />
               <ResumeFilesList imports={imports} isLoading={loadingImports} />
               <KbSetupChecklist stats={stats} hasProject={hasProject} />
               <KbActivityFeed imports={imports} repos={repos} />

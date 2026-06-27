@@ -165,3 +165,12 @@
     grid-template-columns: 1fr var(--aside-w, 340px);
   }
 }
+
+/* Hide the scrollbar gutter while keeping scroll behaviour (used on capped
+   panels and drawers). Firefox + WebKit. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

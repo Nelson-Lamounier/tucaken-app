@@ -109,7 +109,7 @@ export function CareerDataBreakdown({ entries, latestImport, isLoading }: Career
 
   return (
     <PanelShell>
-      <dl className="flex min-h-0 flex-1 flex-col divide-y divide-zinc-200 overflow-y-auto dark:divide-white/5">
+      <dl className="no-scrollbar flex min-h-0 flex-1 flex-col divide-y divide-zinc-200 overflow-y-auto dark:divide-white/5">
         {rows.map(row => (
           <CountRow key={row.type} label={row.label} count={row.count} max={max} />
         ))}
