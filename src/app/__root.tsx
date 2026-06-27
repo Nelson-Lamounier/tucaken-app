@@ -14,6 +14,7 @@ import { Toaster } from '../components/ui/Toaster'
 import { initialiseFaroAdmin } from '../lib/observability/faro-admin'
 import { ThemeProvider } from '../contexts/ThemeContext'
 import { PageTransitionProvider } from '../contexts/PageTransition'
+import { LoadingOverlay } from '../components/LoadingOverlay'
 import { queryClient } from '../lib/query-client'
 
 /**
@@ -129,6 +130,7 @@ function RootComponent() {
     <MotionConfig reducedMotion="never">
       <ThemeProvider>
         <QueryClientProvider client={queryClient}>
+          <LoadingOverlay />
           <PageTransitionProvider>
             <Outlet />
           </PageTransitionProvider>
