@@ -11,7 +11,6 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import type { RouterContext } from '../router'
 import { getUserSessionFn } from '../server/session'
 import { Toaster } from '../components/ui/Toaster'
-import { initialiseFaroAdmin } from '../lib/observability/faro-admin'
 import { ThemeProvider } from '../contexts/ThemeContext'
 import { PageTransitionProvider } from '../contexts/PageTransition'
 import { queryClient } from '../lib/query-client'
@@ -121,10 +120,6 @@ function NotFoundComponent() {
 }
 
 function RootComponent() {
-  React.useEffect(() => {
-    initialiseFaroAdmin()
-  }, [])
-
   return (
     <MotionConfig reducedMotion="never">
       <ThemeProvider>
