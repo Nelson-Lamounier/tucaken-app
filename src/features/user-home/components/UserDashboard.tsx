@@ -149,7 +149,7 @@ export function UserDashboard() {
                list grows downward. */
             <PanelStack>
               <ResumeFilesList imports={imports} isLoading={loadingImports} />
-              <KbSetupChecklist stats={stats} />
+              <KbSetupChecklist stats={stats} hasProject={hasProject} />
               <KbActivityFeed imports={imports} repos={repos} />
             </PanelStack>
           }
