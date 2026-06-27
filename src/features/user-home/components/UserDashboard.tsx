@@ -22,6 +22,7 @@ import { RepoProfileCards } from './RepoProfileCards'
 import { CareerDataBreakdown } from './CareerDataBreakdown'
 import { ResumeFilesList } from './ResumeFilesList'
 import { KbQuickActions } from './KbQuickActions'
+import { PanelFlow } from './PanelFlow'
 import { deriveKbStats } from '../lib/kb-stats'
 import { buildHeroTiles, deriveHeroSparks, deriveHeroMeta } from '../lib/hero-tiles'
 
@@ -61,14 +62,14 @@ export function UserDashboard() {
             end users (lossy-rollup false negatives), so it is admin-only until the
             data matures; users see honest KB quality + their own activity instead. */}
         {isAdmin ? (
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_1fr] xl:items-stretch">
+          <PanelFlow min={300}>
             <KbScorePanel diagnostic={profileSummary?.diagnostic ?? null} isLoading={isLoading} />
             <KbStatsPanel tiles={heroTiles} />
-          </div>
+          </PanelFlow>
         ) : (
           <div className="space-y-6">
             <ActivityPanel />
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3 md:items-start">
+            <PanelFlow min={300}>
               <KbOverviewPanel stats={stats} />
               <RepoBreakdownPanel />
               <CareerDataBreakdown
@@ -76,7 +77,7 @@ export function UserDashboard() {
                 latestImport={latestImport}
                 isLoading={loadingEntries || loadingImports}
               />
-            </div>
+            </PanelFlow>
           </div>
         )}
 
