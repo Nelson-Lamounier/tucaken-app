@@ -25,7 +25,11 @@ import { KbQuickActions } from './KbQuickActions'
 import { PanelStack } from './PanelStack'
 import { PanelGrid } from './PanelGrid'
 import { SplitLayout } from './SplitLayout'
+import { WelcomeSummary } from './WelcomeSummary'
+import { projectsQueries } from '@/features/projects/server/queries'
+import { partitionProjects } from '@/features/projects/lib/classify'
 import { deriveKbStats } from '../lib/kb-stats'
+import { deriveDashboardSummary } from '../lib/dashboard-summary'
 import { buildHeroTiles, deriveHeroSparks, deriveHeroMeta } from '../lib/hero-tiles'
 
 export function UserDashboard() {
@@ -44,9 +48,21 @@ export function UserDashboard() {
     queryFn:  () => listCareerEntriesFn({ data: {} }),
   })
 
+  const { data: projectList } = useQuery(
+    projectsQueries.list({ limit: 100, offset: 0, includeArchived: false }),
+  )
+
   const isLoading    = loadingRepos || loadingImports || loadingEntries
   const stats        = deriveKbStats(repos, entries, imports)
   const latestImport = imports[0]
+  const hasProject   = partitionProjects(projectList?.items ?? []).curated.length > 0
+  const summary      = deriveDashboardSummary({
+    name:    me?.name,
+    email:   me?.email,
+    stats,
+    hasProject,
+    mirror:  profileSummary?.mirror?.paragraph ?? null,
+  })
   const heroTiles    = buildHeroTiles(
     isLoading,
     stats,
@@ -71,6 +87,7 @@ export function UserDashboard() {
           </PanelGrid>
         ) : (
           <PanelStack>
+            <WelcomeSummary summary={summary} />
             <ActivityPanel />
           </PanelStack>
         )}
