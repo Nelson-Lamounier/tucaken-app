@@ -22,7 +22,9 @@ import { RepoProfileCards } from './RepoProfileCards'
 import { CareerDataBreakdown } from './CareerDataBreakdown'
 import { ResumeFilesList } from './ResumeFilesList'
 import { KbQuickActions } from './KbQuickActions'
-import { PanelFlow } from './PanelFlow'
+import { PanelStack } from './PanelStack'
+import { PanelGrid } from './PanelGrid'
+import { SplitLayout } from './SplitLayout'
 import { deriveKbStats } from '../lib/kb-stats'
 import { buildHeroTiles, deriveHeroSparks, deriveHeroMeta } from '../lib/hero-tiles'
 
@@ -58,68 +60,83 @@ export function UserDashboard() {
       description="Your AI agent's data health at a glance."
     >
       <div className="space-y-8">
-        {/* Hero band. The Resume-Readiness diagnostic is not yet trustworthy for
-            end users (lossy-rollup false negatives), so it is admin-only until the
-            data matures; users see honest KB quality + their own activity instead. */}
+        {/* X — Large / full-width band. Add a large, full-width panel here; it
+            stacks to the bottom. The Resume-Readiness diagnostic is not yet
+            trustworthy for end users (lossy-rollup false negatives), so it is
+            admin-only until the data matures; users see their activity instead. */}
         {isAdmin ? (
-          <PanelFlow min={300}>
+          <PanelGrid min={320}>
             <KbScorePanel diagnostic={profileSummary?.diagnostic ?? null} isLoading={isLoading} />
             <KbStatsPanel tiles={heroTiles} />
-          </PanelFlow>
+          </PanelGrid>
         ) : (
-          <div className="space-y-6">
+          <PanelStack>
             <ActivityPanel />
-            <PanelFlow min={300}>
-              <KbOverviewPanel stats={stats} />
-              <RepoBreakdownPanel />
-              <CareerDataBreakdown
-                entries={entries}
-                latestImport={latestImport}
-                isLoading={loadingEntries || loadingImports}
-              />
-            </PanelFlow>
-          </div>
+          </PanelStack>
         )}
 
-        {/* Working panels — one auto-fit flow so an absent panel reflows the rest
-            instead of stranding a tall column for users with sparse data. */}
-        <PanelFlow min={340}>
-          {profileSummary && (
-            <section className="space-y-3">
-              <div>
-                <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Profile Intelligence</h3>
-                <p className="mt-0.5 text-xs text-zinc-500">
-                  What your data says about you — expand any panel for the full read
-                </p>
-              </div>
-              <AnimatedTabs
-                items={[
-                  {
-                    id: 'mirror',
-                    title: 'Profile mirror',
-                    content: <MirrorPanel summary={profileSummary} />,
-                  },
-                  {
-                    id: 'direction',
-                    title: 'Career direction',
-                    content: <DirectionPanel summary={profileSummary} />,
-                  },
-                  {
-                    id: 'reconciliation',
-                    title: 'Résumé reconciliation',
-                    content: (
-                      <ReconciliationPanel summary={profileSummary} hasResume={entries.length > 0} />
-                    ),
-                  },
-                ]}
-              />
-            </section>
-          )}
-          <RepoProfileCards repos={repos} isLoading={loadingRepos} />
-          <KbSetupChecklist stats={stats} />
-          <ResumeFilesList imports={imports} isLoading={loadingImports} />
-          <KbActivityFeed imports={imports} repos={repos} />
-        </PanelFlow>
+        {/* Y — Medium / equal-height card grid (non-admin). Add a medium card
+            here; it wraps to the next row and the row stretches to equal height. */}
+        {!isAdmin && (
+          <PanelGrid min={300}>
+            <KbOverviewPanel stats={stats} />
+            <RepoBreakdownPanel />
+            <CareerDataBreakdown
+              entries={entries}
+              latestImport={latestImport}
+              isLoading={loadingEntries || loadingImports}
+            />
+          </PanelGrid>
+        )}
+
+        {/* Main reading column (left) + small sidebar rail (right). */}
+        <SplitLayout
+          main={
+            <PanelStack>
+              {profileSummary && (
+                <section className="space-y-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Profile Intelligence</h3>
+                    <p className="mt-0.5 text-xs text-zinc-500">
+                      What your data says about you — expand any panel for the full read
+                    </p>
+                  </div>
+                  <AnimatedTabs
+                    items={[
+                      {
+                        id: 'mirror',
+                        title: 'Profile mirror',
+                        content: <MirrorPanel summary={profileSummary} />,
+                      },
+                      {
+                        id: 'direction',
+                        title: 'Career direction',
+                        content: <DirectionPanel summary={profileSummary} />,
+                      },
+                      {
+                        id: 'reconciliation',
+                        title: 'Résumé reconciliation',
+                        content: (
+                          <ReconciliationPanel summary={profileSummary} hasResume={entries.length > 0} />
+                        ),
+                      },
+                    ]}
+                  />
+                </section>
+              )}
+              <RepoProfileCards repos={repos} isLoading={loadingRepos} />
+            </PanelStack>
+          }
+          aside={
+            /* Z — Small / sidebar list. Add a small, compact widget here; the
+               list grows downward. */
+            <PanelStack>
+              <ResumeFilesList imports={imports} isLoading={loadingImports} />
+              <KbSetupChecklist stats={stats} />
+              <KbActivityFeed imports={imports} repos={repos} />
+            </PanelStack>
+          }
+        />
 
         <KbQuickActions />
       </div>
