@@ -25,8 +25,23 @@ vi.mock('../../../lib/observability/ga4', () => ({
 vi.mock('../../../lib/observability/faro-admin', () => ({
   initialiseFaroAdmin: mocks.initialiseFaroAdmin,
 }))
+const router = vi.hoisted(() => ({
+  cb: null as (() => void) | null,
+  pathname: '/home',
+}))
+
 vi.mock('@tanstack/react-router', () => ({
-  useRouter: () => ({ subscribe: () => () => {} }),
+  useRouter: () => ({
+    subscribe: (_event: string, cb: () => void) => {
+      router.cb = cb
+      return () => { router.cb = null }
+    },
+    state: {
+      location: {
+        get pathname() { return router.pathname },
+      },
+    },
+  }),
 }))
 
 import { ConsentEffects } from '../../../features/consent/ConsentEffects'
@@ -37,6 +52,8 @@ beforeEach(() => {
   cleanup()
   vi.clearAllMocks()
   localStorage.clear()
+  router.cb = null
+  router.pathname = '/home'
   useConsentStore.setState({
     analytics: undefined,
     marketing: undefined,
@@ -57,7 +74,7 @@ describe('ConsentEffects', () => {
   it('loads GA4 + Faro once analytics is granted', () => {
     render(<ConsentEffects />)
     act(() => { useConsentStore.getState().acceptAll() })
-    expect(mocks.syncConsentMode).toHaveBeenCalled()
+    expect(mocks.syncConsentMode).toHaveBeenCalledWith({ analytics: 'granted', marketing: 'granted' })
     expect(mocks.loadGtagScript).toHaveBeenCalled()
     expect(mocks.initialiseFaroAdmin).toHaveBeenCalled()
   })
@@ -67,5 +84,27 @@ describe('ConsentEffects', () => {
     act(() => { useConsentStore.getState().rejectAll() })
     expect(mocks.loadGtagScript).not.toHaveBeenCalled()
     expect(mocks.initialiseFaroAdmin).not.toHaveBeenCalled()
+  })
+
+  it('tracks page_view via router subscription when analytics is granted', () => {
+    render(<ConsentEffects />)
+    act(() => { useConsentStore.getState().acceptAll() })
+    router.pathname = '/dashboard'
+    act(() => { router.cb?.() })
+    expect(mocks.trackPageView).toHaveBeenCalledWith('/dashboard', document.title)
+  })
+
+  it('does not track page_view when analytics is not granted', () => {
+    render(<ConsentEffects />)
+    // analytics remains undecided (default state)
+    act(() => { router.cb?.() })
+    expect(mocks.trackPageView).not.toHaveBeenCalled()
+  })
+
+  it('does not track page_view after analytics is rejected', () => {
+    render(<ConsentEffects />)
+    act(() => { useConsentStore.getState().rejectAll() })
+    act(() => { router.cb?.() })
+    expect(mocks.trackPageView).not.toHaveBeenCalled()
   })
 })
