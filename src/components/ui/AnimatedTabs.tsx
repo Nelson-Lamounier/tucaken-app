@@ -16,21 +16,27 @@ interface AnimatedTabsProps {
   readonly items: readonly AnimatedTabItem[]
   /** Tab selected on first render. Defaults to the first item. */
   readonly defaultId?: string
+  /** Drop the outer card border/background to embed inside a panel Card. */
+  readonly bare?: boolean
 }
 
 /**
  * Horizontal tab bar (titles on one line) with a shared `layoutId` underline
  * that slides to the active tab, and a cross-fading content region below.
  */
-export function AnimatedTabs({ items, defaultId }: AnimatedTabsProps) {
+export function AnimatedTabs({ items, defaultId, bare }: AnimatedTabsProps) {
   const [activeId, setActiveId] = useState<string>(defaultId ?? items[0]?.id ?? '')
   const active = items.find(item => item.id === activeId) ?? items[0]
 
   if (!active) return null
 
+  const shellClass = bare
+    ? 'overflow-hidden'
+    : 'overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-white/10 dark:bg-white/2'
+
   return (
     <MotionConfig transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}>
-      <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-white/10 dark:bg-white/2">
+      <div className={shellClass}>
         {/* Tab bar — titles on a single line */}
         <div
           role="tablist"

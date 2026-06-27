@@ -258,12 +258,9 @@ export function RepoProfileCards({ repos, isLoading }: RepoProfileCardsProps) {
   }
 
   return (
-    <section className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Connected Repositories</h3>
-          <p className="mt-0.5 text-xs text-zinc-500">Indexed into your knowledge base</p>
-        </div>
+    <Card as="section" className="flex flex-col overflow-hidden">
+      <div className="flex items-center justify-between gap-3 border-b border-zinc-200 px-6 py-4 dark:border-white/5">
+        <h3 className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">Connected Repositories</h3>
         <Link
           to="/settings/github"
           search={{ tab: 'repositories' }}
@@ -272,7 +269,7 @@ export function RepoProfileCards({ repos, isLoading }: RepoProfileCardsProps) {
           Manage →
         </Link>
       </div>
-      {content}
+      <div className="p-6">{content}</div>
 
       {/* Full-review slide-over — same drawer as the resume preview */}
       <DashboardDrawer
@@ -290,6 +287,6 @@ export function RepoProfileCards({ repos, isLoading }: RepoProfileCardsProps) {
           </div>
         )}
       </DashboardDrawer>
-    </section>
+    </Card>
   )
 }

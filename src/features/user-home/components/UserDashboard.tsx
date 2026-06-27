@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { DashboardPage } from '@/components/layouts/DashboardPage'
+import { Card } from '@/components/ui/Card'
 import { useGitHubConnectedRepos } from '@/features/github/hooks/use-github-connected-repos'
 import { useProfileSummary } from '@/features/profile/hooks/use-profile-summary'
 import { adminKeys } from '@/lib/api/query-keys'
@@ -110,14 +111,12 @@ export function UserDashboard() {
                 </PanelGrid>
               )}
               {profileSummary && (
-                <section className="space-y-3">
-                  <div>
-                    <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Profile Intelligence</h3>
-                    <p className="mt-0.5 text-xs text-zinc-500">
-                      What your data says about you — expand any panel for the full read
-                    </p>
+                <Card as="section" className="flex flex-col overflow-hidden">
+                  <div className="flex items-center border-b border-zinc-200 px-6 py-4 dark:border-white/5">
+                    <h3 className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">Profile Intelligence</h3>
                   </div>
                   <AnimatedTabs
+                    bare
                     items={[
                       {
                         id: 'mirror',
@@ -138,7 +137,7 @@ export function UserDashboard() {
                       },
                     ]}
                   />
-                </section>
+                </Card>
               )}
               <RepoProfileCards repos={repos} isLoading={loadingRepos} />
             </PanelStack>
