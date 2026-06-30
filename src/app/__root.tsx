@@ -14,6 +14,10 @@ import { Toaster } from '../components/ui/Toaster'
 import { ThemeProvider } from '../contexts/ThemeContext'
 import { PageTransitionProvider } from '../contexts/PageTransition'
 import { queryClient } from '../lib/query-client'
+import { ConsentEffects } from '../features/consent/ConsentEffects'
+import { ConsentBanner } from '../features/consent/components/ConsentBanner'
+import { ConsentPreferences } from '../features/consent/components/ConsentPreferences'
+import { usePreferencesUiStore } from '../features/consent/store-ui'
 
 /**
  * Inline script injected into <head> before first paint.
@@ -120,6 +124,7 @@ function NotFoundComponent() {
 }
 
 function RootComponent() {
+  const openPanel = usePreferencesUiStore((s) => s.openPanel)
   return (
     <MotionConfig reducedMotion="never">
       <ThemeProvider>
@@ -127,6 +132,9 @@ function RootComponent() {
           <PageTransitionProvider>
             <Outlet />
           </PageTransitionProvider>
+          <ConsentEffects />
+          <ConsentBanner onManage={openPanel} />
+          <ConsentPreferences />
           <Suspense fallback={null}>
             <TanStackDevtools />
           </Suspense>
