@@ -87,13 +87,19 @@ export function createArticlesRouter(config: AdminApiConfig): Hono<AdminApiBindi
     if (existing) return ctx.json({ error: 'An article with this slug already exists' }, 409);
 
     const status = typeof body['status'] === 'string' ? body['status'] : 'draft';
+    if (status !== 'draft' && !ALL_STATUS_SET.has(status)) {
+      return ctx.json({ error: 'Invalid status' }, 400);
+    }
+
+
+    const rawTags = Array.isArray(body['tags']) ? (body['tags'] as unknown[]) : [];
 
     await upsertArticle(pool, {
       slug,
       title,
       excerpt: typeof body['excerpt'] === 'string' ? body['excerpt'] : null,
       contentMd,
-      tags: Array.isArray(body['tags']) ? (body['tags'] as string[]) : [],
+      tags: rawTags.filter((t): t is string => typeof t === 'string'),
       status,
       aiGenerated: false,
       aiModel: null,
@@ -160,6 +166,9 @@ export function createArticlesRouter(config: AdminApiConfig): Hono<AdminApiBindi
     const existing = await getArticleBySlug(pool, slug);
     if (!existing) return ctx.json({ error: 'Article not found' }, 404);
 
+    const rawDest = Array.isArray(updates['destinations']) ? (updates['destinations'] as unknown[]) : [];
+    const filteredDest = rawDest.filter((d): d is string => typeof d === 'string' && ALLOWED_DESTINATIONS.has(d));
+
     const merged: import('../lib/repositories/articles.js').Article = {
         slug,
         title:       'title'       in updates ? (updates['title']       as string)              : existing.title,
@@ -173,7 +182,7 @@ export function createArticlesRouter(config: AdminApiConfig): Hono<AdminApiBindi
             ? (updates['publishedAt'] ? new Date(updates['publishedAt'] as string) : null)
             : existing.publishedAt,
         coverImage:   'coverImage'   in updates ? (updates['coverImage']   as string | null) : existing.coverImage,
-        destinations: 'destinations' in updates ? (updates['destinations'] as string[]) : existing.destinations,
+        destinations: 'destinations' in updates ? (filteredDest.length > 0 ? filteredDest : existing.destinations) : existing.destinations,
     };
 
     await upsertArticle(pool, merged);

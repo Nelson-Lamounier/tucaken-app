@@ -545,3 +545,98 @@ describe('GET /:slug/versions — read pipeline_runs history', () => {
     expect(body.versions).toHaveLength(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// PUT /:slug — destination allowlist filtering (Fix 1)
+// ---------------------------------------------------------------------------
+
+describe('PUT /:slug — destination allowlist filtering', () => {
+  const existingWithDest = { ...ARTICLE_ITEM, destinations: ['portfolio'] };
+
+  beforeEach(() => {
+    pgUpsertMock.mockReset();
+    pgUpsertMock.mockResolvedValue(undefined);
+    pgGetArticleBySlugMock.mockReset();
+    pgGetArticleBySlugMock.mockResolvedValue(existingWithDest as never);
+  });
+
+  it('filters out non-string and disallowed values, keeping only valid destinations', async () => {
+    await buildApp().request('/my-slug', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ destinations: ['portfolio', 'bogus', 123] }),
+    });
+    expect(pgUpsertMock).toHaveBeenCalledTimes(1);
+    const arg = pgUpsertMock.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(arg['destinations']).toEqual(['portfolio']);
+  });
+
+  it('falls back to existing destinations when all provided values are invalid', async () => {
+    await buildApp().request('/my-slug', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ destinations: ['bogus', 999] }),
+    });
+    expect(pgUpsertMock).toHaveBeenCalledTimes(1);
+    const arg = pgUpsertMock.mock.calls[0]?.[1] as Record<string, unknown>;
+    // all-invalid → fall back to existing
+    expect(arg['destinations']).toEqual(['portfolio']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST / — status validation (Fix 2) and tags filtering (Fix 3)
+// ---------------------------------------------------------------------------
+
+describe('POST / — status validation (Fix 2)', () => {
+  beforeEach(() => {
+    pgUpsertMock.mockReset();
+    pgUpsertMock.mockResolvedValue(undefined);
+    pgGetArticleBySlugMock.mockReset();
+    pgGetArticleBySlugMock.mockResolvedValue(null);
+  });
+
+  it('returns 400 for an unknown status value', async () => {
+    const res = await buildApp().request('/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ slug: 'valid-slug', title: 'Hi', contentMd: '# Hi', status: 'bogus' }),
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe('Invalid status');
+    expect(pgUpsertMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts a known non-draft status without error', async () => {
+    const res = await buildApp().request('/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ slug: 'valid-slug', title: 'Hi', contentMd: '# Hi', status: 'review' }),
+    });
+    expect(res.status).toBe(201);
+    expect(pgUpsertMock).toHaveBeenCalledTimes(1);
+    const arg = pgUpsertMock.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(arg['status']).toBe('review');
+  });
+});
+
+describe('POST / — tags filtering (Fix 3)', () => {
+  beforeEach(() => {
+    pgUpsertMock.mockReset();
+    pgUpsertMock.mockResolvedValue(undefined);
+    pgGetArticleBySlugMock.mockReset();
+    pgGetArticleBySlugMock.mockResolvedValue(null);
+  });
+
+  it('filters out non-string elements from tags array', async () => {
+    await buildApp().request('/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ slug: 'valid-slug', title: 'Hi', contentMd: '# Hi', tags: ['a', 5, 'b'] }),
+    });
+    expect(pgUpsertMock).toHaveBeenCalledTimes(1);
+    const arg = pgUpsertMock.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(arg['tags']).toEqual(['a', 'b']);
+  });
+});
