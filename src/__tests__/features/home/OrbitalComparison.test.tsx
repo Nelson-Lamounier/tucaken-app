@@ -39,7 +39,7 @@ describe('OrbitalComparison', () => {
     expect(second.getAttribute('aria-expanded')).toBe('true')
   })
 
-  it('opens the clicked node detail in the centre card', async () => {
+  it('opens the clicked node detail in the side card', async () => {
     const { default: userEvent } = await import('@testing-library/user-event')
     const { within } = await import('@testing-library/react')
     render(<OrbitalComparison items={items} />)
@@ -49,12 +49,13 @@ describe('OrbitalComparison', () => {
     expect(within(card).getByText(items[0].t, { exact: false })).toBeTruthy()
   })
 
-  it('hides the infinity hub while a card is open', async () => {
+  it('keeps the infinity hub visible while a card is open (card sits to the side)', async () => {
     const { default: userEvent } = await import('@testing-library/user-event')
     render(<OrbitalComparison items={items} />)
     expect(screen.getByTestId('infinity-hub')).toBeTruthy()
     await userEvent.click(screen.getAllByRole('button')[0])
-    expect(screen.queryByTestId('infinity-hub')).toBeNull()
+    expect(screen.getByTestId('orbit-detail-card')).toBeTruthy()
+    expect(screen.getByTestId('infinity-hub')).toBeTruthy()
   })
 
   it('shows every item q/o/t in the accessible static list', () => {

@@ -1,14 +1,22 @@
 // src/features/home/content.ts
 export const hero = {
   eyebrow: 'Try for free',
-  headlineLead: 'GenAI resumes that are',
-  rotatingWords: ['evidence-backed', 'matched to the job', 'ready in minutes', 'honest about your skills'],
+  headlineLead: 'GenAI resumes',
+  rotatingWords: ['evidence-backed', 'matched to the job', 'ready in minutes', 'skills honest'],
   primaryCta: 'Connect GitHub — see your evidence',
   secondaryCta: 'How it works',
   sub: 'Connect your GitHub with read-only access. Tucaken verifies the skills your code actually proves, matches them to any job description, and writes a tailored resume in minutes. Apply to the right roles with real evidence behind every claim, not generic AI guesswork.',
   ctaNote: 'No credit card required · revoke access anytime',
   founderNote: 'Built by an engineer using it for his own job search.',
 }
+
+// PLACEHOLDER metrics — set real figures (or reframe, e.g. "on the waitlist")
+// before launch. Invented stats undercut the proof-not-prose positioning.
+export const stats = [
+  { value: 1200, suffix: '+', label: 'Developers trust Tucaken' },
+  { value: 8000, suffix: '+', label: 'Resumes generated' },
+  { value: 40, suffix: '%', label: 'Less time on job applications' },
+] as const
 
 export const problems = [
   {
@@ -50,6 +58,16 @@ export const comparison: readonly ComparisonItem[] = [
   { label: 'Tailoring', icon: 'Target', q: 'Can you tailor for a Kubernetes role?', o: 'Generic Kubernetes language.', t: 'Pulls your actual K8s work — the cluster you ran, the issues you solved.' },
   { label: 'Thin docs', icon: 'FileWarning', q: 'What if my repos have thin docs?', o: 'Generates plausible content anyway.', t: 'Tells you which repos need better docs and how to improve them.' },
   { label: 'Sounds like you', icon: 'Fingerprint', q: 'Will this resume sound like me?', o: 'Trained on millions of generic resumes.', t: 'Trained on the documentation you wrote about systems you built.' },
+  { label: 'Read-only', icon: 'Lock', q: 'What happens to my source code?', o: 'Often uploaded or stored on their servers.', t: 'Read-only GitHub access. Your source is never stored, and you can revoke access anytime.' },
+  { label: 'Honesty', icon: 'ListChecks', q: "What about skills I can't prove yet?", o: 'Padded in anyway to beat the keyword filter.', t: 'Marked verified, partial, or a gap, so you only claim what you can defend.' },
+  { label: 'Matching', icon: 'ScanSearch', q: 'Does it match a specific job?', o: 'One generic resume for every role.', t: 'Maps the job description to your verified evidence and shows exactly where you fit.' },
+  { label: 'Coaching', icon: 'MessagesSquare', q: 'What happens after the resume?', o: "You're on your own for the interview.", t: 'Per-stage interview coaching grounded in your real projects.' },
+  { label: 'Formats', icon: 'FileDown', q: 'Can I export in the format each application wants?', o: 'One fixed format, take it or leave it.', t: 'Export as PDF, DOC, or plain text to suit whatever the application requires.' },
+  { label: 'Templates', icon: 'LayoutTemplate', q: 'Can I choose how it looks?', o: 'A single rigid layout.', t: 'Choose from three resume templates, with more on the way.' },
+  { label: 'Dashboard', icon: 'LayoutDashboard', q: 'Where do I manage everything?', o: 'Scattered files and one-off exports.', t: 'One dashboard for your repositories, job descriptions, evidence, and resumes — refine and track it all in one place.' },
+  { label: 'Builder', icon: 'FileText', q: 'Do I have to start from scratch?', o: 'A blank page and a rigid template.', t: 'Seed a draft from your GitHub in one step, or build manually and refine — your call.' },
+  { label: 'AI', icon: 'Sparkles', q: 'How does the AI actually help?', o: 'Generic phrasing bolted onto a template.', t: 'A multi-agent AI pipeline turns your real commits into tailored, evidence-backed bullets.' },
+  { label: 'Speed', icon: 'Clock', q: 'How long does a tailored resume take?', o: 'Hours of manual editing for every role.', t: 'A tailored draft in minutes — most of it is done before you add the final touches.' },
 ]
 
 export const founder = {

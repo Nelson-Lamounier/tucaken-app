@@ -13,7 +13,7 @@ const PRESS = { type: 'spring', stiffness: 400, damping: 30 } as const
 // Shared card chrome — kept as a const so the four actions don't duplicate the
 // (long) class string. Links stay explicit to preserve TanStack router types.
 const CARD_CLASS =
-  'group flex items-center gap-4 rounded-xl border border-zinc-200 bg-white p-4 transition-colors hover:border-teal-500/40 hover:bg-zinc-50 dark:border-white/10 dark:bg-white/4 dark:hover:border-teal-500/30 dark:hover:bg-white/6'
+  'group flex items-center gap-4 rounded-md border border-zinc-200 bg-white p-4 transition-colors hover:border-teal-500/40 hover:bg-zinc-50 dark:border-white/10 dark:bg-white/4 dark:hover:border-teal-500/30 dark:hover:bg-white/6'
 
 function ActionBody({
   icon: Icon,
@@ -26,7 +26,7 @@ function ActionBody({
 }) {
   return (
     <>
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-teal-500/10 text-teal-600 ring-1 ring-inset ring-teal-500/20 dark:text-teal-400">
+      <span className="flex size-10 shrink-0 items-center justify-center text-teal-600 dark:text-teal-400">
         <Icon className="size-5" />
       </span>
       <span>

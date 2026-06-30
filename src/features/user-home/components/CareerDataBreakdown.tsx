@@ -28,7 +28,7 @@ interface CareerDataBreakdownProps {
 
 function PanelShell({ children }: { readonly children: React.ReactNode }) {
   return (
-    <Card as="section" className="flex h-full flex-col overflow-hidden">
+    <Card as="section" className="flex h-full max-h-64 flex-col overflow-hidden">
       <div className="flex items-center justify-between gap-3 border-b border-zinc-200 px-6 py-4 dark:border-white/5">
         <h3 className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">Career Data</h3>
         <Link
@@ -46,7 +46,7 @@ function PanelShell({ children }: { readonly children: React.ReactNode }) {
 
 function CountRow({ label, count, max }: { readonly label: string; readonly count: number; readonly max: number }) {
   return (
-    <div className="flex flex-col gap-1.5 px-6 py-3">
+    <div className="flex flex-col gap-1 px-6 py-2">
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400">{label}</span>
         <span className="text-sm font-semibold tabular-nums text-teal-600 dark:text-teal-300">{count}</span>
@@ -109,14 +109,14 @@ export function CareerDataBreakdown({ entries, latestImport, isLoading }: Career
 
   return (
     <PanelShell>
-      <dl className="flex flex-1 flex-col divide-y divide-zinc-200 dark:divide-white/5">
+      <dl className="no-scrollbar flex min-h-0 flex-1 flex-col divide-y divide-zinc-200 overflow-y-auto dark:divide-white/5">
         {rows.map(row => (
           <CountRow key={row.type} label={row.label} count={row.count} max={max} />
         ))}
       </dl>
 
       {latestImport && (
-        <div className="flex items-center gap-2 border-t border-zinc-200 px-6 py-3 dark:border-white/5">
+        <div className="flex items-center gap-2 border-t border-zinc-200 px-6 py-2 dark:border-white/5">
           {isOk      && <CheckCircle2 className="size-3.5 shrink-0 text-emerald-500 dark:text-emerald-400" />}
           {isFailed  && <AlertCircle  className="size-3.5 shrink-0 text-red-500 dark:text-red-400" />}
           {isPending && <Loader2      className="size-3.5 shrink-0 animate-spin text-indigo-500 dark:text-indigo-400" />}

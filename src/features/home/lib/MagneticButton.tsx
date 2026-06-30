@@ -32,7 +32,7 @@ export function MagneticButton({ children, primary, onClick, className = '' }: P
       animate={{ x: pos.x, y: pos.y }}
       transition={{ type: 'spring', stiffness: 200, damping: 15, mass: 0.4 }}
       className={[
-        'group relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-xl px-5 py-3 text-sm font-semibold transition-shadow',
+        'group relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-md px-5 py-3 text-sm font-semibold transition-shadow',
         primary
           ? 'bg-gradient-to-r from-teal-500 to-emerald-600 text-white shadow-lg shadow-teal-500/30 hover:shadow-xl hover:shadow-teal-500/40'
           : 'border border-white/15 bg-white/5 text-white backdrop-blur hover:bg-white/10',
