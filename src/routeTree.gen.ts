@@ -16,6 +16,7 @@ import { Route as LoginRouteImport } from './app/login'
 import { Route as DashboardRouteImport } from './app/_dashboard'
 import { Route as TermsRouteRouteImport } from './app/terms/route'
 import { Route as PrivacyRouteRouteImport } from './app/privacy/route'
+import { Route as CookiesRouteRouteImport } from './app/cookies/route'
 import { Route as IndexRouteImport } from './app/index'
 import { Route as SignInCallbackRouteImport } from './app/sign-in.callback'
 import { Route as GithubCallbackRouteImport } from './app/github.callback'
@@ -82,6 +83,11 @@ const TermsRouteRoute = TermsRouteRouteImport.update({
 const PrivacyRouteRoute = PrivacyRouteRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CookiesRouteRoute = CookiesRouteRouteImport.update({
+  id: '/cookies',
+  path: '/cookies',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -261,6 +267,7 @@ const DashboardAdminUsersUserIdReposRepoRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/cookies': typeof CookiesRouteRoute
   '/privacy': typeof PrivacyRouteRoute
   '/terms': typeof TermsRouteRoute
   '/login': typeof LoginRoute
@@ -302,6 +309,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/cookies': typeof CookiesRouteRoute
   '/privacy': typeof PrivacyRouteRoute
   '/terms': typeof TermsRouteRoute
   '/login': typeof LoginRoute
@@ -344,6 +352,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/cookies': typeof CookiesRouteRoute
   '/privacy': typeof PrivacyRouteRoute
   '/terms': typeof TermsRouteRoute
   '/_dashboard': typeof DashboardRouteWithChildren
@@ -388,6 +397,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/cookies'
     | '/privacy'
     | '/terms'
     | '/login'
@@ -429,6 +439,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/cookies'
     | '/privacy'
     | '/terms'
     | '/login'
@@ -470,6 +481,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/cookies'
     | '/privacy'
     | '/terms'
     | '/_dashboard'
@@ -513,6 +525,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CookiesRouteRoute: typeof CookiesRouteRoute
   PrivacyRouteRoute: typeof PrivacyRouteRoute
   TermsRouteRoute: typeof TermsRouteRoute
   DashboardRoute: typeof DashboardRouteWithChildren
@@ -576,6 +589,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cookies': {
+      id: '/cookies'
+      path: '/cookies'
+      fullPath: '/cookies'
+      preLoaderRoute: typeof CookiesRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -909,6 +929,7 @@ const SignInRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CookiesRouteRoute: CookiesRouteRoute,
   PrivacyRouteRoute: PrivacyRouteRoute,
   TermsRouteRoute: TermsRouteRoute,
   DashboardRoute: DashboardRouteWithChildren,
