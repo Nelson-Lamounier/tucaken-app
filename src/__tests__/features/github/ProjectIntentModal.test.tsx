@@ -25,7 +25,7 @@ describe('ProjectIntentModal', () => {
     render(<ProjectIntentModal open projects={projects} onChoose={onChoose} onClose={() => {}} />)
     fireEvent.click(screen.getByText(/Link to an existing Project/i))
     fireEvent.change(screen.getByLabelText(/existing project/i), { target: { value: 'p1' } })
-    fireEvent.click(screen.getByText(/^Link$/i))
+    fireEvent.click(screen.getByText(/^Link repository$/i))
     expect(onChoose).toHaveBeenCalledWith({ intent: 'link', targetProjectId: 'p1' })
   })
 })

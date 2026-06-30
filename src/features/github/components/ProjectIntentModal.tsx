@@ -1,11 +1,55 @@
 import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react'
+import { Hammer, GitMerge, Database, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 
 export type ProjectIntentChoice =
   | { intent: 'build' }
   | { intent: 'link'; targetProjectId: string }
   | { intent: 'none' }
+
+/** A single intent choice rendered as a rich, scannable card. */
+function OptionCard({
+  icon,
+  title,
+  description,
+  onClick,
+  recommended = false,
+  disabled = false,
+}: {
+  readonly icon: ReactNode
+  readonly title: string
+  readonly description: string
+  readonly onClick: () => void
+  readonly recommended?: boolean
+  readonly disabled?: boolean
+}) {
+  const tone = recommended
+    ? 'border-accent/40 bg-accent/5 hover:bg-accent/10'
+    : 'border-white/10 bg-white/5 hover:bg-white/10'
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`flex h-full flex-col gap-2 rounded-md border p-4 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${tone}`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-white/5 text-accent">
+          {icon}
+        </span>
+        {recommended && (
+          <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent">
+            Recommended
+          </span>
+        )}
+      </div>
+      <p className="text-sm font-semibold text-zinc-100">{title}</p>
+      <p className="text-xs leading-relaxed text-zinc-400">{description}</p>
+    </button>
+  )
+}
 
 export function ProjectIntentModal({
   open,
@@ -30,89 +74,84 @@ export function ProjectIntentModal({
     }
   }, [open])
 
+  const hasProjects = projects.length > 0
+  const linkDescription = hasProjects
+    ? 'Add this repository to a Project you have already created and regenerate it with the new code. Ideal when several repositories belong to the same product — a monorepo, or a split front-end and back-end — so the Project, and the resumes built from it, reflect the whole system.'
+    : 'You have no confirmed Projects to link to yet. Create one first, or build a new Project from this repository.'
+
   return (
     <Dialog open={open} onClose={onClose} className="relative z-50">
       <div aria-hidden="true" className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <DialogPanel className="w-full max-w-sm rounded-xl border border-white/10 bg-zinc-900 p-6 shadow-2xl">
-          <DialogTitle className="text-base font-semibold text-zinc-100">
-            What should this repo become?
+        <DialogPanel className="w-full max-w-5xl rounded-xl border border-white/10 bg-zinc-900 p-8 shadow-2xl">
+          <DialogTitle className="text-lg font-semibold text-zinc-100">
+            What should this repository become?
           </DialogTitle>
-          <p className="mt-1 text-xs text-zinc-500">
-            After it syncs, we can build or extend a Project case study from it.
+          <p className="mt-1 text-sm text-zinc-400">
+            Choose how Tucaken uses this repository once it finishes syncing. You can change this later.
           </p>
 
           {mode === 'pick' ? (
-            <div className="mt-5 flex flex-col gap-3">
-              <button
-                type="button"
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <OptionCard
+                icon={<Hammer className="size-4.5" aria-hidden />}
+                title="Build a new Project"
+                description="Generate a Project case study from this repository once it syncs. Tucaken indexes its full context — code, commit history and structure — so when you tailor a resume to a job description, the bullets are grounded in what this project genuinely demonstrates and optimised for that role."
+                recommended
                 onClick={() => onChoose({ intent: 'build' })}
-                className="rounded-lg border border-indigo-500/40 bg-indigo-500/10 px-4 py-3 text-left transition-colors hover:bg-indigo-500/20"
-              >
-                <p className="text-sm font-medium text-zinc-100">Build a new Project</p>
-                <p className="mt-0.5 text-xs text-zinc-400">
-                  Generate a case study from this repo once it syncs.
-                </p>
-              </button>
-              <button
-                type="button"
-                onClick={() => { setMode('link') }}
-                disabled={projects.length === 0}
-                className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-left transition-colors hover:bg-white/10 disabled:opacity-40"
-              >
-                <p className="text-sm font-medium text-zinc-100">Link to an existing Project</p>
-                <p className="mt-0.5 text-xs text-zinc-400">
-                  {projects.length === 0 ? 'No confirmed projects yet.' : 'Add this repo to a project + regenerate.'}
-                </p>
-              </button>
-              <button
-                type="button"
+              />
+              <OptionCard
+                icon={<GitMerge className="size-4.5" aria-hidden />}
+                title="Link to an existing Project"
+                description={linkDescription}
+                disabled={!hasProjects}
+                onClick={() => setMode('link')}
+              />
+              <OptionCard
+                icon={<Database className="size-4.5" aria-hidden />}
+                title="Add to knowledge base only"
+                description="Sync and index the repository now without creating a Project. The code becomes searchable context straight away, and you can promote it to a Project later — useful while the work is still in progress, so you can wait until it is finished before generating a Project and tailoring your first resume to a job description."
                 onClick={() => onChoose({ intent: 'none' })}
-                className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-left transition-colors hover:bg-white/10"
-              >
-                <p className="text-sm font-medium text-zinc-100">Add to knowledge base only</p>
-                <p className="mt-0.5 text-xs text-zinc-400">Sync the repo without creating a Project.</p>
-              </button>
+              />
             </div>
           ) : (
-            <div className="mt-5 flex flex-col gap-3">
-              <label htmlFor="link-project" className="text-xs text-zinc-400">
-                Existing project
+            <div className="mt-6 flex flex-col gap-3">
+              <label htmlFor="link-project" className="text-sm font-medium text-zinc-300">
+                Link to which Project?
               </label>
+              <p className="text-xs text-zinc-500">
+                The repository is added to the selected Project, which is then regenerated to include its code.
+              </p>
               <select
                 id="link-project"
                 aria-label="existing project"
                 value={target}
                 onChange={(e) => setTarget(e.target.value)}
-                className="rounded-md border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-sm text-zinc-200"
+                className="rounded-md border border-white/10 bg-white/4 px-3 py-2 text-sm text-zinc-200"
               >
-                <option value="">Select a project...</option>
+                <option value="">Select a Project…</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
                   </option>
                 ))}
               </select>
-              <div className="flex justify-between">
-                <Button
-                  variant="ghost"
-                  onClick={() => setMode('pick')}
-                  className="px-3 py-1.5 text-xs"
-                >
-                  Back
+              <div className="mt-1 flex items-center justify-between">
+                <Button variant="ghost" onClick={() => setMode('pick')} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs">
+                  <ArrowLeft className="size-3.5" aria-hidden /> Back
                 </Button>
                 <Button
                   onClick={() => target && onChoose({ intent: 'link', targetProjectId: target })}
                   disabled={!target}
-                  className="px-3 py-1.5 text-xs"
+                  className="px-4 py-1.5 text-xs"
                 >
-                  Link
+                  Link repository
                 </Button>
               </div>
             </div>
           )}
 
-          <div className="mt-5 flex justify-end">
+          <div className="mt-6 flex justify-end border-t border-white/5 pt-4">
             <Button variant="ghost" onClick={onClose} className="px-3 py-1.5 text-xs">
               Cancel
             </Button>

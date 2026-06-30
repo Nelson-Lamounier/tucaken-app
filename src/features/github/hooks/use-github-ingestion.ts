@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { adminKeys } from '@/lib/api/query-keys'
 import { triggerGitHubIngestionFn } from '@/server/github'
 import { useToastStore } from '@/lib/stores/toast-store'
+import { planLimitMessage } from '../lib/plan-limit-error'
 
 interface IngestionVariables {
   readonly repoFullName:  string
@@ -19,6 +20,7 @@ export function useGitHubIngestion() {
   const queryClient = useQueryClient()
   const { addToast } = useToastStore()
   const [needsUpgrade, setNeedsUpgrade] = useState(false)
+  const [upgradeMessage, setUpgradeMessage] = useState<string | null>(null)
 
   const mutation = useMutation<
     { status: string; repoFullName: string; jobName: string },
@@ -31,8 +33,10 @@ export function useGitHubIngestion() {
       void queryClient.invalidateQueries({ queryKey: adminKeys.github.accessibleRepos() })
     },
     onError: (err) => {
-      if (err.message.includes('[429]')) {
-        // Show the persistent upgrade banner instead of an auto-dismissing toast.
+      const limit = planLimitMessage(err)
+      if (limit) {
+        // Show the upgrade modal instead of an auto-dismissing error toast.
+        setUpgradeMessage(limit)
         setNeedsUpgrade(true)
       } else {
         addToast('error', `Failed to queue repo: ${err.message}`)
@@ -43,6 +47,10 @@ export function useGitHubIngestion() {
   return {
     ...mutation,
     needsUpgrade,
-    dismissUpgrade: () => setNeedsUpgrade(false),
+    upgradeMessage,
+    dismissUpgrade: () => {
+      setNeedsUpgrade(false)
+      setUpgradeMessage(null)
+    },
   }
 }
