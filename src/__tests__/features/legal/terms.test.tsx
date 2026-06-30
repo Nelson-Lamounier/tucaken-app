@@ -1,5 +1,7 @@
 /** @vitest-environment happy-dom */
 import { describe, it, expect } from 'vitest'
+import { render } from '@testing-library/react'
+import { LegalPage } from '@/features/legal/components/LegalPage'
 import { termsDoc } from '@/features/legal/content/terms'
 
 describe('termsDoc', () => {
@@ -17,13 +19,9 @@ describe('termsDoc', () => {
   })
 
   it('billing section states subscriptions are non-refundable', () => {
-    const billingSection = termsDoc.sections.find((s) => s.id === 'billing')
-    expect(billingSection).toBeDefined()
-
-    // Render the body to text
-    const bodyText = String((billingSection?.body as any)?.props?.children || '')
-
-    // Check for key phrase
-    expect(bodyText).toContain('Subscriptions are non-refundable')
+    const { container } = render(<LegalPage doc={termsDoc} />)
+    const text = container.textContent ?? ''
+    expect(text).toContain('Subscriptions are non-refundable')
+    expect(text).toContain('faulty or not as described')
   })
 })
