@@ -114,7 +114,8 @@ export function createArticlesRouter(config: AdminApiConfig): Hono<AdminApiBindi
         publishedAt: 'publishedAt' in updates
             ? (updates['publishedAt'] ? new Date(updates['publishedAt'] as string) : null)
             : existing.publishedAt,
-        coverImage:  'coverImage'  in updates ? (updates['coverImage']  as string | null)       : existing.coverImage,
+        coverImage:   'coverImage'   in updates ? (updates['coverImage']   as string | null) : existing.coverImage,
+        destinations: existing.destinations,
     };
 
     await upsertArticle(pool, merged);

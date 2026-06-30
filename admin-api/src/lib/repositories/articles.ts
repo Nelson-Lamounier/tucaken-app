@@ -5,16 +5,17 @@
 import type { Queryable } from '../pg.js';
 
 export interface Article {
-    slug:        string;
-    title:       string;
-    excerpt:     string | null;
-    contentMd:   string;
-    tags:        string[];
-    status:      string;
-    aiGenerated: boolean;
-    aiModel:     string | null;
-    publishedAt: Date | null;
-    coverImage:  string | null;
+    slug:         string;
+    title:        string;
+    excerpt:      string | null;
+    contentMd:    string;
+    tags:         string[];
+    status:       string;
+    aiGenerated:  boolean;
+    aiModel:      string | null;
+    publishedAt:  Date | null;
+    coverImage:   string | null;
+    destinations: string[];
     /** users.id of the owner. Set on the article-job placeholder so
      *  AI-generated articles are attributed; preserved on re-upsert. */
     authorId?:   string | null;
@@ -25,21 +26,22 @@ export interface Article {
 const LIST_BY_STATUS_LIMIT = 100;
 const LIST_ALL_LIMIT = 200;
 
-function rowToArticle(row: Record<string, unknown>): Article {
+export function rowToArticle(row: Record<string, unknown>): Article {
     return {
-        slug:        row['slug']         as string,
-        title:       row['title']        as string,
-        excerpt:     row['excerpt']      as string | null,
-        contentMd:   row['content_md']   as string,
-        tags:        (row['tags']        as string[]) ?? [],
-        status:      row['status']       as string,
-        aiGenerated: row['ai_generated'] as boolean,
-        aiModel:     row['ai_model']     as string | null,
-        publishedAt: row['published_at'] ? new Date(row['published_at'] as string) : null,
-        coverImage:  row['cover_image']  as string | null,
-        authorId:    (row['author_id']   as string | null) ?? null,
-        createdAt:   row['created_at']   ? new Date(row['created_at']   as string) : undefined,
-        updatedAt:   row['updated_at']   ? new Date(row['updated_at']   as string) : undefined,
+        slug:         row['slug']          as string,
+        title:        row['title']         as string,
+        excerpt:      row['excerpt']       as string | null,
+        contentMd:    row['content_md']    as string,
+        tags:         (row['tags']         as string[]) ?? [],
+        status:       row['status']        as string,
+        aiGenerated:  row['ai_generated']  as boolean,
+        aiModel:      row['ai_model']      as string | null,
+        publishedAt:  row['published_at']  ? new Date(row['published_at'] as string) : null,
+        coverImage:   row['cover_image']   as string | null,
+        destinations: (row['destinations'] as string[]) ?? ['portfolio'],
+        authorId:     (row['author_id']    as string | null) ?? null,
+        createdAt:    row['created_at']    ? new Date(row['created_at']   as string) : undefined,
+        updatedAt:    row['updated_at']    ? new Date(row['updated_at']   as string) : undefined,
     };
 }
 
@@ -47,8 +49,8 @@ export async function upsertArticle(pool: Queryable, article: Article): Promise<
     await pool.query(
         `INSERT INTO articles
              (slug, title, excerpt, content_md, tags, status, ai_generated, ai_model,
-              published_at, cover_image, author_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+              published_at, cover_image, author_id, destinations)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          ON CONFLICT (slug) DO UPDATE SET
              title        = EXCLUDED.title,
              excerpt      = EXCLUDED.excerpt,
@@ -59,6 +61,7 @@ export async function upsertArticle(pool: Queryable, article: Article): Promise<
              ai_model     = EXCLUDED.ai_model,
              published_at = EXCLUDED.published_at,
              cover_image  = EXCLUDED.cover_image,
+             destinations = EXCLUDED.destinations,
              -- Preserve the owner once set: the article-job placeholder
              -- sets author_id; later content upserts must not null it.
              author_id    = COALESCE(articles.author_id, EXCLUDED.author_id),
@@ -75,6 +78,7 @@ export async function upsertArticle(pool: Queryable, article: Article): Promise<
             article.publishedAt ?? null,
             article.coverImage ?? null,
             article.authorId ?? null,
+            article.destinations ?? ['portfolio'],
         ],
     );
 }
@@ -82,7 +86,7 @@ export async function upsertArticle(pool: Queryable, article: Article): Promise<
 export async function getArticleBySlug(pool: Queryable, slug: string): Promise<Article | null> {
     const result = await pool.query(
         `SELECT slug, title, excerpt, content_md, tags, status, ai_generated,
-                ai_model, published_at, cover_image, created_at, updated_at
+                ai_model, published_at, cover_image, destinations, created_at, updated_at
          FROM articles WHERE slug = $1`,
         [slug],
     );
@@ -93,7 +97,7 @@ export async function getArticleBySlug(pool: Queryable, slug: string): Promise<A
 export async function listArticlesByStatus(pool: Queryable, status: string): Promise<Article[]> {
     const result = await pool.query(
         `SELECT slug, title, excerpt, content_md, tags, status, ai_generated,
-                ai_model, published_at, cover_image, created_at, updated_at
+                ai_model, published_at, cover_image, destinations, created_at, updated_at
          FROM articles WHERE status = $1 ORDER BY updated_at DESC LIMIT ${LIST_BY_STATUS_LIMIT}`,
         [status],
     );
@@ -103,7 +107,7 @@ export async function listArticlesByStatus(pool: Queryable, status: string): Pro
 export async function listAllArticles(pool: Queryable): Promise<Article[]> {
     const result = await pool.query(
         `SELECT slug, title, excerpt, content_md, tags, status, ai_generated,
-                ai_model, published_at, cover_image, created_at, updated_at
+                ai_model, published_at, cover_image, destinations, created_at, updated_at
          FROM articles ORDER BY updated_at DESC LIMIT ${LIST_ALL_LIMIT}`,
     );
     return (result.rows as Record<string, unknown>[]).map(rowToArticle);

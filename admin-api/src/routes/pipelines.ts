@@ -133,7 +133,8 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
           aiModel:     null,
           publishedAt: null,
           coverImage:  null,
-          authorId:    userId,
+          authorId:     userId,
+          destinations: ['portfolio'],
         });
       } catch (err: unknown) {
         console.error('[pipelines/article-job] failed to upsert article placeholder', err);
