@@ -18,6 +18,7 @@ import { StatCard } from '@/components/ui/StatCard'
 import { faqCategories } from '../lib/faq'
 import { highlightParts } from '../lib/highlight'
 import { tiersFromPublic } from '@/features/billing/catalog'
+import { trackSocialClick } from '@/lib/observability/analytics'
 import { getPublicTierConfigFn } from '@/server/tier-config'
 import { SparkleField } from '../lib/SparkleField'
 import { tierCtaTarget } from '../lib/pricing-cta'
@@ -464,6 +465,7 @@ export function FooterSection() {
               <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-zinc-500">Contact</div>
               <a
                 href="mailto:support@tucaken.com"
+                onClick={() => trackSocialClick('Email', 'mailto:support@tucaken.com')}
                 className="mt-2 inline-flex items-center gap-1 text-sm text-zinc-400 transition-colors hover:text-white"
               >
                 support@tucaken.com
@@ -476,6 +478,7 @@ export function FooterSection() {
                 <a
                   key={label}
                   href={href}
+                  onClick={() => trackSocialClick(label, href)}
                   target={href.startsWith('mailto:') ? undefined : '_blank'}
                   rel="noreferrer"
                   aria-label={label}
