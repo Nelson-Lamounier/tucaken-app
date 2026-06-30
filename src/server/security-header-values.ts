@@ -17,8 +17,9 @@
  */
 
 function scriptSrc(nonce?: string): string {
-  if (nonce) return `script-src 'self' 'nonce-${nonce}' https://js.stripe.com`
-  return "script-src 'self' 'unsafe-inline' https://js.stripe.com"
+  const google = 'https://www.googletagmanager.com'
+  if (nonce) return `script-src 'self' 'nonce-${nonce}' https://js.stripe.com ${google}`
+  return `script-src 'self' 'unsafe-inline' https://js.stripe.com ${google}`
 }
 
 /**
@@ -32,7 +33,7 @@ export function buildCsp(nonce?: string): string {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https:",
     "font-src 'self' https:",
-    "connect-src 'self' https://*.nelsonlamounier.com https://*.amazonaws.com https://*.amazoncognito.com https://api.stripe.com",
+    "connect-src 'self' https://*.nelsonlamounier.com https://*.amazonaws.com https://*.amazoncognito.com https://api.stripe.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com",
     "frame-src https://js.stripe.com https://hooks.stripe.com",
     "frame-ancestors 'none'",
     "base-uri 'self'",

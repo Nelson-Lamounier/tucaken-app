@@ -11,11 +11,14 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import type { RouterContext } from '../router'
 import { getUserSessionFn } from '../server/session'
 import { Toaster } from '../components/ui/Toaster'
-import { initialiseFaroAdmin } from '../lib/observability/faro-admin'
 import { ThemeProvider } from '../contexts/ThemeContext'
 import { PageTransitionProvider } from '../contexts/PageTransition'
 import { LoadingOverlay } from '../components/LoadingOverlay'
 import { queryClient } from '../lib/query-client'
+import { ConsentEffects } from '../features/consent/ConsentEffects'
+import { ConsentBanner } from '../features/consent/components/ConsentBanner'
+import { ConsentPreferences } from '../features/consent/components/ConsentPreferences'
+import { usePreferencesUiStore } from '../features/consent/store-ui'
 
 /**
  * Inline script injected into <head> before first paint.
@@ -122,10 +125,7 @@ function NotFoundComponent() {
 }
 
 function RootComponent() {
-  React.useEffect(() => {
-    initialiseFaroAdmin()
-  }, [])
-
+  const openPanel = usePreferencesUiStore((s) => s.openPanel)
   return (
     <MotionConfig reducedMotion="never">
       <ThemeProvider>
@@ -134,6 +134,9 @@ function RootComponent() {
           <PageTransitionProvider>
             <Outlet />
           </PageTransitionProvider>
+          <ConsentEffects />
+          <ConsentBanner onManage={openPanel} />
+          <ConsentPreferences />
           <Suspense fallback={null}>
             <TanStackDevtools />
           </Suspense>
