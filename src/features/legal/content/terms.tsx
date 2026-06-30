@@ -97,19 +97,16 @@ export const termsDoc: LegalDoc = {
       id: 'billing',
       heading: 'Billing and cancellation',
       body: (
-        <>
-          <p>
-            Paid plans are billed through Stripe. You can cancel at any time to stop
-            future billing; cancellation takes effect at the end of the current
-            billing period.
-          </p>
-          <p>
-            Tucaken is a digital service provided immediately. When you subscribe you
-            ask us to begin straight away and acknowledge that your statutory 14-day
-            right of withdrawal ends once the service has begun. This does not affect
-            your other statutory consumer rights.
-          </p>
-        </>
+        <p>
+          Paid plans are billed through Stripe. Subscriptions are non-refundable.
+          Because Tucaken is a digital service that begins immediately, when you
+          subscribe you ask us to start straight away and acknowledge that your
+          statutory 14-day right of withdrawal ends once the service has begun. You
+          can cancel at any time to stop future billing; cancellation takes effect at
+          the end of the current billing period. This does not affect your other
+          statutory consumer rights, for example where a service is faulty or not as
+          described.
+        </p>
       ),
     },
     {

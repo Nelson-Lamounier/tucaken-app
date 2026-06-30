@@ -15,4 +15,15 @@ describe('termsDoc', () => {
     const ids = termsDoc.sections.map((s) => s.id)
     expect(new Set(ids).size).toBe(ids.length)
   })
+
+  it('billing section states subscriptions are non-refundable', () => {
+    const billingSection = termsDoc.sections.find((s) => s.id === 'billing')
+    expect(billingSection).toBeDefined()
+
+    // Render the body to text
+    const bodyText = String((billingSection?.body as any)?.props?.children || '')
+
+    // Check for key phrase
+    expect(bodyText).toContain('Subscriptions are non-refundable')
+  })
 })
