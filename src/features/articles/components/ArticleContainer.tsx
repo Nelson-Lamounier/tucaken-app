@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from '@tanstack/react-router'
 import { Tabs } from '@/components/ui/Tabs'
 import type { TabItem } from '@/types'
 import type { ArticleWithSlug } from '@/lib/types/article.types'
@@ -6,7 +7,7 @@ import { useAdminArticles } from '@/hooks/use-admin-articles'
 import { ArticleAccordion } from './ArticleAccordion'
 import { Stats } from '@/components/ui/Stats'
 import { CommandPallete, type CommandPalleteItem } from '@/components/ui/CommandPallete'
-import { AdjustmentsHorizontalIcon } from '@heroicons/react/20/solid'
+import { AdjustmentsHorizontalIcon, PencilSquareIcon } from '@heroicons/react/20/solid'
 
 type ActiveTab = 'all' | 'drafts' | 'processing' | 'in review' | 'flagged' | 'published' | 'failed'
 
@@ -108,13 +109,22 @@ export function ArticleContainer() {
       <div className="px-4 py-5 sm:p-6 border-b border-zinc-200 dark:border-white/10">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Articles History</h2>
-          <button
-            onClick={() => setPaletteOpen(true)}
-            className="flex items-center gap-2 text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/10 hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors"
-          >
-            <AdjustmentsHorizontalIcon className="size-5" />
-            {selectedModel.id === 'all' ? 'Filter by Model' : `Model: ${selectedModel.name}`}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setPaletteOpen(true)}
+              className="flex items-center gap-2 text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white px-3 py-1.5 rounded-md border border-zinc-200 dark:border-white/10 hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors"
+            >
+              <AdjustmentsHorizontalIcon className="size-5" />
+              {selectedModel.id === 'all' ? 'Filter by Model' : `Model: ${selectedModel.name}`}
+            </button>
+            <Link
+              to="/articles/new"
+              className="inline-flex items-center gap-2 rounded-md bg-teal-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-teal-500 transition-colors"
+            >
+              <PencilSquareIcon className="size-4" aria-hidden="true" />
+              New article
+            </Link>
+          </div>
         </div>
 
       </div>

@@ -45,6 +45,7 @@ import { Route as DashboardApplicationsInterviewPrepRouteImport } from './app/_d
 import { Route as DashboardApplicationsSlugRouteImport } from './app/_dashboard/applications/$slug'
 import { Route as DashboardResumesNewRouteRouteImport } from './app/_dashboard/resumes/new/route'
 import { Route as DashboardAdminUsersRouteRouteImport } from './app/_dashboard/admin/users/route'
+import { Route as DashboardArticlesNewIndexRouteImport } from './app/_dashboard/articles/new/index'
 import { Route as UUsernamePSlugRouteImport } from './app/u/$username/p/$slug'
 import { Route as DashboardProjectsIdEditRouteImport } from './app/_dashboard/projects/$id.edit'
 import { Route as DashboardAdminUsersUserIdReposRepoRouteImport } from './app/_dashboard/admin/users_.$userId.repos.$repo'
@@ -236,6 +237,12 @@ const DashboardAdminUsersRouteRoute =
     path: '/admin/users',
     getParentRoute: () => DashboardRoute,
   } as any)
+const DashboardArticlesNewIndexRoute =
+  DashboardArticlesNewIndexRouteImport.update({
+    id: '/new/',
+    path: '/new/',
+    getParentRoute: () => DashboardArticlesRouteRoute,
+  } as any)
 const UUsernamePSlugRoute = UUsernamePSlugRouteImport.update({
   id: '/u/$username/p/$slug',
   path: '/u/$username/p/$slug',
@@ -291,6 +298,7 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof DashboardSettingsIndexRoute
   '/projects/$id/edit': typeof DashboardProjectsIdEditRoute
   '/u/$username/p/$slug': typeof UUsernamePSlugRoute
+  '/articles/new/': typeof DashboardArticlesNewIndexRoute
   '/admin/users/$userId/repos/$repo': typeof DashboardAdminUsersUserIdReposRepoRoute
 }
 export interface FileRoutesByTo {
@@ -330,6 +338,7 @@ export interface FileRoutesByTo {
   '/settings': typeof DashboardSettingsIndexRoute
   '/projects/$id/edit': typeof DashboardProjectsIdEditRoute
   '/u/$username/p/$slug': typeof UUsernamePSlugRoute
+  '/articles/new': typeof DashboardArticlesNewIndexRoute
   '/admin/users/$userId/repos/$repo': typeof DashboardAdminUsersUserIdReposRepoRoute
 }
 export interface FileRoutesById {
@@ -372,6 +381,7 @@ export interface FileRoutesById {
   '/_dashboard/settings/': typeof DashboardSettingsIndexRoute
   '/_dashboard/projects/$id/edit': typeof DashboardProjectsIdEditRoute
   '/u/$username/p/$slug': typeof UUsernamePSlugRoute
+  '/_dashboard/articles/new/': typeof DashboardArticlesNewIndexRoute
   '/_dashboard/admin/users_/$userId/repos/$repo': typeof DashboardAdminUsersUserIdReposRepoRoute
 }
 export interface FileRouteTypes {
@@ -414,6 +424,7 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/projects/$id/edit'
     | '/u/$username/p/$slug'
+    | '/articles/new/'
     | '/admin/users/$userId/repos/$repo'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -453,6 +464,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/projects/$id/edit'
     | '/u/$username/p/$slug'
+    | '/articles/new'
     | '/admin/users/$userId/repos/$repo'
   id:
     | '__root__'
@@ -494,6 +506,7 @@ export interface FileRouteTypes {
     | '/_dashboard/settings/'
     | '/_dashboard/projects/$id/edit'
     | '/u/$username/p/$slug'
+    | '/_dashboard/articles/new/'
     | '/_dashboard/admin/users_/$userId/repos/$repo'
   fileRoutesById: FileRoutesById
 }
@@ -765,6 +778,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAdminUsersRouteRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/_dashboard/articles/new/': {
+      id: '/_dashboard/articles/new/'
+      path: '/new'
+      fullPath: '/articles/new/'
+      preLoaderRoute: typeof DashboardArticlesNewIndexRouteImport
+      parentRoute: typeof DashboardArticlesRouteRoute
+    }
     '/u/$username/p/$slug': {
       id: '/u/$username/p/$slug'
       path: '/u/$username/p/$slug'
@@ -791,11 +811,13 @@ declare module '@tanstack/react-router' {
 
 interface DashboardArticlesRouteRouteChildren {
   DashboardArticlesIndexRoute: typeof DashboardArticlesIndexRoute
+  DashboardArticlesNewIndexRoute: typeof DashboardArticlesNewIndexRoute
 }
 
 const DashboardArticlesRouteRouteChildren: DashboardArticlesRouteRouteChildren =
   {
     DashboardArticlesIndexRoute: DashboardArticlesIndexRoute,
+    DashboardArticlesNewIndexRoute: DashboardArticlesNewIndexRoute,
   }
 
 const DashboardArticlesRouteRouteWithChildren =
