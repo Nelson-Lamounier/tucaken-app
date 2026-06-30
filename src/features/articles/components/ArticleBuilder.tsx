@@ -77,22 +77,6 @@ export function ArticleBuilder() {
   })
 
   // ---------------------------------------------------------------------------
-  // Slug derivation — auto-fills slug from title
-  // ---------------------------------------------------------------------------
-
-  const handleTitleChange = useCallback(
-    (value: string) => {
-      form.setFieldValue('title', value)
-      if (!slugManuallyEdited.current) {
-        const derived = deriveSlug(value)
-        form.setFieldValue('slug', derived)
-      }
-      setSlugUnavailable(false)
-    },
-    [form],
-  )
-
-  // ---------------------------------------------------------------------------
   // Slug availability check (debounced 400 ms)
   // ---------------------------------------------------------------------------
 
@@ -112,6 +96,25 @@ export function ArticleBuilder() {
       }, 400)
     },
     [],
+  )
+
+  // ---------------------------------------------------------------------------
+  // Slug derivation — auto-fills slug from title
+  // ---------------------------------------------------------------------------
+
+  const handleTitleChange = useCallback(
+    (value: string) => {
+      form.setFieldValue('title', value)
+      if (!slugManuallyEdited.current) {
+        const derived = deriveSlug(value)
+        form.setFieldValue('slug', derived)
+        setSlugUnavailable(false)
+        checkSlug(derived)
+      } else {
+        setSlugUnavailable(false)
+      }
+    },
+    [form, checkSlug],
   )
 
   const handleSlugChange = useCallback(

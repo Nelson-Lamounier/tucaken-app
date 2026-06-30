@@ -59,6 +59,7 @@ export interface ArticleMetadata {
   excerpt: string | null
   contentMd: string
   tags: string[]
+  destinations: string[]
   status: string
   aiGenerated: boolean
   aiModel: string | null
@@ -352,6 +353,10 @@ export const createArticleFn = createServerFn({ method: 'POST' })
       pathTemplate: '/articles',
     })
 
+    if (!created.created) {
+      throw new Error('Article creation failed — admin-api returned created:false')
+    }
+
     // Dual content store: also write S3 content/<slug>.md for the admin editor/preview.
     await apiFetch<{ saved: boolean }>(
       `/content/${encodeURIComponent(created.slug)}`,
@@ -362,7 +367,7 @@ export const createArticleFn = createServerFn({ method: 'POST' })
       },
     )
 
-    return { success: created.created, slug: created.slug }
+    return { success: true, slug: created.slug }
   })
 
 /**

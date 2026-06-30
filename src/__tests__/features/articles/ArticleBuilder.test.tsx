@@ -196,4 +196,39 @@ describe('ArticleBuilder', () => {
 
     expect(mockCreateArticleFn).not.toHaveBeenCalled()
   })
+
+  // -------------------------------------------------------------------------
+  // Test 5 (Fix 1): auto-derived slug triggers availability check
+  // -------------------------------------------------------------------------
+  it('triggers slug availability check for auto-derived slugs and blocks submit when unavailable', async () => {
+    mockCheckSlugAvailableFn.mockResolvedValue({ available: false })
+
+    render(<ArticleBuilder />)
+
+    // Type ONLY the title — let the slug auto-derive (do NOT manually set slug)
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/title/i), {
+        target: { value: 'My Auto Derived Title' },
+      })
+      fireEvent.change(screen.getByTestId('markdown-editor'), {
+        target: { value: 'Some content here' },
+      })
+    })
+
+    // Wait for the debounced slug availability check to surface the error
+    await waitFor(
+      () => {
+        expect(screen.getByText(/already taken/i)).toBeTruthy()
+      },
+      { timeout: 1000 },
+    )
+
+    const saveDraftBtn = screen.getByRole('button', { name: /save draft/i })
+    await act(async () => {
+      fireEvent.click(saveDraftBtn)
+    })
+
+    // createArticleFn must NOT be called when slug is unavailable
+    expect(mockCreateArticleFn).not.toHaveBeenCalled()
+  })
 })

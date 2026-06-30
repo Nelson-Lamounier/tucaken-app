@@ -351,6 +351,38 @@ describe('articles server functions', () => {
         }),
       ).rejects.toThrow()
     })
+
+    it('throws and does NOT call S3 content endpoint when admin-api returns created:false', async () => {
+      mockResponse({ created: false, slug: 'hello-world' })
+
+      const handler = createArticleFn as (i: {
+        data: {
+          slug: string
+          title: string
+          contentMd: string
+          destinations: string[]
+          status?: string
+        }
+      }) => Promise<{ success: boolean; slug: string }>
+
+      await expect(
+        handler({
+          data: {
+            slug: 'hello-world',
+            title: 'Hello World',
+            contentMd: '# Hello World',
+            destinations: ['portfolio'],
+          },
+        }),
+      ).rejects.toThrow('created:false')
+
+      // Only the metadata POST should have been called — NOT the S3 content write
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${EXPECTED_API_URL}/articles`,
+        expect.objectContaining({ method: 'POST' }),
+      )
+    })
   })
 
   describe('checkSlugAvailableFn', () => {

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { Tabs } from '@/components/ui/Tabs'
 import { MdxPreview } from './MdxPreview'
 
@@ -20,7 +20,6 @@ export function MarkdownEditor({
   placeholder = 'Article MDX content…',
 }: MarkdownEditorProps) {
   const [activeTab, setActiveTab] = useState('Write')
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const lines = value.split('\n').length
 
@@ -48,7 +47,6 @@ export function MarkdownEditor({
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'Write' ? (
           <textarea
-            ref={textareaRef}
             value={value}
             onChange={(e) => onChange(e.target.value)}
             spellCheck={false}
