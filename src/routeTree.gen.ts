@@ -15,6 +15,7 @@ import { Route as OnboardingRouteImport } from './app/onboarding'
 import { Route as LoginRouteImport } from './app/login'
 import { Route as DashboardRouteImport } from './app/_dashboard'
 import { Route as TermsRouteRouteImport } from './app/terms/route'
+import { Route as PrivacyRouteRouteImport } from './app/privacy/route'
 import { Route as IndexRouteImport } from './app/index'
 import { Route as SignInCallbackRouteImport } from './app/sign-in.callback'
 import { Route as GithubCallbackRouteImport } from './app/github.callback'
@@ -76,6 +77,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const TermsRouteRoute = TermsRouteRouteImport.update({
   id: '/terms',
   path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRouteRoute = PrivacyRouteRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -255,6 +261,7 @@ const DashboardAdminUsersUserIdReposRepoRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/privacy': typeof PrivacyRouteRoute
   '/terms': typeof TermsRouteRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
@@ -295,6 +302,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/privacy': typeof PrivacyRouteRoute
   '/terms': typeof TermsRouteRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
@@ -336,6 +344,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/privacy': typeof PrivacyRouteRoute
   '/terms': typeof TermsRouteRoute
   '/_dashboard': typeof DashboardRouteWithChildren
   '/login': typeof LoginRoute
@@ -379,6 +388,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/privacy'
     | '/terms'
     | '/login'
     | '/onboarding'
@@ -419,6 +429,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/privacy'
     | '/terms'
     | '/login'
     | '/onboarding'
@@ -459,6 +470,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/privacy'
     | '/terms'
     | '/_dashboard'
     | '/login'
@@ -501,6 +513,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  PrivacyRouteRoute: typeof PrivacyRouteRoute
   TermsRouteRoute: typeof TermsRouteRoute
   DashboardRoute: typeof DashboardRouteWithChildren
   LoginRoute: typeof LoginRoute
@@ -556,6 +569,13 @@ declare module '@tanstack/react-router' {
       path: '/terms'
       fullPath: '/terms'
       preLoaderRoute: typeof TermsRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -889,6 +909,7 @@ const SignInRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  PrivacyRouteRoute: PrivacyRouteRoute,
   TermsRouteRoute: TermsRouteRoute,
   DashboardRoute: DashboardRouteWithChildren,
   LoginRoute: LoginRoute,
