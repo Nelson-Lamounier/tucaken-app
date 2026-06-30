@@ -83,7 +83,7 @@ export function ProjectIntentModal({
     <Dialog open={open} onClose={onClose} className="relative z-50">
       <div aria-hidden="true" className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <DialogPanel className="w-full max-w-3xl rounded-xl border border-white/10 bg-zinc-900 p-8 shadow-2xl">
+        <DialogPanel className="w-full max-w-5xl rounded-xl border border-white/10 bg-zinc-900 p-8 shadow-2xl">
           <DialogTitle className="text-lg font-semibold text-zinc-100">
             What should this repository become?
           </DialogTitle>
