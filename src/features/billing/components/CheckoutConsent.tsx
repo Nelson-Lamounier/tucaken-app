@@ -10,12 +10,12 @@ interface CheckoutConsentProps {
  */
 export function CheckoutConsent({ accepted, onChange }: CheckoutConsentProps) {
   return (
-    <label className="flex cursor-pointer items-start gap-2 text-sm text-zinc-600">
+    <label className="flex cursor-pointer items-start gap-2 text-sm text-zinc-600 dark:text-zinc-300">
       <input
         type="checkbox"
         checked={accepted}
         onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-teal-600 focus:ring-teal-500"
+        className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-teal-600 focus:ring-teal-500 dark:border-zinc-600 dark:bg-zinc-900"
       />
       <span>
         I agree to the{' '}
@@ -23,7 +23,7 @@ export function CheckoutConsent({ accepted, onChange }: CheckoutConsentProps) {
           href="/terms"
           target="_blank"
           rel="noreferrer"
-          className="font-medium text-teal-600 underline hover:text-teal-500"
+          className="font-medium text-teal-600 underline hover:text-teal-500 dark:text-teal-400"
         >
           Terms &amp; Conditions
         </a>{' '}
