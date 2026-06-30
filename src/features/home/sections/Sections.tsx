@@ -18,7 +18,7 @@ import { StatCard } from '@/components/ui/StatCard'
 import { faqCategories } from '../lib/faq'
 import { highlightParts } from '../lib/highlight'
 import { tiersFromPublic } from '@/features/billing/catalog'
-import { trackSocialClick } from '@/lib/observability/analytics'
+import { trackCtaClick, trackSocialClick } from '@/lib/observability/analytics'
 import { getPublicTierConfigFn } from '@/server/tier-config'
 import { SparkleField } from '../lib/SparkleField'
 import { tierCtaTarget } from '../lib/pricing-cta'
@@ -303,7 +303,10 @@ export function PricingSection() {
               <MagneticButton
                 primary={t.highlighted}
                 className="mt-7 w-full"
-                onClick={() => transitionTo(tierCtaTarget(t))}
+                onClick={() => {
+                  trackCtaClick(t.cta, `pricing_${t.id}`)
+                  transitionTo(tierCtaTarget(t))
+                }}
               >
                 {t.cta}
               </MagneticButton>
