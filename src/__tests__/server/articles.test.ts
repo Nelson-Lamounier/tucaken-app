@@ -71,6 +71,8 @@ import {
   deleteArticleFn,
   saveArticleContentFn,
   saveArticleMetadataFn,
+  createArticleFn,
+  checkSlugAvailableFn,
 } from '../../server/articles'
 
 const EXPECTED_API_URL = 'http://admin-api.admin-api:3002/api/admin'
@@ -285,6 +287,131 @@ describe('articles server functions', () => {
         }),
       )
       expect(result.success).toBe(true)
+    })
+  })
+
+  describe('createArticleFn', () => {
+    it('posts to /articles then writes content to /content/:slug', async () => {
+      mockResponse({ created: true, slug: 'hello-world' })
+      mockResponse({ saved: true, slug: 'hello-world', contentRef: 's3://bucket/key.md' })
+
+      const handler = createArticleFn as (i: {
+        data: {
+          slug: string
+          title: string
+          contentMd: string
+          destinations: string[]
+          status?: string
+        }
+      }) => Promise<{ success: boolean; slug: string }>
+
+      const result = await handler({
+        data: {
+          slug: 'hello-world',
+          title: 'Hello World',
+          contentMd: '# Hello World',
+          destinations: ['portfolio'],
+        },
+      })
+
+      expect(result).toEqual({ success: true, slug: 'hello-world' })
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        1,
+        `${EXPECTED_API_URL}/articles`,
+        expect.objectContaining({ method: 'POST' }),
+      )
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        2,
+        `${EXPECTED_API_URL}/content/hello-world`,
+        expect.objectContaining({ method: 'POST' }),
+      )
+    })
+
+    it('propagates a 409 duplicate-slug error from admin-api', async () => {
+      mockResponse({ error: 'Slug already exists' }, false, 409)
+
+      const handler = createArticleFn as (i: {
+        data: {
+          slug: string
+          title: string
+          contentMd: string
+          destinations: string[]
+        }
+      }) => Promise<{ success: boolean; slug: string }>
+
+      await expect(
+        handler({
+          data: {
+            slug: 'existing-slug',
+            title: 'Existing',
+            contentMd: '# Existing',
+            destinations: ['tucaken'],
+          },
+        }),
+      ).rejects.toThrow()
+    })
+
+    it('throws and does NOT call S3 content endpoint when admin-api returns created:false', async () => {
+      mockResponse({ created: false, slug: 'hello-world' })
+
+      const handler = createArticleFn as (i: {
+        data: {
+          slug: string
+          title: string
+          contentMd: string
+          destinations: string[]
+          status?: string
+        }
+      }) => Promise<{ success: boolean; slug: string }>
+
+      await expect(
+        handler({
+          data: {
+            slug: 'hello-world',
+            title: 'Hello World',
+            contentMd: '# Hello World',
+            destinations: ['portfolio'],
+          },
+        }),
+      ).rejects.toThrow('created:false')
+
+      // Only the metadata POST should have been called — NOT the S3 content write
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${EXPECTED_API_URL}/articles`,
+        expect.objectContaining({ method: 'POST' }),
+      )
+    })
+  })
+
+  describe('checkSlugAvailableFn', () => {
+    it('returns { available: false } when admin-api reports slug taken', async () => {
+      mockResponse({ available: false })
+
+      const handler = checkSlugAvailableFn as (
+        i: { data: string },
+      ) => Promise<{ available: boolean }>
+
+      const result = await handler({ data: 'taken-slug' })
+
+      expect(result).toEqual({ available: false })
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${EXPECTED_API_URL}/articles/slug-available?slug=taken-slug`,
+        expect.anything(),
+      )
+    })
+
+    it('returns { available: true } when admin-api reports slug free', async () => {
+      mockResponse({ available: true })
+
+      const handler = checkSlugAvailableFn as (
+        i: { data: string },
+      ) => Promise<{ available: boolean }>
+
+      const result = await handler({ data: 'free-slug' })
+
+      expect(result).toEqual({ available: true })
     })
   })
 })

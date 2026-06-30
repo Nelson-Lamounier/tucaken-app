@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   useArticleContent,
   useSaveContent,
 } from '@/hooks/use-admin-articles'
 import { useToastStore } from '@/lib/stores/toast-store'
-import { Tabs } from '@/components/ui/Tabs'
-import { MdxPreview } from './MdxPreview'
+import { MarkdownEditor } from './MarkdownEditor'
 
 interface ArticleEditorDrawerContentProps {
   /** The article slug to load content for */
@@ -42,8 +41,6 @@ export function ArticleEditorDrawerContent({
   const [content, setContent] = useState('')
   const [originalContent, setOriginalContent] = useState('')
   const [isInitialised, setIsInitialised] = useState(false)
-  const [activeTab, setActiveTab] = useState('Write')
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Derived values
   const hasUnsavedChanges = content !== originalContent
@@ -141,50 +138,18 @@ export function ArticleEditorDrawerContent({
       {/* Editor */}
       {isReady && !error && (
         <div className="flex flex-1 flex-col gap-3 overflow-hidden">
-          {/* Info bar */}
-          <div className="flex items-center justify-between text-xs text-zinc-400">
-            <span>
-              {content.length.toLocaleString()} characters ·{' '}
-              {content.split('\n').length.toLocaleString()} lines
-            </span>
-            <div className="flex items-center gap-3">
-              {hasUnsavedChanges && (
-                <span className="inline-flex items-center gap-1 text-xs text-amber-400">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                  Unsaved
-                </span>
-              )}
-              <span className="font-mono">⌘S to save</span>
-            </div>
-          </div>
-
-          {/* Action bar and Tab Toggle */}
-          <div className="flex-none">
-            <Tabs
-              tabs={[
-                { name: 'Write', current: activeTab === 'Write' },
-                { name: 'Preview', current: activeTab === 'Preview' },
-              ]}
-              onTabChange={setActiveTab}
-            />
-          </div>
-
-          <div className="flex-1 overflow-y-auto">
-            {activeTab === 'Write' ? (
-              <textarea
-                ref={textareaRef}
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                spellCheck={false}
-                className="h-full w-full resize-none rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4 font-mono text-sm leading-relaxed text-zinc-800 dark:text-zinc-200 shadow-sm outline-none transition-colors focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
-                placeholder="Article MDX content…"
-              />
-            ) : (
-              <div className="h-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-950 p-6 shadow-inner">
-                <MdxPreview content={content} />
-              </div>
+          {/* Save-concept bar — unsaved indicator + keyboard hint */}
+          <div className="flex items-center justify-end gap-3 text-xs text-zinc-400">
+            {hasUnsavedChanges && (
+              <span className="inline-flex items-center gap-1 text-xs text-amber-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                Unsaved
+              </span>
             )}
+            <span className="font-mono">⌘S to save</span>
           </div>
+
+          <MarkdownEditor value={content} onChange={setContent} />
 
           {/* Action bar */}
           <div className="flex items-center justify-end gap-3 border-t border-zinc-200 dark:border-white/10 pt-3">
