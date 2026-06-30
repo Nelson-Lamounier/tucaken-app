@@ -389,7 +389,7 @@ export function FAQSection() {
 type FooterLink = { label: string; to?: string; href?: string }
 type FooterColumn = { heading: string; links: FooterLink[] }
 
-const FOOTER_COLUMNS: FooterColumn[] = [
+export const FOOTER_COLUMNS: FooterColumn[] = [
   {
     heading: 'Product',
     links: [
@@ -404,6 +404,14 @@ const FOOTER_COLUMNS: FooterColumn[] = [
       { label: 'Our story', href: '#founder' },
       { label: 'Sign in', to: '/sign-in' },
       { label: 'Get started', to: '/pricing' },
+    ],
+  },
+  {
+    heading: 'Legal',
+    links: [
+      { label: 'Terms & Conditions', to: '/terms' },
+      { label: 'Privacy Policy', to: '/privacy' },
+      { label: 'Cookie Policy', to: '/cookies' },
     ],
   },
 ]
