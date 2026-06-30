@@ -413,9 +413,9 @@ const FOOTER_COLUMNS: FooterColumn[] = [
 ]
 
 const FOOTER_SOCIALS = [
-  { label: 'GitHub', href: 'https://github.com/Nelson-Lamounier', Icon: Github },
-  { label: 'LinkedIn', href: 'https://www.linkedin.com/in/nelson-lamounier-leao', Icon: Linkedin },
-  { label: 'Email support', href: 'mailto:support@tucaken.com', Icon: Mail },
+  { label: 'GitHub', platform: 'GitHub', href: 'https://github.com/Nelson-Lamounier', Icon: Github },
+  { label: 'LinkedIn', platform: 'LinkedIn', href: 'https://www.linkedin.com/in/nelson-lamounier-leao', Icon: Linkedin },
+  { label: 'Email support', platform: 'Email', href: 'mailto:support@tucaken.com', Icon: Mail },
 ] as const
 
 function FooterNavLink({ link }: { link: FooterLink }) {
@@ -477,11 +477,11 @@ export function FooterSection() {
             </div>
 
             <div className="mt-6 flex items-center gap-3">
-              {FOOTER_SOCIALS.map(({ label, href, Icon }) => (
+              {FOOTER_SOCIALS.map(({ label, platform, href, Icon }) => (
                 <a
                   key={label}
                   href={href}
-                  onClick={() => trackSocialClick(label, href)}
+                  onClick={() => trackSocialClick(platform, href)}
                   target={href.startsWith('mailto:') ? undefined : '_blank'}
                   rel="noreferrer"
                   aria-label={label}

@@ -30,6 +30,15 @@ describe('FooterSection social tracking', () => {
     )
   })
 
+  it('tracks the email icon with platform label Email (not "Email support")', () => {
+    render(<FooterSection />)
+    fireEvent.click(screen.getByLabelText('Email support'))
+    expect(mocks.trackSocialClick).toHaveBeenCalledWith(
+      'Email',
+      'mailto:support@tucaken.com',
+    )
+  })
+
   it('tracks the contact email link', () => {
     render(<FooterSection />)
     fireEvent.click(screen.getByText('support@tucaken.com'))

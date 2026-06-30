@@ -156,5 +156,3 @@ export function trackEvent(
     ...(value !== undefined && { value }),
   });
 }
-
-

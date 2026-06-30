@@ -29,11 +29,13 @@ describe('CTA tracking', () => {
     render(<Header />)
     fireEvent.click(screen.getByText('Try free'))
     expect(mocks.trackCtaClick).toHaveBeenCalledWith('Try free', 'header')
+    expect(mocks.transitionTo).toHaveBeenCalled()
   })
 
   it('header "Sign in" tracks (Sign in, header)', () => {
     render(<Header />)
     fireEvent.click(screen.getByText('Sign in'))
     expect(mocks.trackCtaClick).toHaveBeenCalledWith('Sign in', 'header')
+    expect(mocks.transitionTo).toHaveBeenCalled()
   })
 })
