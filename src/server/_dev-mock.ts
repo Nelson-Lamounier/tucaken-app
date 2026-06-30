@@ -321,7 +321,16 @@ export function mockApiResponse(path: string, method = 'GET', body?: unknown): u
       const repoFullName = String(parsed['repoFullName'] ?? '')
       const defaultBranch = String(parsed['defaultBranch'] ?? 'main')
       const deferSync = parsed['deferSync'] === true
-      if (repoFullName && !mockConnectedRepos.some((r) => r.repoFullName === repoFullName)) {
+      const alreadyConnected = mockConnectedRepos.some((r) => r.repoFullName === repoFullName)
+      // Simulate the admin-api free-plan repo cap so the upgrade UI is reachable
+      // in dev: the Free plan allows 1 repository, and adding another returns the
+      // same [403] the real backend does. Set mockMe.plan.effectivePlan to 'pro'
+      // to lift the cap when testing other repo flows locally.
+      const repoLimit = mockMe.plan.effectivePlan === 'free' ? 1 : Number.POSITIVE_INFINITY
+      if (!alreadyConnected && mockConnectedRepos.length >= repoLimit) {
+        throw new Error('admin-api POST /github/connected-repos failed [403] — Your plan allows 1 repository. Upgrade for more.')
+      }
+      if (repoFullName && !alreadyConnected) {
         const [owner, ...rest] = repoFullName.split('/')
         mockConnectedRepos.push({
           repoFullName,

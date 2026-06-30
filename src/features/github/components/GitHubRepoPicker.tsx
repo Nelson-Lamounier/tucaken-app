@@ -6,7 +6,7 @@ import { EnrichmentModal } from './EnrichmentModal'
 import { ProjectIntentModal } from './ProjectIntentModal'
 import type { ProjectIntentChoice } from './ProjectIntentModal'
 import { GitHubRepoChip } from './GitHubRepoChip'
-import { UpgradeLimitBanner } from './UpgradeLimitBanner'
+import { UpgradePlanModal } from './UpgradePlanModal'
 import { useGitHubIngestion } from '../hooks/use-github-ingestion'
 import { useGitHubQueueRepo } from '../hooks/use-github-queue-repo'
 import { adminKeys } from '@/lib/api/query-keys'
@@ -151,22 +151,24 @@ export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos, m
         onClose={() => setPendingIntent(null)}
       />
 
-      {ingestion.needsUpgrade && (
-        mode === 'queue' ? (
-          <div className="flex items-start justify-between gap-3 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-300">
-            <span>Repository limit reached — remove a queued repo to add a different one.</span>
-            <button
-              type="button"
-              onClick={ingestion.dismissUpgrade}
-              className="shrink-0 text-amber-400/70 transition hover:text-amber-200"
-            >
-              Dismiss
-            </button>
-          </div>
-        ) : (
-          <UpgradeLimitBanner onDismiss={ingestion.dismissUpgrade} />
-        )
+      {ingestion.needsUpgrade && mode === 'queue' && (
+        <div className="flex items-start justify-between gap-3 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs text-amber-300">
+          <span>Repository limit reached — remove a queued repo to add a different one.</span>
+          <button
+            type="button"
+            onClick={ingestion.dismissUpgrade}
+            className="shrink-0 text-amber-400/70 transition hover:text-amber-200"
+          >
+            Dismiss
+          </button>
+        </div>
       )}
+      <UpgradePlanModal
+        open={ingestion.needsUpgrade && mode !== 'queue'}
+        message={ingestion.upgradeMessage}
+        currentPlan={me.data?.plan.effectivePlan ?? 'free'}
+        onClose={ingestion.dismissUpgrade}
+      />
     <div className="rounded-lg border border-white/10 overflow-hidden">
       <div className="flex items-center justify-between border-b border-white/[0.08] px-4 py-3">
         <div>
