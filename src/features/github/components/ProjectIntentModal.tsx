@@ -33,22 +33,20 @@ function OptionCard({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`flex items-start gap-3 rounded-md border p-4 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${tone}`}
+      className={`flex h-full flex-col gap-2 rounded-md border p-4 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${tone}`}
     >
-      <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-md bg-white/5 text-accent">
-        {icon}
-      </span>
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-semibold text-zinc-100">{title}</p>
-          {recommended && (
-            <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent">
-              Recommended
-            </span>
-          )}
-        </div>
-        <p className="mt-1 text-xs leading-relaxed text-zinc-400">{description}</p>
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-white/5 text-accent">
+          {icon}
+        </span>
+        {recommended && (
+          <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-accent">
+            Recommended
+          </span>
+        )}
       </div>
+      <p className="text-sm font-semibold text-zinc-100">{title}</p>
+      <p className="text-xs leading-relaxed text-zinc-400">{description}</p>
     </button>
   )
 }
@@ -85,7 +83,7 @@ export function ProjectIntentModal({
     <Dialog open={open} onClose={onClose} className="relative z-50">
       <div aria-hidden="true" className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
       <div className="fixed inset-0 flex items-center justify-center p-4">
-        <DialogPanel className="w-full max-w-lg rounded-xl border border-white/10 bg-zinc-900 p-8 shadow-2xl">
+        <DialogPanel className="w-full max-w-3xl rounded-xl border border-white/10 bg-zinc-900 p-8 shadow-2xl">
           <DialogTitle className="text-lg font-semibold text-zinc-100">
             What should this repository become?
           </DialogTitle>
@@ -94,7 +92,7 @@ export function ProjectIntentModal({
           </p>
 
           {mode === 'pick' ? (
-            <div className="mt-6 flex flex-col gap-3">
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
               <OptionCard
                 icon={<Hammer className="size-4.5" aria-hidden />}
                 title="Build a new Project"
