@@ -46,7 +46,7 @@ export function ConsentBanner({ onManage }: ConsentBannerProps) {
             <Button variant="secondary" onClick={acceptAll}>
               Accept all
             </Button>
-            <Button variant="ghost" onClick={rejectAll}>
+            <Button variant="secondary" onClick={rejectAll}>
               Reject all
             </Button>
             <button

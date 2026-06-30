@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   trackPageView: vi.fn(),
   isGa4Enabled: vi.fn(() => true),
   initialiseFaroAdmin: vi.fn(),
+  pauseFaroAdmin: vi.fn(),
+  resumeFaroAdmin: vi.fn(),
 }))
 
 vi.mock('../../../features/consent/consent-mode', () => ({
@@ -24,6 +26,8 @@ vi.mock('../../../lib/observability/ga4', () => ({
 }))
 vi.mock('../../../lib/observability/faro-admin', () => ({
   initialiseFaroAdmin: mocks.initialiseFaroAdmin,
+  pauseFaroAdmin: mocks.pauseFaroAdmin,
+  resumeFaroAdmin: mocks.resumeFaroAdmin,
 }))
 const router = vi.hoisted(() => ({
   cb: null as (() => void) | null,
@@ -106,5 +110,12 @@ describe('ConsentEffects', () => {
     act(() => { useConsentStore.getState().rejectAll() })
     act(() => { router.cb?.() })
     expect(mocks.trackPageView).not.toHaveBeenCalled()
+  })
+
+  it('pauses Faro when Analytics consent is withdrawn after acceptance', () => {
+    render(<ConsentEffects />)
+    act(() => { useConsentStore.getState().acceptAll() })
+    act(() => { useConsentStore.getState().rejectAll() })
+    expect(mocks.pauseFaroAdmin).toHaveBeenCalled()
   })
 })

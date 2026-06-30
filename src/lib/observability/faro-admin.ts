@@ -89,3 +89,19 @@ export function initialiseFaroAdmin(): Faro | null {
     return null
   }
 }
+
+/**
+ * Pause Faro telemetry transmission — call when Analytics consent is withdrawn.
+ * No-op if Faro has not yet been initialised.
+ */
+export function pauseFaroAdmin(): void {
+  faroInstance?.pause()
+}
+
+/**
+ * Resume Faro telemetry transmission — call when Analytics consent is granted.
+ * No-op if Faro has not yet been initialised.
+ */
+export function resumeFaroAdmin(): void {
+  faroInstance?.unpause()
+}

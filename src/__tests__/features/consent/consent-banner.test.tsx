@@ -16,9 +16,12 @@ beforeEach(() => {
 describe('ConsentBanner', () => {
   it('renders Accept all and Reject all with equal prominence when undecided', () => {
     render(<ConsentBanner onManage={() => {}} />)
-    expect(screen.getByRole('button', { name: /accept all/i })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /reject all/i })).toBeTruthy()
+    const accept = screen.getByRole('button', { name: /accept all/i })
+    const reject = screen.getByRole('button', { name: /reject all/i })
+    expect(accept).toBeTruthy()
+    expect(reject).toBeTruthy()
     expect(screen.getByRole('button', { name: /manage preferences/i })).toBeTruthy()
+    expect(accept.className).toBe(reject.className)
   })
 
   it('hides once a decision has been made', () => {

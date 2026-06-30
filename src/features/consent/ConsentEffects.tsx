@@ -6,7 +6,7 @@ import {
   syncConsentMode,
 } from './consent-mode'
 import { isGa4Enabled, loadGtagScript, trackPageView } from '../../lib/observability/ga4'
-import { initialiseFaroAdmin } from '../../lib/observability/faro-admin'
+import { initialiseFaroAdmin, pauseFaroAdmin, resumeFaroAdmin } from '../../lib/observability/faro-admin'
 import { useConsentStore } from './store'
 
 /**
@@ -35,9 +35,13 @@ export function ConsentEffects() {
   // 2. React to consent changes: update signals and load tags when granted.
   useEffect(() => {
     syncConsentMode({ analytics, marketing })
-    if (analytics !== 'granted') return
+    if (analytics !== 'granted') {
+      pauseFaroAdmin()
+      return
+    }
     if (isGa4Enabled()) loadGtagScript()
     initialiseFaroAdmin()
+    resumeFaroAdmin()
   }, [analytics, marketing])
 
   // 3. Track SPA navigations only while analytics is granted.
