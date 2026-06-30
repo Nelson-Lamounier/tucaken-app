@@ -96,6 +96,7 @@ const saveMetadataSchema = z.object({
   author: z.string().optional(),
   category: z.string().optional(),
   tags: z.array(z.string()).optional(),
+  destinations: z.array(z.enum(['portfolio', 'tucaken'])).optional(),
   status: z.enum(['draft', 'processing', 'review', 'flagged', 'published', 'rejected']).optional(),
   publishedAt: z.string().optional(),
   seo: z
@@ -104,6 +105,19 @@ const saveMetadataSchema = z.object({
       keywords: z.array(z.string()).optional(),
     })
     .optional(),
+})
+
+const DESTINATIONS = ['portfolio', 'tucaken'] as const
+
+const createArticleSchema = z.object({
+  slug: z.string().regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, 'Invalid slug'),
+  title: z.string().min(1),
+  excerpt: z.string().optional(),
+  contentMd: z.string().min(1),
+  tags: z.array(z.string()).optional(),
+  destinations: z.array(z.enum(DESTINATIONS)).min(1, 'Pick at least one destination'),
+  coverImage: z.string().optional(),
+  status: z.enum(['draft', 'published']).default('draft'),
 })
 
 // =============================================================================
@@ -314,4 +328,58 @@ export const getArticleMetadataFn = createServerFn({ method: 'GET' })
       if (err instanceof Error && err.message.includes('[404]')) return null
       throw err
     }
+  })
+
+/**
+ * Creates a new article record in admin-api (POST /articles) and writes
+ * the initial markdown content to S3 via the /content/:slug endpoint.
+ *
+ * Two-step write: metadata first, then S3 content store. Both calls must
+ * succeed; a failure on either surfaces to the caller.
+ *
+ * @param data - Full article payload including slug, title, contentMd, destinations
+ * @returns { success, slug } on creation
+ */
+export const createArticleFn = createServerFn({ method: 'POST' })
+  .inputValidator(createArticleSchema)
+  .handler(async ({ data }) => {
+    await requireAdmin()
+
+    const { contentMd, ...meta } = data
+    const created = await apiFetch<{ created: boolean; slug: string }>('/articles', {
+      method: 'POST',
+      body: JSON.stringify({ ...meta, contentMd }),
+      pathTemplate: '/articles',
+    })
+
+    // Dual content store: also write S3 content/<slug>.md for the admin editor/preview.
+    await apiFetch<{ saved: boolean }>(
+      `/content/${encodeURIComponent(created.slug)}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ content: contentMd }),
+        pathTemplate: '/content/:slug',
+      },
+    )
+
+    return { success: created.created, slug: created.slug }
+  })
+
+/**
+ * Checks whether a given slug is available (not yet used by another article).
+ *
+ * Delegates to GET /articles/slug-available?slug=… on admin-api.
+ *
+ * @param data - The candidate slug string
+ * @returns { available: boolean }
+ */
+export const checkSlugAvailableFn = createServerFn({ method: 'GET' })
+  .inputValidator(slugSchema)
+  .handler(async ({ data: slug }) => {
+    await requireAdmin()
+
+    return apiFetch<{ available: boolean }>(
+      `/articles/slug-available?slug=${encodeURIComponent(slug)}`,
+      { pathTemplate: '/articles/slug-available' },
+    )
   })
