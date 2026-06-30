@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { motion } from 'motion/react'
 import { ArrowRight } from 'lucide-react'
 import { usePageTransition } from '@/contexts/PageTransition'
+import { trackCtaClick } from '@/lib/observability/analytics'
 import { FloatingPaths } from '@/components/ui/FloatingPaths'
 import { RippleButton } from '../lib/RippleButton'
 import { hero } from '../content'
@@ -69,7 +70,12 @@ export function HeroSection() {
           </h1>
 
           <div className="flex items-center justify-center">
-            <RippleButton onClick={() => transitionTo({ to: '/sign-in' })}>
+            <RippleButton
+              onClick={() => {
+                trackCtaClick(hero.primaryCta, 'hero')
+                transitionTo({ to: '/sign-in' })
+              }}
+            >
               {hero.primaryCta} <ArrowRight className="h-4 w-4" />
             </RippleButton>
           </div>
