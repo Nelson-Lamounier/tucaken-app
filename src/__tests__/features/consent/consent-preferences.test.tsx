@@ -48,4 +48,13 @@ describe('ConsentPreferences', () => {
     expect(useConsentStore.getState().analytics).toBe('granted')
     expect(usePreferencesUiStore.getState().open).toBe(false)
   })
+
+  it('saving with marketing toggled commits marketing as granted and analytics as denied', () => {
+    usePreferencesUiStore.setState({ open: true })
+    render(<ConsentPreferences />)
+    fireEvent.click(screen.getByLabelText(/marketing/i))
+    fireEvent.click(screen.getByRole('button', { name: /save preferences/i }))
+    expect(useConsentStore.getState().marketing).toBe('granted')
+    expect(useConsentStore.getState().analytics).toBe('denied')
+  })
 })
