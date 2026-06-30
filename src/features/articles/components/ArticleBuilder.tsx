@@ -1,5 +1,3 @@
-'use client'
-
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useForm } from '@tanstack/react-form'
@@ -25,6 +23,8 @@ type DestinationId = (typeof DESTINATIONS)[number]['id']
 
 const DESTINATION_IDS = new Set<string>(DESTINATIONS.map((d) => d.id))
 
+const SLUG_REGEX = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/
+
 // =============================================================================
 // Schema
 // =============================================================================
@@ -34,7 +34,7 @@ const articleSchema = z.object({
   slug: z
     .string()
     .min(2, 'Slug must be at least 2 characters')
-    .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$/, 'Slug must be lowercase alphanumeric with hyphens'),
+    .regex(SLUG_REGEX, 'Slug must be lowercase alphanumeric with hyphens'),
   excerpt: z.string(),
   tags: z.array(z.string()),
   destinations: z
@@ -59,6 +59,7 @@ export function ArticleBuilder() {
   const [submitting, setSubmitting] = useState(false)
 
   const slugCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const slugManuallyEdited = useRef(false)
 
   const form = useForm({
     defaultValues: {
@@ -81,9 +82,11 @@ export function ArticleBuilder() {
 
   const handleTitleChange = useCallback(
     (value: string) => {
-      const derived = deriveSlug(value)
       form.setFieldValue('title', value)
-      form.setFieldValue('slug', derived)
+      if (!slugManuallyEdited.current) {
+        const derived = deriveSlug(value)
+        form.setFieldValue('slug', derived)
+      }
       setSlugUnavailable(false)
     },
     [form],
@@ -113,6 +116,7 @@ export function ArticleBuilder() {
 
   const handleSlugChange = useCallback(
     (value: string) => {
+      slugManuallyEdited.current = true
       form.setFieldValue('slug', value)
       setSlugUnavailable(false)
       checkSlug(value)
@@ -468,7 +472,7 @@ export function ArticleBuilder() {
           children={(values) => {
             const isInvalid =
               !values.title.trim() ||
-              values.slug.length < 2 ||
+              !SLUG_REGEX.test(values.slug) ||
               !values.contentMd.trim() ||
               values.destinations.length === 0 ||
               slugUnavailable

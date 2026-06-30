@@ -147,7 +147,30 @@ describe('ArticleBuilder', () => {
   })
 
   // -------------------------------------------------------------------------
-  // Test 3: slug unavailable — blocked
+  // Test 3: manual slug lock — title change must not overwrite a typed slug
+  // -------------------------------------------------------------------------
+  it('preserves a manually-typed slug when the title is changed afterwards', async () => {
+    render(<ArticleBuilder />)
+
+    const slugInput = screen.getByLabelText(/slug/i)
+
+    // Manually type a custom slug first
+    await act(async () => {
+      fireEvent.change(slugInput, { target: { value: 'my-custom-slug' } })
+    })
+
+    // Now change the title — should NOT overwrite the manually-edited slug
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/title/i), {
+        target: { value: 'A Completely Different Title' },
+      })
+    })
+
+    expect((slugInput as HTMLInputElement).value).toBe('my-custom-slug')
+  })
+
+  // -------------------------------------------------------------------------
+  // Test 4: slug unavailable — blocked
   // -------------------------------------------------------------------------
   it('shows slug taken error and does not call createArticleFn when slug is unavailable', async () => {
     mockCheckSlugAvailableFn.mockResolvedValue({ available: false })

@@ -17,22 +17,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { requireAuth } from './auth-guard'
 import { apiFetch } from './_api-client'
-
-/**
- * Derives a URL-safe slug from a filename.
- *
- * @param fileName - Raw filename (e.g. `my-article.md`)
- * @returns Slugified base without extension
- */
-function deriveSlug(fileName: string): string {
-  return fileName
-    .replace(/\.md$/i, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9\s_-]/g, '')
-    .replace(/[\s_]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-}
+import { deriveSlug } from '@/features/articles/lib/derive-slug'
 
 // =============================================================================
 // Input Schema
