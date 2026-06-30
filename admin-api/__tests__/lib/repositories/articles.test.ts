@@ -41,12 +41,15 @@ describe('ArticleRepository', () => {
                 aiModel: null,
                 publishedAt: null,
                 coverImage: null,
+                destinations: ['portfolio'],
             });
             expect(mockQuery).toHaveBeenCalledTimes(1);
             const [sql, params] = mockQuery.mock.calls[0] as unknown as [string, unknown[]];
             expect(sql).toMatch(/INSERT INTO articles/i);
             expect(sql).toMatch(/ON CONFLICT \(slug\) DO UPDATE/i);
+            expect(sql).toMatch(/destinations/i);
             expect(params).toContain('hello-world');
+            expect(params).toContainEqual(['portfolio']);
         });
     });
 
@@ -64,6 +67,7 @@ describe('ArticleRepository', () => {
                     ai_model: null,
                     published_at: null,
                     cover_image: null,
+                    destinations: ['portfolio', 'tucaken'],
                     created_at: new Date('2026-01-01'),
                     updated_at: new Date('2026-01-01'),
                 }],
@@ -72,6 +76,29 @@ describe('ArticleRepository', () => {
             expect(result).not.toBeNull();
             expect(result!.slug).toBe('hello-world');
             expect(result!.contentMd).toBe('# Hello');
+            expect(result!.destinations).toEqual(['portfolio', 'tucaken']);
+        });
+
+        it('should default destinations to portfolio when the row value is null', async () => {
+            mockQuery.mockResolvedValue({
+                rows: [{
+                    slug: 'legacy',
+                    title: 'Legacy',
+                    excerpt: null,
+                    content_md: '# Legacy',
+                    tags: [],
+                    status: 'published',
+                    ai_generated: false,
+                    ai_model: null,
+                    published_at: null,
+                    cover_image: null,
+                    destinations: null,
+                    created_at: null,
+                    updated_at: null,
+                }],
+            });
+            const result = await getArticleBySlug(fakePool, 'legacy');
+            expect(result!.destinations).toEqual(['portfolio']);
         });
 
         it('should return null when not found', async () => {
