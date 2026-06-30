@@ -31,7 +31,7 @@ export const privacyDoc: LegalDoc = {
           <li>Account and sign-in details, managed through Amazon Cognito.</li>
           <li>Data you connect from GitHub, used to generate your resume.</li>
           <li>Profile and professional information you add.</li>
-          <li>Billing details handled by Stripe — Stripe holds your card data, not us.</li>
+          <li>Billing details handled by Stripe - Stripe holds your card data, not us.</li>
           <li>
             Please avoid placing sensitive information (for example, health or
             political details) in free-text fields, as it is not needed.

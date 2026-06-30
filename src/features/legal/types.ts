@@ -12,7 +12,7 @@ export interface LegalSection {
 export interface LegalDoc {
   slug: LegalSlug
   title: string
-  /** Human-readable date string, rendered as 'Last updated on …'. */
+  /** Human-readable date string, rendered as 'Last updated on ...'. */
   lastUpdated: string
   intro?: ReactNode
   sections: LegalSection[]

@@ -29,7 +29,7 @@ export const termsDoc: LegalDoc = {
       body: (
         <p>
           You must be at least 16 years old to use Tucaken. By submitting or
-          connecting data — including data from your GitHub account — you confirm
+          connecting data - including data from your GitHub account - you confirm
           you have the right to provide it to us for the purpose of generating
           your resume.
         </p>
@@ -119,7 +119,7 @@ export const termsDoc: LegalDoc = {
         <p>
           To the fullest extent permitted by law, we are not liable for indirect or
           unforeseeable loss arising from your use of Tucaken. Nothing in these terms
-          excludes or limits our liability where it would be unlawful to do so —
+          excludes or limits our liability where it would be unlawful to do so -
           including liability for death or personal injury caused by negligence, for
           fraud, or for your non-excludable statutory consumer rights.
         </p>
