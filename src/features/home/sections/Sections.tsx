@@ -13,6 +13,7 @@ import { MagneticButton } from '../lib/MagneticButton'
 import { Marquee } from '../lib/Marquee'
 import { KineticText } from '../lib/KineticText'
 import { comparison, founder, hero, stats } from '../content'
+import { CookiePreferencesLink } from '../../consent/components/CookiePreferencesLink'
 import { StatCard } from '@/components/ui/StatCard'
 import { faqCategories } from '../lib/faq'
 import { highlightParts } from '../lib/highlight'
@@ -508,6 +509,7 @@ export function FooterSection() {
         <div className="mt-12 flex flex-col items-start justify-between gap-4 border-t border-white/5 pt-6 text-xs text-zinc-500 sm:flex-row sm:items-center">
           <p>&copy; {new Date().getFullYear()} Tucaken. All rights reserved.</p>
           <p className="font-mono uppercase tracking-[0.18em]">Made in Dublin</p>
+          <CookiePreferencesLink className="text-xs text-zinc-500 transition-colors hover:text-white" />
         </div>
       </div>
     </footer>
