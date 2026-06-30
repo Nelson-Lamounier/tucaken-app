@@ -32,6 +32,7 @@ import { internalApiFetch } from './_internal-api-client'
 import { logger } from '@/lib/observability/logger'
 import type { PlanId, PaymentMethodView, InvoiceView, BillingDetailsView } from '@/features/account/types'
 import type { TierConfig } from '@/features/billing/tier-config'
+import { checkoutConsentSchema, buildConsentMetadata } from '@/features/billing/consent'
 import { enforceBillingRateLimit } from './_rate-limit'
 
 // -----------------------------------------------------------------------------
@@ -228,9 +229,9 @@ export const getInvoicesFn = createServerFn({ method: 'GET' }).handler(
 // Create Checkout Session (Embedded UI, mode=subscription)
 // -----------------------------------------------------------------------------
 
-const CreateCheckoutInput = z.object({
-  tier: z.enum(['pro', 'premium']),
-})
+const CreateCheckoutInput = z
+  .object({ tier: z.enum(['pro', 'premium']) })
+  .merge(checkoutConsentSchema)
 
 export const createCheckoutSessionFn = createServerFn({ method: 'POST' })
   .inputValidator(CreateCheckoutInput)
@@ -282,6 +283,7 @@ export const createCheckoutSessionFn = createServerFn({ method: 'POST' })
       metadata: {
         tier: data.tier,
         ...(user ? { userId: user.id } : { source: 'guest' }),
+        ...buildConsentMetadata(new Date()),
       },
       subscription_data: {
         metadata: {

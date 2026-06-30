@@ -52,7 +52,7 @@ function CheckoutRoute() {
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['checkout-session', tier],
-    queryFn: () => createCheckoutSessionFn({ data: { tier } }),
+    queryFn: () => createCheckoutSessionFn({ data: { tier, termsAccepted: true } }),
     // Stripe sessions expire ~24h. Never reuse a stale clientSecret across
     // remounts — it would attach the embedded form to a closed session.
     staleTime: 0,
