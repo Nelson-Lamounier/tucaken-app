@@ -48,6 +48,64 @@ export function createArticlesRouter(config: AdminApiConfig): Hono<AdminApiBindi
   const ALL_STATUSES = ['draft', 'processing', 'review', 'published', 'rejected', 'flagged'] as const;
   const ALL_STATUS_SET = new Set<string>(ALL_STATUSES);
 
+  /** Slug format: lowercase alphanumeric + hyphens, no leading/trailing hyphen. */
+  const SLUG_RE = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
+
+  /** Destinations that may be written to the articles table. */
+  const ALLOWED_DESTINATIONS = new Set(['portfolio', 'tucaken']);
+
+  // -----------------------------------------------------------------------
+  // GET /api/admin/articles/slug-available — registered before /:slug
+  // -----------------------------------------------------------------------
+  router.get('/slug-available', async (ctx) => {
+    const slug = ctx.req.query('slug') ?? '';
+    if (!SLUG_RE.test(slug)) return ctx.json({ available: false }, 200);
+    const existing = await getArticleBySlug(getPool(config), slug);
+    return ctx.json({ available: existing === null });
+  });
+
+  // -----------------------------------------------------------------------
+  // POST /api/admin/articles — create article
+  // -----------------------------------------------------------------------
+  router.post('/', async (ctx) => {
+    const body = await ctx.req.json<Record<string, unknown>>();
+    const slug = typeof body['slug'] === 'string' ? body['slug'] : '';
+    const title = typeof body['title'] === 'string' ? body['title'] : '';
+    const contentMd = typeof body['contentMd'] === 'string' ? body['contentMd'] : '';
+
+    if (!SLUG_RE.test(slug)) return ctx.json({ error: 'Invalid slug' }, 400);
+    if (!title || !contentMd) return ctx.json({ error: 'title and contentMd are required' }, 400);
+
+    const rawDest = Array.isArray(body['destinations']) ? (body['destinations'] as unknown[]) : [];
+    const destinations = rawDest.filter(
+      (d): d is string => typeof d === 'string' && ALLOWED_DESTINATIONS.has(d),
+    );
+    const finalDestinations = destinations.length > 0 ? destinations : ['portfolio'];
+
+    const pool = getPool(config);
+    const existing = await getArticleBySlug(pool, slug);
+    if (existing) return ctx.json({ error: 'An article with this slug already exists' }, 409);
+
+    const status = typeof body['status'] === 'string' ? body['status'] : 'draft';
+
+    await upsertArticle(pool, {
+      slug,
+      title,
+      excerpt: typeof body['excerpt'] === 'string' ? body['excerpt'] : null,
+      contentMd,
+      tags: Array.isArray(body['tags']) ? (body['tags'] as string[]) : [],
+      status,
+      aiGenerated: false,
+      aiModel: null,
+      publishedAt: status === 'published' ? new Date() : null,
+      coverImage: typeof body['coverImage'] === 'string' ? body['coverImage'] : null,
+      destinations: finalDestinations,
+      authorId: ctx.get('userId') ?? null,
+    });
+
+    return ctx.json({ created: true, slug }, 201);
+  });
+
   // -----------------------------------------------------------------------
   // GET /api/admin/articles
   // -----------------------------------------------------------------------
@@ -88,7 +146,7 @@ export function createArticlesRouter(config: AdminApiConfig): Hono<AdminApiBindi
     const allowedFields = [
       'title', 'excerpt', 'tags', 'status', 'coverImage',
       'author', 'category', 'publishedAt', 'seo',
-      'contentMd', 'aiGenerated', 'aiModel',
+      'contentMd', 'aiGenerated', 'aiModel', 'destinations',
     ];
     const updates = Object.fromEntries(
       Object.entries(body).filter(([k]) => allowedFields.includes(k)),
@@ -115,7 +173,7 @@ export function createArticlesRouter(config: AdminApiConfig): Hono<AdminApiBindi
             ? (updates['publishedAt'] ? new Date(updates['publishedAt'] as string) : null)
             : existing.publishedAt,
         coverImage:   'coverImage'   in updates ? (updates['coverImage']   as string | null) : existing.coverImage,
-        destinations: existing.destinations,
+        destinations: 'destinations' in updates ? (updates['destinations'] as string[]) : existing.destinations,
     };
 
     await upsertArticle(pool, merged);

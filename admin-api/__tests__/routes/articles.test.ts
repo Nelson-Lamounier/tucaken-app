@@ -343,6 +343,138 @@ describe('POST /:slug/publish — flip status to published in PG', () => {
 });
 
 // ---------------------------------------------------------------------------
+// POST / — create article
+// ---------------------------------------------------------------------------
+
+describe('POST / — create article', () => {
+  beforeEach(() => {
+    pgUpsertMock.mockReset();
+    pgUpsertMock.mockResolvedValue(undefined);
+    pgGetArticleBySlugMock.mockReset();
+    pgGetArticleBySlugMock.mockResolvedValue(null);
+  });
+
+  it('creates a new article with status=draft and default destinations', async () => {
+    const res = await buildApp().request('/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ slug: 'hello-world', title: 'Hi', contentMd: '# Hi' }),
+    });
+    expect(res.status).toBe(201);
+    expect(await res.json()).toMatchObject({ created: true, slug: 'hello-world' });
+    expect(pgUpsertMock).toHaveBeenCalledTimes(1);
+    const arg = pgUpsertMock.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(arg['slug']).toBe('hello-world');
+    expect(arg['status']).toBe('draft');
+    expect(arg['destinations']).toEqual(['portfolio']);
+  });
+
+  it('rejects a duplicate slug with 409', async () => {
+    pgGetArticleBySlugMock.mockResolvedValue(ARTICLE_ITEM as never);
+    const res = await buildApp().request('/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ slug: 'hello-world', title: 'Hi', contentMd: '# Hi' }),
+    });
+    expect(res.status).toBe(409);
+    expect(pgUpsertMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid slug with 400', async () => {
+    const res = await buildApp().request('/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ slug: 'Bad Slug!', title: 'Hi', contentMd: '# Hi' }),
+    });
+    expect(res.status).toBe(400);
+    expect(pgUpsertMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects missing title with 400', async () => {
+    const res = await buildApp().request('/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ slug: 'valid-slug', contentMd: '# Hi' }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('filters destinations to allowed values and preserves valid ones', async () => {
+    await buildApp().request('/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ slug: 'valid-slug', title: 'Hi', contentMd: '# Hi', destinations: ['tucaken', 'evil'] }),
+    });
+    const arg = pgUpsertMock.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(arg['destinations']).toEqual(['tucaken']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /slug-available
+// ---------------------------------------------------------------------------
+
+describe('GET /slug-available — slug availability check', () => {
+  beforeEach(() => {
+    pgGetArticleBySlugMock.mockReset();
+    pgGetArticleBySlugMock.mockResolvedValue(null);
+  });
+
+  it('returns available=false for an existing slug', async () => {
+    pgGetArticleBySlugMock.mockResolvedValue(ARTICLE_ITEM as never);
+    const res = await buildApp().request('/slug-available?slug=hello-world');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ available: false });
+  });
+
+  it('returns available=true for a free slug', async () => {
+    const res = await buildApp().request('/slug-available?slug=free-slug');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ available: true });
+  });
+
+  it('returns available=false for an invalid slug format', async () => {
+    const res = await buildApp().request('/slug-available?slug=Bad+Slug!');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ available: false });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PUT /:slug destinations patchability
+// ---------------------------------------------------------------------------
+
+describe('PUT /:slug — destinations patchable', () => {
+  beforeEach(() => {
+    pgUpsertMock.mockReset();
+    pgUpsertMock.mockResolvedValue(undefined);
+    pgGetArticleBySlugMock.mockReset();
+    pgGetArticleBySlugMock.mockResolvedValue({ ...ARTICLE_ITEM, destinations: ['portfolio'] } as never);
+  });
+
+  it('updates destinations when provided in body', async () => {
+    await buildApp().request('/my-slug', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ destinations: ['tucaken'] }),
+    });
+    expect(pgUpsertMock).toHaveBeenCalledTimes(1);
+    const arg = pgUpsertMock.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(arg['destinations']).toEqual(['tucaken']);
+  });
+
+  it('preserves existing destinations when not in body', async () => {
+    await buildApp().request('/my-slug', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'New Title' }),
+    });
+    const arg = pgUpsertMock.mock.calls[0]?.[1] as Record<string, unknown>;
+    expect(arg['destinations']).toEqual(['portfolio']);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // GET /:slug/versions
 // ---------------------------------------------------------------------------
 
