@@ -1026,3 +1026,35 @@ export async function adminUpdateUser(
   }
   return true;
 }
+
+/**
+ * Read the chatbot feature flag for a user (migration 112). Returns false when
+ * the row is absent. Accepts a pooled or transaction client.
+ */
+export async function getChatbotEnabled(
+  client: import('pg').PoolClient,
+  id: string,
+): Promise<boolean> {
+  const r = await client.query<{ chatbot_enabled: boolean }>(
+    `SELECT chatbot_enabled FROM users WHERE id = $1`,
+    [id],
+  );
+  return r.rows[0]?.chatbot_enabled === true;
+}
+
+/**
+ * Set the chatbot feature flag for a user (migration 112). Returns true when a
+ * row was updated, false when the user does not exist. Transaction boundaries
+ * are the caller's responsibility.
+ */
+export async function setChatbotEnabled(
+  client: import('pg').PoolClient,
+  id: string,
+  enabled: boolean,
+): Promise<boolean> {
+  const r = await client.query(
+    `UPDATE users SET chatbot_enabled = $2, updated_at = NOW() WHERE id = $1`,
+    [id, enabled],
+  );
+  return (r.rowCount ?? 0) > 0;
+}

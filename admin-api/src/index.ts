@@ -35,6 +35,7 @@ import { createBedrockUsageRouter } from './routes/bedrock-usage.js';
 import { createFinopsRouter } from './routes/finops.js';
 import { createGitHubRouter, createGitHubWebhookRouter } from './routes/github.js';
 import { createHealthRouter } from './routes/health.js';
+import { createAdminSettingsRouter } from './routes/admin-settings.js';
 import { createAdminUsersRouter } from './routes/admin-users.js';
 import { createRoleOntologyRouter } from './routes/role-ontology.js';
 import { createIngestionRouter } from './routes/ingestion.js';
@@ -179,6 +180,8 @@ app.use('/api/admin/prompt-feedback/stats', requireAdminGroup());
 // `/api/admin/users/*` is the support tool surface — restore deleted users,
 // future ops actions. Locked behind the `admin` Cognito group.
 app.use('/api/admin/users/*',         requireAdminGroup());
+// Owner-scoped chatbot feature flag — admin-managed, owner-applied.
+app.use('/api/admin/settings/*',      requireAdminGroup());
 // Read-only operator visibility into the role-ontology auto-training loop.
 app.use('/api/admin/role-ontology/*', requireAdminGroup());
 
@@ -201,6 +204,7 @@ app.route('/api/admin/profile',        createProfileRouter(config));
 app.route('/api/admin/activity',       createActivityRouter(config));
 app.route('/api/admin/projects',       createProjectsRouter(config));
 app.route('/api/admin/users',          createAdminUsersRouter(config));
+app.route('/api/admin/settings',       createAdminSettingsRouter(config));
 app.route('/api/admin/role-ontology',  createRoleOntologyRouter(config));
 app.route('/api/admin/tier-config',    createTierConfigRouter(config));
 
