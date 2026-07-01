@@ -25,6 +25,12 @@ export const adminKeys = {
   /** Root key — invalidate this to clear the entire admin cache */
   all: ['admin'] as const,
 
+  /** Admin settings (chatbot feature flag, etc.) */
+  settings: {
+    all: ['admin', 'settings'] as const,
+    chatbot: () => ['admin', 'settings', 'chatbot'] as const,
+  },
+
   /** Article-related query keys */
   articles: {
     /** All article queries (list + content) */
