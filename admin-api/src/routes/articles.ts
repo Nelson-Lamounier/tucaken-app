@@ -65,6 +65,61 @@ export function createArticlesRouter(config: AdminApiConfig): Hono<AdminApiBindi
   });
 
   // -----------------------------------------------------------------------
+  // GET /api/admin/articles/topic-candidates — registered before /:slug
+  // Suggested article topics mined from case-study evidence (Gap 2). Optional
+  // ?githubRepoId= filter. User-scoped via withUser so a future v2 that drops
+  // the admin gate needs no query change.
+  // -----------------------------------------------------------------------
+  router.get('/topic-candidates', async (ctx) => {
+    const userId = ctx.get('userId');
+    if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
+
+    const githubRepoId = ctx.req.query('githubRepoId');
+
+    return withUser(getPool(config), userId, async (db) => {
+      // Explicit user_id scope: article_topic_candidates has no RLS policy, so the
+      // ownership filter lives in the query. github_repo_id (BIGINT) is validated
+      // as digits before use to keep the parameter well-typed.
+      const params: unknown[] = [userId];
+      let repoClause = '';
+      if (githubRepoId && /^\d+$/.test(githubRepoId)) {
+        params.push(githubRepoId);
+        repoClause = ` AND github_repo_id = $2`;
+      }
+      const result = await db.query<{
+          id: string; github_repo_id: string; repo_full_name: string | null;
+          title: string; problem: string; angle: string | null;
+          primary_keyword: string | null; evidence_refs: unknown; verified_metrics: unknown;
+          skills: string[]; created_at: Date;
+      }>(
+          `SELECT id, github_repo_id::text AS github_repo_id, repo_full_name, title, problem,
+                  angle, primary_keyword, evidence_refs, verified_metrics, skills, created_at
+             FROM article_topic_candidates
+            WHERE user_id = $1 AND status = 'suggested'${repoClause}
+            ORDER BY created_at DESC
+            LIMIT 100`,
+          params,
+      );
+
+      const candidates = result.rows.map((r) => ({
+          id:              r.id,
+          githubRepoId:    r.github_repo_id,
+          repoFullName:    r.repo_full_name,
+          title:           r.title,
+          problem:         r.problem,
+          angle:           r.angle,
+          primaryKeyword:  r.primary_keyword,
+          evidenceRefs:    r.evidence_refs ?? [],
+          verifiedMetrics: r.verified_metrics ?? [],
+          skills:          r.skills ?? [],
+          createdAt:       r.created_at,
+      }));
+
+      return ctx.json({ candidates, count: candidates.length });
+    });
+  });
+
+  // -----------------------------------------------------------------------
   // POST /api/admin/articles — create article
   // -----------------------------------------------------------------------
   router.post('/', async (ctx) => {

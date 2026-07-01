@@ -23,9 +23,29 @@ import { deriveSlug } from '@/features/articles/lib/derive-slug'
 // Input Schema
 // =============================================================================
 
+/** A verified metric carried by a chosen topic candidate (Gap 3). */
+const verifiedMetricSchema = z.object({
+  label: z.string(),
+  value: z.string(),
+  unit: z.string().optional(),
+  source: z.string().optional(),
+})
+
+/** Structured brief from a chosen topic candidate — replaces the bare short prompt. */
+const articleBriefSchema = z.object({
+  problem: z.string().optional(),
+  angle: z.string().optional(),
+  primaryKeyword: z.string().optional(),
+  verifiedMetrics: z.array(verifiedMetricSchema).optional(),
+})
+
 const publishDraftSchema = z.object({
   fileName: z.string().min(1, 'Filename is required'),
   content: z.string().min(20, 'Content must be at least 20 characters'),
+  /** When the draft was started from a suggested topic, its structured brief. */
+  brief: articleBriefSchema.optional(),
+  /** The topic candidate this draft came from — marked 'used' on dispatch. */
+  candidateId: z.string().uuid().optional(),
 })
 
 // =============================================================================
@@ -91,7 +111,11 @@ export const publishDraftFn = createServerFn({ method: 'POST' })
         `/pipelines/article-job/${encodeURIComponent(slug)}`,
         {
           method: 'POST',
-          body: JSON.stringify({ mode: 'kb-augmented' }),
+          body: JSON.stringify({
+            mode: 'kb-augmented',
+            ...(data.brief ? { brief: data.brief } : {}),
+            ...(data.candidateId ? { candidateId: data.candidateId } : {}),
+          }),
           pathTemplate: '/pipelines/article-job/:slug',
         },
       )

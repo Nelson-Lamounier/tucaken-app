@@ -331,6 +331,51 @@ export const getArticleMetadataFn = createServerFn({ method: 'GET' })
     }
   })
 
+// =============================================================================
+// Topic candidates (Gap 2)
+// =============================================================================
+
+/** A verified measured number carried by a topic candidate (author-confirmed). */
+export interface TopicCandidateMetric {
+  label: string
+  value: string
+  unit?: string
+  source?: string
+}
+
+/** A suggested article topic mined from case-study evidence. */
+export interface TopicCandidate {
+  id: string
+  githubRepoId: string
+  repoFullName: string | null
+  title: string
+  problem: string
+  angle: string | null
+  primaryKeyword: string | null
+  verifiedMetrics: TopicCandidateMetric[]
+  skills: string[]
+}
+
+const topicCandidatesSchema = z
+  .object({ githubRepoId: z.string().regex(/^\d+$/).optional() })
+  .default({})
+
+/**
+ * Lists the admin's suggested article topics (optionally for one repo).
+ * Feeds the builder's "Start from a suggested topic" dropdown.
+ */
+export const getTopicCandidatesFn = createServerFn({ method: 'GET' })
+  .inputValidator(topicCandidatesSchema)
+  .handler(async ({ data }) => {
+    await requireAdmin()
+    const qs = data.githubRepoId ? `?githubRepoId=${encodeURIComponent(data.githubRepoId)}` : ''
+    const body = await apiFetch<{ candidates: TopicCandidate[]; count: number }>(
+      `/articles/topic-candidates${qs}`,
+      { pathTemplate: '/articles/topic-candidates' },
+    )
+    return body.candidates
+  })
+
 /**
  * Creates a new article record in admin-api (POST /articles) and writes
  * the initial markdown content to S3 via the /content/:slug endpoint.

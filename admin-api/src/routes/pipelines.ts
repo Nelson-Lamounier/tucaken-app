@@ -82,9 +82,24 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
 
     const slug = ctx.req.param('slug');
 
-    let body: { mode?: string } = {};
+    interface ArticleBriefBody {
+      problem?:        string;
+      angle?:          string;
+      primaryKeyword?: string;
+      verifiedMetrics?: ReadonlyArray<{ label: string; value: string; unit?: string; source?: string }>;
+    }
+    let body: { mode?: string; brief?: ArticleBriefBody; candidateId?: string } = {};
     try { body = await ctx.req.json(); }
     catch { /* empty body is fine — all required values come from config + slug */ }
+
+    // A chosen topic candidate carries a structured brief (problem/angle + author-
+    // confirmed verified metrics). Passed to the pipeline via ARTICLE_BRIEF so the
+    // Writer can cite real numbers (Gap 3). Only well-formed briefs are forwarded.
+    const brief = body.brief && typeof body.brief === 'object' ? body.brief : undefined;
+    const candidateId =
+      typeof body.candidateId === 'string' && /^[0-9a-f-]{36}$/i.test(body.candidateId)
+        ? body.candidateId
+        : undefined;
 
     if (!isAssetsBucketConfigured(config.assetsBucketName)) {
       return ctx.json({ error: 'Article pipeline unavailable — assets S3 bucket not configured' }, 503);
@@ -166,12 +181,30 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
           { name: 'FOUNDATION_MODEL', value: config.foundationModel },
           { name: 'QA_MODEL',         value: config.foundationModel },
           { name: 'AWS_REGION',       value: config.awsRegion },
+          // Structured topic brief (problem/angle + verified metrics) from a chosen
+          // candidate. The pipeline parses ARTICLE_BRIEF fail-open; absent → draft-only.
+          ...(brief ? [{ name: 'ARTICLE_BRIEF', value: JSON.stringify(brief) }] : []),
         ],
         envFromSecretRefs:   ['platform-rds-credentials'],
       });
 
       if (!(await createPipelineJob(config.articlePipelineNamespace, job, 'pipelines/article-job'))) {
         return ctx.json({ error: 'Failed to schedule pipeline Job' }, 502);
+      }
+
+      // Mark the source candidate 'used' so it drops out of the suggested set.
+      // Best-effort: a failure here must not fail an already-scheduled run.
+      if (candidateId) {
+        try {
+          await db.query(
+            `UPDATE article_topic_candidates
+                SET status = 'used', used_article_slug = $3, updated_at = NOW()
+              WHERE id = $1 AND user_id = $2`,
+            [candidateId, userId, slug],
+          );
+        } catch (err: unknown) {
+          console.error('[pipelines/article-job] failed to mark candidate used', err);
+        }
       }
 
       return ctx.json({ status: 'queued', pipelineRunId, jobName: job.metadata!.name!, slug }, 202);

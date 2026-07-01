@@ -3,7 +3,9 @@ import type { ChangeEvent, DragEvent } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Bot } from 'lucide-react'
 import { usePublishDraft } from '../hooks/use-publish-draft'
+import { useTopicCandidates } from '../hooks/use-topic-candidates'
 import { usePipelineStatus } from '../hooks/use-pipeline-status'
+import type { TopicCandidate } from '@/server/articles'
 import { useToastStore } from '@/lib/stores/toast-store'
 import { usePipelineNotificationsStore } from '@/lib/stores/pipeline-notifications-store'
 import { AiArticlesList } from './AiArticlesList'
@@ -44,8 +46,14 @@ export function AIAgentContainer({ initialMode = 'test', initialSlug = null }: A
   const [pasteContent, setPasteContent] = useState('')
   const [pasteFilename, setPasteFilename] = useState('')
 
+  // ── Topic-discovery state (Gap 2) ─────────────────────────────────────────
+  // The candidate the current draft was started from (null for a hand-written
+  // draft or an uploaded file). Carries the structured brief on publish.
+  const [selectedCandidate, setSelectedCandidate] = useState<TopicCandidate | null>(null)
+
   // ── TanStack Query hooks ──────────────────────────────────────────────────
   const publishMutation = usePublishDraft()
+  const candidatesQuery = useTopicCandidates()
   const pipelineStatus = usePipelineStatus(mode === 'pipeline' ? pipelineSlug : null)
   const reviewNotifiedRef = useRef(false)
   const flaggedNotifiedRef = useRef(false)
@@ -105,9 +113,10 @@ export function AIAgentContainer({ initialMode = 'test', initialSlug = null }: A
       const lines = content.split('\n')
       const preview = lines.slice(0, PREVIEW_LINE_COUNT).join('\n')
 
-      // File wins — clear paste state so only one source is active
+      // File wins — clear paste state and any chosen topic so only one source is active
       setPasteContent('')
       setPasteFilename('')
+      setSelectedCandidate(null)
       setDraft({
         name: file.name,
         content,
@@ -155,6 +164,20 @@ export function AIAgentContainer({ initialMode = 'test', initialSlug = null }: A
     setDraft(null)
     setPasteContent('')
     setPasteFilename('')
+    setSelectedCandidate(null)
+    publishMutation.reset()
+  }, [publishMutation])
+
+  // Start a draft from a suggested topic: seed the filename + a short prompt
+  // (problem/angle) that the pipeline treats as the author direction, and keep
+  // the candidate so its structured brief (with verified metrics) rides the
+  // publish. Paste wins, so any uploaded file is cleared.
+  const handleSelectCandidate = useCallback((c: TopicCandidate) => {
+    setDraft(null)
+    setPasteFilename(c.title)
+    const prompt = [c.problem, c.angle ? `Angle: ${c.angle}` : ''].filter(Boolean).join('\n\n')
+    setPasteContent(prompt)
+    setSelectedCandidate(c)
     publishMutation.reset()
   }, [publishMutation])
 
@@ -172,8 +195,21 @@ export function AIAgentContainer({ initialMode = 'test', initialSlug = null }: A
       content = draft.content
     }
 
+    // Carry the chosen topic's structured brief (problem/angle + verified
+    // metrics) only when the draft actually came from it (paste path). An
+    // uploaded file clears selectedCandidate, so file drafts never carry a brief.
+    const usingCandidate = selectedCandidate !== null && !draft
+    const brief = usingCandidate
+      ? {
+          problem:         selectedCandidate.problem,
+          angle:           selectedCandidate.angle ?? undefined,
+          primaryKeyword:  selectedCandidate.primaryKeyword ?? undefined,
+          verifiedMetrics: selectedCandidate.verifiedMetrics,
+        }
+      : undefined
+
     publishMutation.mutate(
-      { fileName, content },
+      { fileName, content, brief, candidateId: usingCandidate ? selectedCandidate.id : undefined },
       {
         onSuccess: (data) => {
           if (data.success) {
@@ -197,7 +233,7 @@ export function AIAgentContainer({ initialMode = 'test', initialSlug = null }: A
         },
       },
     )
-  }, [mode, draft, pasteContent, sanitisedFilename, isPasteReady, publishMutation, addToast])
+  }, [mode, draft, pasteContent, sanitisedFilename, isPasteReady, selectedCandidate, publishMutation, addToast, addNotification, navigate])
 
   return (
     <div className="px-6 py-8 sm:px-8 lg:px-10">
@@ -225,6 +261,9 @@ export function AIAgentContainer({ initialMode = 'test', initialSlug = null }: A
             draft={draft}
             isDragOver={isDragOver}
             isPending={publishMutation.isPending}
+            candidates={candidatesQuery.data ?? []}
+            selectedCandidateId={selectedCandidate?.id ?? null}
+            onSelectCandidate={handleSelectCandidate}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
