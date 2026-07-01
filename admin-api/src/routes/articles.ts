@@ -23,6 +23,7 @@ import { Hono } from 'hono';
 
 import type { AdminApiConfig } from '../lib/config.js';
 import { getPool, withUser } from '../lib/pg.js';
+import { revalidatePortfolioArticle } from '../lib/portfolio-revalidate.js';
 import { requireAdminGroup } from '../middleware/auth.js';
 import {
     upsertArticle,
@@ -267,7 +268,13 @@ export function createArticlesRouter(config: AdminApiConfig): Hono<AdminApiBindi
         `UPDATE articles SET status = 'published', published_at = COALESCE(published_at, NOW()), updated_at = NOW() WHERE slug = $1`,
         [slug],
     );
-    return ctx.json({ published: true, slug });
+
+    // Best-effort ISR revalidation so the portfolio shows the article
+    // immediately instead of after its 1-hour cache window. Never blocks or
+    // fails the publish — the article is already published in PG.
+    const revalidated = await revalidatePortfolioArticle(config, slug);
+
+    return ctx.json({ published: true, slug, revalidated: revalidated.ok });
   });
 
   // -----------------------------------------------------------------------
