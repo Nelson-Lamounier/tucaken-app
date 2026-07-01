@@ -751,6 +751,10 @@ export async function dispatchCaseStudyJob(
             { name: 'CASE_STUDY_PIPELINE_RUN_ID', value: pipelineRunId },
             { name: 'PROJECT_ID',                 value: projectId },
             { name: 'USER_ID',                    value: userId },
+            // Enable article topic discovery as a byproduct of case-study
+            // generation (Gap 2). Fail-open in the orchestrator — never blocks
+            // or slows the case-study run.
+            { name: 'ARTICLE_TOPIC_DISCOVERY',    value: '1' },
             ...REDIS_CACHE_ENV,
         ],
         envFromSecretRefs: ['platform-rds-credentials', 'job-strategist-redis-cache'],
