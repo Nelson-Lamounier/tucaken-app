@@ -24,6 +24,8 @@ type StripePrice = {
   id: string
   nickname: string | null
   productName: string | null
+  /** Minor units (e.g. 3500 = €35.00). Drives the derived display price. */
+  unitAmount: number | null
 }
 
 // ---- ConfirmDialog ---------------------------------------------------------
@@ -282,15 +284,21 @@ function TierCard({
             onChange={(e) => onChange({ cta: e.target.value })}
           />
         </Field>
-        <Field label="Monthly price (EUR)">
+        <Field
+          label="Monthly price (EUR)"
+          hint={paidTier ? 'Derived from the mapped Stripe price' : undefined}
+        >
           <input
             className={inputCls()}
             type="number"
             min={0}
             value={entry.priceMonthly}
-            onChange={(e) =>
+            readOnly={Boolean(paidTier)}
+            aria-readonly={Boolean(paidTier)}
+            onChange={(e) => {
+              if (paidTier) return
               onChange({ priceMonthly: Number.parseInt(e.target.value, 10) || 0 })
-            }
+            }}
           />
         </Field>
         <Field label="Annual price (EUR)">
@@ -312,7 +320,16 @@ function TierCard({
             <PriceSelect
               value={entry.stripePriceIdMonthly}
               prices={prices}
-              onChange={(v) => onChange({ stripePriceIdMonthly: v })}
+              onChange={(v) => {
+                // Mirror the mapped price's amount into the display price so the
+                // marketing cards and checkout can never show a different number.
+                const picked = prices.find((p) => p.id === v)
+                const patch: Partial<TierConfigEntry> = { stripePriceIdMonthly: v }
+                if (picked?.unitAmount != null) {
+                  patch.priceMonthly = picked.unitAmount / 100
+                }
+                onChange(patch)
+              }}
             />
           </Field>
           <CreateStripePrice tier={paidTier} defaultAmount={entry.priceMonthly} onChange={onChange} />
