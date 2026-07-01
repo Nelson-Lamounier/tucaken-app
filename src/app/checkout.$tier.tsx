@@ -21,8 +21,22 @@ import {
   EmbeddedCheckout,
 } from '@stripe/react-stripe-js'
 import { createCheckoutSessionFn } from '@/server/billing'
-import { findTier } from '@/features/billing/catalog'
+import { getPublicTierConfigFn } from '@/server/tier-config'
+import { findTier, tiersFromPublic } from '@/features/billing/catalog'
 import type { PlanId } from '@/features/account/types'
+
+// Format a Stripe amount (major units) in its own currency — never assume a
+// symbol. The Stripe price is the single source of truth for what is charged.
+function formatMoney(amount: number, currency: string): string {
+  return new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: currency.toUpperCase(),
+  }).format(amount)
+}
+
+function intervalNoun(interval: string): string {
+  return interval === 'year' ? 'year' : 'month'
+}
 
 // loadStripe is cached internally, but holding our own promise prevents a
 // second fetch when React re-renders before the first resolves.
@@ -49,7 +63,6 @@ export const Route = createFileRoute('/checkout/$tier')({
 
 function CheckoutRoute() {
   const { tier } = Route.useParams()
-  const tierMeta = findTier(tier)!
 
   const [accepted, setAccepted] = useState(false)
 
@@ -65,13 +78,31 @@ function CheckoutRoute() {
     refetchOnMount: 'always',
   })
 
+  // Display copy (name, blurb, features) is admin-editable via the tier
+  // config; fall back to the static catalog while it loads.
+  const publicConfig = useQuery({
+    queryKey: ['public-tier-config'],
+    queryFn: getPublicTierConfigFn,
+    staleTime: 5 * 60_000,
+  })
+  const tierMeta = useMemo(
+    () =>
+      tiersFromPublic(publicConfig.data).find((t) => t.id === tier) ??
+      findTier(tier)!,
+    [publicConfig.data, tier],
+  )
+
   const options = useMemo(
     () => (data?.clientSecret ? { clientSecret: data.clientSecret } : null),
     [data?.clientSecret],
   )
 
-  const monthlyTotal = tierMeta.priceMonthly
-  const taxes = 0 // Stripe Tax disabled in createCheckoutSessionFn; surface "—" instead
+  // Amount / currency / interval come straight from the resolved Stripe price,
+  // so the summary always equals what Stripe charges. Null until the session
+  // resolves — rendered as an em dash placeholder.
+  const priceLabel = data ? formatMoney(data.amount, data.currency) : '—'
+  const cadence = data ? intervalNoun(data.interval) : 'month'
+  const cadenceLabel = cadence === 'year' ? 'annually' : 'monthly'
 
   return (
     // Layout: on lg+ the page is exactly viewport-height (`lg:h-dvh`) with
@@ -131,8 +162,8 @@ function CheckoutRoute() {
           </div>
 
           <p className="mt-4 text-xs text-zinc-500">
-            Your card will be charged EUR{monthlyTotal} today and on the same date
-            each month until you cancel.
+            Your card will be charged {priceLabel} today and on the same date
+            each {cadence} until you cancel.
           </p>
         </div>
       </section>
@@ -152,7 +183,7 @@ function CheckoutRoute() {
               Amount due today
             </dt>
             <dd className="mt-1 text-3xl font-bold tracking-tight text-white">
-              €{monthlyTotal}.00
+              {priceLabel}
             </dd>
           </dl>
 
@@ -165,11 +196,11 @@ function CheckoutRoute() {
                 <h3 className="text-white">Tucaken {tierMeta.name}</h3>
                 <p className="text-teal-200/80">{tierMeta.blurb}</p>
                 <p className="text-xs text-teal-200/60">
-                  Billed monthly · cancel anytime
+                  Billed {cadenceLabel} · cancel anytime
                 </p>
               </div>
               <p className="flex-none text-base font-medium text-white">
-                €{monthlyTotal}.00
+                {priceLabel}
               </p>
             </li>
           </ul>
@@ -177,15 +208,15 @@ function CheckoutRoute() {
           <dl className="space-y-2.5 border-t border-white/10 pt-4 text-sm font-medium">
             <div className="flex items-center justify-between">
               <dt>Subtotal</dt>
-              <dd>€{monthlyTotal}.00</dd>
+              <dd>{priceLabel}</dd>
             </div>
             <div className="flex items-center justify-between">
               <dt>Taxes</dt>
-              <dd>{taxes ? `€${taxes}.00` : 'Calculated by Stripe'}</dd>
+              <dd>Calculated by Stripe</dd>
             </div>
             <div className="flex items-center justify-between border-t border-white/10 pt-3 text-white">
               <dt className="text-base">Total today</dt>
-              <dd className="text-base">€{monthlyTotal}.00</dd>
+              <dd className="text-base">{priceLabel}</dd>
             </div>
           </dl>
 

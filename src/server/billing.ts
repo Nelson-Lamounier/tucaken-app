@@ -298,7 +298,17 @@ export const createCheckoutSessionFn = createServerFn({ method: 'POST' })
         'Stripe did not return a client_secret for embedded checkout.',
       )
     }
-    return { clientSecret: session.client_secret }
+
+    // Return the resolved price alongside the client secret so the checkout
+    // summary renders EXACTLY what Stripe will charge (amount, currency,
+    // interval) — no second source of truth to drift from the mapped price.
+    const price = await stripe().prices.retrieve(priceId)
+    return {
+      clientSecret: session.client_secret,
+      amount: (price.unit_amount ?? 0) / 100,
+      currency: price.currency,
+      interval: price.recurring?.interval ?? 'month',
+    }
   })
 
 // -----------------------------------------------------------------------------
