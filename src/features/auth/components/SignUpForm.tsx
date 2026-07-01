@@ -144,8 +144,24 @@ export function SignUpForm({ onSwitchToSignIn, onSubmit, onGoogle, onGithub, err
               </span>
               <span>
                 I agree to the{' '}
-                <a className="font-medium text-teal-600 hover:underline dark:text-teal-400">Terms of Service</a> and{' '}
-                <a className="font-medium text-teal-600 hover:underline dark:text-teal-400">Privacy Policy</a>.
+                <a
+                  href="/terms"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-teal-600 hover:underline dark:text-teal-400"
+                >
+                  Terms &amp; Conditions
+                </a>{' '}
+                and{' '}
+                <a
+                  href="/privacy"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-teal-600 hover:underline dark:text-teal-400"
+                >
+                  Privacy Policy
+                </a>
+                .
               </span>
             </label>
           )}

@@ -14,6 +14,9 @@ import { Route as PricingRouteImport } from './app/pricing'
 import { Route as OnboardingRouteImport } from './app/onboarding'
 import { Route as LoginRouteImport } from './app/login'
 import { Route as DashboardRouteImport } from './app/_dashboard'
+import { Route as TermsRouteRouteImport } from './app/terms/route'
+import { Route as PrivacyRouteRouteImport } from './app/privacy/route'
+import { Route as CookiesRouteRouteImport } from './app/cookies/route'
 import { Route as IndexRouteImport } from './app/index'
 import { Route as SignInCallbackRouteImport } from './app/sign-in.callback'
 import { Route as GithubCallbackRouteImport } from './app/github.callback'
@@ -72,6 +75,21 @@ const LoginRoute = LoginRouteImport.update({
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/_dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRouteRoute = TermsRouteRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRouteRoute = PrivacyRouteRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CookiesRouteRoute = CookiesRouteRouteImport.update({
+  id: '/cookies',
+  path: '/cookies',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -262,6 +280,9 @@ const DashboardAdminUsersUserIdReposRepoRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/cookies': typeof CookiesRouteRoute
+  '/privacy': typeof PrivacyRouteRoute
+  '/terms': typeof TermsRouteRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/pricing': typeof PricingRoute
@@ -303,6 +324,9 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/cookies': typeof CookiesRouteRoute
+  '/privacy': typeof PrivacyRouteRoute
+  '/terms': typeof TermsRouteRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/pricing': typeof PricingRoute
@@ -344,6 +368,9 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/cookies': typeof CookiesRouteRoute
+  '/privacy': typeof PrivacyRouteRoute
+  '/terms': typeof TermsRouteRoute
   '/_dashboard': typeof DashboardRouteWithChildren
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
@@ -388,6 +415,9 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/cookies'
+    | '/privacy'
+    | '/terms'
     | '/login'
     | '/onboarding'
     | '/pricing'
@@ -429,6 +459,9 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/cookies'
+    | '/privacy'
+    | '/terms'
     | '/login'
     | '/onboarding'
     | '/pricing'
@@ -469,6 +502,9 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/cookies'
+    | '/privacy'
+    | '/terms'
     | '/_dashboard'
     | '/login'
     | '/onboarding'
@@ -512,6 +548,9 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CookiesRouteRoute: typeof CookiesRouteRoute
+  PrivacyRouteRoute: typeof PrivacyRouteRoute
+  TermsRouteRoute: typeof TermsRouteRoute
   DashboardRoute: typeof DashboardRouteWithChildren
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
@@ -559,6 +598,27 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cookies': {
+      id: '/cookies'
+      path: '/cookies'
+      fullPath: '/cookies'
+      preLoaderRoute: typeof CookiesRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -922,6 +982,9 @@ const SignInRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CookiesRouteRoute: CookiesRouteRoute,
+  PrivacyRouteRoute: PrivacyRouteRoute,
+  TermsRouteRoute: TermsRouteRoute,
   DashboardRoute: DashboardRouteWithChildren,
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,

@@ -11,7 +11,8 @@
 // URL: /checkout/pro · /checkout/premium
 
 import { createFileRoute, notFound, Link } from '@tanstack/react-router'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { CheckoutConsent } from '@/features/billing/components/CheckoutConsent'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft } from 'lucide-react'
 import { loadStripe, type Stripe } from '@stripe/stripe-js'
@@ -50,9 +51,12 @@ function CheckoutRoute() {
   const { tier } = Route.useParams()
   const tierMeta = findTier(tier)!
 
+  const [accepted, setAccepted] = useState(false)
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['checkout-session', tier],
-    queryFn: () => createCheckoutSessionFn({ data: { tier } }),
+    queryFn: () => createCheckoutSessionFn({ data: { tier, termsAccepted: true } }),
+    enabled: accepted,
     // Stripe sessions expire ~24h. Never reuse a stale clientSecret across
     // remounts — it would attach the embedded form to a closed session.
     staleTime: 0,
@@ -108,22 +112,27 @@ function CheckoutRoute() {
             Secure payment processed by Stripe. We never see your card number.
           </p>
 
-          {/* White surface — matches Stripe iframe background so the form
-              feels continuous with the panel chrome. */}
-          <div className="mt-5 rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm">
-            {isLoading && <Skeleton />}
-            {error && <ErrorBox message={(error as Error).message} />}
-            {options && (
-              <EmbeddedCheckoutProvider stripe={getStripe()} options={options}>
-                <EmbeddedCheckout />
-              </EmbeddedCheckoutProvider>
-            )}
+          <div className="mt-5 space-y-4">
+            <CheckoutConsent accepted={accepted} onChange={setAccepted} />
+            <div className="rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm">
+              {!accepted && (
+                <p className="px-3 py-6 text-center text-sm text-zinc-500">
+                  Agree to the terms above to continue to payment.
+                </p>
+              )}
+              {accepted && isLoading && <Skeleton />}
+              {accepted && error && <ErrorBox message={(error as Error).message} />}
+              {accepted && options && (
+                <EmbeddedCheckoutProvider stripe={getStripe()} options={options}>
+                  <EmbeddedCheckout />
+                </EmbeddedCheckoutProvider>
+              )}
+            </div>
           </div>
 
           <p className="mt-4 text-xs text-zinc-500">
-            By subscribing you agree to our terms. Your card will be charged
-            €{monthlyTotal} today and on the same date each month until you
-            cancel.
+            Your card will be charged EUR{monthlyTotal} today and on the same date
+            each month until you cancel.
           </p>
         </div>
       </section>

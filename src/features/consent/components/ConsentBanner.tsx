@@ -39,6 +39,13 @@ export function ConsentBanner({ onManage }: ConsentBannerProps) {
               className="font-medium text-teal-600 underline hover:text-teal-500 dark:text-teal-400"
             >
               privacy policy
+            </a>{' '}
+            and{' '}
+            <a
+              href="/cookies"
+              className="font-medium text-teal-600 underline hover:text-teal-500 dark:text-teal-400"
+            >
+              cookie policy
             </a>
             .
           </p>
