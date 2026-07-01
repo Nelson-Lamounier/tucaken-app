@@ -2,12 +2,18 @@ import { useRef } from 'react'
 import type { ChangeEvent, DragEvent } from 'react'
 import { PhotoIcon } from '@heroicons/react/24/solid'
 import { BYTES_PER_KB, MIN_PASTE_CONTENT_LENGTH, type DraftFile } from './AIAgentTypes'
+import type { TopicCandidate } from '@/server/articles'
 
 
 export interface AiArticleFormProps {
   readonly draft: DraftFile | null
   readonly isDragOver: boolean
   readonly isPending: boolean
+
+  /** Suggested topics mined from the admin's repos (Gap 2). Empty → dropdown hidden. */
+  readonly candidates?: readonly TopicCandidate[]
+  readonly selectedCandidateId?: string | null
+  readonly onSelectCandidate?: (candidate: TopicCandidate) => void
   readonly onDragOver: (e: DragEvent<HTMLDivElement>) => void
   readonly onDragLeave: () => void
   readonly onDrop: (e: DragEvent<HTMLDivElement>) => void
@@ -28,6 +34,9 @@ export function AiArticleForm({
   draft,
   isDragOver,
   isPending,
+  candidates = [],
+  selectedCandidateId = null,
+  onSelectCandidate,
   onDragOver,
   onDragLeave,
   onDrop,
@@ -56,6 +65,37 @@ export function AiArticleForm({
           </p>
 
           <div className="mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+            {candidates.length > 0 && (
+              <div className="sm:col-span-6">
+                <label htmlFor="topic-candidate" className="block text-sm/6 font-medium text-white">
+                  Start from a suggested topic
+                </label>
+                <p className="mt-1 text-xs/5 text-zinc-400">
+                  Narrow, evidence-grounded topics mined from your repositories. Selecting one pre-fills the prompt and carries its verified metrics into generation.
+                </p>
+                <div className="mt-2">
+                  <select
+                    id="topic-candidate"
+                    name="topic-candidate"
+                    value={selectedCandidateId ?? ''}
+                    onChange={(e) => {
+                      const chosen = candidates.find((c) => c.id === e.target.value)
+                      if (chosen) onSelectCandidate?.(chosen)
+                    }}
+                    className="block w-full rounded-md bg-white/5 px-3 py-1.5 text-base text-white outline-1 -outline-offset-1 outline-white/10 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-500 sm:text-sm/6"
+                  >
+                    <option value="" className="bg-zinc-900">Write my own (no suggested topic)</option>
+                    {candidates.map((c) => (
+                      <option key={c.id} value={c.id} className="bg-zinc-900">
+                        {c.title}
+                        {c.verifiedMetrics.length > 0 ? ` · ${c.verifiedMetrics.length} metric(s)` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
             <div className="sm:col-span-4">
               <label htmlFor="paste-filename" className="block text-sm/6 font-medium text-white">
                 Article Filename
