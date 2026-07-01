@@ -12,6 +12,7 @@ import {
   FileText,
   Globe,
   Layout,
+  MessageSquare,
   Zap,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
@@ -26,6 +27,7 @@ import { WebhooksSection } from './WebhooksSection'
 import { DataSection } from './DataSection'
 import { DangerZoneSection } from './DangerZoneSection'
 import { TierConfigSection } from './TierConfigSection'
+import { ChatbotSettingsSection } from './ChatbotSettingsSection'
 import { adminKeys } from '@/lib/api/query-keys'
 import { getMeFn } from '@/server/me'
 
@@ -46,6 +48,12 @@ const TIERS_SECTION: PageNavSection = {
   icon: CreditCard,
 }
 
+const CHATBOT_SECTION: PageNavSection = {
+  id: 'chatbot',
+  label: 'Chatbot',
+  icon: MessageSquare,
+}
+
 export function SettingsPage({ settings, onUpdateSettings }: SettingsPageProps) {
   // The danger zone needs the canonical email for the type-to-confirm step.
   // useQuery shares cache with use-billing → /me is fetched at most once.
@@ -55,7 +63,7 @@ export function SettingsPage({ settings, onUpdateSettings }: SettingsPageProps) 
   })
 
   const isAdmin = me?.plan?.role === 'admin'
-  const sections = isAdmin ? [...BASE_SECTIONS, TIERS_SECTION] : BASE_SECTIONS
+  const sections = isAdmin ? [...BASE_SECTIONS, TIERS_SECTION, CHATBOT_SECTION] : BASE_SECTIONS
 
   // Helpers — patch a single nested slice without callers having to spread.
   function patch<K extends keyof Settings>(
@@ -155,13 +163,23 @@ export function SettingsPage({ settings, onUpdateSettings }: SettingsPageProps) 
       </PageSection>
 
       {isAdmin ? (
-        <PageSection
-          id="tiers"
-          label="Subscription tiers"
-          sub="Control Free, Pro and Premium pricing, Stripe mapping and entitlements. Owner only."
-        >
-          <TierConfigSection />
-        </PageSection>
+        <>
+          <PageSection
+            id="tiers"
+            label="Subscription tiers"
+            sub="Control Free, Pro and Premium pricing, Stripe mapping and entitlements. Owner only."
+          >
+            <TierConfigSection />
+          </PageSection>
+
+          <PageSection
+            id="chatbot"
+            label="Chatbot"
+            sub="Enable the portfolio chatbot and its lifecycle extraction. Owner only."
+          >
+            <ChatbotSettingsSection />
+          </PageSection>
+        </>
       ) : null}
     </PageShell>
   )
