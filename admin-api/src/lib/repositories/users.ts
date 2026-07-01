@@ -1028,6 +1028,21 @@ export async function adminUpdateUser(
 }
 
 /**
+ * Resolve the single portfolio owner's id from the DB (migration 113), the
+ * canonical source of the owner identity (replaces the PORTFOLIO_OWNER_USER_ID
+ * env). A partial unique index guarantees at most one owner. Returns null when
+ * none is set. Accepts a pooled or transaction client.
+ */
+export async function getPortfolioOwnerId(
+  client: import('pg').PoolClient,
+): Promise<string | null> {
+  const r = await client.query<{ id: string }>(
+    `SELECT id FROM users WHERE is_portfolio_owner = true LIMIT 1`,
+  );
+  return r.rows[0]?.id ?? null;
+}
+
+/**
  * Read the chatbot feature flag for a user (migration 112). Returns false when
  * the row is absent. Accepts a pooled or transaction client.
  */
