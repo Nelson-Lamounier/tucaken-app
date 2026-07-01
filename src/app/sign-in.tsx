@@ -12,6 +12,7 @@ import {
   forgotPasswordFn,
   confirmForgotPasswordFn,
 } from '../server/auth'
+import { withFormTracking } from '@/lib/observability/with-form-tracking'
 
 export const Route = createFileRoute('/sign-in')({
   validateSearch: z.object({
@@ -41,7 +42,9 @@ function AuthPage() {
       onGoogle={() => goOAuth('Google')}
       onGithub={() => goOAuth('GitHub')}
       onSignIn={async (v) => {
-        const result = await signInWithPasswordFn({ data: v })
+        const result = await withFormTracking('sign_in', () =>
+          signInWithPasswordFn({ data: v }),
+        )
         if (!result.success) return 'otp'
         navigateAfterAuth(result.isNewUser)
       }}
@@ -50,7 +53,9 @@ function AuthPage() {
         globalThis.window.location.href = callbackUrl ?? '/overview'
       }}
       onSignUp={async (v) => {
-        await signUpFn({ data: { email: v.email, password: v.password, name: v.name } })
+        await withFormTracking('sign_up', () =>
+          signUpFn({ data: { email: v.email, password: v.password, name: v.name } }),
+        )
         // Dev mock: no real email is sent, so skip the verify-code screen.
         if (import.meta.env.VITE_MOCK_AUTH === 'true') navigateAfterAuth(true)
       }}

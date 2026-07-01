@@ -18,6 +18,7 @@ import { StatCard } from '@/components/ui/StatCard'
 import { faqCategories } from '../lib/faq'
 import { highlightParts } from '../lib/highlight'
 import { tiersFromPublic } from '@/features/billing/catalog'
+import { trackCtaClick, trackSocialClick } from '@/lib/observability/analytics'
 import { getPublicTierConfigFn } from '@/server/tier-config'
 import { SparkleField } from '../lib/SparkleField'
 import { tierCtaTarget } from '../lib/pricing-cta'
@@ -302,7 +303,10 @@ export function PricingSection() {
               <MagneticButton
                 primary={t.highlighted}
                 className="mt-7 w-full"
-                onClick={() => transitionTo(tierCtaTarget(t))}
+                onClick={() => {
+                  trackCtaClick(t.cta, `pricing_${t.id}`)
+                  transitionTo(tierCtaTarget(t))
+                }}
               >
                 {t.cta}
               </MagneticButton>
@@ -409,9 +413,9 @@ const FOOTER_COLUMNS: FooterColumn[] = [
 ]
 
 const FOOTER_SOCIALS = [
-  { label: 'GitHub', href: 'https://github.com/Nelson-Lamounier', Icon: Github },
-  { label: 'LinkedIn', href: 'https://www.linkedin.com/in/nelson-lamounier-leao', Icon: Linkedin },
-  { label: 'Email support', href: 'mailto:support@tucaken.com', Icon: Mail },
+  { label: 'GitHub', platform: 'GitHub', href: 'https://github.com/Nelson-Lamounier', Icon: Github },
+  { label: 'LinkedIn', platform: 'LinkedIn', href: 'https://www.linkedin.com/in/nelson-lamounier-leao', Icon: Linkedin },
+  { label: 'Email support', platform: 'Email', href: 'mailto:support@tucaken.com', Icon: Mail },
 ] as const
 
 function FooterNavLink({ link }: { link: FooterLink }) {
@@ -464,6 +468,7 @@ export function FooterSection() {
               <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-zinc-500">Contact</div>
               <a
                 href="mailto:support@tucaken.com"
+                onClick={() => trackSocialClick('Email', 'mailto:support@tucaken.com')}
                 className="mt-2 inline-flex items-center gap-1 text-sm text-zinc-400 transition-colors hover:text-white"
               >
                 support@tucaken.com
@@ -472,10 +477,11 @@ export function FooterSection() {
             </div>
 
             <div className="mt-6 flex items-center gap-3">
-              {FOOTER_SOCIALS.map(({ label, href, Icon }) => (
+              {FOOTER_SOCIALS.map(({ label, platform, href, Icon }) => (
                 <a
                   key={label}
                   href={href}
+                  onClick={() => trackSocialClick(platform, href)}
                   target={href.startsWith('mailto:') ? undefined : '_blank'}
                   rel="noreferrer"
                   aria-label={label}

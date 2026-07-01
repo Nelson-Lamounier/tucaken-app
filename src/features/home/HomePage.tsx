@@ -4,6 +4,7 @@
 import { useState } from 'react'
 import { MotionConfig, useScroll, useMotionValueEvent } from 'motion/react'
 import { usePageTransition } from '@/contexts/PageTransition'
+import { trackCtaClick } from '@/lib/observability/analytics'
 import { RippleButton } from './lib/RippleButton'
 import { LandingCursor } from './lib/LandingCursor'
 import { ScrollProgress } from './lib/ScrollProgress'
@@ -19,7 +20,7 @@ import {
 import { ScrollStorySection } from './sections/ScrollStorySection'
 import logo from '@/images/logo-horizontal-resume-flat-teal.png'
 
-function Header() {
+export function Header() {
   const { transitionTo, isPending } = usePageTransition()
   const [scrolled, setScrolled] = useState(false)
   const { scrollY } = useScroll()
@@ -45,12 +46,22 @@ function Header() {
           <button
             type="button"
             disabled={isPending}
-            onClick={() => transitionTo({ to: '/sign-in' })}
+            onClick={() => {
+              trackCtaClick('Sign in', 'header')
+              transitionTo({ to: '/sign-in' })
+            }}
             className="hidden text-base font-normal uppercase tracking-wide text-zinc-300 transition-colors hover:text-white disabled:opacity-60 md:block"
           >
             Sign in
           </button>
-          <RippleButton onClick={() => transitionTo({ to: '/sign-in' })}>Try free</RippleButton>
+          <RippleButton
+            onClick={() => {
+              trackCtaClick('Try free', 'header')
+              transitionTo({ to: '/sign-in' })
+            }}
+          >
+            Try free
+          </RippleButton>
         </div>
       </div>
     </header>
