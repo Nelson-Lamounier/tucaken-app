@@ -188,7 +188,16 @@ async function listConnectedRepos(pool: Pool, userId: string): Promise<Connected
     const { rows } = await pool.query<ConnectedRepoRow>(
         `SELECT r.full_name, r.default_branch, r.index_status, r.added_at,
                 s.sync_status, s.last_synced_at, s.last_sync_triggered_at,
-                s.file_count, s.chunk_count, s.embedded_count, s.embed_total,
+                s.file_count,
+                -- chunk_count in repo_sync_state is a per-run snapshot: an
+                -- incremental sync overwrites it with only the changed-file
+                -- delta, so it under-reports large repos. Prefer the live
+                -- cumulative count from the vector store (same source as the
+                -- KB Health panel), falling back to the snapshot if no rows.
+                -- Joined on github_repo_id (the stable key post repo-rename
+                -- re-key) so a renamed repo still matches its embeddings.
+                COALESCE(de.chunks, s.chunk_count)    AS chunk_count,
+                s.embedded_count, s.embed_total,
                 s.phase, s.phase_done, s.phase_total, s.error_message,
                 p.quality_score, p.quality_breakdown, p.classification, p.extraction_status,
                 p.extracted->>'one_liner'             AS one_liner,
@@ -205,6 +214,12 @@ async function listConnectedRepos(pool: Pool, userId: string): Promise<Connected
            ON s.user_id = r.user_id AND s.repo_full_name = r.full_name
          LEFT JOIN repository_profiles p
            ON p.user_id = r.user_id AND p.repo_full_name = r.full_name
+         LEFT JOIN (
+             SELECT github_repo_id, COUNT(*)::int AS chunks
+               FROM document_embeddings
+              WHERE user_id = $1::uuid AND github_repo_id IS NOT NULL
+              GROUP BY github_repo_id
+         ) de ON de.github_repo_id = r.github_repo_id
          WHERE r.user_id = $1::uuid AND r.provider = 'github'
          ORDER BY r.added_at DESC`,
         [userId],
