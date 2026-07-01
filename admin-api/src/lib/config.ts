@@ -158,6 +158,20 @@ export interface AdminApiConfig {
   /** PostgreSQL password (from Secrets Manager via ESO). */
   readonly pgPassword: string;
 
+  /**
+   * Portfolio (nextjs) base URL for on-demand ISR revalidation after publish.
+   * Cluster-internal DNS. Defaults to the in-cluster nextjs service; a
+   * publish POSTs {secret, slug} to `${url}/api/revalidate`.
+   */
+  readonly portfolioRevalidateUrl: string;
+
+  /**
+   * Shared secret for the portfolio revalidation endpoint (SSM
+   * /bedrock-dev/revalidation-secret via ESO). Optional — when absent the
+   * publish route skips revalidation (best-effort) rather than failing.
+   */
+  readonly portfolioRevalidateSecret: string | undefined;
+
   /** Kubernetes namespace where ingestion Jobs are created. */
   readonly ingestionNamespace: string;
 
@@ -389,5 +403,9 @@ export function loadConfig(): AdminApiConfig {
     strategistResearchModel:         process.env['STRATEGIST_RESEARCH_MODEL'] ?? 'eu.anthropic.claude-sonnet-4-6',
     foundationModel:                 process.env['FOUNDATION_MODEL'] ?? 'eu.anthropic.claude-sonnet-4-6',
     coachModel:                      process.env['COACH_MODEL'] ?? 'eu.anthropic.claude-sonnet-4-6',
+    portfolioRevalidateUrl:          process.env['REVALIDATION_URL'] ?? 'http://nextjs.nextjs-app.svc.cluster.local:3000',
+    portfolioRevalidateSecret:       process.env['REVALIDATION_SECRET'] && process.env['REVALIDATION_SECRET'].length > 0
+      ? process.env['REVALIDATION_SECRET']
+      : undefined,
   };
 }
