@@ -4,7 +4,6 @@ import {
   CheckCircle2,
   Loader2,
   AlertTriangle,
-  RefreshCw,
   Clock,
   Cpu,
   FileSearch,
@@ -12,8 +11,6 @@ import {
   Database,
 } from 'lucide-react'
 import { useApplicationDetail, usePipelineRunStatus } from '@/hooks/use-admin-applications'
-import { useApplicationRequeue } from '../hooks/use-application-requeue'
-import { notifyError } from '@/lib/errors/notify'
 
 // =============================================================================
 // Pipeline stage definitions
@@ -115,7 +112,6 @@ export function ProgressBars({
   onComplete?: () => void
 }) {
   const { data, timedOut } = useApplicationDetail(slug)
-  const requeue = useApplicationRequeue()
 
   // Poll pipeline_runs while the application status is active (or not yet loaded).
   // Do NOT derive this from isFailed — pipelineRun.status itself informs isFailed,
@@ -354,34 +350,13 @@ export function ProgressBars({
           </p>
         )}
 
-        {isStalled ? (
-          <button
-            type="button"
-            onClick={() =>
-              requeue.mutate(
-                { slug },
-                { onError: (err) => notifyError(err, 'generic', { onRetry: () => requeue.mutate({ slug }) }) },
-              )
-            }
-            disabled={requeue.isPending || requeue.isSuccess}
-            className="inline-flex flex-none items-center gap-1.5 rounded-lg bg-rose-50 text-rose-700 ring-rose-600/20 hover:bg-rose-100 dark:bg-rose-500/10 dark:text-rose-400 dark:ring-rose-500/20 dark:hover:bg-rose-500/15 px-3 py-1.5 text-xs font-medium ring-1 ring-inset disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {requeue.isPending ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
-            ) : (
-              <RefreshCw className="w-3 h-3" />
-            )}
-            {requeue.isSuccess ? 'Requeued' : 'Retry via DLQ'}
-          </button>
-        ) : (
-          <Link
-            to="/applications/$slug"
-            params={{ slug }}
-            className="flex-none text-xs text-zinc-500 dark:text-zinc-600 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
-          >
-            View results →
-          </Link>
-        )}
+        <Link
+          to="/applications/$slug"
+          params={{ slug }}
+          className="flex-none text-xs text-zinc-500 dark:text-zinc-600 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
+        >
+          {isStalled ? 'View details →' : 'View results →'}
+        </Link>
       </div>
     </div>
   )

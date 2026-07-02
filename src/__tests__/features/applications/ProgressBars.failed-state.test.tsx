@@ -16,28 +16,25 @@ vi.mock('@/hooks/use-admin-applications', () => ({
   usePipelineRunStatus: () => null,
 }))
 
-vi.mock('@/features/applications/hooks/use-application-requeue', () => ({
-  useApplicationRequeue: () => ({ mutate: vi.fn(), isPending: false, isSuccess: false, isError: false, error: null }),
-}))
-
 describe('ProgressBars — stalled (failed / timed out) state', () => {
-  it('shows Retry and no running stage when the run timed out (status still analysing)', () => {
+  it('shows a details link and no running stage when the run timed out (status still analysing)', () => {
     detailMock.mockReturnValue({ data: { status: 'analysing' }, timedOut: true })
     render(<ProgressBars slug="app-1" startedAt={Date.now()} />)
 
     expect(screen.getByText('Build timed out')).toBeTruthy()
     // The stepper must not leave a stage spinning as "running".
     expect(screen.queryByText('running')).toBeNull()
-    expect(screen.getByText('Retry via DLQ')).toBeTruthy()
+    // Stalled runs link to the detail page (the dead "Retry via DLQ" button was removed).
+    expect(screen.getByText('View details →')).toBeTruthy()
   })
 
-  it('shows Retry and no running stage when the run failed', () => {
+  it('shows a details link and no running stage when the run failed', () => {
     detailMock.mockReturnValue({ data: { status: 'failed' }, timedOut: false })
     render(<ProgressBars slug="app-1" startedAt={Date.now()} />)
 
     expect(screen.getByText('Build failed')).toBeTruthy()
     expect(screen.queryByText('running')).toBeNull()
-    expect(screen.getByText('Retry via DLQ')).toBeTruthy()
+    expect(screen.getByText('View details →')).toBeTruthy()
   })
 
   it('keeps a running stage while the run is genuinely in progress', () => {
@@ -46,6 +43,8 @@ describe('ProgressBars — stalled (failed / timed out) state', () => {
 
     expect(screen.getByText('Building your resume')).toBeTruthy()
     expect(screen.getByText('running')).toBeTruthy()
-    expect(screen.queryByText('Retry via DLQ')).toBeNull()
+    // Not stalled → the results link, not the details link.
+    expect(screen.getByText('View results →')).toBeTruthy()
+    expect(screen.queryByText('View details →')).toBeNull()
   })
 })
