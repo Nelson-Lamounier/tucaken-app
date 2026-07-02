@@ -76,6 +76,16 @@ jest.unstable_mockModule('../../src/lib/pg.js', () => ({
   _resetPool: () => {},
 }));
 
+// S3 presign mocks — the resume.pdf route signs a GET URL for pdf_s3_key.
+const getSignedUrlMock = jest.fn<() => Promise<string>>().mockResolvedValue('https://s3.example/presigned-resume.pdf');
+jest.unstable_mockModule('@aws-sdk/s3-request-presigner', () => ({
+  getSignedUrl: getSignedUrlMock,
+}));
+jest.unstable_mockModule('@aws-sdk/client-s3', () => ({
+  S3Client:         class { },
+  GetObjectCommand: class { constructor(public readonly input: unknown) {} },
+}));
+
 // ---------------------------------------------------------------------------
 // Dynamic imports
 // ---------------------------------------------------------------------------
@@ -923,5 +933,50 @@ describe('GET /analytics/funnel — funnel + 2026 framing', () => {
     const res = await buildAppNoAuth().request('/analytics/funnel');
     expect(res.status).toBe(401);
     expect(computeFunnelMock).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /:slug/resume.pdf — presigned URL to the canonical ATS text PDF
+// ---------------------------------------------------------------------------
+
+describe('GET /:slug/resume.pdf — canonical ATS PDF', () => {
+  beforeEach(() => {
+    poolQueryMock.mockReset();
+    getSignedUrlMock.mockClear();
+    getSignedUrlMock.mockResolvedValue('https://s3.example/presigned-resume.pdf');
+  });
+
+  it('returns 200 with a presigned URL when pdf_s3_key is set', async () => {
+    poolQueryMock.mockResolvedValue({ rows: [{ pdf_s3_key: 'resumes/user-1/res-1.pdf' }] });
+    const res = await buildApp().request('/app-1/resume.pdf');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { url: string; expiresIn: number };
+    expect(body.url).toBe('https://s3.example/presigned-resume.pdf');
+    expect(body.expiresIn).toBe(300);
+    // Signs a GET on the configured bucket + the stored key.
+    expect(getSignedUrlMock).toHaveBeenCalledTimes(1);
+    const cmd = getSignedUrlMock.mock.calls[0]![1] as { input: { Bucket: string; Key: string } };
+    expect(cmd.input.Bucket).toBe('b');
+    expect(cmd.input.Key).toBe('resumes/user-1/res-1.pdf');
+  });
+
+  it('returns 404 when the resume has no pdf_s3_key yet', async () => {
+    poolQueryMock.mockResolvedValue({ rows: [{ pdf_s3_key: null }] });
+    const res = await buildApp().request('/app-1/resume.pdf');
+    expect(res.status).toBe(404);
+    expect(getSignedUrlMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when no resume row exists for the application', async () => {
+    poolQueryMock.mockResolvedValue({ rows: [] });
+    const res = await buildApp().request('/app-1/resume.pdf');
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 503 when userId is absent (fail-closed)', async () => {
+    const res = await buildAppNoAuth().request('/app-1/resume.pdf');
+    expect(res.status).toBe(503);
+    expect(getSignedUrlMock).not.toHaveBeenCalled();
   });
 });

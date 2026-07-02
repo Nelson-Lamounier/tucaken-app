@@ -251,6 +251,10 @@ describe('POST /strategist-job - K8s Job strategist pipeline', () => {
     expect(envMap['RESEARCH_MODEL']).toBe('eu.anthropic.claude-sonnet-4-6');
     // Filter-then-rank flag forwarded from admin-api env; defaults to 'off' (fail-open).
     expect(envMap['RETRIEVAL_PREFILTER']).toBe('off');
+    // Assets bucket forwarded so the pipeline's ATS step can upload the
+    // text-selectable PDF to S3 and persist pdf_s3_key. Without it the store
+    // step silently no-ops (if (a.bucket)) and the resume has no canonical PDF.
+    expect(envMap['ASSETS_BUCKET']).toBe('test-assets-bucket');
   });
 
   it('dispatches MODE=standard only for a premium effective plan', async () => {

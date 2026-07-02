@@ -24,7 +24,22 @@ import {
   downloadTxt, downloadDoc, downloadPdf, sanitizeFilename,
 } from './downloads'
 
-export function ResumeBuilderApp({ onClose, onSave }: { onClose?: () => void; onSave?: () => void } = {}) {
+export function ResumeBuilderApp({
+  onClose,
+  onSave,
+  serverPdfLoader,
+}: {
+  onClose?: () => void
+  onSave?: () => void
+  /**
+   * Optional loader for the canonical server-rendered ATS PDF (resume view
+   * only). Returns a presigned URL, or `null` when none exists yet — in which
+   * case the download falls back to the client-side raster renderer. Supplied
+   * by the application editor (which knows the slug); absent for the standalone
+   * `/resume-theme` wireframe, where only the raster path exists.
+   */
+  serverPdfLoader?: (filename: string) => Promise<{ url: string } | null>
+} = {}) {
   const state = useStore((s) => s)
 
   React.useEffect(() => {
@@ -64,7 +79,7 @@ export function ResumeBuilderApp({ onClose, onSave }: { onClose?: () => void; on
 
   return (
     <div className="main" style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-      <TopBar state={state} theme={theme} view={view} margins={margins} onClose={onClose} onSave={onSave} />
+      <TopBar state={state} theme={theme} view={view} margins={margins} onClose={onClose} onSave={onSave} serverPdfLoader={serverPdfLoader} />
       <div className="workspace">
         <FormPanel state={state} />
         <div className="preview-pane" ref={previewRef}>
@@ -93,6 +108,7 @@ function TopBar({
   margins,
   onClose,
   onSave,
+  serverPdfLoader,
 }: {
   state: AppState;
   theme: ThemeName;
@@ -100,6 +116,7 @@ function TopBar({
   margins: number;
   onClose?: () => void;
   onSave?: () => void;
+  serverPdfLoader?: (filename: string) => Promise<{ url: string } | null>;
 }) {
   const [savedFlash, setSavedFlash] = React.useState(false)
 
@@ -131,6 +148,27 @@ function TopBar({
           : buildCoverDoc(state.resume, state.cover, state.theme, Math.round(state.margins * 96))
       downloadDoc(html, baseName)
     } else {
+      // Prefer the canonical server-rendered ATS PDF (real text layer, small,
+      // ATS-parseable) for the resume. Fall back to the client raster only when
+      // no server PDF exists yet or the lookup fails. Cover letters have no
+      // server PDF today, so they always use the raster path.
+      if (view === 'resume' && serverPdfLoader) {
+        try {
+          const server = await serverPdfLoader(baseName)
+          if (server?.url) {
+            const a = document.createElement('a')
+            a.href = server.url
+            a.rel = 'noopener'
+            document.body.appendChild(a)
+            a.click()
+            a.remove()
+            return
+          }
+        } catch (err) {
+          console.error(err)
+          // fall through to the raster renderer
+        }
+      }
       try {
         await downloadPdf('capture-doc', baseName)
       } catch (err) {

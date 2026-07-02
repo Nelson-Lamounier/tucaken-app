@@ -17,7 +17,11 @@ import {
   builderStateToResumeData,
   builderStateToCoverLetter,
 } from '../utils/resume-adapters'
-import { updateApplicationCoverLetterFn, updateApplicationResumeFn } from '@/server/applications'
+import {
+  updateApplicationCoverLetterFn,
+  updateApplicationResumeFn,
+  getResumePdfUrlFn,
+} from '@/server/applications'
 import type { ResumeData } from '@/lib/resumes/resume-data'
 import type { CoverLetter } from '@/lib/types/applications.types'
 import { useToastStore } from '@/lib/stores/toast-store'
@@ -121,6 +125,7 @@ export function ResumeBuilderDrawer({
         key={builderKey}
         onClose={handleClose}
         onSave={() => saveMutation.mutate()}
+        serverPdfLoader={(filename) => getResumePdfUrlFn({ data: { slug, filename } })}
       />
     </DashboardDrawer>
   )
