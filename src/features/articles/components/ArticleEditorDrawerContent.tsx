@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   useArticleContent,
+  useArticleMetadata,
   useSaveContent,
+  useUpdateMetadata,
 } from '@/hooks/use-admin-articles'
 import { useToastStore } from '@/lib/stores/toast-store'
 import { MarkdownEditor } from './MarkdownEditor'
+import { CoverImageField } from './CoverImageField'
 
 interface ArticleEditorDrawerContentProps {
   /** The article slug to load content for */
@@ -14,9 +17,13 @@ interface ArticleEditorDrawerContentProps {
 }
 
 /**
- * Self-contained MDX editor that loads article content from S3
- * and provides save functionality. Designed to render inside a
+ * Self-contained editor for an existing article: edits the MDX body and the
+ * cover (hero) image, then saves both. Designed to render inside a
  * `DashboardDrawer` overlay.
+ *
+ * Content is saved via the content endpoint; the cover image is persisted as
+ * article metadata (`PUT /articles/:slug`). A single "Save Changes" commits
+ * whichever of the two is dirty.
  *
  * @param props - Component props
  * @returns Editor content JSX
@@ -35,18 +42,29 @@ export function ArticleEditorDrawerContent({
     refetch,
   } = useArticleContent(slug)
 
+  const { data: metadata } = useArticleMetadata(slug)
+
   const saveMutation = useSaveContent()
+  const coverMutation = useUpdateMetadata()
 
   // ── Local editor state ──────────────────────────────────────────────────────
   const [content, setContent] = useState('')
   const [originalContent, setOriginalContent] = useState('')
   const [isInitialised, setIsInitialised] = useState(false)
 
+  const [coverImage, setCoverImage] = useState<string | null>(null)
+  const [originalCover, setOriginalCover] = useState<string | null>(null)
+  const [coverInitialised, setCoverInitialised] = useState(false)
+  const [uploadingCover, setUploadingCover] = useState(false)
+
   // Derived values
-  const hasUnsavedChanges = content !== originalContent
+  const contentDirty = content !== originalContent
+  const coverDirty = coverInitialised && coverImage !== originalCover
+  const hasUnsavedChanges = contentDirty || coverDirty
+  const isSaving = saveMutation.isPending || coverMutation.isPending
   const error = queryError?.message ?? null
 
-  // ── Sync fetched data into local state (only on initial load) ───────────────
+  // ── Sync fetched content into local state (only on initial load) ────────────
   useEffect(() => {
     if (articleData && !isInitialised) {
       setContent(articleData.content ?? '')
@@ -55,37 +73,57 @@ export function ArticleEditorDrawerContent({
     }
   }, [articleData, isInitialised])
 
+  // ── Sync fetched cover into local state (only on initial load) ──────────────
+  useEffect(() => {
+    if (metadata && !coverInitialised) {
+      setCoverImage(metadata.coverImage ?? null)
+      setOriginalCover(metadata.coverImage ?? null)
+      setCoverInitialised(true)
+    }
+  }, [metadata, coverInitialised])
+
+  /**
+   * Persists whichever of content / cover image has changed. Content goes to
+   * the content endpoint; the cover image is written as article metadata.
+   */
+  const handleSave = useCallback(async () => {
+    try {
+      if (contentDirty) {
+        await saveMutation.mutateAsync({ slug, content })
+        setOriginalContent(content)
+      }
+      if (coverDirty) {
+        await coverMutation.mutateAsync({ slug, updates: { coverImage } })
+        setOriginalCover(coverImage)
+      }
+      addToast('success', 'Changes saved.')
+    } catch (err: unknown) {
+      addToast('error', err instanceof Error ? err.message : 'Save failed.')
+    }
+  }, [
+    slug,
+    content,
+    contentDirty,
+    coverImage,
+    coverDirty,
+    saveMutation,
+    coverMutation,
+    addToast,
+  ])
+
   // ── Keyboard shortcut: Cmd/Ctrl + S ─────────────────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
         e.preventDefault()
-        if (hasUnsavedChanges && !saveMutation.isPending) {
-          handleSave()
+        if (hasUnsavedChanges && !isSaving && !uploadingCover) {
+          void handleSave()
         }
       }
     }
     globalThis.addEventListener('keydown', handler)
     return () => globalThis.removeEventListener('keydown', handler)
-  }, [hasUnsavedChanges, saveMutation.isPending, content])
-
-  /**
-   * Saves updated content back to S3 via the save mutation.
-   */
-  const handleSave = useCallback(() => {
-    saveMutation.mutate(
-      { slug, content },
-      {
-        onSuccess: () => {
-          setOriginalContent(content)
-          addToast('success', 'Content saved to S3.')
-        },
-        onError: (err) => {
-          addToast('error', err.message)
-        },
-      },
-    )
-  }, [slug, content, saveMutation, addToast])
+  }, [hasUnsavedChanges, isSaving, uploadingCover, handleSave])
 
   // ── Ready state ─────────────────────────────────────────────────────────────
   const isReady = isInitialised && !isLoading
@@ -149,6 +187,19 @@ export function ArticleEditorDrawerContent({
             <span className="font-mono">⌘S to save</span>
           </div>
 
+          {/* Cover image */}
+          <div className="shrink-0">
+            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+              Cover image
+            </p>
+            <CoverImageField
+              value={coverImage}
+              onChange={setCoverImage}
+              onUploadingChange={setUploadingCover}
+              disabled={isSaving}
+            />
+          </div>
+
           <MarkdownEditor value={content} onChange={setContent} />
 
           {/* Action bar */}
@@ -160,11 +211,11 @@ export function ArticleEditorDrawerContent({
               Cancel
             </button>
             <button
-              onClick={handleSave}
-              disabled={!hasUnsavedChanges || saveMutation.isPending}
+              onClick={() => void handleSave()}
+              disabled={!hasUnsavedChanges || isSaving || uploadingCover}
               className="inline-flex items-center justify-center rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-teal-500 disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-500"
             >
-              {saveMutation.isPending ? 'Saving…' : 'Save Changes'}
+              {isSaving ? 'Saving…' : 'Save Changes'}
             </button>
           </div>
         </div>

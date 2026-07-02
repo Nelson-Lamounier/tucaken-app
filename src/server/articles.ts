@@ -99,6 +99,9 @@ const saveMetadataSchema = z.object({
   tags: z.array(z.string()).optional(),
   destinations: z.array(z.enum(['portfolio', 'tucaken'])).optional(),
   status: z.enum(['draft', 'processing', 'review', 'flagged', 'published', 'rejected']).optional(),
+  // `null` clears the cover image; a string sets it. admin-api's PUT merges
+  // `'coverImage' in updates`, so null is a deliberate remove, not a no-op.
+  coverImage: z.string().nullable().optional(),
   publishedAt: z.string().optional(),
   seo: z
     .object({

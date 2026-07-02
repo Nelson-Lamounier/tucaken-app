@@ -50,6 +50,14 @@ export function ArticleAccordion({ article }: ArticleAccordionProps) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
 
+            {article.heroImageUrl && (
+              <img
+                src={article.heroImageUrl}
+                alt=""
+                className="mt-0.5 h-10 w-14 shrink-0 rounded-md object-cover ring-1 ring-zinc-200 dark:ring-white/10"
+              />
+            )}
+
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-1">
                 {/* Status badge — visible without expanding */}
