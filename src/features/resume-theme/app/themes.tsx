@@ -386,8 +386,8 @@ export const THEME_CSS = `
 .resume-doc .entry-period.mono { font-family: 'JetBrains Mono', monospace; }
 .resume-doc .entry-location { font-size: 10px; color: #666; font-style: italic; margin-top: 1px; }
 .resume-doc .entry-desc { font-size: 10.5px; color: #222; margin-top: 4px; line-height: 1.5; }
-.resume-doc .bullets { margin: 4px 0 0; padding: 0 0 0 16px; }
-.resume-doc .bullets li { font-size: 10.5px; color: #222; line-height: 1.5; margin-top: 2px; }
+.resume-doc .bullets { margin: 4px 0 0; padding: 0 0 0 16px; list-style: disc outside; }
+.resume-doc .bullets li { font-size: 10.5px; color: #222; line-height: 1.5; margin-top: 2px; list-style: disc outside; }
 
 .resume-doc .summary-text { margin: 0; font-size: 10.5px; line-height: 1.6; color: #222; }
 

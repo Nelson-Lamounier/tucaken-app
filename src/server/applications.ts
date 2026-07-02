@@ -302,3 +302,37 @@ export const updateApplicationCoverLetterFn = createServerFn({ method: 'POST' })
     )
     return { success: true }
   })
+
+// =============================================================================
+// Canonical ATS PDF
+// =============================================================================
+
+/**
+ * Resolves a short-lived presigned URL for the resume's canonical
+ * text-selectable PDF (rendered server-side, stored at `resumes.pdf_s3_key`).
+ *
+ * Returns `null` when no server PDF exists yet (older runs, or a run before the
+ * ATS store was wired) so the caller can fall back to client-side rendering,
+ * rather than surfacing an error for the expected "not generated yet" case.
+ *
+ * @param data - The application slug
+ * @returns `{ url }` when a canonical PDF exists, otherwise `null`
+ */
+export const getResumePdfUrlFn = createServerFn({ method: 'GET' })
+  .inputValidator(z.object({ slug: z.string().min(1), filename: z.string().min(1).optional() }))
+  .handler(async ({ data }): Promise<{ url: string } | null> => {
+    await requireAuth()
+
+    const qs = data.filename ? `?filename=${encodeURIComponent(data.filename)}` : ''
+    try {
+      const body = await apiFetch<{ url: string; expiresIn: number }>(
+        `/applications/${encodeURIComponent(data.slug)}/resume.pdf${qs}`,
+        { pathTemplate: '/applications/:slug/resume.pdf' },
+      )
+      return { url: body.url }
+    } catch {
+      // 404 (no pdf_s3_key yet) or any transient failure → fall back to the
+      // client-side renderer. The download flow never hard-fails on this.
+      return null
+    }
+  })
