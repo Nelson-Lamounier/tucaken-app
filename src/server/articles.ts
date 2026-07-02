@@ -145,14 +145,15 @@ export const getArticlesFn = createServerFn({ method: 'GET' })
   })
 
 /**
- * Retrieves the MDX body for an article from S3 via admin-api's content endpoint.
+ * Retrieves the Markdown body for an article.
  *
- * Uses /content/:slug (not /articles/:slug) — the articles endpoint returns
- * DynamoDB METADATA which has no `content` field. Content is stored in S3
- * and served via the dedicated content route.
+ * Reads from `GET /api/admin/articles/:slug`, which returns the full article
+ * incl. `contentMd` from the RDS `articles` table. (The legacy `/content/:slug`
+ * route was an S3-backed DynamoDB-era endpoint that was never rebuilt for RDS —
+ * calling it 404'd, so the editor could neither load nor save content.)
  *
  * @param data - The article slug
- * @returns { slug, contentRef, content } or null if not found
+ * @returns { slug, content } or null if not found
  */
 export const getArticleContentFn = createServerFn({ method: 'GET' })
   .inputValidator(slugSchema)
@@ -160,11 +161,11 @@ export const getArticleContentFn = createServerFn({ method: 'GET' })
     await requireAdmin()
 
     try {
-      const body = await apiFetch<{ slug: string; contentRef: string; content: string }>(
-        `/content/${encodeURIComponent(slug)}`,
-        { pathTemplate: '/content/:slug' },
+      const body = await apiFetch<{ article: { slug: string; contentMd: string } }>(
+        `/articles/${encodeURIComponent(slug)}`,
+        { pathTemplate: '/articles/:slug' },
       )
-      return body
+      return { slug: body.article.slug, content: body.article.contentMd ?? '' }
     } catch (err: unknown) {
       if (err instanceof Error && err.message.includes('[404]')) {
         return null
@@ -233,11 +234,12 @@ export const deleteArticleFn = createServerFn({ method: 'POST' })
   })
 
 /**
- * Saves article markdown content via admin-api (which writes to S3).
+ * Saves article Markdown content.
  *
- * Uses POST /content/:slug — content is stored in S3 via admin-api's content
- * route. The articles PUT endpoint handles only metadata fields (title, tags,
- * status, etc.) and does not accept `content`.
+ * Writes `contentMd` via `PUT /api/admin/articles/:slug`, which does a partial
+ * merge on the RDS `articles` row (all other fields preserved). Replaces the
+ * dead `POST /content/:slug` S3 route (never rebuilt for RDS) — that 404 was
+ * why editor saves silently failed.
  *
  * @param data.id - The article slug
  * @param data.content - Markdown content body
@@ -248,12 +250,12 @@ export const saveArticleContentFn = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     await requireAdmin()
 
-    await apiFetch<{ saved: boolean; slug: string; contentRef: string }>(
-      `/content/${encodeURIComponent(data.id)}`,
+    await apiFetch<{ article: { slug: string } }>(
+      `/articles/${encodeURIComponent(data.id)}`,
       {
-        method: 'POST',
-        body: JSON.stringify({ content: data.content }),
-        pathTemplate: '/content/:slug',
+        method: 'PUT',
+        body: JSON.stringify({ contentMd: data.content }),
+        pathTemplate: '/articles/:slug',
       },
     )
     return { success: true }
@@ -377,11 +379,13 @@ export const getTopicCandidatesFn = createServerFn({ method: 'GET' })
   })
 
 /**
- * Creates a new article record in admin-api (POST /articles) and writes
- * the initial markdown content to S3 via the /content/:slug endpoint.
+ * Creates a new article record via `POST /api/admin/articles`, which persists
+ * the metadata and `contentMd` to the RDS `articles` table in a single write.
  *
- * Two-step write: metadata first, then S3 content store. Both calls must
- * succeed; a failure on either surfaces to the caller.
+ * (Previously this made a second, redundant write to a dead `/content/:slug`
+ * S3 route — that 404'd and threw, so article creation surfaced an error even
+ * though the row had already been created. `contentMd` is accepted by
+ * `POST /articles` directly, so the second call is gone.)
  *
  * @param data - Full article payload including slug, title, contentMd, destinations
  * @returns { success, slug } on creation
@@ -401,16 +405,6 @@ export const createArticleFn = createServerFn({ method: 'POST' })
     if (!created.created) {
       throw new Error('Article creation failed — admin-api returned created:false')
     }
-
-    // Dual content store: also write S3 content/<slug>.md for the admin editor/preview.
-    await apiFetch<{ saved: boolean }>(
-      `/content/${encodeURIComponent(created.slug)}`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ content: contentMd }),
-        pathTemplate: '/content/:slug',
-      },
-    )
 
     return { success: true, slug: created.slug }
   })

@@ -98,16 +98,6 @@ const DRAFT_ARTICLE = {
   updatedAt: '2026-01-11T10:00:00Z',
 }
 
-const ARTICLE_DETAIL = {
-  slug: 'my-draft',
-  title: 'Draft Article',
-  description: 'Test',
-  status: 'draft',
-  author: 'Test Author',
-  date: '2026-01-10',
-  contentRef: 's3://bucket/key.mdx',
-  content: '# My Draft Article\n\nThis is the content.',
-}
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -165,17 +155,17 @@ describe('articles server functions', () => {
   })
 
   describe('getArticleContentFn', () => {
-    it('should fetch article content from admin-api', async () => {
-      mockResponse(ARTICLE_DETAIL)
+    it('should fetch article content via GET /articles/:slug (contentMd from RDS)', async () => {
+      mockResponse({ article: { slug: 'my-draft', contentMd: '# My Draft Article' } })
 
       const handler = getArticleContentFn as (i: { data: string }) => Promise<unknown>
       const result = await handler({ data: 'my-draft' })
 
       expect(fetchMock).toHaveBeenCalledWith(
-        `${EXPECTED_API_URL}/content/my-draft`,
+        `${EXPECTED_API_URL}/articles/my-draft`,
         expect.anything(),
       )
-      expect(result).toEqual(ARTICLE_DETAIL)
+      expect(result).toEqual({ slug: 'my-draft', content: '# My Draft Article' })
     })
 
     it('should return null when article is not found (404)', async () => {
@@ -251,8 +241,8 @@ describe('articles server functions', () => {
   })
 
   describe('saveArticleContentFn', () => {
-    it('should call POST /content/:slug with content body', async () => {
-      mockResponse({ updated: true, slug: 'my-draft' })
+    it('should PUT /articles/:slug with contentMd (partial merge on the RDS row)', async () => {
+      mockResponse({ article: { slug: 'my-draft' } })
 
       const handler = saveArticleContentFn as (
         i: { data: { id: string; content: string } },
@@ -260,10 +250,10 @@ describe('articles server functions', () => {
       const result = await handler({ data: { id: 'my-draft', content: '# Updated content' } })
 
       expect(fetchMock).toHaveBeenCalledWith(
-        `${EXPECTED_API_URL}/content/my-draft`,
+        `${EXPECTED_API_URL}/articles/my-draft`,
         expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify({ content: '# Updated content' }),
+          method: 'PUT',
+          body: JSON.stringify({ contentMd: '# Updated content' }),
         }),
       )
       expect(result.success).toBe(true)
@@ -291,9 +281,8 @@ describe('articles server functions', () => {
   })
 
   describe('createArticleFn', () => {
-    it('posts to /articles then writes content to /content/:slug', async () => {
+    it('posts to /articles once, persisting contentMd in a single write', async () => {
       mockResponse({ created: true, slug: 'hello-world' })
-      mockResponse({ saved: true, slug: 'hello-world', contentRef: 's3://bucket/key.md' })
 
       const handler = createArticleFn as (i: {
         data: {
@@ -315,16 +304,14 @@ describe('articles server functions', () => {
       })
 
       expect(result).toEqual({ success: true, slug: 'hello-world' })
-      expect(fetchMock).toHaveBeenCalledTimes(2)
-      expect(fetchMock).toHaveBeenNthCalledWith(
-        1,
+      // Single write — the dead second /content/:slug S3 call was removed.
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(fetchMock).toHaveBeenCalledWith(
         `${EXPECTED_API_URL}/articles`,
-        expect.objectContaining({ method: 'POST' }),
-      )
-      expect(fetchMock).toHaveBeenNthCalledWith(
-        2,
-        `${EXPECTED_API_URL}/content/hello-world`,
-        expect.objectContaining({ method: 'POST' }),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ slug: 'hello-world', title: 'Hello World', destinations: ['portfolio'], contentMd: '# Hello World' }),
+        }),
       )
     })
 

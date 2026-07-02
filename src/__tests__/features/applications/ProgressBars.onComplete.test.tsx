@@ -16,16 +16,6 @@ vi.mock('@/hooks/use-admin-applications', () => ({
   usePipelineRunStatus: () => null,
 }))
 
-vi.mock('@/features/applications/hooks/use-application-requeue', () => ({
-  useApplicationRequeue: () => ({
-    mutate: vi.fn(),
-    isPending: false,
-    isSuccess: false,
-    isError: false,
-    error: null,
-  }),
-}))
-
 describe('ProgressBars onComplete', () => {
   beforeEach(() => {
     vi.useFakeTimers()
