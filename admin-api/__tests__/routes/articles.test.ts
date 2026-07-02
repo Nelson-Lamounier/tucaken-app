@@ -12,6 +12,7 @@ import { jest, describe, it, expect, beforeEach } from '@jest/globals';
 const pgUpsertMock = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
 const pgDeleteArticleMock = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
 const pgGetArticleBySlugMock = jest.fn<() => Promise<unknown>>().mockResolvedValue(null);
+const pgGetArticleBySlugForAuthorMock = jest.fn<() => Promise<unknown>>().mockResolvedValue(null);
 const pgListArticlesByStatusMock = jest.fn<() => Promise<never[]>>().mockResolvedValue([]);
 const pgListAllArticlesMock = jest.fn<() => Promise<never[]>>().mockResolvedValue([]);
 
@@ -23,6 +24,7 @@ jest.unstable_mockModule('../../src/lib/repositories/articles.js', () => ({
     upsertArticle: pgUpsertMock,
     deleteArticle: pgDeleteArticleMock,
     getArticleBySlug: pgGetArticleBySlugMock,
+    getArticleBySlugForAuthor: pgGetArticleBySlugForAuthorMock,
     listArticlesByStatus: pgListArticlesByStatusMock,
     listAllArticles: pgListAllArticlesMock,
 }));
@@ -148,7 +150,7 @@ describe('GET / — list articles', () => {
 
     expect(res.status).toBe(200);
     expect(body.articles).toHaveLength(1);
-    expect(pgListArticlesByStatusMock).toHaveBeenCalledWith(expect.anything(), 'draft');
+    expect(pgListArticlesByStatusMock).toHaveBeenCalledWith(expect.anything(), 'draft', 'test-user-sub');
   });
 
   it('returns 400 for an unknown status value', async () => {
@@ -171,13 +173,13 @@ describe('GET / — list articles', () => {
 // GET /:slug
 // ---------------------------------------------------------------------------
 
-describe('GET /:slug — get article by slug', () => {
+describe('GET /:slug — get article by slug (owner-scoped)', () => {
   beforeEach(() => {
-    pgGetArticleBySlugMock.mockReset();
+    pgGetArticleBySlugForAuthorMock.mockReset();
   });
 
-  it('returns the article when found', async () => {
-    pgGetArticleBySlugMock.mockResolvedValue(ARTICLE_ITEM as never);
+  it('returns the article when found and owned', async () => {
+    pgGetArticleBySlugForAuthorMock.mockResolvedValue(ARTICLE_ITEM as never);
 
     const res = await buildApp().request('/my-slug');
     const body = (await res.json()) as { article: typeof ARTICLE_ITEM };
@@ -187,16 +189,16 @@ describe('GET /:slug — get article by slug', () => {
     expect(body.article.title).toBe('My Test Article');
   });
 
-  it('calls getArticleBySlug with the correct slug', async () => {
-    pgGetArticleBySlugMock.mockResolvedValue(ARTICLE_ITEM as never);
+  it('scopes the lookup to the signed-in user', async () => {
+    pgGetArticleBySlugForAuthorMock.mockResolvedValue(ARTICLE_ITEM as never);
 
     await buildApp().request('/my-slug');
 
-    expect(pgGetArticleBySlugMock).toHaveBeenCalledWith(expect.anything(), 'my-slug');
+    expect(pgGetArticleBySlugForAuthorMock).toHaveBeenCalledWith(expect.anything(), 'my-slug', 'test-user-sub');
   });
 
-  it('returns 404 when article is not found', async () => {
-    pgGetArticleBySlugMock.mockResolvedValue(null);
+  it('returns 404 when the article is not found or not owned', async () => {
+    pgGetArticleBySlugForAuthorMock.mockResolvedValue(null);
 
     const res = await buildApp().request('/nonexistent-slug');
     expect(res.status).toBe(404);
@@ -213,8 +215,8 @@ describe('PUT /:slug — update article (PG upsert)', () => {
   beforeEach(() => {
     pgUpsertMock.mockReset();
     pgUpsertMock.mockResolvedValue(undefined);
-    pgGetArticleBySlugMock.mockReset();
-    pgGetArticleBySlugMock.mockResolvedValue(ARTICLE_ITEM as never);
+    pgGetArticleBySlugForAuthorMock.mockReset();
+    pgGetArticleBySlugForAuthorMock.mockResolvedValue(ARTICLE_ITEM as never);
   });
 
   it('returns 200 with updated: true on success', async () => {
@@ -242,8 +244,8 @@ describe('PUT /:slug — update article (PG upsert)', () => {
     expect(pgUpsertMock).not.toHaveBeenCalled();
   });
 
-  it('returns 404 when article does not exist in PG', async () => {
-    pgGetArticleBySlugMock.mockResolvedValue(null);
+  it('returns 404 when article does not exist or is not owned', async () => {
+    pgGetArticleBySlugForAuthorMock.mockResolvedValue(null);
     const res = await buildApp().request('/missing', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -283,13 +285,15 @@ describe('PUT /:slug — update article (PG upsert)', () => {
 // DELETE /:slug
 // ---------------------------------------------------------------------------
 
-describe('DELETE /:slug — delete article (PG-only)', () => {
+describe('DELETE /:slug — delete article (PG-only, owner-scoped)', () => {
   beforeEach(() => {
     pgDeleteArticleMock.mockReset();
     pgDeleteArticleMock.mockResolvedValue(undefined);
+    pgGetArticleBySlugForAuthorMock.mockReset();
+    pgGetArticleBySlugForAuthorMock.mockResolvedValue(ARTICLE_ITEM as never);
   });
 
-  it('returns 200 with deleted: true', async () => {
+  it('returns 200 with deleted: true for the owner', async () => {
     const res = await buildApp().request('/my-slug', { method: 'DELETE' });
     const body = (await res.json()) as { deleted: boolean; slug: string };
     expect(res.status).toBe(200);
@@ -302,21 +306,28 @@ describe('DELETE /:slug — delete article (PG-only)', () => {
     expect(pgDeleteArticleMock).toHaveBeenCalledTimes(1);
     expect(pgDeleteArticleMock).toHaveBeenCalledWith(expect.anything(), 'my-slug');
   });
+
+  it("returns 404 without deleting when the article is not owned", async () => {
+    pgGetArticleBySlugForAuthorMock.mockResolvedValue(null);
+    const res = await buildApp().request('/someone-elses', { method: 'DELETE' });
+    expect(res.status).toBe(404);
+    expect(pgDeleteArticleMock).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
 // POST /:slug/publish
 // ---------------------------------------------------------------------------
 
-describe('POST /:slug/publish — flip status to published in PG', () => {
+describe('POST /:slug/publish — flip status to published in PG (owner-scoped)', () => {
   beforeEach(() => {
-    pgGetArticleBySlugMock.mockReset();
+    pgGetArticleBySlugForAuthorMock.mockReset();
     poolQueryMock.mockReset();
     poolQueryMock.mockResolvedValue({ rows: [] });
   });
 
-  it('returns 200 with published: true and runs UPDATE statement', async () => {
-    pgGetArticleBySlugMock.mockResolvedValue(ARTICLE_ITEM as never);
+  it('returns 200 with published: true and runs an owner-scoped UPDATE', async () => {
+    pgGetArticleBySlugForAuthorMock.mockResolvedValue(ARTICLE_ITEM as never);
 
     const res = await buildApp().request('/my-slug/publish', { method: 'POST' });
     expect(res.status).toBe(200);
@@ -330,11 +341,12 @@ describe('POST /:slug/publish — flip status to published in PG', () => {
     expect(sql).toMatch(/UPDATE articles/);
     expect(sql).toMatch(/status = 'published'/);
     expect(sql).toMatch(/COALESCE\(published_at, NOW\(\)\)/);
-    expect(params).toEqual(['my-slug']);
+    expect(sql).toMatch(/author_id = \$2/);
+    expect(params).toEqual(['my-slug', 'test-user-sub']);
   });
 
-  it('returns 404 when article does not exist', async () => {
-    pgGetArticleBySlugMock.mockResolvedValue(null);
+  it('returns 404 when article does not exist or is not owned', async () => {
+    pgGetArticleBySlugForAuthorMock.mockResolvedValue(null);
 
     const res = await buildApp().request('/missing/publish', { method: 'POST' });
     expect(res.status).toBe(404);
@@ -448,8 +460,8 @@ describe('PUT /:slug — destinations patchable', () => {
   beforeEach(() => {
     pgUpsertMock.mockReset();
     pgUpsertMock.mockResolvedValue(undefined);
-    pgGetArticleBySlugMock.mockReset();
-    pgGetArticleBySlugMock.mockResolvedValue({ ...ARTICLE_ITEM, destinations: ['portfolio'] } as never);
+    pgGetArticleBySlugForAuthorMock.mockReset();
+    pgGetArticleBySlugForAuthorMock.mockResolvedValue({ ...ARTICLE_ITEM, destinations: ['portfolio'] } as never);
   });
 
   it('updates destinations when provided in body', async () => {
@@ -556,8 +568,8 @@ describe('PUT /:slug — destination allowlist filtering', () => {
   beforeEach(() => {
     pgUpsertMock.mockReset();
     pgUpsertMock.mockResolvedValue(undefined);
-    pgGetArticleBySlugMock.mockReset();
-    pgGetArticleBySlugMock.mockResolvedValue(existingWithDest as never);
+    pgGetArticleBySlugForAuthorMock.mockReset();
+    pgGetArticleBySlugForAuthorMock.mockResolvedValue(existingWithDest as never);
   });
 
   it('filters out non-string and disallowed values, keeping only valid destinations', async () => {

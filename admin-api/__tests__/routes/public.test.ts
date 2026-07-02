@@ -6,9 +6,11 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 const userExistsByEmailMock = jest.fn<() => Promise<boolean>>().mockResolvedValue(false);
+const countUsersMock = jest.fn<() => Promise<number>>().mockResolvedValue(0);
 
 jest.unstable_mockModule('../../src/lib/repositories/users.js', () => ({
   userExistsByEmail: userExistsByEmailMock,
+  countUsers: countUsersMock,
 }));
 
 jest.unstable_mockModule('../../src/lib/pg.js', () => ({
