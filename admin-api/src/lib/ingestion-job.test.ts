@@ -1,7 +1,7 @@
 /** @format */
 import { describe, it, expect } from '@jest/globals';
 import type { AdminApiConfig } from './config.js';
-import { buildIngestionJobSpec, buildIngestionTokenSecret, buildRollupJobSpec, resolveEnrichmentEnv } from './ingestion-job.js';
+import { buildIngestionJobSpec, buildIngestionTokenSecret, buildReenrichJobSpec, buildRollupJobSpec, resolveEnrichmentEnv } from './ingestion-job.js';
 import { DEFAULT_TIER_CONFIG } from './tier-config-shape.js';
 import type { TierConfig } from './tier-config-shape.js';
 
@@ -124,6 +124,47 @@ describe('buildRollupJobSpec', () => {
         expect(c?.envFrom?.[0]?.secretRef?.name).toBe('platform-rds-credentials');
         expect(job.metadata?.name?.startsWith('rollup-')).toBe(true);
         expect((job.metadata?.name ?? '').length).toBeLessThanOrEqual(63);
+    });
+});
+
+describe('buildReenrichJobSpec (tier-gated backlog drain)', () => {
+    function reenrichEnv(opts?: Parameters<typeof buildReenrichJobSpec>[4]): Map<string, string> {
+        const job = buildReenrichJobSpec(cfg, 'img:tag', USER, 1700000000000, opts);
+        return new Map((job.spec?.template?.spec?.containers?.[0]?.env ?? []).map((e) => [e.name, e.value ?? '']));
+    }
+
+    it('runs run-reenrich.js with USER_ID only — no repo, no token', () => {
+        const job = buildReenrichJobSpec(cfg, 'img:tag', USER, 1700000000000, { effectivePlan: 'premium' });
+        const c = job.spec?.template?.spec?.containers?.[0];
+        expect(c?.command).toEqual(['node', 'dist/run-reenrich.js']);
+        const env = new Map((c?.env ?? []).map((e) => [e.name, e.value ?? '']));
+        expect(env.get('USER_ID')).toBe(USER);
+        expect(env.has('GITHUB_TOKEN')).toBe(false);
+        expect(c?.envFrom?.[0]?.secretRef?.name).toBe('platform-rds-credentials');
+        expect(job.metadata?.name?.startsWith('reenrich-')).toBe(true);
+        expect((job.metadata?.name ?? '').length).toBeLessThanOrEqual(63);
+    });
+
+    it('premium gets full LLM enrichment env (ENRICH_TIER1, no ENRICHMENT_DISABLED)', () => {
+        const env = reenrichEnv({ effectivePlan: 'premium' });
+        expect(env.get('ENRICH_TIER1')).toBe('1');
+        expect(env.has('ENRICHMENT_DISABLED')).toBe(false);
+        expect(env.get('ENRICH_CANONICAL')).toBe('1');
+        expect(env.get('ENRICH_PACK')).toBe('1');           // packed canonical residue
+        expect(env.get('ENRICHMENT_MODEL_ID')).toMatch(/^eu\./);
+    });
+
+    it('FAILS CLOSED: a free-tier (or absent) plan carries ENRICHMENT_DISABLED=1 — the worker exits before any Bedrock call', () => {
+        for (const opts of [{ effectivePlan: 'free' as const }, {}]) {
+            const env = reenrichEnv(opts);
+            expect(env.get('ENRICHMENT_DISABLED')).toBe('1');
+        }
+    });
+
+    it('admin role overrides a free plan to full enrichment', () => {
+        const env = reenrichEnv({ effectivePlan: 'free', role: 'admin' });
+        expect(env.has('ENRICHMENT_DISABLED')).toBe(false);
+        expect(env.get('ENRICH_TIER1')).toBe('1');
     });
 });
 

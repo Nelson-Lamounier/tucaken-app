@@ -8,6 +8,9 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 const userExistsByEmailMock = jest.fn<() => Promise<boolean>>().mockResolvedValue(false);
 const countUsersMock = jest.fn<() => Promise<number>>().mockResolvedValue(0);
 
+// ESM mocks must provide EVERY export the module under test imports —
+// public.ts imports countUsers too, and a missing name fails the whole
+// suite with "does not provide an export named 'countUsers'".
 jest.unstable_mockModule('../../src/lib/repositories/users.js', () => ({
   userExistsByEmail: userExistsByEmailMock,
   countUsers: countUsersMock,

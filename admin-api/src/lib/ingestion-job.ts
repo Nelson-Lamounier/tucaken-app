@@ -206,6 +206,14 @@ export function buildIngestionJobSpec(
                             // overlaps. Default on; INGESTION_ENRICH_CANONICAL=0 reverts to
                             // free-text. Method-scoped dedup cache (ai-app) keeps the switch safe.
                             { name: 'ENRICH_CANONICAL', value: process.env['INGESTION_ENRICH_CANONICAL'] ?? '1' },
+                            // Canonical chunk-packing (ai-applications feature 004, deferred
+                            // lane): the enricher resolves N chunks per Haiku call, so the
+                            // system prompt + controlled vocabulary — measured live as ~83%
+                            // of ALL LLM spend at 68k calls/month for a 13.6k-chunk corpus —
+                            // bill once per pack instead of once per chunk. Default on;
+                            // INGESTION_ENRICH_PACK=0 reverts to per-chunk (rollback knob).
+                            { name: 'ENRICH_PACK',      value: process.env['INGESTION_ENRICH_PACK'] ?? '1' },
+                            { name: 'ENRICH_PACK_SIZE', value: process.env['INGESTION_ENRICH_PACK_SIZE'] ?? '20' },
                             // Enrichment depth: keyed on the user's effective plan + persisted role.
                             // Premium plan or admin role → full per-chunk enrichment (ENRICH_TIER1=1).
                             // All other plans → Tier-1 deterministic only (ENRICHMENT_DISABLED=1 +
@@ -228,6 +236,78 @@ export function buildIngestionJobSpec(
                             { secretRef: { name: 'platform-rds-credentials' } },
                             ...(opts.extraSecretRefs ?? []).map((name) => ({ secretRef: { name } })),
                         ],
+                        resources: {
+                            requests: { memory: '512Mi', cpu: '250m' },
+                            limits:   { memory: '1Gi',   cpu: '500m' },
+                        },
+                    }],
+                },
+            },
+        },
+    };
+}
+
+/**
+ * Job spec for run-reenrich.js — drains a user's pending/skipped enrichment
+ * backlog WITHOUT re-ingesting or re-embedding anything. Trimmed twin of
+ * {@link buildRollupJobSpec}: same ingestion image, no GitHub token, plus the
+ * enrichment env. Dispatched by the reenrich sweep (scripts/reenrich-sweep.ts)
+ * for PREMIUM/ADMIN users only — LLM enrichment is a paid entitlement (a full
+ * repo enrichment costs real Bedrock money), so the sweep never dispatches for
+ * free-tier users, and the enrichment env below fails closed on top of that:
+ * a mis-dispatched free-tier Job carries ENRICHMENT_DISABLED=1, which makes
+ * run-reenrich exit before any Bedrock call.
+ */
+export function buildReenrichJobSpec(
+    cfg: AdminApiConfig,
+    image: string,
+    userId: string,
+    timestamp: number,
+    opts: Pick<IngestionJobOptions, 'effectivePlan' | 'role' | 'tierConfig'> = {},
+): V1Job {
+    const safeUser = sanitizeIngestionLabel(userId);
+    const suffix   = createHash('sha1').update(`reenrich:${userId}:${timestamp}`).digest('hex').slice(0, 8);
+    const jobName  = `reenrich-${safeUser}-${suffix}`.slice(0, MAX_NAME_LEN);
+    const tp = traceParentEnv();
+
+    return {
+        apiVersion: 'batch/v1',
+        kind:       'Job',
+        metadata: {
+            name:      jobName,
+            namespace: cfg.ingestionNamespace,
+            labels:      { app: 'reenrich-worker', userId: safeUser },
+            annotations: { 'ingestion.tucaken.io/user-id': userId },
+        },
+        spec: {
+            ttlSecondsAfterFinished: 3600,
+            backoffLimit:            MODEL_JOB_BACKOFF_LIMIT,
+            activeDeadlineSeconds:   900,
+            template: {
+                metadata: { labels: { app: 'reenrich-worker', userId: safeUser } },
+                spec: {
+                    restartPolicy:      'Never',
+                    serviceAccountName: cfg.ingestionServiceAccount,
+                    containers: [{
+                        name:    'reenrich',
+                        image,
+                        command: ['node', 'dist/run-reenrich.js'],
+                        env: [
+                            ...observabilityEnv('reenrich-worker', `${userId}:${timestamp}`),
+                            { name: 'USER_ID', value: userId },
+                            // Tier gate: premium/admin -> ENRICH_TIER1=1 (full LLM
+                            // enrichment); anything else -> ENRICHMENT_DISABLED=1,
+                            // on which the worker exits before any Bedrock call.
+                            ...Object.entries(resolveEnrichmentEnv(opts.effectivePlan ?? 'free', opts.role, opts.tierConfig)).map(([name, value]) => ({ name, value })),
+                            // Same enrichment lane config as the ingestion Job, so a
+                            // swept chunk is indistinguishable from an in-job one.
+                            { name: 'ENRICH_CANONICAL', value: process.env['INGESTION_ENRICH_CANONICAL'] ?? '1' },
+                            { name: 'ENRICH_PACK',      value: process.env['INGESTION_ENRICH_PACK'] ?? '1' },
+                            { name: 'ENRICH_PACK_SIZE', value: process.env['INGESTION_ENRICH_PACK_SIZE'] ?? '20' },
+                            { name: 'ENRICHMENT_MODEL_ID', value: process.env['ENRICHMENT_MODEL_ID'] ?? 'eu.anthropic.claude-haiku-4-5-20251001-v1:0' },
+                            ...(tp ? [tp] : []),
+                        ],
+                        envFrom: [{ secretRef: { name: 'platform-rds-credentials' } }],
                         resources: {
                             requests: { memory: '512Mi', cpu: '250m' },
                             limits:   { memory: '1Gi',   cpu: '500m' },
