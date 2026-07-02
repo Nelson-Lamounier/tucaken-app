@@ -12,7 +12,8 @@ import type { Tier } from '@/features/billing/catalog'
 import { MagneticButton } from '../lib/MagneticButton'
 import { Marquee } from '../lib/Marquee'
 import { KineticText } from '../lib/KineticText'
-import { comparison, founder, hero, stats } from '../content'
+import { comparison, founder, hero } from '../content'
+import { resolveDisplayStats } from '../lib/stats'
 import { CookiePreferencesLink } from '../../consent/components/CookiePreferencesLink'
 import { StatCard } from '@/components/ui/StatCard'
 import { faqCategories } from '../lib/faq'
@@ -20,6 +21,7 @@ import { highlightParts } from '../lib/highlight'
 import { tiersFromPublic } from '@/features/billing/catalog'
 import { trackCtaClick, trackSocialClick } from '@/lib/observability/analytics'
 import { getPublicTierConfigFn } from '@/server/tier-config'
+import { getPublicStatsFn } from '@/server/public-stats'
 import { SparkleField } from '../lib/SparkleField'
 import { tierCtaTarget } from '../lib/pricing-cta'
 import { OrbitalComparison } from '../lib/OrbitalComparison'
@@ -149,6 +151,14 @@ export function ComparisonSection() {
 export function ValuePropSection() {
   const reduce = useReducedMotion() ?? false
   const parts = highlightParts(hero.sub, 'real evidence behind every claim')
+  // Live platform counts. Each figure stays hidden until its real count clears
+  // its floor, so tiny early-stage numbers never surface. While loading (or if
+  // the endpoint is unreachable) only the static claim below is shown.
+  const { data: live } = useQuery({
+    queryKey: ['public-stats'],
+    queryFn: getPublicStatsFn,
+  })
+  const displayStats = resolveDisplayStats(live)
   return (
     <Section id="value" className="border-t border-white/5">
       <div className="mx-auto flex max-w-5xl flex-col items-center text-center">
@@ -174,8 +184,8 @@ export function ValuePropSection() {
         </motion.p>
       </div>
 
-      <div className="mx-auto mt-16 grid max-w-5xl gap-12 px-2 sm:grid-cols-3 sm:gap-20">
-        {stats.map((stat) => (
+      <div className="mx-auto mt-16 grid max-w-5xl justify-items-center gap-12 px-2 sm:grid-cols-3 sm:gap-20">
+        {displayStats.map((stat) => (
           <StatCard key={stat.label} value={stat.value} suffix={stat.suffix} label={stat.label} />
         ))}
       </div>

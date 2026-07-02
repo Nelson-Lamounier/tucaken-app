@@ -43,6 +43,17 @@ const SELECT_COLS = `
   content_json, rendered_html, generated_at
 `;
 
+/**
+ * Total number of resumes generated across all users.
+ * Feeds the public marketing stats band — read-only, non-sensitive.
+ */
+export async function countResumes(pool: Queryable): Promise<number> {
+    const result = await pool.query<{ count: string }>(
+        `SELECT COUNT(*)::text AS count FROM resumes`,
+    );
+    return Number.parseInt(result.rows[0]?.count ?? '0', 10);
+}
+
 export async function upsertResume(pool: Queryable, resume: Resume): Promise<void> {
     await pool.query(
         `INSERT INTO resumes

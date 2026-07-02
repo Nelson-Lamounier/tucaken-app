@@ -70,6 +70,17 @@ export async function userExistsByEmail(pool: Pool, email: string): Promise<bool
 }
 
 /**
+ * Total number of registered people (one row per person, not per identity).
+ * Feeds the public marketing stats band — read-only, non-sensitive.
+ */
+export async function countUsers(pool: Queryable): Promise<number> {
+  const result = await pool.query<{ count: string }>(
+    `SELECT COUNT(*)::text AS count FROM users`,
+  );
+  return Number.parseInt(result.rows[0]?.count ?? '0', 10);
+}
+
+/**
  * Resolves or creates a users row and links the Cognito identity to it.
  *
  * Idempotent — safe to call on every authenticated request.

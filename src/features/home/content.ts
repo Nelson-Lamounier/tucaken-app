@@ -10,12 +10,30 @@ export const hero = {
   founderNote: 'Built by an engineer using it for his own job search.',
 }
 
-// PLACEHOLDER metrics — set real figures (or reframe, e.g. "on the waitlist")
-// before launch. Invented stats undercut the proof-not-prose positioning.
-export const stats = [
-  { value: 1200, suffix: '+', label: 'Developers trust Tucaken' },
-  { value: 8000, suffix: '+', label: 'Resumes generated' },
-  { value: 40, suffix: '%', label: 'Less time on job applications' },
+// Marketing stats band.
+//
+// The two DB-backed figures are fetched from the public /stats endpoint at
+// runtime (see getPublicStatsFn). Each stays hidden until its real count
+// clears `floor`, so an early-stage figure like "3 developers" never surfaces
+// and undercuts the proof-not-prose positioning. `staticStats` are hand-set
+// claims, always shown.
+export type LiveStatKey = 'users' | 'resumes'
+
+export interface LiveStat {
+  key: LiveStatKey
+  suffix: string
+  label: string
+  /** Reveal the real count only once it reaches this floor. */
+  floor: number
+}
+
+export const liveStats: readonly LiveStat[] = [
+  { key: 'users', suffix: '+', label: 'Developers trust Tucaken', floor: 50 },
+  { key: 'resumes', suffix: '+', label: 'Resumes generated', floor: 100 },
+] as const
+
+export const staticStats = [
+  { value: 80, suffix: '%', label: 'Less time on job applications' },
 ] as const
 
 export const problems = [

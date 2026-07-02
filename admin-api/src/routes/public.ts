@@ -14,7 +14,8 @@ import { Hono } from 'hono';
 
 import type { AdminApiConfig } from '../lib/config.js';
 import { getPool } from '../lib/pg.js';
-import { userExistsByEmail } from '../lib/repositories/users.js';
+import { countUsers, userExistsByEmail } from '../lib/repositories/users.js';
+import { countResumes } from '../lib/repositories/resumes.js';
 import { getCachedTierConfig } from '../lib/tier-config-cache.js';
 import { toPublicTierConfig } from '../lib/tier-config-shape.js';
 
@@ -96,6 +97,15 @@ export function createPublicRouter(config: AdminApiConfig): Hono {
   router.get('/tier-config', async (ctx) => {
     const cfg = await getCachedTierConfig(getPool(config));
     return ctx.json(toPublicTierConfig(cfg));
+  });
+
+  // Platform-wide social-proof counts for the marketing stats band. No auth,
+  // no per-user data — just two aggregate COUNTs. The client applies a floor
+  // before revealing a number, so raw small counts never surface publicly.
+  router.get('/stats', async (ctx) => {
+    const pool = getPool(config);
+    const [users, resumes] = await Promise.all([countUsers(pool), countResumes(pool)]);
+    return ctx.json({ users, resumes });
   });
 
   return router;
