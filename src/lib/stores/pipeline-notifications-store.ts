@@ -37,6 +37,14 @@ export type PipelineNotificationStatus = 'running' | 'review' | 'complete' | 'fa
 export interface PipelineNotification {
   /** Unique notification ID */
   readonly id: string
+  /**
+   * Canonical id (users.id) of the user this notification belongs to. Stamped
+   * from the current session at creation time so the browser-local store — which
+   * is shared across every account that signs into this browser — never surfaces
+   * one user's pipeline to another. Optional only for legacy entries persisted
+   * before scoping existed; those are dropped on the next setCurrentUser call.
+   */
+  readonly userId?: string
   /** Pipeline type — determines which polling strategy to use */
   readonly type: PipelineNotificationType
   /** Pipeline/article/application slug */
@@ -63,13 +71,30 @@ export interface PipelineNotification {
 
 interface PipelineNotificationsState {
   notifications: PipelineNotification[]
+  /**
+   * Canonical id (users.id) of the signed-in user, or null when signed out.
+   * Not persisted — it is re-established from the session on every load so a
+   * stale value can never widen visibility.
+   */
+  currentUserId: string | null
 }
 
 interface PipelineNotificationsActions {
   /**
-   * Adds a new pipeline notification (duplicate slugs are ignored).
+   * Adds a new pipeline notification (duplicate slugs are ignored). The entry is
+   * stamped with the current `currentUserId` so it stays scoped to its owner.
    */
-  addNotification: (notification: Omit<PipelineNotification, 'id' | 'createdAt' | 'read'>) => void
+  addNotification: (
+    notification: Omit<PipelineNotification, 'id' | 'createdAt' | 'read' | 'userId'>,
+  ) => void
+
+  /**
+   * Sets the active user and drops every notification that does not belong to
+   * them. Call on sign-in (with users.id) and sign-out (with null). This is the
+   * teardown that prevents one account's pipelines leaking into another's bell
+   * on a shared browser.
+   */
+  setCurrentUser: (userId: string | null) => void
 
   /**
    * Updates the status (and optionally completedAt) of an existing notification.
@@ -116,16 +141,19 @@ export const usePipelineNotificationsStore = create<
   persist(
     (set) => ({
       notifications: [],
+      currentUserId: null,
 
       addNotification: (notification) => {
         set((state) => {
-          // Prevent duplicate entries for the same slug
-          const exists = state.notifications.some((n) => n.slug === notification.slug)
+          // Prevent duplicate entries for the same slug, scoped to this user.
+          const exists = state.notifications.some(
+            (n) => n.slug === notification.slug && n.userId === state.currentUserId,
+          )
           if (exists) {
             // Re-activate if previously completed
             return {
               notifications: state.notifications.map((n) =>
-                n.slug === notification.slug
+                n.slug === notification.slug && n.userId === state.currentUserId
                   ? { ...n, status: notification.status, completedAt: undefined, read: false }
                   : n,
               ),
@@ -136,11 +164,19 @@ export const usePipelineNotificationsStore = create<
           const newNotification: PipelineNotification = {
             ...notification,
             id,
+            userId: state.currentUserId ?? undefined,
             createdAt: Date.now(),
             read: false,
           }
           return { notifications: [newNotification, ...state.notifications] }
         })
+      },
+
+      setCurrentUser: (userId) => {
+        set((state) => ({
+          currentUserId: userId,
+          notifications: state.notifications.filter((n) => n.userId === userId),
+        }))
       },
 
       updateNotification: (slug, status) => {
@@ -187,6 +223,9 @@ export const usePipelineNotificationsStore = create<
     }),
     {
       name: 'pipeline-notifications',
+      // Persist only the entries — currentUserId is re-established from the
+      // session on load, so notifications stay hidden until the owner is known.
+      partialize: (state) => ({ notifications: state.notifications }),
     },
   ),
 )

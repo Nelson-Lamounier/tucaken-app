@@ -83,6 +83,14 @@ export async function upsertArticle(pool: Queryable, article: Article): Promise<
     );
 }
 
+/**
+ * Fetch an article by slug WITHOUT an owner filter.
+ *
+ * Slugs are globally unique, so this is only for global concerns like
+ * slug-availability checks. Do NOT use it on user-facing read/mutation paths —
+ * use getArticleBySlugForAuthor so one user cannot see or edit another's
+ * article. See the articles router.
+ */
 export async function getArticleBySlug(pool: Queryable, slug: string): Promise<Article | null> {
     const result = await pool.query(
         `SELECT slug, title, excerpt, content_md, tags, status, ai_generated,
@@ -94,21 +102,47 @@ export async function getArticleBySlug(pool: Queryable, slug: string): Promise<A
     return rowToArticle(result.rows[0] as Record<string, unknown>);
 }
 
-export async function listArticlesByStatus(pool: Queryable, status: string): Promise<Article[]> {
+/**
+ * Owner-scoped fetch: returns the article only if it belongs to `authorId`.
+ * Returns null for a non-existent slug OR a slug owned by another user, so
+ * callers can treat "not yours" and "not found" identically (404).
+ */
+export async function getArticleBySlugForAuthor(
+    pool: Queryable,
+    slug: string,
+    authorId: string,
+): Promise<Article | null> {
     const result = await pool.query(
         `SELECT slug, title, excerpt, content_md, tags, status, ai_generated,
                 ai_model, published_at, cover_image, destinations, created_at, updated_at
-         FROM articles WHERE status = $1 ORDER BY updated_at DESC LIMIT ${LIST_BY_STATUS_LIMIT}`,
-        [status],
+         FROM articles WHERE slug = $1 AND author_id = $2`,
+        [slug, authorId],
+    );
+    if (result.rows.length === 0) return null;
+    return rowToArticle(result.rows[0] as Record<string, unknown>);
+}
+
+export async function listArticlesByStatus(
+    pool: Queryable,
+    status: string,
+    authorId: string,
+): Promise<Article[]> {
+    const result = await pool.query(
+        `SELECT slug, title, excerpt, content_md, tags, status, ai_generated,
+                ai_model, published_at, cover_image, destinations, created_at, updated_at
+         FROM articles WHERE status = $1 AND author_id = $2
+         ORDER BY updated_at DESC LIMIT ${LIST_BY_STATUS_LIMIT}`,
+        [status, authorId],
     );
     return (result.rows as Record<string, unknown>[]).map(rowToArticle);
 }
 
-export async function listAllArticles(pool: Queryable): Promise<Article[]> {
+export async function listAllArticles(pool: Queryable, authorId: string): Promise<Article[]> {
     const result = await pool.query(
         `SELECT slug, title, excerpt, content_md, tags, status, ai_generated,
                 ai_model, published_at, cover_image, destinations, created_at, updated_at
-         FROM articles ORDER BY updated_at DESC LIMIT ${LIST_ALL_LIMIT}`,
+         FROM articles WHERE author_id = $1 ORDER BY updated_at DESC LIMIT ${LIST_ALL_LIMIT}`,
+        [authorId],
     );
     return (result.rows as Record<string, unknown>[]).map(rowToArticle);
 }

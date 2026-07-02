@@ -29,6 +29,7 @@ import {
     upsertArticle,
     deleteArticle as pgDeleteArticle,
     getArticleBySlug,
+    getArticleBySlugForAuthor,
     listArticlesByStatus,
     listAllArticles,
 } from '../lib/repositories/articles.js';
@@ -124,6 +125,9 @@ export function createArticlesRouter(config: AdminApiConfig): Hono<AdminApiBindi
   // POST /api/admin/articles — create article
   // -----------------------------------------------------------------------
   router.post('/', async (ctx) => {
+    const userId = ctx.get('userId');
+    if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
+
     const body = await ctx.req.json<Record<string, unknown>>();
     const slug = typeof body['slug'] === 'string' ? body['slug'] : '';
     const title = typeof body['title'] === 'string' ? body['title'] : '';
@@ -162,7 +166,7 @@ export function createArticlesRouter(config: AdminApiConfig): Hono<AdminApiBindi
       publishedAt: status === 'published' ? new Date() : null,
       coverImage: typeof body['coverImage'] === 'string' ? body['coverImage'] : null,
       destinations: finalDestinations,
-      authorId: ctx.get('userId') ?? null,
+      authorId: userId,
     });
 
     return ctx.json({ created: true, slug }, 201);
@@ -172,28 +176,33 @@ export function createArticlesRouter(config: AdminApiConfig): Hono<AdminApiBindi
   // GET /api/admin/articles
   // -----------------------------------------------------------------------
   router.get('/', async (ctx) => {
+    const userId = ctx.get('userId');
+    if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
+
     const rawStatus = (ctx.req.query('status') ?? 'all').toLowerCase();
-    const pool = getPool(config);
-
-    let articles: import('../lib/repositories/articles.js').Article[];
-
-    if (rawStatus === 'all') {
-        articles = await listAllArticles(pool);
-    } else if (ALL_STATUS_SET.has(rawStatus)) {
-        articles = await listArticlesByStatus(pool, rawStatus);
-    } else {
+    if (rawStatus !== 'all' && !ALL_STATUS_SET.has(rawStatus)) {
         return ctx.json({ error: `Invalid status "${rawStatus}". Must be one of: all, ${ALL_STATUSES.join(', ')}` }, 400);
     }
 
-    return ctx.json({ articles, count: articles.length });
+    // Owner-scoped: a user only ever sees their own articles. withUser sets the
+    // RLS session var too, so the scope holds even if the raw query is bypassed.
+    return withUser(getPool(config), userId, async (db) => {
+        const articles = rawStatus === 'all'
+            ? await listAllArticles(db, userId)
+            : await listArticlesByStatus(db, rawStatus, userId);
+        return ctx.json({ articles, count: articles.length });
+    });
   });
 
   // -----------------------------------------------------------------------
-  // GET /api/admin/articles/:slug
+  // GET /api/admin/articles/:slug — owner-scoped
   // -----------------------------------------------------------------------
   router.get('/:slug', async (ctx) => {
+    const userId = ctx.get('userId');
+    if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
+
     const slug = ctx.req.param('slug');
-    const article = await getArticleBySlug(getPool(config), slug);
+    const article = await getArticleBySlugForAuthor(getPool(config), slug, userId);
     if (!article) return ctx.json({ error: 'Article not found' }, 404);
     return ctx.json({ article });
   });
@@ -202,6 +211,9 @@ export function createArticlesRouter(config: AdminApiConfig): Hono<AdminApiBindi
   // PUT /api/admin/articles/:slug — PG-only upsert
   // -----------------------------------------------------------------------
   router.put('/:slug', async (ctx) => {
+    const userId = ctx.get('userId');
+    if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
+
     const slug = ctx.req.param('slug');
     const body = await ctx.req.json<Record<string, unknown>>();
 
@@ -219,7 +231,7 @@ export function createArticlesRouter(config: AdminApiConfig): Hono<AdminApiBindi
     }
 
     const pool = getPool(config);
-    const existing = await getArticleBySlug(pool, slug);
+    const existing = await getArticleBySlugForAuthor(pool, slug, userId);
     if (!existing) return ctx.json({ error: 'Article not found' }, 404);
 
     const rawDest = Array.isArray(updates['destinations']) ? (updates['destinations'] as unknown[]) : [];
@@ -249,8 +261,17 @@ export function createArticlesRouter(config: AdminApiConfig): Hono<AdminApiBindi
   // DELETE /api/admin/articles/:slug — PG-only
   // -----------------------------------------------------------------------
   router.delete('/:slug', async (ctx) => {
+    const userId = ctx.get('userId');
+    if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
+
     const slug = ctx.req.param('slug');
-    await pgDeleteArticle(getPool(config), slug);
+    const pool = getPool(config);
+    // Owner check: deleting another user's article returns 404 (indistinguishable
+    // from a missing slug), never touching their row.
+    const existing = await getArticleBySlugForAuthor(pool, slug, userId);
+    if (!existing) return ctx.json({ error: 'Article not found' }, 404);
+
+    await pgDeleteArticle(pool, slug);
     return ctx.json({ deleted: true, slug });
   });
 
@@ -258,15 +279,19 @@ export function createArticlesRouter(config: AdminApiConfig): Hono<AdminApiBindi
   // POST /api/admin/articles/:slug/publish — PG status flip
   // -----------------------------------------------------------------------
   router.post('/:slug/publish', async (ctx) => {
+    const userId = ctx.get('userId');
+    if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
+
     const slug = ctx.req.param('slug');
     const pool = getPool(config);
 
-    const existing = await getArticleBySlug(pool, slug);
+    const existing = await getArticleBySlugForAuthor(pool, slug, userId);
     if (!existing) return ctx.json({ error: 'Article not found' }, 404);
 
     await pool.query(
-        `UPDATE articles SET status = 'published', published_at = COALESCE(published_at, NOW()), updated_at = NOW() WHERE slug = $1`,
-        [slug],
+        `UPDATE articles SET status = 'published', published_at = COALESCE(published_at, NOW()), updated_at = NOW()
+         WHERE slug = $1 AND author_id = $2`,
+        [slug, userId],
     );
 
     // Best-effort ISR revalidation so the portfolio shows the article

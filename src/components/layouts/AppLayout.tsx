@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogBackdrop,
@@ -37,6 +37,7 @@ import {
 import { Link } from "@tanstack/react-router";
 import { HeaderNav } from "../ui/HeaderNav";
 import { PipelineNotificationWatcher } from "../ui/PipelineNotificationWatcher";
+import { usePipelineNotificationsStore } from "@/lib/stores/pipeline-notifications-store";
 import { GlobalAnalysisProgressModal } from "../../features/applications/components/GlobalAnalysisProgressModal";
 import { GlobalCaseStudyProgressModal } from "../../features/projects/components/GlobalCaseStudyProgressModal";
 import { IngestionSyncWatcher } from "../ui/IngestionSyncWatcher";
@@ -152,12 +153,23 @@ export default function AppLayout({
   disableMainWrapper = false,
 }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const setNotificationUser = usePipelineNotificationsStore((s) => s.setCurrentUser);
+
+  // Scope the browser-local notification store to the signed-in user. Runs on
+  // sign-in and whenever the account changes, dropping any notification that
+  // belonged to a previously signed-in user on this browser.
+  useEffect(() => {
+    setNotificationUser(me?.id ?? null);
+  }, [me?.id, setNotificationUser]);
 
   /**
    * Handles sign-out, delegating to the server-side logout function.
    * Falls back to `/login` if the server returns no redirect URL.
    */
   const handleSignOut = async () => {
+    // Clear the notification store before the account context goes away, so
+    // nothing persists into the next user's session on this browser.
+    setNotificationUser(null);
     let targetUrl = "/sign-in";
     try {
       const { logoutFn } = await import("@/server/auth");
