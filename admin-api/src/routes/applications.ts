@@ -18,10 +18,12 @@
  *   GET    /analytics/funnel              — funnel computation + 2026 framing
  */
 
+import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Hono } from 'hono';
 
 import type { AdminApiConfig } from '../lib/config.js';
-import { getJobImage, isImageConfigured } from '../lib/config.js';
+import { getJobImage, isImageConfigured, isAssetsBucketConfigured } from '../lib/config.js';
 import { dispatchCoach, isPrepStage } from '../lib/coach-dispatch.js';
 import type { CoachJobEnv } from '../lib/coach-dispatch.js';
 import { buildPipelineJob, sanitizeLabel } from '../lib/k8s-job-builder.js';
@@ -254,6 +256,14 @@ function makeCoachAdapters(config: AdminApiConfig, slug: string) {
 }
 
 // ── Router factory ────────────────────────────────────────────────────────────
+
+/** S3 client singleton — credentials from IMDS, no explicit config. */
+const s3 = new S3Client({
+  region: process.env['AWS_REGION'] ?? process.env['AWS_DEFAULT_REGION'] ?? 'eu-west-1',
+});
+
+/** Presigned-URL lifetime for the canonical resume PDF (seconds). */
+const RESUME_PDF_PRESIGN_EXPIRY_SECONDS = 300;
 
 /**
  * Creates the Hono router for application management routes.
@@ -610,6 +620,63 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
           userAnnotations:     application.userAnnotations ?? {},
         },
       });
+    });
+  });
+
+  // ── GET /:slug/resume.pdf — presigned URL to the canonical ATS text PDF ──
+  /**
+   * Returns a short-lived presigned GET URL for the resume's canonical
+   * text-selectable PDF (rendered server-side by the strategist pipeline and
+   * stored at `resumes.pdf_s3_key`). The lookup is RLS-scoped via
+   * {@link withUser}, so a caller can only reach their own resume.
+   *
+   * 404 when the resume has no `pdf_s3_key` yet (older runs, or a run before the
+   * ATS store was wired) — the client falls back to client-side rendering.
+   * Registered before `/:slug` semantics are unaffected because the extra
+   * `/resume.pdf` segment makes this a distinct, more specific route.
+   */
+  app.get('/:slug/resume.pdf', async (ctx) => {
+    const userId = ctx.get('userId');
+    if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
+
+    if (!isAssetsBucketConfigured(config.assetsBucketName)) {
+      return ctx.json({ error: 'Resume PDF unavailable — S3 bucket not configured' }, 503);
+    }
+    const bucket = config.assetsBucketName;
+
+    const slug = ctx.req.param('slug');
+
+    return withUser(getPool(config), userId, async (db) => {
+      const result = await db.query<{ pdf_s3_key: string | null }>(
+        `SELECT pdf_s3_key FROM resumes WHERE job_application_id = $1
+          ORDER BY generated_at DESC LIMIT 1`,
+        [slug],
+      );
+      const key = result.rows[0]?.pdf_s3_key ?? null;
+      if (!key) {
+        return ctx.json(
+          { error: 'No ATS PDF for this resume yet — regenerate the resume to produce one' },
+          404,
+        );
+      }
+
+      // Force a download (not inline) with a friendly filename. The presign is
+      // cross-origin (S3), so an <a download> attribute is ignored client-side —
+      // Content-Disposition on the signed URL is the only reliable way to name it.
+      const rawName = ctx.req.query('filename');
+      const safeName = (rawName ?? 'resume').replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '') || 'resume';
+
+      const url = await getSignedUrl(
+        s3,
+        new GetObjectCommand({
+          Bucket: bucket,
+          Key: key,
+          ResponseContentDisposition: `attachment; filename="${safeName}.pdf"`,
+          ResponseContentType: 'application/pdf',
+        }),
+        { expiresIn: RESUME_PDF_PRESIGN_EXPIRY_SECONDS },
+      );
+      return ctx.json({ url, expiresIn: RESUME_PDF_PRESIGN_EXPIRY_SECONDS });
     });
   });
 

@@ -443,6 +443,14 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
           // Forwarded from the admin-api env so the ephemeral Job inherits the flag.
           { name: 'RETRIEVAL_PREFILTER', value: process.env['RETRIEVAL_PREFILTER'] ?? 'off' },
           { name: 'AWS_REGION',         value: config.awsRegion },
+          // Assets bucket for the pipeline's ATS step: it renders the resume to a
+          // text-selectable PDF and uploads it to S3 (persisting pdf_s3_key). The
+          // dispatched pod reads process.env['ASSETS_BUCKET'] un-validated and the
+          // store is guarded by `if (a.bucket)`, so without this the PDF is
+          // rendered + parse-checked but never stored — pdf_s3_key stays NULL.
+          // Optional in config (SSM may not have synced yet); omit when absent so
+          // behaviour is unchanged rather than passing an empty bucket.
+          ...(config.assetsBucketName ? [{ name: 'ASSETS_BUCKET', value: config.assetsBucketName }] : []),
           ...(resumeId ? [{ name: 'RESUME_ID', value: resumeId }] : []),
         ],
         envFromSecretRefs: ['platform-rds-credentials'],
