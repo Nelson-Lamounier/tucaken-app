@@ -102,8 +102,14 @@ function CaseStudyNotificationWatcher({ slug, pipelineRunId }: { slug: string; p
  */
 export function PipelineNotificationWatcher() {
   const notifications = usePipelineNotificationsStore((s) => s.notifications)
+  const currentUserId = usePipelineNotificationsStore((s) => s.currentUserId)
 
-  const running = notifications.filter((n) => n.status === 'running')
+  // Defence-in-depth: only poll the signed-in user's pipelines. setCurrentUser
+  // already prunes the store, but this guards the render path against any timing
+  // window where a foreign entry is still present.
+  const running = notifications.filter(
+    (n) => n.status === 'running' && n.userId === currentUserId,
+  )
 
   return (
     <>

@@ -200,11 +200,12 @@ function NotificationRow({ notification }: { notification: PipelineNotification 
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function NotificationPanel() {
-  const { notifications, markAllAsRead } = usePipelineNotificationsStore()
+  const { notifications, markAllAsRead, currentUserId } = usePipelineNotificationsStore()
 
-  // Only show notifications from the last 24 hours
+  // Scope to the signed-in user (defence-in-depth over setCurrentUser's prune),
+  // then only show notifications from the last 24 hours.
   const recentNotifications = notifications.filter(
-    (n) => Date.now() - n.createdAt <= ONE_DAY_MS,
+    (n) => n.userId === currentUserId && Date.now() - n.createdAt <= ONE_DAY_MS,
   )
 
   const unreadCount = recentNotifications.filter((n) => !n.read).length
