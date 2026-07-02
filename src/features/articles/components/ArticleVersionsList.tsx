@@ -3,6 +3,7 @@ import { useNavigate } from '@tanstack/react-router'
 import type { ArticleWithSlug } from '@/lib/types/article.types'
 import { DashboardDrawer } from '@/components/ui/DashboardDrawer'
 import { ArticleEditorDrawerContent } from './ArticleEditorDrawerContent'
+import { VerdictBadges } from './VerdictBadges'
 import {
   useDeleteArticle,
   usePublishArticle,
@@ -32,12 +33,6 @@ const STATUS_CLASS: Record<string, string> = {
   review:     'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
   rejected:   'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',
   processing: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400',
-}
-
-const QA_CLASS: Record<string, string> = {
-  approve: 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300',
-  revise:  'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300',
-  reject:  'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',
 }
 
 /**
@@ -240,14 +235,16 @@ export function ArticleVersionsList({ article }: ArticleVersionsListProps) {
 
           {!versionsLoading && versionData?.versions && versionData.versions.length > 0 && (
             <div className="space-y-2">
-              {[...versionData.versions].sort((a, b) => b.version - a.version).map((v) => (
+              {[...versionData.versions]
+                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                .map((v, i) => (
                 <div
-                  key={v.sk}
+                  key={v.pipelineRunId}
                   className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-zinc-100 dark:border-white/5 bg-zinc-50 dark:bg-white/2 px-3 py-2.5"
                 >
-                  {/* Version badge */}
+                  {/* Version badge — newest first, so v{count-i} */}
                   <span className="shrink-0 rounded-md bg-zinc-200 dark:bg-white/10 px-2 py-0.5 text-xs font-mono font-semibold text-zinc-700 dark:text-zinc-300">
-                    v{v.version}
+                    v{versionData.versions.length - i}
                   </span>
 
                   {/* Pipeline status at this version */}
@@ -255,18 +252,8 @@ export function ArticleVersionsList({ article }: ArticleVersionsListProps) {
                     {v.status}
                   </span>
 
-                  {/* QA recommendation badge */}
-                  {v.qaRecommendation && (
-                    <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${QA_CLASS[v.qaRecommendation] ?? ''}`}>
-                      QA: {v.qaRecommendation}
-                      {v.qaTotalScore !== undefined && ` (${v.qaTotalScore}/100)`}
-                    </span>
-                  )}
-
-                  {/* Model used */}
-                  {v.model && (
-                    <span className="text-xs text-zinc-400 font-mono">{v.model}</span>
-                  )}
+                  {/* Verdict badges — QA, grounding, prose, lint */}
+                  <VerdictBadges verdicts={v.verdicts} />
 
                   {/* Date — pushed to the right */}
                   <time

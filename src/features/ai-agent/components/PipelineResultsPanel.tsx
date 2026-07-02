@@ -3,6 +3,7 @@ import { CheckCircle, Archive, Loader2, RefreshCw, FileText, ShieldCheck } from 
 import { usePipelineStatus } from '../hooks/use-pipeline-status'
 import { usePipelineAction } from '../hooks/use-pipeline-action'
 import { useArticleVersions } from '@/hooks/use-admin-articles'
+import { VerdictBadges } from '@/features/articles/components/VerdictBadges'
 import { useToastStore } from '@/lib/stores/toast-store'
 
 // =============================================================================
@@ -39,8 +40,11 @@ export function PipelineResultsPanel({ pipelineSlug, onActionComplete }: Pipelin
 
   const { data: versionData } = useArticleVersions(terminalWithQA ? pipelineSlug : null)
   const latestVersion = versionData?.versions
-    ? [...versionData.versions].sort((a, b) => b.version - a.version)[0]
+    ? [...versionData.versions].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )[0]
     : null
+  const latestQa = latestVersion?.verdicts.qa
 
   const handleApprove = useCallback(() => {
     actionMutation.mutate(
@@ -84,8 +88,8 @@ export function PipelineResultsPanel({ pipelineSlug, onActionComplete }: Pipelin
         </div>
       )}
 
-      {/* ── QA evaluation ───────────────────────────────────────────────────── */}
-      {terminalWithQA && latestVersion && (latestVersion.qaTotalScore !== undefined || latestVersion.qaRecommendation) && (
+      {/* ── QA evaluation + verdicts ────────────────────────────────────────── */}
+      {terminalWithQA && latestVersion && (
         <div className={`rounded-xl p-4 ${
           state === 'review'
             ? 'border border-emerald-500/20 bg-emerald-500/5'
@@ -94,28 +98,20 @@ export function PipelineResultsPanel({ pipelineSlug, onActionComplete }: Pipelin
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-xs text-zinc-400">
               <ShieldCheck className="h-3.5 w-3.5" />
-              <span>QA evaluation — v{latestVersion.version}</span>
+              <span>Review verdicts</span>
             </div>
-            {latestVersion.qaTotalScore !== undefined && (
+            {latestQa?.overallScore !== undefined && (
               <span className={`text-sm font-bold tabular-nums ${
-                latestVersion.qaTotalScore >= 80 ? 'text-emerald-400' : 'text-orange-400'
+                latestQa.overallScore >= 80 ? 'text-emerald-400' : 'text-orange-400'
               }`}>
-                {latestVersion.qaTotalScore}
+                {latestQa.overallScore}
                 <span className="text-xs font-normal text-zinc-500">/100</span>
               </span>
             )}
           </div>
-          {latestVersion.qaRecommendation && (
-            <p className="mt-1 text-xs capitalize text-zinc-400">
-              Recommendation:{' '}
-              <span className={
-                latestVersion.qaRecommendation === 'approve' ? 'text-emerald-400' :
-                latestVersion.qaRecommendation === 'revise'  ? 'text-amber-400'   : 'text-red-400'
-              }>
-                {latestVersion.qaRecommendation}
-              </span>
-            </p>
-          )}
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <VerdictBadges verdicts={latestVersion.verdicts} />
+          </div>
         </div>
       )}
 

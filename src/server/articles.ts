@@ -18,6 +18,9 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { requireAdmin } from './auth-guard'
 import { apiFetch } from './_api-client'
+import { parseRunVersion, type RunVersion } from '@/features/articles/lib/parse-run-verdicts'
+
+export type { RunVersion } from '@/features/articles/lib/parse-run-verdicts'
 
 // =============================================================================
 // Types
@@ -36,20 +39,6 @@ export interface ArticleSummary {
   tags?: string[]
   gsi1pk?: string
   updatedAt?: string
-}
-
-/** Single pipeline version record from GET /articles/:slug/versions */
-export interface ArticleVersion {
-  sk: string                    // e.g. "VERSION#v3"
-  version: number               // e.g. 3
-  status: string                // pipeline status at time of this run
-  createdAt: string             // ISO timestamp
-  model?: string                // Claude model used
-  contentRef?: string           // S3 key for this version's content
-  qaTotalScore?: number         // QA evaluation score (0–100)
-  qaRecommendation?: 'approve' | 'revise' | 'reject'
-  qaIssues?: string[]
-  kbPassages?: number           // number of KB passages used
 }
 
 /** Metadata returned by GET /articles/:slug on admin-api (PostgreSQL record). */
@@ -298,21 +287,23 @@ export const saveArticleMetadataFn = createServerFn({ method: 'POST' })
  */
 export const getArticleVersionsFn = createServerFn({ method: 'GET' })
   .inputValidator(slugSchema)
-  .handler(async ({ data: slug }) => {
-    await requireAdmin()
+  .handler(
+    async ({ data: slug }): Promise<{ slug: string; totalVersions: number; versions: RunVersion[] }> => {
+      await requireAdmin()
 
-    const body = await apiFetch<{
-      success: boolean
-      slug: string
-      totalVersions: number
-      versions: ArticleVersion[]
-    }>(
-      `/articles/${encodeURIComponent(slug)}/versions`,
-      { pathTemplate: '/articles/:slug/versions' },
-    )
+      // admin-api returns raw pipeline_runs rows: { pipelineRunId, status,
+      // metadata, errorMessage, createdAt, updatedAt }. Parse each row's raw
+      // metadata JSONB into typed verdicts (qa/grounding/prose/lint) so the
+      // review UI shows WHY a draft needs revision, not blank badges.
+      const body = await apiFetch<{ slug?: string; versions?: unknown[] }>(
+        `/articles/${encodeURIComponent(slug)}/versions`,
+        { pathTemplate: '/articles/:slug/versions' },
+      )
 
-    return body
-  })
+      const versions = (body.versions ?? []).map(parseRunVersion)
+      return { slug: body.slug ?? slug, totalVersions: versions.length, versions }
+    },
+  )
 
 /**
  * Fetches article metadata by slug from admin-api (PostgreSQL record).

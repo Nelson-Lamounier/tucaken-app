@@ -1,9 +1,11 @@
-import type { ArticleMetadata, ArticleVersion } from '@/hooks/use-admin-articles'
+import type { ArticleMetadata, RunVersion } from '@/hooks/use-admin-articles'
+import type { RunVerdicts } from '@/features/articles/lib/parse-run-verdicts'
+import { VerdictBadges } from './VerdictBadges'
 
 interface VersionData {
   slug: string
   totalVersions: number
-  versions: ArticleVersion[]
+  versions: RunVersion[]
 }
 
 interface ArticlePreviewMetaProps {
@@ -22,10 +24,81 @@ const STATUS_CLASS: Record<string, string> = {
   processing: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400',
 }
 
-const QA_CLASS: Record<string, string> = {
-  approve: 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300',
-  revise:  'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300',
-  reject:  'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',
+// ── Verdict detail panels (latest run) ─────────────────────────────────────
+
+function GroundingPanel({ verdicts }: { verdicts: RunVerdicts }) {
+  const g = verdicts.grounding
+  if (!g || g.status === 'GROUNDED') return null
+  return (
+    <div>
+      <dt className="text-red-400">Not grounded</dt>
+      {g.reason && <dd className="mt-0.5 text-zinc-400 leading-relaxed">{g.reason}</dd>}
+      {g.ungroundedClaims.length > 0 && (
+        <ul className="mt-1 space-y-1">
+          {g.ungroundedClaims.map((c) => (
+            <li key={c} className="flex gap-1.5 text-zinc-400">
+              <span className="mt-0.5 shrink-0 text-red-500">·</span>
+              {c}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function LintPanel({ verdicts }: { verdicts: RunVerdicts }) {
+  const lint = verdicts.lint
+  if (!lint || lint.findings.length === 0) return null
+  return (
+    <div>
+      <dt className="text-zinc-500">Structural lint — {lint.errors}E / {lint.warnings}W</dt>
+      <ul className="mt-1 space-y-1">
+        {lint.findings.map((f) => (
+          <li key={`${f.rule}:${f.message}`} className="flex gap-1.5 text-zinc-400">
+            <span className={`mt-0.5 shrink-0 ${f.severity === 'error' ? 'text-red-500' : 'text-amber-500'}`}>·</span>
+            <span><span className="font-mono text-zinc-500">{f.rule}</span> — {f.message}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function QaIssuesPanel({ verdicts }: { verdicts: RunVerdicts }) {
+  const qa = verdicts.qa
+  if (!qa || qa.issues.length === 0) return null
+  return (
+    <div>
+      <dt className="text-zinc-500">QA issues{qa.recommendation ? ` — ${qa.recommendation}` : ''}</dt>
+      <ul className="mt-1 space-y-1">
+        {qa.issues.map((issue) => (
+          <li key={`${issue.dimension ?? ''}:${issue.description}`} className="flex gap-1.5 text-zinc-400">
+            <span className="mt-0.5 shrink-0 text-amber-500">·</span>
+            <span>{issue.dimension && <span className="font-mono text-zinc-500">{issue.dimension} </span>}{issue.description}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function EvidencePanel({ verdicts }: { verdicts: RunVerdicts }) {
+  const defects = verdicts.evidence?.verdicts.filter((v) => v.decision === 'DEFECT') ?? []
+  if (defects.length === 0) return null
+  return (
+    <div>
+      <dt className="text-red-400">Evidence defects — KB does not support</dt>
+      <ul className="mt-1 space-y-1">
+        {defects.map((v) => (
+          <li key={`${v.rule}:${v.reason}`} className="flex gap-1.5 text-zinc-400">
+            <span className="mt-0.5 shrink-0 text-red-500">·</span>
+            <span><span className="font-mono text-zinc-500">{v.rule}</span> — {v.reason}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
 }
 
 export function ArticlePreviewMeta({
@@ -35,7 +108,9 @@ export function ArticlePreviewMeta({
   versionsIsLoading,
 }: ArticlePreviewMetaProps) {
   const sortedVersions = versionData?.versions
-    ? [...versionData.versions].sort((a, b) => b.version - a.version)
+    ? [...versionData.versions].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )
     : null
   const latestVersion = sortedVersions?.[0] ?? null
 
@@ -48,36 +123,29 @@ export function ArticlePreviewMeta({
         </div>
       )
     }
-    if (!versionData?.versions?.length) {
+    if (!sortedVersions?.length) {
       return <p className="text-xs text-zinc-500 italic">No pipeline runs yet.</p>
     }
+    const count = sortedVersions.length
     return (
       <div className="space-y-2">
-        {(sortedVersions ?? [])
-          .map((v) => (
-            <div
-              key={v.sk}
-              className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2"
-            >
-              <span className="shrink-0 rounded bg-zinc-700 px-1.5 py-0.5 font-mono text-xs font-semibold text-zinc-300">
-                v{v.version}
-              </span>
-              <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[v.status] ?? 'bg-zinc-800 text-zinc-400'}`}>
-                {v.status}
-              </span>
-              {v.qaRecommendation && (
-                <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${QA_CLASS[v.qaRecommendation] ?? ''}`}>
-                  QA: {v.qaRecommendation}
-                  {v.qaTotalScore !== undefined && ` (${v.qaTotalScore})`}
-                </span>
-              )}
-              <time className="ml-auto text-xs text-zinc-500" dateTime={v.createdAt}>
-                {new Date(v.createdAt).toLocaleDateString('en-GB', {
-                  day: 'numeric', month: 'short',
-                })}
-              </time>
-            </div>
-          ))}
+        {sortedVersions.map((v, i) => (
+          <div
+            key={v.pipelineRunId}
+            className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2"
+          >
+            <span className="shrink-0 rounded bg-zinc-700 px-1.5 py-0.5 font-mono text-xs font-semibold text-zinc-300">
+              v{count - i}
+            </span>
+            <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[v.status] ?? 'bg-zinc-800 text-zinc-400'}`}>
+              {v.status}
+            </span>
+            <VerdictBadges verdicts={v.verdicts} />
+            <time className="ml-auto text-xs text-zinc-500" dateTime={v.createdAt}>
+              {new Date(v.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+            </time>
+          </div>
+        ))}
       </div>
     )
   }
@@ -152,16 +220,6 @@ export function ArticlePreviewMeta({
             </dd>
           </div>
         )}
-        {metadata.updatedAt && (
-          <div>
-            <dt className="text-zinc-500">Updated</dt>
-            <dd className="mt-0.5 text-zinc-300">
-              {new Date(metadata.updatedAt).toLocaleDateString('en-GB', {
-                day: 'numeric', month: 'short', year: 'numeric',
-              })}
-            </dd>
-          </div>
-        )}
       </dl>
     )
   }
@@ -178,28 +236,21 @@ export function ArticlePreviewMeta({
           {renderMetadata()}
         </div>
 
-        {/* ── Latest QA ────────────────────────────────────────────────────── */}
-        {latestVersion?.qaRecommendation && (
+        {/* ── Latest verdicts ──────────────────────────────────────────────── */}
+        {latestVersion && (
           <div className="px-4 py-5">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              Latest QA — v{latestVersion.version}
+            <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+              Latest verdicts
             </p>
-            <div className="space-y-2">
-              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${QA_CLASS[latestVersion.qaRecommendation] ?? ''}`}>
-                {latestVersion.qaRecommendation}
-                {latestVersion.qaTotalScore !== undefined && ` · ${latestVersion.qaTotalScore}/100`}
-              </span>
-              {latestVersion.qaIssues && latestVersion.qaIssues.length > 0 && (
-                <ul className="mt-2 space-y-1">
-                  {[...new Set(latestVersion.qaIssues)].map((issue) => (
-                    <li key={issue} className="text-xs text-zinc-400 flex gap-1.5">
-                      <span className="mt-0.5 shrink-0 text-amber-500">·</span>
-                      {issue}
-                    </li>
-                  ))}
-                </ul>
-              )}
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              <VerdictBadges verdicts={latestVersion.verdicts} />
             </div>
+            <dl className="space-y-3 text-xs">
+              <GroundingPanel verdicts={latestVersion.verdicts} />
+              <EvidencePanel verdicts={latestVersion.verdicts} />
+              <LintPanel verdicts={latestVersion.verdicts} />
+              <QaIssuesPanel verdicts={latestVersion.verdicts} />
+            </dl>
           </div>
         )}
 
