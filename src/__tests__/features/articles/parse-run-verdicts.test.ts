@@ -4,6 +4,7 @@ import {
   parseGrounding,
   parseProse,
   parseLint,
+  parseEvidence,
   parseRunVerdicts,
   parseRunVersion,
 } from '@/features/articles/lib/parse-run-verdicts'
@@ -63,6 +64,28 @@ describe('parseLint', () => {
     })
     expect(l?.errors).toBe(1)
     expect(l?.warnings).toBe(0)
+  })
+})
+
+describe('parseEvidence', () => {
+  it('parses verdicts and keeps DEFECT/CLEARED, dropping malformed', () => {
+    const e = parseEvidence({
+      defects: 1,
+      verdicts: [
+        { rule: 'title-coverage', finding: 'golden', decision: 'DEFECT', reason: 'absent' },
+        { rule: 'dangling-reference', finding: 'caveat', decision: 'CLEARED', reason: 'ok' },
+        { rule: 'x', decision: 'MAYBE', reason: 'y' }, // dropped
+      ],
+    })
+    expect(e?.defects).toBe(1)
+    expect(e?.verdicts).toHaveLength(2)
+    expect(e?.verdicts[0].decision).toBe('DEFECT')
+  })
+
+  it('derives defect count when not supplied and returns undefined for junk', () => {
+    const e = parseEvidence({ verdicts: [{ rule: 'r', finding: 'f', decision: 'DEFECT', reason: '' }] })
+    expect(e?.defects).toBe(1)
+    expect(parseEvidence(null)).toBeUndefined()
   })
 })
 

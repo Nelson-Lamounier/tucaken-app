@@ -49,11 +49,24 @@ export interface LintVerdict {
   readonly findings: readonly LintFinding[]
 }
 
+export interface EvidenceItem {
+  readonly rule: string
+  readonly finding: string
+  readonly decision: 'DEFECT' | 'CLEARED'
+  readonly reason: string
+}
+
+export interface EvidenceVerdict {
+  readonly defects: number
+  readonly verdicts: readonly EvidenceItem[]
+}
+
 export interface RunVerdicts {
   readonly qa?: QaVerdict
   readonly grounding?: GroundingVerdict
   readonly prose?: ProseVerdict
   readonly lint?: LintVerdict
+  readonly evidence?: EvidenceVerdict
 }
 
 /** One pipeline run, as returned by admin-api /articles/:slug/versions. */
@@ -166,6 +179,23 @@ export function parseLint(v: unknown): LintVerdict | undefined {
   return { errors, warnings, findings }
 }
 
+export function parseEvidence(v: unknown): EvidenceVerdict | undefined {
+  const o = asRecord(v)
+  if (!o) return undefined
+  const rawVerdicts = Array.isArray(o['verdicts']) ? o['verdicts'] : []
+  const verdicts = rawVerdicts
+    .map((i) => {
+      const io = asRecord(i)
+      const rule = asString(io?.['rule'])
+      const decision = asString(io?.['decision'])
+      if (!rule || (decision !== 'DEFECT' && decision !== 'CLEARED')) return undefined
+      return { rule, finding: asString(io?.['finding']) ?? '', decision, reason: asString(io?.['reason']) ?? '' }
+    })
+    .filter((i): i is EvidenceItem => i !== undefined)
+  const defects = asNumber(o['defects']) ?? verdicts.filter((i) => i.decision === 'DEFECT').length
+  return { defects, verdicts }
+}
+
 // =============================================================================
 // Top-level
 // =============================================================================
@@ -178,6 +208,7 @@ export function parseRunVerdicts(metadata: unknown): RunVerdicts {
     grounding: parseGrounding(o['grounding']),
     prose: parseProse(o['prose']),
     lint: parseLint(o['lint']),
+    evidence: parseEvidence(o['evidence']),
   }
 }
 

@@ -83,6 +83,24 @@ function QaIssuesPanel({ verdicts }: { verdicts: RunVerdicts }) {
   )
 }
 
+function EvidencePanel({ verdicts }: { verdicts: RunVerdicts }) {
+  const defects = verdicts.evidence?.verdicts.filter((v) => v.decision === 'DEFECT') ?? []
+  if (defects.length === 0) return null
+  return (
+    <div>
+      <dt className="text-red-400">Evidence defects — KB does not support</dt>
+      <ul className="mt-1 space-y-1">
+        {defects.map((v) => (
+          <li key={`${v.rule}:${v.reason}`} className="flex gap-1.5 text-zinc-400">
+            <span className="mt-0.5 shrink-0 text-red-500">·</span>
+            <span><span className="font-mono text-zinc-500">{v.rule}</span> — {v.reason}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 export function ArticlePreviewMeta({
   metadata,
   versionData,
@@ -217,6 +235,7 @@ export function ArticlePreviewMeta({
             </div>
             <dl className="space-y-3 text-xs">
               <GroundingPanel verdicts={latestVersion.verdicts} />
+              <EvidencePanel verdicts={latestVersion.verdicts} />
               <LintPanel verdicts={latestVersion.verdicts} />
               <QaIssuesPanel verdicts={latestVersion.verdicts} />
             </dl>

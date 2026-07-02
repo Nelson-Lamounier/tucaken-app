@@ -24,8 +24,9 @@ const NEUTRAL = 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400'
  * run did not produce, so an older run without lint/prose degrades cleanly.
  */
 export function VerdictBadges({ verdicts }: VerdictBadgesProps) {
-  const { qa, grounding, prose, lint } = verdicts
+  const { qa, grounding, prose, lint, evidence } = verdicts
   const lintDirty = lint !== undefined && (lint.errors > 0 || lint.warnings > 0)
+  const evidenceDirty = evidence !== undefined && evidence.defects > 0
 
   return (
     <>
@@ -52,6 +53,11 @@ export function VerdictBadges({ verdicts }: VerdictBadgesProps) {
       {lintDirty && (
         <span className={`${BADGE} ${lint.errors > 0 ? BAD : WARN}`}>
           Lint: {lint.errors}E / {lint.warnings}W
+        </span>
+      )}
+      {evidenceDirty && (
+        <span className={`${BADGE} ${BAD}`}>
+          Evidence: {evidence.defects} defect{evidence.defects === 1 ? '' : 's'}
         </span>
       )}
     </>
