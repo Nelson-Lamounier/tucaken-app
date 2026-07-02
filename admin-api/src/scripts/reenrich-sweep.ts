@@ -73,7 +73,6 @@ async function main(): Promise<SweepResult> {
     database: process.env['PG_DATABASE'],
     user:     process.env['PG_USER'],
     password: process.env['PG_PASSWORD'],
-    ssl:      { rejectUnauthorized: false },
     max:      1,
   });
 
