@@ -7,7 +7,7 @@ import { FormTextarea, FieldInfo } from '@/components/ui/Field'
 import { MarkdownEditor } from './MarkdownEditor'
 import { deriveSlug } from '@/features/articles/lib/derive-slug'
 import { createArticleFn, checkSlugAvailableFn } from '@/server/articles'
-import { uploadCoverImage } from '@/features/articles/lib/upload-cover-image'
+import { CoverImageField } from './CoverImageField'
 import { useToastStore } from '@/lib/stores/toast-store'
 
 // =============================================================================
@@ -54,7 +54,6 @@ export function ArticleBuilder() {
 
   const [slugUnavailable, setSlugUnavailable] = useState(false)
   const [tagInput, setTagInput] = useState('')
-  const [coverPreview, setCoverPreview] = useState<string | null>(null)
   const [uploadingCover, setUploadingCover] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
@@ -135,31 +134,6 @@ export function ArticleBuilder() {
       }
     }
   }, [])
-
-  // ---------------------------------------------------------------------------
-  // Cover image upload
-  // ---------------------------------------------------------------------------
-
-  const handleCoverImageChange = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0]
-      if (!file) return
-
-      setCoverPreview(URL.createObjectURL(file))
-      setUploadingCover(true)
-
-      try {
-        const url = await uploadCoverImage(file)
-        form.setFieldValue('coverImage', url)
-      } catch {
-        addToast('error', 'Cover image upload failed. Please try again.')
-        setCoverPreview(null)
-      } finally {
-        setUploadingCover(false)
-      }
-    },
-    [form, addToast],
-  )
 
   // ---------------------------------------------------------------------------
   // Tag input
@@ -427,25 +401,16 @@ export function ArticleBuilder() {
         <p className="mt-1 text-sm/6 text-zinc-500 dark:text-zinc-400">
           Optional cover image displayed at the top of the article.
         </p>
-        <div className="mt-4">
-          {coverPreview && (
-            <img
-              src={coverPreview}
-              alt="Cover preview"
-              className="mb-3 h-40 w-full rounded-md object-cover ring-1 ring-zinc-200 dark:ring-white/10"
+        <form.Field
+          name="coverImage"
+          children={(field) => (
+            <CoverImageField
+              value={field.state.value || null}
+              onChange={(url) => field.handleChange(url ?? '')}
+              onUploadingChange={setUploadingCover}
             />
           )}
-          <label className="flex cursor-pointer items-center justify-center rounded-md border border-dashed border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800/50 p-6 text-sm text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
-            {uploadingCover ? 'Uploading…' : 'Click to upload an image (PNG, JPG, WebP)'}
-            <input
-              type="file"
-              accept="image/*"
-              className="sr-only"
-              onChange={handleCoverImageChange}
-              disabled={uploadingCover}
-            />
-          </label>
-        </div>
+        />
       </div>
 
       {/* ── Content ───────────────────────────────────────────────────────── */}

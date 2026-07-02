@@ -256,11 +256,14 @@ export function entityToArticle(
     (e.readingTimeMinutes as number) ??
     (typeof e.readingTime === 'number' ? e.readingTime : undefined)
 
-  // heroImageUrl: only pass through if it's a valid non-empty URL
-  const heroImageUrl =
-    typeof e.heroImageUrl === 'string' && e.heroImageUrl.length > 0
-      ? e.heroImageUrl
-      : undefined
+  // heroImageUrl: prefer the DynamoDB field; fall back to the PG `coverImage`
+  // field (admin-api list rows), so a single accessor works across both
+  // sources. Only pass through a valid non-empty URL.
+  const heroCandidate =
+    (typeof e.heroImageUrl === 'string' && e.heroImageUrl.length > 0 && e.heroImageUrl) ||
+    (typeof e.coverImage === 'string' && e.coverImage.length > 0 && e.coverImage) ||
+    ''
+  const heroImageUrl = heroCandidate.length > 0 ? heroCandidate : undefined
 
   // githubUrl: only pass through if it's a valid non-empty string
   const githubUrl =

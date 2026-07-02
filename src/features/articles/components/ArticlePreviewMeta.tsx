@@ -98,6 +98,18 @@ export function ArticlePreviewMeta({
     if (!metadata) return null
     return (
       <dl className="space-y-2.5 text-xs">
+        {metadata.coverImage && (
+          <div>
+            <dt className="text-zinc-500">Cover image</dt>
+            <dd className="mt-1">
+              <img
+                src={metadata.coverImage}
+                alt="Article cover"
+                className="h-28 w-full rounded-md object-cover ring-1 ring-zinc-800"
+              />
+            </dd>
+          </div>
+        )}
         <div>
           <dt className="text-zinc-500">Status</dt>
           <dd className="mt-0.5">
