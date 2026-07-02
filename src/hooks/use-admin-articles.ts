@@ -14,7 +14,7 @@ import {
   saveArticleContentFn,
 } from '../server/articles'
 
-export type { ArticleVersion, ArticleMetadata } from '../server/articles'
+export type { RunVersion, ArticleMetadata } from '../server/articles'
 
 // =============================================================================
 // Types
