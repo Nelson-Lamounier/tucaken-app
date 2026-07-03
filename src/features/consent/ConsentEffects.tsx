@@ -25,6 +25,9 @@ export function ConsentEffects() {
   const marketing = useConsentStore((s) => s.marketing)
   const analyticsRef = useRef(analytics)
   analyticsRef.current = analytics
+  // Guards the one-off landing page_view so a later consent re-sync (e.g. a
+  // marketing toggle) does not re-fire it.
+  const initialPageViewSent = useRef(false)
 
   // 1. Bootstrap consent mode once, before any tag can load.
   useEffect(() => {
@@ -36,13 +39,24 @@ export function ConsentEffects() {
   useEffect(() => {
     syncConsentMode({ analytics, marketing })
     if (analytics !== 'granted') {
+      // Reset so a later re-grant sends a fresh landing page_view for the new
+      // tracking window (fire once PER grant, not once per component lifetime).
+      initialPageViewSent.current = false
       pauseFaroAdmin()
       return
     }
-    if (isGa4Enabled()) loadGtagScript()
+    if (isGa4Enabled()) {
+      loadGtagScript()
+      // GA4 is configured with send_page_view:false, so the landing view is
+      // not auto-sent. Fire it once here (SPA route changes are handled below).
+      if (!initialPageViewSent.current) {
+        initialPageViewSent.current = true
+        trackPageView(router.state.location.pathname, document.title)
+      }
+    }
     initialiseFaroAdmin()
     resumeFaroAdmin()
-  }, [analytics, marketing])
+  }, [analytics, marketing, router])
 
   // 3. Track SPA navigations only while analytics is granted.
   useEffect(() => {
