@@ -607,3 +607,66 @@
   background-image: radial-gradient(circle at 1px 1px, #27272a 1px, transparent 0);
 }
 .dark .main .page-meta { color: #52525b; }
+
+/* ── WYSIWYG print-to-PDF ──────────────────────────────────────────────
+   The "PDF" download portals a scale-1 copy of the live preview into
+   `#resume-print-root` on <body> (see main.tsx) and calls the browser's
+   native print pipeline. Off-screen but kept in the layout so PaginatedDoc
+   can measure + paginate at true A4 size; only made visible for print. */
+#resume-print-root {
+  position: fixed;
+  left: -100000px;
+  top: 0;
+  width: 794px; /* A4_W — natural page width so pagination matches the preview */
+  background: #fff;
+  color-scheme: light; /* the printed page is paper — never dark mode */
+}
+
+@media print {
+  @page { size: A4; margin: 0; }
+  html, body { background: #fff !important; }
+
+  /* Print ONLY the resume: hide the app shell + any overlays, reveal the copy. */
+  body > *:not(#resume-print-root) { display: none !important; }
+  #resume-print-root {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    width: auto !important;
+  }
+
+  /* Neutralise preview affordances: scale transform, drop shadows, screen chrome. */
+  #resume-print-root .paginated-doc { transform: none !important; width: auto !important; }
+  #resume-print-root .page-meta { display: none !important; }
+
+  /* Pagination: one printed page per sheet. Break BEFORE every sheet after the
+     first (not AFTER each paper) so there is no trailing blank page — the last
+     `.page-paper` is never `:last-child` because `.page-meta` follows it, which
+     is why an `:last-child` "break-after: auto" override would silently miss. */
+  #resume-print-root .page-sheet {
+    gap: 0 !important;
+    break-inside: avoid !important;
+  }
+  #resume-print-root .page-sheet + .page-sheet { break-before: page !important; }
+
+  #resume-print-root .page-paper {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    /* Clamp every sheet to exactly one A4 page, in the SAME unit the JS packer
+       uses (A4_H = 1123px). Some themes (e.g. `modern`) render a hair taller in
+       print than on screen, tipping a full page onto a 3rd. The packer keeps a
+       page's content within A4_H - 2*margin, and the paper adds `margin` px of
+       top/bottom padding, so there is bottom slack — clipping at 1123px absorbs
+       the sub-pixel spill without ever cutting real content. */
+    height: 1123px !important;
+    min-height: 1123px !important;
+    overflow: hidden !important;
+  }
+
+  /* Preserve theme background fills/dividers in the printed output. */
+  #resume-print-root * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

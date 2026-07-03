@@ -1,4 +1,5 @@
 import React from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from '@tanstack/react-router'
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react'
 import { ChevronDownIcon, ArrowDownTrayIcon } from '@heroicons/react/20/solid'
@@ -21,24 +22,15 @@ import {
 } from './editor'
 import {
   buildResumeTxt, buildCoverTxt, buildResumeDoc, buildCoverDoc,
-  downloadTxt, downloadDoc, downloadPdf, sanitizeFilename,
+  downloadTxt, downloadDoc, sanitizeFilename,
 } from './downloads'
 
 export function ResumeBuilderApp({
   onClose,
   onSave,
-  serverPdfLoader,
 }: {
   onClose?: () => void
   onSave?: () => void
-  /**
-   * Optional loader for the canonical server-rendered ATS PDF (resume view
-   * only). Returns a presigned URL, or `null` when none exists yet — in which
-   * case the download falls back to the client-side raster renderer. Supplied
-   * by the application editor (which knows the slug); absent for the standalone
-   * `/resume-theme` wireframe, where only the raster path exists.
-   */
-  serverPdfLoader?: (filename: string) => Promise<{ url: string } | null>
 } = {}) {
   const state = useStore((s) => s)
 
@@ -60,6 +52,49 @@ export function ResumeBuilderApp({
     [view, resume, cover],
   )
 
+  // ── WYSIWYG print-to-PDF ────────────────────────────────────────────────
+  // The "PDF" download prints the live preview through the browser's native
+  // print pipeline: vector text (selectable, ATS-parseable), pixel-identical to
+  // the preview, and small — no raster capture, no server round-trip. A scale-1
+  // copy of the doc is portalled to <body> (see the `@media print` block in
+  // style.css) so page chrome is excluded and pagination is at true A4 size.
+  const [printing, setPrinting] = React.useState(false)
+  const printName = React.useRef('resume')
+
+  const triggerPrint = React.useCallback((filename: string) => {
+    printName.current = filename
+    setPrinting(true)
+  }, [])
+
+  React.useEffect(() => {
+    if (!printing) return
+    const originalTitle = document.title
+    // The "Save as PDF" dialog seeds its filename from document.title.
+    document.title = printName.current
+    let settled = false
+    const finish = () => {
+      if (settled) return
+      settled = true
+      document.title = originalTitle
+      setPrinting(false)
+    }
+    globalThis.addEventListener('afterprint', finish, { once: true })
+    // Let the portal mount + paginate + fonts settle before invoking print.
+    const fontsReady = document.fonts?.ready ?? Promise.resolve()
+    const timer = setTimeout(() => {
+      void fontsReady.then(() => {
+        globalThis.print()
+        // Safari does not always fire afterprint — guarantee cleanup.
+        setTimeout(finish, 1500)
+      })
+    }, 150)
+    return () => {
+      clearTimeout(timer)
+      globalThis.removeEventListener('afterprint', finish)
+      document.title = originalTitle
+    }
+  }, [printing])
+
   const previewRef = React.useRef<HTMLDivElement>(null)
   const [previewScale, setPreviewScale] = React.useState(0.72)
 
@@ -79,7 +114,21 @@ export function ResumeBuilderApp({
 
   return (
     <div className="main" style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-      <TopBar state={state} theme={theme} view={view} margins={margins} onClose={onClose} onSave={onSave} serverPdfLoader={serverPdfLoader} />
+      <TopBar state={state} theme={theme} view={view} margins={margins} onClose={onClose} onSave={onSave} onPrintPdf={triggerPrint} />
+      {printing &&
+        createPortal(
+          <div id="resume-print-root">
+            <PaginatedDoc
+              blocks={blocks}
+              margin={marginPx}
+              theme={theme}
+              scale={1}
+              coverMode={view === 'cover'}
+              domId="resume-print-doc"
+            />
+          </div>,
+          document.body,
+        )}
       <div className="workspace">
         <FormPanel state={state} />
         <div className="preview-pane" ref={previewRef}>
@@ -108,7 +157,7 @@ function TopBar({
   margins,
   onClose,
   onSave,
-  serverPdfLoader,
+  onPrintPdf,
 }: {
   state: AppState;
   theme: ThemeName;
@@ -116,7 +165,7 @@ function TopBar({
   margins: number;
   onClose?: () => void;
   onSave?: () => void;
-  serverPdfLoader?: (filename: string) => Promise<{ url: string } | null>;
+  onPrintPdf?: (filename: string) => void;
 }) {
   const [savedFlash, setSavedFlash] = React.useState(false)
 
@@ -134,7 +183,7 @@ function TopBar({
     return `${root}_${view === 'resume' ? 'Resume' : 'CoverLetter'}`
   }, [state.resume.profile.name, view])
 
-  const handleDownload = async (kind: 'pdf' | 'doc' | 'txt') => {
+  const handleDownload = (kind: 'pdf' | 'doc' | 'txt') => {
     if (kind === 'txt') {
       const txt =
         view === 'resume'
@@ -148,33 +197,11 @@ function TopBar({
           : buildCoverDoc(state.resume, state.cover, state.theme, Math.round(state.margins * 96))
       downloadDoc(html, baseName)
     } else {
-      // Prefer the canonical server-rendered ATS PDF (real text layer, small,
-      // ATS-parseable) for the resume. Fall back to the client raster only when
-      // no server PDF exists yet or the lookup fails. Cover letters have no
-      // server PDF today, so they always use the raster path.
-      if (view === 'resume' && serverPdfLoader) {
-        try {
-          const server = await serverPdfLoader(baseName)
-          if (server?.url) {
-            const a = document.createElement('a')
-            a.href = server.url
-            a.rel = 'noopener'
-            document.body.appendChild(a)
-            a.click()
-            a.remove()
-            return
-          }
-        } catch (err) {
-          console.error(err)
-          // fall through to the raster renderer
-        }
-      }
-      try {
-        await downloadPdf('capture-doc', baseName)
-      } catch (err) {
-        console.error(err)
-        alert('PDF generation failed. Please try again.')
-      }
+      // WYSIWYG print: the parent portals a scale-1 copy of the live preview to
+      // <body> and invokes the browser's native print pipeline. Output is vector
+      // text (selectable, ATS-parseable), pixel-identical to the preview, and
+      // small — no raster capture, no server round-trip.
+      onPrintPdf?.(baseName)
     }
   }
 
@@ -284,7 +311,7 @@ function TopBar({
             className="absolute right-0 z-20 mt-2 w-56 origin-top-right rounded-lg bg-white dark:bg-zinc-800 shadow-lg ring-1 ring-zinc-200 dark:ring-zinc-700/50 divide-y divide-zinc-100 dark:divide-zinc-700/50 outline-none transition data-closed:scale-95 data-closed:opacity-0 data-enter:duration-100 data-enter:ease-out data-leave:duration-75 data-leave:ease-in"
           >
             {([
-              { kind: 'pdf' as const, ext: '.pdf', label: 'PDF', desc: 'Print-perfect · industry standard' },
+              { kind: 'pdf' as const, ext: '.pdf', label: 'PDF', desc: 'Matches preview · opens print dialog' },
               { kind: 'doc' as const, ext: '.doc', label: 'Word', desc: 'Editable in Word, Pages, Docs' },
               { kind: 'txt' as const, ext: '.txt', label: 'Plain text', desc: 'ATS-safe fallback' },
             ]).map(({ kind, ext, label, desc }) => (
@@ -292,7 +319,7 @@ function TopBar({
                 <MenuItem>
                   <button
                     type="button"
-                    onClick={() => void handleDownload(kind)}
+                    onClick={() => handleDownload(kind)}
                     className="group flex w-full items-center gap-x-3 px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 data-focus:bg-zinc-50 dark:data-focus:bg-white/5 data-focus:text-zinc-900 dark:data-focus:text-white data-focus:outline-hidden"
                   >
                     <span className="shrink-0 font-mono text-xs font-semibold text-teal-600 dark:text-teal-400 bg-teal-500/10 border border-teal-500/20 px-1.5 py-0.5 rounded">
