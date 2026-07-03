@@ -118,4 +118,25 @@ describe('ConsentEffects', () => {
     act(() => { useConsentStore.getState().rejectAll() })
     expect(mocks.pauseFaroAdmin).toHaveBeenCalled()
   })
+
+  it('sends an initial page_view for the current route on grant (no navigation needed)', () => {
+    render(<ConsentEffects />)
+    act(() => { useConsentStore.getState().acceptAll() })
+    expect(mocks.trackPageView).toHaveBeenCalledWith('/home', document.title)
+  })
+
+  it('sends the initial page_view only once even if consent re-syncs', () => {
+    render(<ConsentEffects />)
+    act(() => { useConsentStore.getState().acceptAll() })
+    // A later category change re-runs the consent effect but must not re-fire it.
+    act(() => { useConsentStore.getState().setCategory('marketing', 'denied') })
+    expect(mocks.trackPageView).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not send an initial page_view when GA4 is disabled', () => {
+    mocks.isGa4Enabled.mockReturnValueOnce(false)
+    render(<ConsentEffects />)
+    act(() => { useConsentStore.getState().acceptAll() })
+    expect(mocks.trackPageView).not.toHaveBeenCalled()
+  })
 })
