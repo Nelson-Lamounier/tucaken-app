@@ -39,6 +39,9 @@ export function ConsentEffects() {
   useEffect(() => {
     syncConsentMode({ analytics, marketing })
     if (analytics !== 'granted') {
+      // Reset so a later re-grant sends a fresh landing page_view for the new
+      // tracking window (fire once PER grant, not once per component lifetime).
+      initialPageViewSent.current = false
       pauseFaroAdmin()
       return
     }

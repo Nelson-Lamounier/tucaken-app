@@ -133,6 +133,14 @@ describe('ConsentEffects', () => {
     expect(mocks.trackPageView).toHaveBeenCalledTimes(1)
   })
 
+  it('sends a fresh initial page_view on re-grant after withdrawal (once per grant)', () => {
+    render(<ConsentEffects />)
+    act(() => { useConsentStore.getState().acceptAll() })
+    act(() => { useConsentStore.getState().rejectAll() })
+    act(() => { useConsentStore.getState().acceptAll() })
+    expect(mocks.trackPageView).toHaveBeenCalledTimes(2)
+  })
+
   it('does not send an initial page_view when GA4 is disabled', () => {
     mocks.isGa4Enabled.mockReturnValueOnce(false)
     render(<ConsentEffects />)
