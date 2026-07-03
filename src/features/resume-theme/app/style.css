@@ -637,15 +637,32 @@
 
   /* Neutralise preview affordances: scale transform, drop shadows, screen chrome. */
   #resume-print-root .paginated-doc { transform: none !important; width: auto !important; }
-  #resume-print-root .page-sheet { gap: 0 !important; }
   #resume-print-root .page-meta { display: none !important; }
+
+  /* Pagination: one printed page per sheet. Break BEFORE every sheet after the
+     first (not AFTER each paper) so there is no trailing blank page — the last
+     `.page-paper` is never `:last-child` because `.page-meta` follows it, which
+     is why an `:last-child` "break-after: auto" override would silently miss. */
+  #resume-print-root .page-sheet {
+    gap: 0 !important;
+    break-inside: avoid !important;
+  }
+  #resume-print-root .page-sheet + .page-sheet { break-before: page !important; }
+
   #resume-print-root .page-paper {
     box-shadow: none !important;
     border-radius: 0 !important;
     margin: 0 !important;
-    break-after: page;
+    /* Clamp every sheet to exactly one A4 page, in the SAME unit the JS packer
+       uses (A4_H = 1123px). Some themes (e.g. `modern`) render a hair taller in
+       print than on screen, tipping a full page onto a 3rd. The packer keeps a
+       page's content within A4_H - 2*margin, and the paper adds `margin` px of
+       top/bottom padding, so there is bottom slack — clipping at 1123px absorbs
+       the sub-pixel spill without ever cutting real content. */
+    height: 1123px !important;
+    min-height: 1123px !important;
+    overflow: hidden !important;
   }
-  #resume-print-root .page-paper:last-child { break-after: auto; }
 
   /* Preserve theme background fills/dividers in the printed output. */
   #resume-print-root * {
