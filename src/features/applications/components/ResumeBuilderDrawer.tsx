@@ -20,7 +20,6 @@ import {
 import {
   updateApplicationCoverLetterFn,
   updateApplicationResumeFn,
-  getResumePdfUrlFn,
 } from '@/server/applications'
 import type { ResumeData } from '@/lib/resumes/resume-data'
 import type { CoverLetter } from '@/lib/types/applications.types'
@@ -125,7 +124,6 @@ export function ResumeBuilderDrawer({
         key={builderKey}
         onClose={handleClose}
         onSave={() => saveMutation.mutate()}
-        serverPdfLoader={(filename) => getResumePdfUrlFn({ data: { slug, filename } })}
       />
     </DashboardDrawer>
   )

@@ -607,3 +607,49 @@
   background-image: radial-gradient(circle at 1px 1px, #27272a 1px, transparent 0);
 }
 .dark .main .page-meta { color: #52525b; }
+
+/* ── WYSIWYG print-to-PDF ──────────────────────────────────────────────
+   The "PDF" download portals a scale-1 copy of the live preview into
+   `#resume-print-root` on <body> (see main.tsx) and calls the browser's
+   native print pipeline. Off-screen but kept in the layout so PaginatedDoc
+   can measure + paginate at true A4 size; only made visible for print. */
+#resume-print-root {
+  position: fixed;
+  left: -100000px;
+  top: 0;
+  width: 794px; /* A4_W — natural page width so pagination matches the preview */
+  background: #fff;
+  color-scheme: light; /* the printed page is paper — never dark mode */
+}
+
+@media print {
+  @page { size: A4; margin: 0; }
+  html, body { background: #fff !important; }
+
+  /* Print ONLY the resume: hide the app shell + any overlays, reveal the copy. */
+  body > *:not(#resume-print-root) { display: none !important; }
+  #resume-print-root {
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    width: auto !important;
+  }
+
+  /* Neutralise preview affordances: scale transform, drop shadows, screen chrome. */
+  #resume-print-root .paginated-doc { transform: none !important; width: auto !important; }
+  #resume-print-root .page-sheet { gap: 0 !important; }
+  #resume-print-root .page-meta { display: none !important; }
+  #resume-print-root .page-paper {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    break-after: page;
+  }
+  #resume-print-root .page-paper:last-child { break-after: auto; }
+
+  /* Preserve theme background fills/dividers in the printed output. */
+  #resume-print-root * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
