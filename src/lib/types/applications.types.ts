@@ -394,6 +394,21 @@ export interface SkillEvidenceEntry {
    * Absent on runs produced before source-lane provenance shipped.
    */
   readonly sourceLanes?: SkillEvidenceLane[]
+  /**
+   * Retrieved KB passages that mention this skill — the "how was this
+   * verified" audit trail (source + retrieval scores + snippet), joined
+   * deterministically from the run's own KB context. Absent on runs
+   * produced before passage provenance shipped.
+   */
+  readonly provenance?: SkillEvidencePassage[]
+}
+
+/** One retrieved KB passage backing a ledger entry. */
+export interface SkillEvidencePassage {
+  readonly source: string
+  readonly cosine?: number
+  readonly rerank?: number
+  readonly snippet: string
 }
 
 /** Research Agent output — part of ApplicationDetail */

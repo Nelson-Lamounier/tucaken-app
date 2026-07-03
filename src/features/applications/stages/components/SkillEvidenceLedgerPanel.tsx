@@ -1,5 +1,10 @@
-import { Link2, GitBranch, FolderGit2, FileUser } from 'lucide-react'
-import type { EvidenceStatus, SkillEvidenceEntry, SkillEvidenceLane } from '@/lib/types/applications.types'
+import { Link2, GitBranch, FolderGit2, FileUser, ScanSearch } from 'lucide-react'
+import type {
+  EvidenceStatus,
+  SkillEvidenceEntry,
+  SkillEvidenceLane,
+  SkillEvidencePassage,
+} from '@/lib/types/applications.types'
 import { tallyLedger, entryRetrievedRepos, LANE_LABEL, LANE_ORDER } from '../lib/evidence-quality'
 
 /**
@@ -141,6 +146,58 @@ function LaneChips({ lanes }: { readonly lanes: readonly SkillEvidenceLane[] }) 
   )
 }
 
+/**
+ * Retrieved-passage provenance — the "how was this verified" audit trail.
+ * Each passage the run's KB retrieval surfaced for this skill: source (as a
+ * GitHub link where resolvable), cosine/rerank scores, and a snippet showing
+ * WHY it matched. Collapsed by default so rows stay scannable.
+ */
+function ProvenancePassages({ passages }: { readonly passages: readonly SkillEvidencePassage[] }) {
+  if (passages.length === 0) return null
+  return (
+    <details className="group">
+      <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-[11px] font-medium text-zinc-500 underline-offset-2 hover:underline dark:text-zinc-400">
+        <ScanSearch className="size-3" aria-hidden />
+        How this was verified · {passages.length} retrieved passage{passages.length === 1 ? '' : 's'}
+      </summary>
+      <ul className="mt-2 space-y-2 border-l-2 border-zinc-200 pl-3 dark:border-white/10">
+        {passages.map((p, index) => {
+          const link = toFileLink(p.source, index)
+          return (
+            <li key={link.key} className="space-y-1">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                {link.href ? (
+                  <a
+                    href={link.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-mono text-xs text-accent underline-offset-2 hover:underline"
+                  >
+                    {link.label}
+                  </a>
+                ) : (
+                  <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">{link.label}</span>
+                )}
+                {typeof p.cosine === 'number' && (
+                  <span className="rounded-md border border-zinc-200 bg-white px-1.5 py-0.5 text-[10px] tabular-nums text-zinc-500 dark:border-white/10 dark:bg-white/5 dark:text-zinc-400">
+                    cosine {p.cosine.toFixed(3)}
+                  </span>
+                )}
+                {typeof p.rerank === 'number' && (
+                  <span className="rounded-md border border-zinc-200 bg-white px-1.5 py-0.5 text-[10px] tabular-nums text-zinc-500 dark:border-white/10 dark:bg-white/5 dark:text-zinc-400">
+                    rerank {p.rerank.toFixed(3)}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">{p.snippet}…</p>
+            </li>
+          )
+        })}
+      </ul>
+    </details>
+  )
+}
+
 function LedgerRow({ entry, counts }: { readonly entry: SkillEvidenceEntry; readonly counts: Map<string, number> }) {
   return (
     <li className="space-y-2 rounded-md border border-zinc-200 bg-white p-3 dark:border-white/10 dark:bg-white/2">
@@ -165,6 +222,10 @@ function LedgerRow({ entry, counts }: { readonly entry: SkillEvidenceEntry; read
       {entry.sourceLanes && entry.sourceLanes.length > 0 ? <LaneChips lanes={entry.sourceLanes} /> : null}
 
       <EvidenceFiles files={entry.evidenceFiles} />
+
+      {entry.provenance && entry.provenance.length > 0 ? (
+        <ProvenancePassages passages={entry.provenance} />
+      ) : null}
 
       {entry.transferableBridge && (entry.status === 'transferable' || entry.status === 'gap') ? (
         <p className="text-xs italic text-zinc-500 dark:text-zinc-400">
