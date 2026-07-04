@@ -62,6 +62,11 @@ or the root [README](../README.md) for the product and architecture.
 - [FinOps /costs returns zero despite real Bedrock spend](troubleshooting/finops-costs-empty-untagged-bedrock.md)
 - [Onboarding ingestion diagnostics (historical case study)](troubleshooting/onboarding-ingestion-diagnostics.md)
 
+## Reports
+
+- [portfolio-admin observability & reliability review](reports/portfolio-admin-observability-review.md)
+  — live review of the tucaken UI RUM + admin-api metrics/errors; the `/readyz`↔`getMeFn` reliability chain, gaps, and the UI/API decoupling assessment (keep the monorepo)
+
 ## Architecture and other
 
 - [Repository structure](architecture/repo-structure.md)
