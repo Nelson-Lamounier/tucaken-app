@@ -211,6 +211,23 @@ runtime-decoupled**:
 independent release cadence or a separate compliance/ownership boundary, or the
 combined CI becomes a bottleneck. None apply today.
 
+## Fixes applied — 2026-07-04
+
+| Gap | Status | Where |
+|:----|:-------|:------|
+| `/readyz` returns 500 not 503 (connection acquired outside try/catch) | ✅ Fixed | #236 — `observability.ts` + regression test (503-not-500) |
+| `getMeFn` logs expected-unauth as an error; no transient resilience | ✅ Fixed | #236 — `_dashboard.tsx` (quiet redirect + retry/backoff) |
+| No alert on admin-api readiness / DB / error-rate | ✅ Fixed | kubernetes-bootstrap #190 — `observability:admin-api` (3 alerts) |
+| No combined UI↔admin-api view | ✅ Fixed | kubernetes-bootstrap #190 — new dashboard row (frontend-rum v8) |
+| TTFB 2.4 s / FCP 2.9 s (SSR/auth on critical path) | 📋 Tracked | issue #237 |
+| CLS < 75% good on comments/ai-agent/billing | 📋 Tracked | issue #238 |
+| UI SSR RED metrics population | 📋 Tracked | issue #239 |
+| Decouple UI/API repo | ⛔ Not needed | already runtime-decoupled |
+
+The reliability incidents (`/readyz` 500s, `getMeFn` error storm) are **fixed at
+source and now alerted**; the performance/coverage refinements are tracked as
+issues. The admin-api fix auto-deploys via `deploy-admin-api.yml` on merge.
+
 ## Related
 
 - [Four-pillar observability](../concepts/four-pillars-observability.md)
