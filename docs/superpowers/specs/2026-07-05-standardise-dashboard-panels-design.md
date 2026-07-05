@@ -40,11 +40,15 @@ Resume-Readiness panel appears in the first row.
 - **Shared, unchanged:** Profile Intelligence tabs, Repo profile cards, the
   sidebar rail (Overview / Files / Checklist / Feed), and Quick actions.
 
-### 2. `KbScorePanel` — new `compact` prop
+### 2. `KbScorePanel` — new `compact` prop (densify, don't strip)
 
-Add `compact?: boolean` (default `false`). When `compact`, render the gauge +
-tier pill + tier label only, dropping the embedded `KbReadinessPanel` signal
-breakdown. Loading / null-diagnostic states are unchanged.
+Add `compact?: boolean` (default `false`). When `compact`, the panel keeps
+**all** its information — header + tier pill + AI analysis, gauge, tier label,
+and the embedded `KbReadinessPanel` signal breakdown — but densifies to fit the
+narrow rail: reduced card padding (`p-5`), a smaller gauge (`ReadinessGauge`
+gains a `compact` prop: `w-36` ring + `text-3xl` readout), and tighter breakdown
+spacing. Nothing is removed. Loading / null-diagnostic states share the same
+padding rule.
 
 `UserRagSection` (admin user drill-down) keeps calling the full, non-compact
 version — unaffected.

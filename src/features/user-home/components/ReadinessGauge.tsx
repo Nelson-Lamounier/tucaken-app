@@ -24,8 +24,10 @@ const [ARC_EX, ARC_EY] = polar(START + SWEEP, ARC_R)
 const ARC_PATH = `M ${ARC_SX} ${ARC_SY} A ${ARC_R} ${ARC_R} 0 1 1 ${ARC_EX} ${ARC_EY}`
 
 /** Animated radial readiness score (0–100): a colour-coded arc that draws to
- *  the value with the number counting up in the centre. Respects reduced-motion. */
-export function ReadinessGauge({ value }: { readonly value: number }) {
+ *  the value with the number counting up in the centre. Respects reduced-motion.
+ *  `compact` shrinks the whole gauge (smaller ring + readout) so it fits a
+ *  narrow rail without dropping any information. */
+export function ReadinessGauge({ value, compact = false }: { readonly value: number; readonly compact?: boolean }) {
   const reduce = useReducedMotion()
   const mv = useMotionValue(reduce ? value : 0)
 
@@ -45,7 +47,7 @@ export function ReadinessGauge({ value }: { readonly value: number }) {
   const tier = tierOf(value)
 
   return (
-    <div className="relative mx-auto aspect-square w-52">
+    <div className={`relative mx-auto aspect-square ${compact ? 'w-28' : 'w-52'}`}>
       <svg viewBox="0 0 200 200" className="h-full w-full">
         {/* Track */}
         <path
@@ -71,10 +73,10 @@ export function ReadinessGauge({ value }: { readonly value: number }) {
       {/* Centred score read-out */}
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
         <span className="flex items-baseline">
-          <motion.span className={`text-5xl font-semibold tabular-nums ${TIER_TEXT[tier]}`}>
+          <motion.span className={`font-semibold tabular-nums ${compact ? 'text-2xl' : 'text-5xl'} ${TIER_TEXT[tier]}`}>
             {rounded}
           </motion.span>
-          <span className="text-base font-normal text-zinc-400 dark:text-zinc-500">/100</span>
+          <span className={`font-normal text-zinc-400 dark:text-zinc-500 ${compact ? 'text-xs' : 'text-base'}`}>/100</span>
         </span>
       </div>
     </div>

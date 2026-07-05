@@ -41,13 +41,20 @@ function AiAnalysis({ explanation }: { readonly explanation: string }) {
 export function KbScorePanel({
   diagnostic,
   isLoading,
+  compact = false,
 }: {
   readonly diagnostic: DiagnosticJson | null
   readonly isLoading: boolean
+  /** When true, densify the whole panel — smaller gauge, tighter padding and
+   *  spacing — so it fits the narrow admin rail beside Activity *without*
+   *  dropping any information (the signal breakdown still renders). */
+  readonly compact?: boolean
 }) {
+  const pad = compact ? 'p-4' : 'p-6 sm:p-8'
+
   if (!diagnostic) {
     return (
-      <Card as="section" className="flex h-full flex-col overflow-hidden p-6 sm:p-8">
+      <Card as="section" className={`flex h-full flex-col overflow-hidden ${pad}`}>
         <p className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">Resume-Readiness</p>
         <p className="mt-4 text-sm text-zinc-500">
           {isLoading ? 'Calculating your readiness…' : 'Your readiness diagnostic is still being generated.'}
@@ -59,23 +66,29 @@ export function KbScorePanel({
   const tier = tierOf(diagnostic.overall)
 
   return (
-    <Card as="section" className="flex h-full flex-col overflow-hidden p-6 sm:p-8">
+    <Card as="section" className={`flex h-full flex-col overflow-hidden ${pad}`}>
       <div className="flex items-center justify-between gap-3">
         <p className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">Resume-Readiness</p>
-        <div className="flex items-center gap-2">
-          <span className={`rounded-full px-2.5 py-1 text-xs font-medium inset-ring ${TIER_PILL[tier].glow} ${TIER_TEXT[tier]}`}>
-            {PILL_TEXT[tier]}
-          </span>
-          {diagnostic.explanation && <AiAnalysis explanation={diagnostic.explanation} />}
-        </div>
+        {/* Header tags carry the tier verdict + AI note; in the densified rail
+            they're dropped — the gauge colour and the tier label line below say
+            the same thing in less space. */}
+        {!compact && (
+          <div className="flex items-center gap-2">
+            <span className={`rounded-full px-2.5 py-1 text-xs font-medium inset-ring ${TIER_PILL[tier].glow} ${TIER_TEXT[tier]}`}>
+              {PILL_TEXT[tier]}
+            </span>
+            {diagnostic.explanation && <AiAnalysis explanation={diagnostic.explanation} />}
+          </div>
+        )}
       </div>
 
-      <ReadinessGauge value={diagnostic.overall} />
+      <ReadinessGauge value={diagnostic.overall} compact={compact} />
 
       <p className="text-center text-sm font-medium text-zinc-700 dark:text-zinc-300">{TIER_PILL[tier].label}</p>
 
-      {/* At-a-glance signal breakdown, compact, where the analysis used to sit */}
-      <div className="mt-6 border-t border-zinc-200 pt-4 dark:border-white/5">
+      {/* At-a-glance signal breakdown — always shown; tighter top spacing when
+          the panel is densified for the rail. */}
+      <div className={`border-t border-zinc-200 pt-4 dark:border-white/5 ${compact ? 'mt-4' : 'mt-6'}`}>
         <KbReadinessPanel diagnostic={diagnostic} embedded />
       </div>
     </Card>
