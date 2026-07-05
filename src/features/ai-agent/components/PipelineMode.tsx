@@ -4,6 +4,8 @@ import { PipelineSubmittedBanner } from './PipelineSubmittedBanner'
 import { PipelineResultsPanel } from './PipelineResultsPanel'
 import { usePipelineStatus } from '../hooks/use-pipeline-status'
 import type { PipelineState } from '../hooks/use-pipeline-status'
+import { useArticleVersions } from '@/hooks/use-admin-articles'
+import { usePipelineRunStatus } from '@/hooks/use-admin-applications'
 
 interface PipelineModeProps {
   readonly pipelineSlug: string
@@ -11,6 +13,11 @@ interface PipelineModeProps {
 }
 
 // ── Pipeline stage definitions ────────────────────────────────────────────────
+//
+// Reflects the real article-pipeline K8s Job execution. admin-api dispatches the
+// Job (POST /pipelines/article-job/:slug — createNamespacedJob); pipeline_runs.
+// status advances researching → writing → qa → complete (or failed at any step).
+// There is no Step Functions state machine — that was the retired Lambda flow.
 
 interface Stage {
   id: string
@@ -20,32 +27,73 @@ interface Stage {
 }
 
 const STAGES: Stage[] = [
-  { id: 'research',  label: 'Research',   description: 'Haiku 4.5 — knowledge base + web research', icon: Search },
-  { id: 'writer',    label: 'Writer',     description: 'Sonnet 4.6 — MDX article generation',       icon: PenLine },
-  { id: 'qa',        label: 'QA Agent',   description: 'Sonnet 4.6 — accuracy & quality review',    icon: ShieldCheck },
+  { id: 'research', label: 'Research', description: 'Haiku 4.5 — knowledge base + web research', icon: Search },
+  { id: 'writer',   label: 'Writer',   description: 'Sonnet 4.6 — MDX article generation',       icon: PenLine },
+  { id: 'qa',       label: 'QA Agent', description: 'Sonnet 4.6 — accuracy, quality & retry-then-flag gate', icon: ShieldCheck },
 ]
 
-type StageStatus = 'pending' | 'active' | 'done' | 'failed'
+export type StageStatus = 'pending' | 'active' | 'done' | 'failed'
+
+/** Number of stages in the article pipeline (Research → Writer → QA). */
+export const ARTICLE_STAGE_COUNT = 3
 
 /**
- * Derive per-stage status from the high-level pipeline state.
- * The backend doesn't expose sub-stage progress, so we infer:
- *   pending     → all pending
- *   processing  → all active (unknown which stage is running)
- *   review/flagged/published/rejected → all done
- *   failed      → all failed
+ * Map the real pipeline_runs.status to the index of the stage it is running.
+ * Returns -1 for non-stage statuses (queued/complete/failed/unknown) so the
+ * caller falls back to the coarse article state.
  */
-function stageStatuses(state: PipelineState): [StageStatus, StageStatus, StageStatus] {
-  switch (state) {
-    case 'pending':    return ['pending',  'pending', 'pending']
-    case 'processing': return ['active',   'active',  'active']
-    case 'review':
-    case 'flagged':
-    case 'published':
-    case 'rejected':   return ['done',     'done',    'done']
-    case 'failed':     return ['failed',   'failed',  'failed']
-    default:           return ['pending',  'pending', 'pending']
+export function runStatusToStageIdx(status: string | null | undefined): number {
+  if (status === 'researching') return 0
+  if (status === 'writing')     return 1
+  if (status === 'qa')          return 2
+  return -1
+}
+
+const TERMINAL_OK: ReadonlySet<PipelineState> = new Set<PipelineState>([
+  'review',
+  'flagged',
+  'published',
+  'rejected',
+])
+
+export interface StageInputs {
+  /** Coarse article-row status (usePipelineStatus). */
+  readonly state: PipelineState
+  /** Live pipeline_runs.status (usePipelineRunStatus), or null when unavailable. */
+  readonly runStatus: string | null | undefined
+  /** The status poll gave up (>10 min without resolution). */
+  readonly timedOut: boolean
+}
+
+/**
+ * Per-stage status, from BOTH the coarse article state and the real
+ * pipeline_runs status. Mirrors the Strategist tracker: a run whose Job died
+ * before its catch block leaves the article row 'processing' but flips
+ * pipeline_runs.status to 'failed' — so a stage must render as failed (never
+ * left spinning) even when the article state alone still says 'processing'.
+ */
+export function stageStatusAt(idx: number, { state, runStatus, timedOut }: StageInputs): StageStatus {
+  const runStageIdx = runStatusToStageIdx(runStatus)
+  const isFailed = state === 'failed' || runStatus === 'failed'
+  const isFinished = TERMINAL_OK.has(state) || runStatus === 'complete'
+  const isStalled = isFailed || (timedOut && !isFinished)
+
+  if (isStalled) {
+    const stalledAt = runStageIdx >= 0 ? runStageIdx : 0
+    if (idx < stalledAt) return 'done'
+    if (idx === stalledAt) return 'failed'
+    return 'pending'
   }
+  if (isFinished) return 'done'
+  if (runStageIdx >= 0) {
+    if (idx < runStageIdx) return 'done'
+    if (idx === runStageIdx) return 'active'
+    return 'pending'
+  }
+  // No run row yet (dispatch just started): show the first stage active so the
+  // tracker never sits blank, rather than marking every stage active at once.
+  if (state === 'processing' && idx === 0) return 'active'
+  return 'pending'
 }
 
 // ── Stage step component ──────────────────────────────────────────────────────
@@ -54,17 +102,17 @@ function StageStep({ stage, status }: { stage: Stage; status: StageStatus }) {
   const Icon = stage.icon
 
   const iconCls = {
-    pending:    'bg-zinc-800 text-zinc-600',
-    active:     'bg-violet-500/20 text-violet-400 animate-pulse',
-    done:       'bg-emerald-500/20 text-emerald-400',
-    failed:     'bg-red-500/20 text-red-400',
+    pending: 'bg-zinc-800 text-zinc-600',
+    active:  'bg-violet-500/20 text-violet-400 animate-pulse',
+    done:    'bg-emerald-500/20 text-emerald-400',
+    failed:  'bg-red-500/20 text-red-400',
   }[status]
 
   const labelCls = {
-    pending:    'text-zinc-600',
-    active:     'text-violet-300',
-    done:       'text-zinc-200',
-    failed:     'text-red-400',
+    pending: 'text-zinc-600',
+    active:  'text-violet-300',
+    done:    'text-zinc-200',
+    failed:  'text-red-400',
   }[status]
 
   return (
@@ -84,9 +132,30 @@ function StageStep({ stage, status }: { stage: Stage; status: StageStatus }) {
 
 export function PipelineMode({ pipelineSlug, backToMenu }: PipelineModeProps) {
   const pipelineStatus = usePipelineStatus(pipelineSlug)
-  const state = pipelineStatus.data?.pipelineState ?? 'pending'
+  const state: PipelineState = pipelineStatus.data?.pipelineState ?? 'pending'
 
-  const stages = stageStatuses(state)
+  // Poll the real pipeline_runs row for this article. The coarse article status
+  // (usePipelineStatus, keyed on the articles row) stays 'processing' when the
+  // K8s Job dies before its catch block runs — only pipeline_runs.status flips to
+  // 'failed'. Mirror the Strategist tracker: track BOTH sources. useArticleVersions
+  // returns runs newest-first, so [0] is the current run; usePipelineRunStatus then
+  // live-polls it (status + errorMessage) while the run is active.
+  const runActive = state === 'pending' || state === 'processing'
+  const versions = useArticleVersions(runActive ? pipelineSlug : null)
+  const latestRunId = versions.data?.versions?.[0]?.pipelineRunId ?? null
+  const run = usePipelineRunStatus(latestRunId, runActive)
+
+  const runStageIdx = runStatusToStageIdx(run?.status)
+  const stageInputs: StageInputs = { state, runStatus: run?.status, timedOut: pipelineStatus.timedOut }
+
+  // Dual-source terminal detection (see stageStatusAt for the rationale).
+  const isFailed = state === 'failed' || run?.status === 'failed'
+  const isFinished = state === 'review' || state === 'flagged' || state === 'published'
+    || state === 'rejected' || run?.status === 'complete'
+  const isStalled = isFailed || (pipelineStatus.timedOut && !isFinished)
+
+  const isRunning = !isFinished && !isStalled && (state === 'processing' || runStageIdx >= 0)
+  const failureReason = run?.errorMessage ?? null
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -103,10 +172,10 @@ export function PipelineMode({ pipelineSlug, backToMenu }: PipelineModeProps) {
               Slug: <code className="rounded bg-zinc-800 px-1.5 text-violet-400">{pipelineSlug}</code>
             </p>
           </div>
-          {state === 'processing' && (
+          {isRunning && (
             <div className="flex items-center gap-1.5 rounded-full bg-violet-500/10 px-3 py-1">
               <Clock className="h-3 w-3 text-violet-400" />
-              <span className="text-[11px] font-medium text-violet-400">Polling every 10s</span>
+              <span className="text-[11px] font-medium text-violet-400">Polling every 5s</span>
             </div>
           )}
         </div>
@@ -118,7 +187,7 @@ export function PipelineMode({ pipelineSlug, backToMenu }: PipelineModeProps) {
         <div className="space-y-4">
           {STAGES.map((stage, i) => (
             <div key={stage.id}>
-              <StageStep stage={stage} status={stages[i]} />
+              <StageStep stage={stage} status={stageStatusAt(i, stageInputs)} />
               {i < STAGES.length - 1 && (
                 <div className="ml-4 mt-1 h-4 w-px bg-zinc-800" />
               )}
@@ -128,7 +197,7 @@ export function PipelineMode({ pipelineSlug, backToMenu }: PipelineModeProps) {
       </div>
 
       {/* ── Pending banner ───────────────────────────────────────────────────── */}
-      {state === 'pending' && (
+      {state === 'pending' && !isStalled && (
         <PipelineSubmittedBanner slug={pipelineSlug} />
       )}
 
@@ -184,7 +253,7 @@ export function PipelineMode({ pipelineSlug, backToMenu }: PipelineModeProps) {
             </div>
             <div>
               <p className="text-sm font-semibold text-amber-300">Article rejected and archived</p>
-              <p className="mt-1 text-xs text-zinc-500">Moved to archive. S3 content preserved.</p>
+              <p className="mt-1 text-xs text-zinc-500">Moved to archive. Source draft preserved.</p>
               <button onClick={backToMenu} className="mt-3 rounded-lg bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-700">
                 Start Over
               </button>
@@ -194,15 +263,22 @@ export function PipelineMode({ pipelineSlug, backToMenu }: PipelineModeProps) {
       )}
 
       {/* ── Failed ───────────────────────────────────────────────────────────── */}
-      {state === 'failed' && (
+      {isFailed && (
         <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-6">
           <div className="flex items-start gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-500/20">
               <XCircle className="h-5 w-5 text-red-400" />
             </div>
-            <div>
-              <p className="text-sm font-semibold text-red-300">Pipeline encountered an error</p>
-              <p className="mt-1 text-xs text-zinc-500">Bedrock pipeline failed. Check Step Functions console for details.</p>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-red-300">Pipeline run failed</p>
+              <p className="mt-1 text-xs text-zinc-500">
+                The article-pipeline Job errored before finishing. Retry to run it again.
+              </p>
+              {failureReason && (
+                <pre className="mt-3 max-h-32 overflow-auto whitespace-pre-wrap wrap-break-word rounded-md bg-zinc-950/60 p-3 font-mono text-[11px] leading-relaxed text-red-300/90 ring-1 ring-red-500/15">
+                  {failureReason}
+                </pre>
+              )}
               <button onClick={backToMenu} className="mt-3 rounded-lg bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-700">
                 Try Again
               </button>
@@ -211,17 +287,17 @@ export function PipelineMode({ pipelineSlug, backToMenu }: PipelineModeProps) {
         </div>
       )}
 
-      {/* ── Polling timeout ───────────────────────────────────────────────────── */}
-      {pipelineStatus.timedOut && (
+      {/* ── Polling timeout (only when not already failed/finished) ──────────── */}
+      {pipelineStatus.timedOut && !isFailed && !isFinished && (
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-6">
           <div className="flex items-start gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/20">
               <Clock className="h-5 w-5 text-amber-400" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-amber-300">Pipeline polling timed out</p>
+              <p className="text-sm font-semibold text-amber-300">Lost contact with this run</p>
               <p className="mt-1 text-xs text-zinc-500">
-                Running over 10 minutes without completing. May have failed silently. Check Step Functions console.
+                It has run over 10 minutes without a status update and may have stalled. Check the run history, or retry.
               </p>
               <button onClick={backToMenu} className="mt-3 rounded-lg bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-700">
                 Back to Menu
