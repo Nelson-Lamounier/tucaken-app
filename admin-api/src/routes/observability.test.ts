@@ -89,4 +89,66 @@ describe('GET /readyz', () => {
     // The client WAS acquired here, so it must be released back to the pool.
     expect(release).toHaveBeenCalledTimes(1);
   });
+
+  // Regression tests for the 2026-07-05 outage: when the DB is briefly slow,
+  // the 1s probe bound abandons a `pool.connect()` acquire that pg-pool later
+  // fulfils. That checked-out client had no owner, so it leaked; at max:5 a
+  // few probe cycles wedged the whole pool and the pod stayed 0/1 until
+  // manually replaced.
+  describe('slow-acquire leak', () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('releases a client whose acquire resolves after the probe timed out', async () => {
+      jest.useFakeTimers();
+      const release = jest.fn();
+      const client = {
+        query: jest.fn(async () => ({ rows: [{ ok: 1 }], rowCount: 1 })),
+        release,
+      } as unknown as PoolClient;
+      let resolveConnect!: (c: PoolClient) => void;
+      const connect = jest.fn(
+        () =>
+          new Promise<PoolClient>((resolve) => {
+            resolveConnect = resolve;
+          }),
+      );
+      const pool = { connect } as unknown as Pool;
+
+      const resPromise = buildApp(pool).request('/readyz');
+      await jest.advanceTimersByTimeAsync(1_001);
+      const res = await resPromise;
+      expect(res.status).toBe(503);
+      expect(release).not.toHaveBeenCalled();
+
+      // pg-pool completes the acquire AFTER the handler already answered 503.
+      // The client must be returned to the pool, not abandoned.
+      resolveConnect(client);
+      await jest.advanceTimersByTimeAsync(0);
+      expect(release).toHaveBeenCalledTimes(1);
+    });
+
+    it('destroys (release(err)) a client whose probe query timed out', async () => {
+      jest.useFakeTimers();
+      const release = jest.fn();
+      const client = {
+        // Query never settles — connection is still busy when the bound fires.
+        query: jest.fn(() => new Promise(() => undefined)),
+        release,
+      } as unknown as PoolClient;
+      const pool = {
+        connect: jest.fn(async () => client),
+      } as unknown as Pool;
+
+      const resPromise = buildApp(pool).request('/readyz');
+      await jest.advanceTimersByTimeAsync(1_001);
+      const res = await resPromise;
+      expect(res.status).toBe(503);
+      // A truthy release() argument tells pg to destroy the connection —
+      // returning a connection with an in-flight query would poison the pool.
+      expect(release).toHaveBeenCalledTimes(1);
+      expect(release.mock.calls[0]?.[0]).toBeInstanceOf(Error);
+    });
+  });
 });

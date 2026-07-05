@@ -57,21 +57,35 @@ export function createObservabilityRouter(pool: Pool): Hono {
   router.get('/livez', (ctx) => ctx.json({ status: 'ok' }));
 
   router.get('/readyz', async (ctx) => {
-    // Acquire the connection INSIDE the try. Previously `pool.connect()` sat
-    // outside it, so a connection-acquisition failure (pool exhausted, DB
-    // unreachable) escaped as an unhandled 500 instead of the intended 503 —
-    // which both mislabelled the readiness signal and hid the real cause. Now
-    // any failure (acquire, query, or timeout) yields 503 "not-ready", and the
-    // client is released only if it was actually acquired.
-    let client: PoolClient | undefined;
+    // Acquire failures (pool exhausted, DB unreachable) must surface as 503
+    // "not-ready", never an unhandled 500 — see the test file for history.
+    const acquire = pool.connect();
+    let client: PoolClient;
     try {
-      client = await withTimeout(pool.connect(), READYZ_TIMEOUT_MS, 'connect');
+      client = await withTimeout(acquire, READYZ_TIMEOUT_MS, 'connect');
+    } catch (err) {
+      // The bounded wait gave up, but pg-pool keeps the acquire queued and may
+      // fulfil it later. An unawaited fulfilled acquire is a permanently
+      // checked-out client: with pool max 5, a few slow-DB probe cycles leak
+      // the entire pool and wedge the pod until it is replaced. Release the
+      // client on late arrival; swallow a late rejection (nothing to release).
+      void acquire.then(
+        (lateClient) => lateClient.release(),
+        () => undefined,
+      );
+      return ctx.json({ status: 'not-ready', reason: (err as Error).message }, 503);
+    }
+    try {
       await withTimeout(client.query('SELECT 1'), READYZ_TIMEOUT_MS, 'query');
+      client.release();
       return ctx.json({ status: 'ready' });
     } catch (err) {
-      return ctx.json({ status: 'not-ready', reason: (err as Error).message }, 503);
-    } finally {
-      client?.release();
+      // The probe query may still be in flight on this connection; returning
+      // it to the pool would hand the next caller a dirty connection. A truthy
+      // release() argument tells pg to destroy it instead.
+      const reason = err instanceof Error ? err : new Error(String(err));
+      client.release(reason);
+      return ctx.json({ status: 'not-ready', reason: reason.message }, 503);
     }
   });
 
