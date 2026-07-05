@@ -33,7 +33,7 @@ export function ActivityPanel() {
 
   if (isLoading) {
     return (
-      <Card as="section" className="p-6">
+      <Card as="section" className="h-full p-6">
         <p className="text-sm text-zinc-500">Loading your activity…</p>
       </Card>
     )
@@ -44,7 +44,7 @@ export function ActivityPanel() {
   const hasActivity = totals.applications + totals.resumes > 0
 
   return (
-    <Card as="section" className="space-y-4 p-5">
+    <Card as="section" className="h-full space-y-4 p-5">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Activity className="size-5 text-accent" />

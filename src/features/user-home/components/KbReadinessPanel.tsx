@@ -50,7 +50,8 @@ export function KbReadinessPanel({
     );
   }
 
-  const rowPad = embedded ? "px-0 py-2" : "px-6 py-3";
+  const rowPad = embedded ? "px-0 py-1" : "px-6 py-3";
+  const rowGap = embedded ? "gap-0.5" : "gap-1";
   const blockerPad = embedded ? "px-0" : "px-6";
   const labelSize = embedded ? "text-[11px]" : "text-sm";
   const scoreSize = embedded ? "text-[11px]" : "text-sm";
@@ -91,7 +92,8 @@ export function KbReadinessPanel({
                   setOpenKey((prev) => (prev === key ? null : key))
                 }
                 className={cn(
-                  "flex w-full flex-col gap-1 text-left transition-colors disabled:cursor-default",
+                  "flex w-full flex-col text-left transition-colors disabled:cursor-default",
+                  rowGap,
                   rowPad,
                   hasBlockers &&
                     (embedded

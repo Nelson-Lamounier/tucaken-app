@@ -16,7 +16,6 @@ import { KbScorePanel } from './KbScorePanel'
 import { KbOverviewPanel } from './KbOverviewPanel'
 import { RepoBreakdownPanel } from './RepoBreakdownPanel'
 import { ActivityPanel } from './ActivityPanel'
-import { KbStatsPanel } from './KbStatsPanel'
 import { KbSetupChecklist } from './KbSetupChecklist'
 import { KbActivityFeed } from './KbActivityFeed'
 import { RepoProfileCards } from './RepoProfileCards'
@@ -31,7 +30,6 @@ import { projectsQueries } from '@/features/projects/server/queries'
 import { partitionProjects } from '@/features/projects/lib/classify'
 import { deriveKbStats } from '../lib/kb-stats'
 import { deriveDashboardSummary } from '../lib/dashboard-summary'
-import { buildHeroTiles, deriveHeroSparks, deriveHeroMeta } from '../lib/hero-tiles'
 
 export function UserDashboard() {
   const { data: repos = [], isLoading: loadingRepos } = useGitHubConnectedRepos()
@@ -64,12 +62,6 @@ export function UserDashboard() {
     hasProject,
     mirror:  profileSummary?.mirror?.paragraph ?? null,
   })
-  const heroTiles    = buildHeroTiles(
-    isLoading,
-    stats,
-    deriveHeroSparks(repos, entries, imports),
-    deriveHeroMeta(repos, entries, imports),
-  )
 
   return (
     <DashboardPage
@@ -77,21 +69,30 @@ export function UserDashboard() {
       description="Your AI agent's data health at a glance."
     >
       <div className="space-y-8">
-        {/* X — Large / full-width band. Add a large, full-width panel here; it
-            stacks to the bottom. The Resume-Readiness diagnostic is not yet
-            trustworthy for end users (lossy-rollup false negatives), so it is
-            admin-only until the data matures; users see their activity instead. */}
-        {isAdmin ? (
-          <PanelGrid min={320}>
-            <KbScorePanel diagnostic={profileSummary?.diagnostic ?? null} isLoading={isLoading} />
-            <KbStatsPanel tiles={heroTiles} />
-          </PanelGrid>
-        ) : (
-          <PanelStack>
-            <WelcomeSummary summary={summary} />
+        {/* X — Large / full-width band. Every user gets the same first row:
+            greeting + activity. Admins additionally see a compact
+            Resume-Readiness beside Activity — the one panel that distinguishes
+            the admin view. (The diagnostic is not yet trustworthy for end users
+            — lossy-rollup false negatives — so it stays admin-only for now.) */}
+        <PanelStack>
+          <WelcomeSummary summary={summary} />
+          {isAdmin ? (
+            <SplitLayout
+              stretch
+              asideWidth={380}
+              main={<ActivityPanel />}
+              aside={
+                <KbScorePanel
+                  compact
+                  diagnostic={profileSummary?.diagnostic ?? null}
+                  isLoading={isLoading}
+                />
+              }
+            />
+          ) : (
             <ActivityPanel />
-          </PanelStack>
-        )}
+          )}
+        </PanelStack>
 
         {/* Main reading column (left) + small sidebar rail (right). The overview
             row sits at the top of the main column so it shares Profile
@@ -99,17 +100,15 @@ export function UserDashboard() {
         <SplitLayout
           main={
             <PanelStack>
-              {/* Y — Medium / equal-height card grid (non-admin). */}
-              {!isAdmin && (
-                <PanelGrid min={300}>
-                  <RepoBreakdownPanel />
-                  <CareerDataBreakdown
-                    entries={entries}
-                    latestImport={latestImport}
-                    isLoading={loadingEntries || loadingImports}
-                  />
-                </PanelGrid>
-              )}
+              {/* Y — Medium / equal-height card grid (all users). */}
+              <PanelGrid min={300}>
+                <RepoBreakdownPanel />
+                <CareerDataBreakdown
+                  entries={entries}
+                  latestImport={latestImport}
+                  isLoading={loadingEntries || loadingImports}
+                />
+              </PanelGrid>
               {profileSummary && (
                 <Card as="section" className="flex flex-col overflow-hidden">
                   <div className="flex items-center border-b border-zinc-200 px-6 py-4 dark:border-white/5">
