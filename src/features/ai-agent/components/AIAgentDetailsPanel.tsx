@@ -18,22 +18,21 @@ interface AIAgentDetailsPanelProps {
 /**
  * Maps the high-level pipeline state to a 6-step ProgressBar.
  *
- * Actual backend sequence:
- *   0. S3 Upload       — draft written to the S3 pipeline input bucket
- *   1. Pipeline Trigger — ObjectCreated event fires the trigger Lambda,
- *                         which starts the Step Functions state machine
+ * Actual backend sequence (article-pipeline K8s Job, not Step Functions):
+ *   0. Draft Upload    — draft stored in the pipeline input bucket
+ *   1. Job Dispatch    — admin-api creates the article-pipeline Kubernetes Job
  *   2. Research Agent  — Haiku 4.5 queries the knowledge base and web
  *   3. Writer Agent    — Sonnet 4.6 generates the MDX article
- *   4. QA Agent        — Sonnet 4.6 reviews accuracy and quality
+ *   4. QA Agent        — Sonnet 4.6 reviews accuracy/quality; retry-then-flag gate
  *   5. Human Review    — approve to publish, reject to archive
  *
  * State → current step index:
- *   pending    → 1  (trigger Lambda in flight)
+ *   pending    → 1  (Job being dispatched)
  *   processing → 2  (Bedrock agents running; Research is first)
  *   flagged    → 4  (QA ran and scored below threshold)
  *   review     → 5  (agents complete, awaiting human approval)
  *   rejected   → 5  (terminal at review stage)
- *   failed     → 2  (pipeline errored during Bedrock execution)
+ *   failed     → 2  (Job errored during Bedrock execution)
  *   published  → all complete
  */
 function stepsFromPipelineState(state: PipelineState | undefined): ProgressStep[] {
@@ -58,13 +57,13 @@ function stepsFromPipelineState(state: PipelineState | undefined): ProgressStep[
 
   return [
     {
-      name: 'S3 Upload',
-      description: 'Draft written to the S3 pipeline input bucket',
+      name: 'Draft Upload',
+      description: 'Draft stored in the pipeline input bucket',
       status: step(0),
     },
     {
-      name: 'Pipeline Trigger',
-      description: 'ObjectCreated event starts the Step Functions state machine',
+      name: 'Job Dispatch',
+      description: 'admin-api starts the article-pipeline Kubernetes Job',
       status: step(1),
     },
     {
