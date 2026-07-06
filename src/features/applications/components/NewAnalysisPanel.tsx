@@ -6,7 +6,7 @@ import { useApplicationsTrigger } from '../hooks/use-applications-trigger'
 import { usePipelineNotificationsStore } from '@/lib/stores/pipeline-notifications-store'
 import { useProgressModalStore } from '@/lib/stores/progress-modal-store'
 import type { InterviewStage } from '@/lib/types/applications.types'
-import { MIN_JD_LENGTH } from './ApplicationTypes'
+import { MIN_JD_LENGTH, JD_LONG_WARNING_LENGTH } from './ApplicationTypes'
 import { FormInput } from '@/components/ui/Field'
 import { Button } from '@/components/ui/Button'
 import { ResumeMenuSelect } from './ResumeMenuSelect'
@@ -240,6 +240,20 @@ export function NewAnalysisPanel({ resumeId, onResumeChange }: NewAnalysisPanelP
                     className="block h-full min-h-80 w-full flex-1 resize-y rounded-md border-0 bg-zinc-50 p-2 text-base/6 text-zinc-900 shadow-sm ring-1 ring-inset ring-zinc-300 focus:ring-2 focus:ring-inset focus:ring-teal-500 lg:min-h-96 dark:bg-white/5 dark:text-white dark:ring-white/10"
                   />
                 )}
+              />
+              {/* Proactive length warning — very long JDs can be rejected at the
+                  edge (WAF 8 KB body cap) before reaching Tucaken. Warn, never block. */}
+              <form.Subscribe
+                selector={(state) => state.values.jobDescription.length}
+                children={(len) =>
+                  len > JD_LONG_WARNING_LENGTH ? (
+                    <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400">
+                      Very long ({len.toLocaleString()} characters). Long job descriptions
+                      can be rejected before they reach Tucaken — trim to the core
+                      responsibilities and requirements.
+                    </p>
+                  ) : null
+                }
               />
             </div>
           </div>

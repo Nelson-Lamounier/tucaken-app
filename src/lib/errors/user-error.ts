@@ -29,7 +29,7 @@ export type ErrorContext =
   | 'generic'
 
 const CONTEXT_COPY: Record<ErrorContext, { title: string; message: string }> = {
-  analysis:   { title: "Couldn't start the analysis", message: 'Check the job description and target details, then try again.' },
+  analysis:   { title: "Couldn't start the analysis", message: 'A very long job description can be rejected before it reaches Tucaken. Try trimming it to the core responsibilities and requirements, or retry in a moment.' },
   coach:      { title: "Couldn't generate interview prep", message: 'Give it another try in a moment.' },
   regenerate: { title: "Couldn't refresh the case study", message: 'Give it another try in a moment.' },
   save:       { title: "Couldn't save your changes", message: 'Your changes weren’t saved — try again.' },
