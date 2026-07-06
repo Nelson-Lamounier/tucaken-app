@@ -22,6 +22,13 @@ import type { AdminApiConfig } from './config.js';
 /** Shared interface satisfied by both Pool and PoolClient — use in repository signatures. */
 export type Queryable = Pick<Pool, 'query'>;
 
+/**
+ * Pool size ceiling. Exported so the liveness probe's wedged-pool detection
+ * (routes/observability.ts) compares against the SAME bound the Pool is built
+ * with — a drift between the two would silently disable the detection.
+ */
+export const PG_POOL_MAX = 5;
+
 let _pool: Pool | undefined;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -34,7 +41,7 @@ export function getPool(config: AdminApiConfig): Pool {
             database: config.pgDatabase,
             user:     config.pgUser,
             password: config.pgPassword,
-            max:      5,
+            max:      PG_POOL_MAX,
             idleTimeoutMillis:       30_000,
             connectionTimeoutMillis:  5_000,
         });
