@@ -145,10 +145,10 @@ describe('buildReenrichJobSpec (tier-gated backlog drain)', () => {
         expect((job.metadata?.name ?? '').length).toBeLessThanOrEqual(63);
     });
 
-    it('premium gets full LLM enrichment env (ENRICH_TIER1, no ENRICHMENT_DISABLED)', () => {
+    it('premium is Tier-1-only too — LLM enrichment retired (ENRICHMENT_DISABLED always set)', () => {
         const env = reenrichEnv({ effectivePlan: 'premium' });
         expect(env.get('ENRICH_TIER1')).toBe('1');
-        expect(env.has('ENRICHMENT_DISABLED')).toBe(false);
+        expect(env.get('ENRICHMENT_DISABLED')).toBe('1');
         expect(env.get('ENRICH_CANONICAL')).toBe('1');
         expect(env.get('ENRICH_PACK')).toBe('1');           // packed canonical residue
         expect(env.get('ENRICHMENT_MODEL_ID')).toMatch(/^eu\./);
@@ -161,9 +161,9 @@ describe('buildReenrichJobSpec (tier-gated backlog drain)', () => {
         }
     });
 
-    it('admin role overrides a free plan to full enrichment', () => {
+    it('admin role no longer bypasses the retirement — ENRICHMENT_DISABLED holds', () => {
         const env = reenrichEnv({ effectivePlan: 'free', role: 'admin' });
-        expect(env.has('ENRICHMENT_DISABLED')).toBe(false);
+        expect(env.get('ENRICHMENT_DISABLED')).toBe('1');
         expect(env.get('ENRICH_TIER1')).toBe('1');
     });
 });
@@ -178,11 +178,11 @@ describe('resolveEnrichmentEnv (plan + admin driven)', () => {
             expect(resolveEnrichmentEnv(plan, 'user')).toEqual({ ENRICHMENT_DISABLED: '1', ENRICH_TIER1: '1' });
         }
     });
-    it('premium gets full enrichment', () => {
-        expect(resolveEnrichmentEnv('premium', 'user')).toEqual({ ENRICH_TIER1: '1' });
+    it('premium is Tier-1-only (LLM enrichment retired)', () => {
+        expect(resolveEnrichmentEnv('premium', 'user')).toEqual({ ENRICHMENT_DISABLED: '1', ENRICH_TIER1: '1' });
     });
-    it('an admin gets full enrichment on any plan', () => {
-        expect(resolveEnrichmentEnv('free', 'admin')).toEqual({ ENRICH_TIER1: '1' });
+    it('admin role is Tier-1-only as well (kill switch holds for every role)', () => {
+        expect(resolveEnrichmentEnv('free', 'admin')).toEqual({ ENRICHMENT_DISABLED: '1', ENRICH_TIER1: '1' });
     });
     it('a missing role fails closed to Tier-1', () => {
         expect(resolveEnrichmentEnv('free', null)).toEqual({ ENRICHMENT_DISABLED: '1', ENRICH_TIER1: '1' });
@@ -192,15 +192,15 @@ describe('resolveEnrichmentEnv (plan + admin driven)', () => {
     // Live tier config path
     // -------------------------------------------------------------------------
 
-    it('uses tierConfig enrichment when provided: free tier overridden to full → returns full env', () => {
-        // Build a config where the free tier has enrichment = 'full' (DB override).
+    it("a tierConfig override to 'full' CANNOT re-enable the enricher — the kill switch holds", () => {
+        // Build a config where the free tier has enrichment = 'full' (stale DB override).
         const overridden: TierConfig = {
             tiers: DEFAULT_TIER_CONFIG.tiers.map((t) =>
                 t.id === 'free' ? { ...t, entitlements: { ...t.entitlements, enrichment: 'full' } } : t,
             ),
         };
-        // With live config: free tier now yields full enrichment.
-        expect(resolveEnrichmentEnv('free', null, overridden)).toEqual({ ENRICH_TIER1: '1' });
+        // LLM enrichment is retired: even a live-config 'full' resolves to disabled.
+        expect(resolveEnrichmentEnv('free', null, overridden)).toEqual({ ENRICHMENT_DISABLED: '1', ENRICH_TIER1: '1' });
     });
 
     it('static path unchanged when no tierConfig: free tier still yields Tier-1 env', () => {
@@ -215,8 +215,8 @@ describe('resolveEnrichmentEnv (plan + admin driven)', () => {
             ),
         };
         const env = envOf({ effectivePlan: 'free', tierConfig: overridden });
-        // With the overridden config, free plan should yield full enrichment (no ENRICHMENT_DISABLED).
-        expect(env.has('ENRICHMENT_DISABLED')).toBe(false);
+        // tierConfig still flows through the opts, but the retired enricher stays disabled.
+        expect(env.get('ENRICHMENT_DISABLED')).toBe('1');
         expect(env.get('ENRICH_TIER1')).toBe('1');
     });
 });

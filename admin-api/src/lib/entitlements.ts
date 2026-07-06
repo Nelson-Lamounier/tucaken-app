@@ -42,7 +42,10 @@ export const ENTITLEMENTS: Record<EffectivePlan, Entitlements> = {
     free:    { repos: 1, projects: 1, resumesPerMonth: 1, ingestionJobsPerMonth: 3, enrichment: 'tier1' },
     trial:   { ...UNLIMITED },
     pro:     { ...UNLIMITED },
-    premium: { ...UNLIMITED, enrichment: 'full' },
+    // premium no longer grants 'full' — LLM chunk enrichment is retired (see
+    // enrichmentEnv below). The 'full' mode stays representable so stored tier
+    // configs keep validating.
+    premium: { ...UNLIMITED },
 };
 
 /**
@@ -108,9 +111,23 @@ export function entitlementsFromConfig(
     };
 }
 
-/** Worker env vars for an enrichment mode (consumed by the ingestion Job). */
-export function enrichmentEnv(mode: EnrichmentMode): Record<string, string> {
-    return mode === 'full'
-        ? { ENRICH_TIER1: '1' }
-        : { ENRICHMENT_DISABLED: '1', ENRICH_TIER1: '1' };
+/**
+ * Worker env vars for an enrichment mode (consumed by the ingestion Job).
+ *
+ * RETIRED (2026-07-06): LLM chunk enrichment is disabled for EVERY mode —
+ * including 'full' — because two measurements showed no retrieval benefit:
+ * the golden-set A/B (rag_eval_runs cff9c15b vs 5515e590: recall@8 identical
+ * at 0.9194 with the skills lane on vs off) and a real-JD replay (run
+ * f133155f: 5/5 retrieval queries byte-identical top-15), while enrichment
+ * accounted for ~99% of ingestion LLM spend (~$7-10 per repo sync). Retrieval
+ * keeps the deterministic Tier-1 tech->skill mapping, file_tech_stack gating,
+ * and the existing skills[] tags already in document_embeddings.
+ *
+ * This function is the single kill switch: it also covers stale DB tier
+ * configs that still say enrichment='full'. To re-enable (e.g. for a
+ * contextual-embedding trial), restore the mode branch here and re-run the
+ * rag-eval A/B first.
+ */
+export function enrichmentEnv(_mode: EnrichmentMode): Record<string, string> {
+    return { ENRICHMENT_DISABLED: '1', ENRICH_TIER1: '1' };
 }
