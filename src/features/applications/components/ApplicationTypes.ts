@@ -35,6 +35,15 @@ export const INTERVIEW_STAGE_OPTIONS: readonly { value: InterviewStage; label: s
 
 export const MIN_JD_LENGTH = 50
 
+/**
+ * Soft warning threshold (characters) for very long job descriptions. The shared
+ * public ALB's WAF rejects request bodies over 8 KB (SizeRestrictions_BODY), so a
+ * job description near that size — plus the other form fields and serialisation
+ * overhead — can be blocked at the edge before it reaches Tucaken. We warn (never
+ * block) so the user can trim proactively; admin-api's own hard cap is 100 KB.
+ */
+export const JD_LONG_WARNING_LENGTH = 7000
+
 // =============================================================================
 // COLOUR MAPS
 // =============================================================================
