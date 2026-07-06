@@ -251,6 +251,11 @@ export function createArticlesRouter(config: AdminApiConfig): Hono<AdminApiBindi
             : existing.publishedAt,
         coverImage:   'coverImage'   in updates ? (updates['coverImage']   as string | null) : existing.coverImage,
         destinations: 'destinations' in updates ? (filteredDest.length > 0 ? filteredDest : existing.destinations) : existing.destinations,
+        // articles.author_id is NOT NULL (migration 105) and Postgres rejects
+        // a NULL in the candidate insert tuple BEFORE the upsert's ON CONFLICT
+        // COALESCE can preserve the stored owner — the payload must carry it.
+        // The fetch above is scoped author_id = userId, so userId IS the owner.
+        authorId: userId,
     };
 
     await upsertArticle(pool, merged);

@@ -138,4 +138,28 @@ describe('article routes — owner scoping', () => {
       expect.objectContaining({ slug: 'new-post', authorId: OWNER }),
     );
   });
+
+  // Regression (2026-07-06 live 500): the PUT merge dropped authorId, so the
+  // upsert bound NULL — and since migration 105 made articles.author_id NOT
+  // NULL, Postgres rejects the candidate insert tuple (23502) BEFORE the
+  // ON CONFLICT COALESCE(articles.author_id, …) can preserve the owner. Every
+  // metadata save, content save, and unpublish 500'd. The merged payload must
+  // always carry the signed-in owner.
+  it('PUT /:slug carries the signed-in owner into the upsert payload', async () => {
+    getArticleBySlugForAuthorMock.mockResolvedValueOnce(article());
+    const res = await appWithUser(OWNER).request('/my-article', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coverImage: 'https://nelsonlamounier.com/articles/images/articles/cover.png' }),
+    });
+    expect(res.status).toBe(200);
+    expect(upsertArticleMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        slug: 'my-article',
+        coverImage: 'https://nelsonlamounier.com/articles/images/articles/cover.png',
+        authorId: OWNER,
+      }),
+    );
+  });
 });

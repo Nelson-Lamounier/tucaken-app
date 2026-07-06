@@ -114,7 +114,8 @@ export async function getArticleBySlugForAuthor(
 ): Promise<Article | null> {
     const result = await pool.query(
         `SELECT slug, title, excerpt, content_md, tags, status, ai_generated,
-                ai_model, published_at, cover_image, destinations, created_at, updated_at
+                ai_model, published_at, cover_image, destinations, author_id,
+                created_at, updated_at
          FROM articles WHERE slug = $1 AND author_id = $2`,
         [slug, authorId],
     );
