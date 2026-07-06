@@ -2,6 +2,12 @@
  * @format
  * Periodic re-enrichment sweep — drains the deferred enrichment backlog.
  *
+ * RETIRED IN PRACTICE (2026-07-06): LLM enrichment is disabled for every tier
+ * (see entitlements.ts enrichmentEnv — measured A/B showed no retrieval
+ * benefit). With the static map granting no 'full' mode, this sweep dispatches
+ * nothing; the CronJob is suspended in kubernetes-bootstrap. The code is kept
+ * as the backfill worker skeleton for a future contextual-embedding trial.
+ *
  * Chunks left `enrichment_status IN ('pending','skipped_quota')` by a deferred
  * or deadline-stopped ingestion pass only get enriched when their repo next
  * syncs. With push webhooks quiet, that backlog can sit for weeks (live

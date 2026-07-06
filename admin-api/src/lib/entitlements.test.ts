@@ -29,10 +29,10 @@ describe('ENTITLEMENTS', () => {
         expect(ENTITLEMENTS.pro.repos).toBe(Infinity);
         expect(ENTITLEMENTS.premium.repos).toBe(Infinity);
     });
-    it('only premium gets full chunk enrichment; trial mirrors pro', () => {
+    it('every plan is Tier-1 (LLM enrichment retired); trial mirrors pro', () => {
         expect(ENTITLEMENTS.free.enrichment).toBe('tier1');
         expect(ENTITLEMENTS.pro.enrichment).toBe('tier1');
-        expect(ENTITLEMENTS.premium.enrichment).toBe('full');
+        expect(ENTITLEMENTS.premium.enrichment).toBe('tier1');
         expect(ENTITLEMENTS.trial).toEqual(ENTITLEMENTS.pro);
     });
 });
@@ -62,12 +62,12 @@ describe('entitlementsFor', () => {
     });
 });
 
-describe('enrichmentEnv', () => {
+describe('enrichmentEnv (LLM enrichment retired 2026-07-06)', () => {
     it('tier1 disables the enricher but keeps deterministic Tier 1', () => {
         expect(enrichmentEnv('tier1')).toEqual({ ENRICHMENT_DISABLED: '1', ENRICH_TIER1: '1' });
     });
-    it('full lets the enricher run (Tier 1 still flagged)', () => {
-        expect(enrichmentEnv('full')).toEqual({ ENRICH_TIER1: '1' });
+    it("'full' is also disabled — the kill switch holds for every mode, including stale tier configs", () => {
+        expect(enrichmentEnv('full')).toEqual({ ENRICHMENT_DISABLED: '1', ENRICH_TIER1: '1' });
     });
 });
 
