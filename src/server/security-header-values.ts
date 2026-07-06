@@ -31,7 +31,8 @@ export function buildCsp(nonce?: string): string {
     "default-src 'self'",
     scriptSrc(nonce),
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: https:",
+    // blob: — local object-URL previews (e.g. CoverImageField) before upload.
+    "img-src 'self' blob: data: https:",
     "font-src 'self' https:",
     "connect-src 'self' https://*.nelsonlamounier.com https://*.amazonaws.com https://*.amazoncognito.com https://api.stripe.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com",
     "frame-src https://js.stripe.com https://hooks.stripe.com",

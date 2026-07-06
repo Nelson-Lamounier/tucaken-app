@@ -1,17 +1,17 @@
 /**
  * @format
- * Media upload server function for the admin dashboard.
+ * Media upload presign server function for the admin dashboard.
  *
- * All upload operations are delegated to the `admin-api` BFF service via
- * the pre-signed URL pattern: admin-api generates a signed S3 PUT URL,
- * and the binary content is uploaded directly from the pod to S3.
- *
- * This avoids routing binary content through the Kubernetes pod, reducing
- * memory pressure and upload latency.
+ * The browser sends ONLY metadata (name, type, size) here; admin-api signs an
+ * S3 PUT URL and the browser uploads the binary straight to S3. The file body
+ * must never cross this server fn: AWS WAF on the ALB rejects large request
+ * bodies with 403 before they reach the pod (verified live 2026-07-06), and
+ * the S3 bucket already allows CORS PUT from the app origin.
  *
  * Protected by JWT authentication and admin membership via `requireAdmin()`.
  *
  * @see admin-api/src/routes/assets.ts — upstream presign + delete implementation
+ * @see src/features/articles/lib/upload-cover-image.ts — the browser-side PUT
  */
 
 import { createServerFn } from '@tanstack/react-start'
@@ -64,66 +64,53 @@ function deriveExtension(mimeType: string): string {
 // Schemas
 // =============================================================================
 
-/** Validate that the incoming payload is a FormData instance */
-const formDataSchema = z.instanceof(FormData)
+/** Metadata-only presign request — the file body never crosses this boundary. */
+const presignInputSchema = z.object({
+  fileName: z.string().min(1).max(255),
+  contentType: z.string().min(1),
+  contentLength: z.number().int().positive().max(MAX_FILE_SIZE),
+  /** Optional deterministic ID for content-addressed storage. */
+  id: z.string().min(1).max(120).optional(),
+})
 
 // =============================================================================
 // Server Function
 // =============================================================================
 
 /**
- * Uploads a media file (image or video) to S3 via admin-api pre-signed URLs.
+ * Issues a pre-signed S3 PUT URL for a media file (image or video).
  *
  * Flow:
- *   1. Validates the file type and size locally
- *   2. Requests a pre-signed PUT URL from admin-api
- *   3. Uploads the binary directly to S3 using the signed URL
- *   4. Returns the public CDN URL and S3 key
- *
- * Receives a `FormData` payload with:
- * - `file` — The binary file
- * - `id` (optional) — A deterministic ID for content-addressed storage
- *
- * @returns Upload result with the public URL and S3 key
+ *   1. Validates the declared type and size (admin-api re-validates upstream)
+ *   2. Derives the S3 key (content-addressed when `id` is given)
+ *   3. Requests a pre-signed PUT URL from admin-api
+ *   4. Returns { url, key, publicUrl } — the caller PUTs the binary to `url`
+ *      from the browser and persists `publicUrl`
  */
-export const uploadMediaFn = createServerFn({ method: 'POST' })
-  .inputValidator(formDataSchema)
-  .handler(async ({ data: formData }) => {
+export const presignMediaUploadFn = createServerFn({ method: 'POST' })
+  .inputValidator(presignInputSchema)
+  .handler(async ({ data }) => {
     await requireAdmin()
 
-    const file = formData.get('file') as File | null
-    const id = formData.get('id') as string | null
-
-    if (!file) {
-      throw new Error('No file uploaded')
-    }
-
-    if (!ALLOWED_MIME_TYPES.has(file.type)) {
+    if (!ALLOWED_MIME_TYPES.has(data.contentType)) {
       throw new Error(
-        `Unsupported file type: ${file.type}. Allowed: ${[...ALLOWED_MIME_TYPES].join(', ')}`,
+        `Unsupported file type: ${data.contentType}. Allowed: ${[...ALLOWED_MIME_TYPES].join(', ')}`,
       )
     }
 
-    if (file.size > MAX_FILE_SIZE) {
-      throw new Error(
-        `File too large: ${(file.size / 1024 / 1024).toFixed(1)} MB. Maximum: 50 MB`,
-      )
-    }
-
-    const ext = deriveExtension(file.type)
-    const isVideo = file.type.startsWith('video/')
+    const ext = deriveExtension(data.contentType)
+    const isVideo = data.contentType.startsWith('video/')
     const folder = isVideo ? 'videos/articles' : 'images/articles'
 
     let s3Key: string
-    if (id) {
-      const safeId = id.replaceAll(/[^a-z0-9-]/gi, '-').toLowerCase()
+    if (data.id) {
+      const safeId = data.id.replaceAll(/[^a-z0-9-]/gi, '-').toLowerCase()
       s3Key = `${folder}/${safeId}.${ext}`
     } else {
-      const safeName = file.name.replaceAll(/[^a-zA-Z0-9.-]/g, '_')
+      const safeName = data.fileName.replaceAll(/[^a-zA-Z0-9.-]/g, '_')
       s3Key = `${folder}/${Date.now()}-${safeName}`
     }
 
-    // Step 1: Request a pre-signed PUT URL from admin-api
     const presignResponse = await apiFetch<{
       url: string
       key: string
@@ -132,31 +119,15 @@ export const uploadMediaFn = createServerFn({ method: 'POST' })
       method: 'POST',
       body: JSON.stringify({
         key: s3Key,
-        contentType: file.type,
-        contentLength: file.size,
+        contentType: data.contentType,
+        contentLength: data.contentLength,
       }),
     })
 
-    // Step 2: Upload binary directly to S3 using the signed URL
-    const uploadRes = await fetch(presignResponse.url, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': file.type,
-        'Content-Length': String(file.size),
-      },
-      body: await file.arrayBuffer(),
-    })
-
-    if (!uploadRes.ok) {
-      throw new Error(`S3 direct upload failed [${uploadRes.status}]: ${uploadRes.statusText}`)
-    }
-
-    const absoluteUrl = `${PRODUCTION_DOMAIN}/${presignResponse.key}`
-
     return {
-      success: true,
-      url: absoluteUrl,
+      url: presignResponse.url,
       key: presignResponse.key,
-      id: id ?? undefined,
+      publicUrl: `${PRODUCTION_DOMAIN}/${presignResponse.key}`,
+      expiresIn: presignResponse.expiresIn,
     }
   })
