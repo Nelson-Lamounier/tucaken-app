@@ -53,6 +53,87 @@ describe('GET /livez', () => {
     // restart the pod.
     expect(connect).not.toHaveBeenCalled();
   });
+
+  // Regression tests for the 2026-07-05 outage follow-up: a pod whose pool is
+  // wedged (every client checked out, none ever coming back) previously passed
+  // livez forever and was never restarted — it sat 0/1 until replaced by hand.
+  // livez must detect a SUSTAINED fully-checked-out pool from the in-process
+  // counters alone (still zero DB round-trips) and fail so kubelet restarts
+  // the pod. A DB outage must NOT trip it: failed connects destroy clients,
+  // so totalCount falls below max in that case.
+  describe('wedged-pool detection', () => {
+    /** Fake pool with mutable counters and a connect() spy. */
+    function counterPool(counts: { total: number; idle: number }): {
+      pool: Pool;
+      counts: { total: number; idle: number };
+      connect: jest.Mock;
+    } {
+      const connect = jest.fn(async () => {
+        throw new Error('livez must never connect');
+      });
+      const pool = {
+        connect,
+        get totalCount() {
+          return counts.total;
+        },
+        get idleCount() {
+          return counts.idle;
+        },
+      } as unknown as Pool;
+      return { pool, counts, connect };
+    }
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('returns 503 once the pool has been fully checked out past the threshold', async () => {
+      jest.useFakeTimers();
+      const { pool, connect } = counterPool({ total: 5, idle: 0 });
+      const app = buildApp(pool);
+
+      // First observation of saturation starts the clock — still alive.
+      expect((await app.request('/livez')).status).toBe(200);
+
+      jest.advanceTimersByTime(180_001);
+      const res = await app.request('/livez');
+      expect(res.status).toBe(503);
+      expect((await res.json()) as { status: string }).toMatchObject({
+        status: 'wedged',
+      });
+      // Detection is counter-based only — no DB connection, ever.
+      expect(connect).not.toHaveBeenCalled();
+    });
+
+    it('resets the wedge clock when the pool recovers', async () => {
+      jest.useFakeTimers();
+      const { pool, counts } = counterPool({ total: 5, idle: 0 });
+      const app = buildApp(pool);
+
+      expect((await app.request('/livez')).status).toBe(200);
+      jest.advanceTimersByTime(100_000);
+
+      // A client came back — saturation was transient load, not a wedge.
+      counts.idle = 1;
+      expect((await app.request('/livez')).status).toBe(200);
+
+      // Saturated again much later: the clock must have restarted.
+      counts.idle = 0;
+      jest.advanceTimersByTime(200_000);
+      expect((await app.request('/livez')).status).toBe(200);
+    });
+
+    it('stays 200 through a DB outage (totalCount below max is not a wedge)', async () => {
+      jest.useFakeTimers();
+      // Outage signature: pg destroys failed connections, so the pool drains.
+      const { pool } = counterPool({ total: 0, idle: 0 });
+      const app = buildApp(pool);
+
+      expect((await app.request('/livez')).status).toBe(200);
+      jest.advanceTimersByTime(600_000);
+      expect((await app.request('/livez')).status).toBe(200);
+    });
+  });
 });
 
 describe('GET /readyz', () => {
