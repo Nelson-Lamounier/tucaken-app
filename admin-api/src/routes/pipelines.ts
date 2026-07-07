@@ -442,6 +442,12 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
           // pod at run-pipeline.ts; absent ⇒ pure-vector retrieval (fail-open).
           // Forwarded from the admin-api env so the ephemeral Job inherits the flag.
           { name: 'RETRIEVAL_PREFILTER', value: process.env['RETRIEVAL_PREFILTER'] ?? 'off' },
+          // Writer extended-thinking budget. The strategist pod falls back to
+          // 8192 when unset — but thinking tokens generate SERIALLY before the
+          // output and the writer is >50% of pipeline wall-clock; halving the
+          // budget previously cut ~2min with no measured quality drop (see
+          // strategist-agent.ts). Overridable via the admin-api env.
+          { name: 'THINKING_BUDGET_TOKENS', value: process.env['STRATEGIST_THINKING_BUDGET'] ?? '4096' },
           { name: 'AWS_REGION',         value: config.awsRegion },
           // Assets bucket for the pipeline's ATS step: it renders the resume to a
           // text-selectable PDF and uploads it to S3 (persisting pdf_s3_key). The
