@@ -36,6 +36,7 @@ import { Hono } from 'hono';
 import type { AdminApiConfig } from '../lib/config.js';
 import { getJobImage, isImageConfigured, isAssetsBucketConfigured } from '../lib/config.js';
 import { getBatchApi } from '../lib/k8s.js';
+import { dispatchRollupRefresh } from '../lib/dispatch-rollup.js';
 import { getPool } from '../lib/pg.js';
 import { secondsUntilNextMonthUTC } from '../lib/retry-after.js';
 import {
@@ -362,6 +363,11 @@ export function createResumeImportsRouter(config: AdminApiConfig): Hono<AdminApi
       // retry; a janitor/monitor can also re-dispatch stuck 'confirmed' rows.
       return ctx.json({ error: 'Failed to schedule enrichment job' }, 502);
     }
+
+    // The Reconciliation synthesis compares the rollup against the imported
+    // resume — refresh it now or the Profile Intelligence panel keeps judging
+    // the OLD resume until the next repo sync. Best-effort, never blocks.
+    void dispatchRollupRefresh(config, userId, 'resume-import confirm');
 
     return ctx.json({ importId: importRecord.id, status: 'confirmed' }, 202);
   });

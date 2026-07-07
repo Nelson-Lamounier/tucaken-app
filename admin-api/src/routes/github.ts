@@ -48,6 +48,7 @@ import {
 } from '../lib/github-app.js';
 import type { V1EnvVar, V1Job } from '@kubernetes/client-node';
 import { getBatchApi, getCoreApi } from '../lib/k8s.js';
+import { dispatchRollupRefresh } from '../lib/dispatch-rollup.js';
 import { traceParentEnv, observabilityEnv, MODEL_JOB_BACKOFF_LIMIT } from '../lib/k8s-job-builder.js';
 import { buildIngestionJobSpec, buildIngestionTokenSecret, ingestionTokenSecretName, buildRollupJobSpec } from '../lib/ingestion-job.js';
 import { getPool } from '../lib/pg.js';
@@ -569,23 +570,6 @@ async function dispatchIngestionJob(
         throw err;
     }
     return { jobName };
-}
-
-/**
- * Dispatch a run-rollup Job to refresh the user's profile rollup after a repo is
- * removed (so the deleted repo drops out of the aggregate immediately rather than
- * lazily on the next sync). Best-effort: a missing image or API error MUST NOT
- * fail the delete — the rollup self-heals on the next sync regardless.
- */
-async function dispatchRollupJob(config: AdminApiConfig, userId: string): Promise<void> {
-    try {
-        const image = getJobImage('ingestion');
-        if (!isImageConfigured(image)) return;
-        const job = buildRollupJobSpec(config, image, userId, Date.now());
-        await getBatchApi().createNamespacedJob({ namespace: config.ingestionNamespace, body: job });
-    } catch (err) {
-        console.warn('[github] rollup refresh dispatch failed after repo delete (non-fatal)', err);
-    }
 }
 
 /**
@@ -1521,7 +1505,7 @@ export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBinding
         await deleteRepository(pool, uid, repoFullName);
         // Refresh the profile rollup so the removed repo drops out of the
         // aggregate now, not lazily on the next sync. Best-effort, non-blocking.
-        void dispatchRollupJob(config, uid);
+        void dispatchRollupRefresh(config, uid, 'repo delete');
         return ctx.json({ success: true });
     });
 
