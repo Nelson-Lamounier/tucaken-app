@@ -15,7 +15,7 @@ function makeData(overrides: Partial<PublicCaseStudyData> = {}): PublicCaseStudy
     startedAt: null, endedAt: null, lastActivityAt: null, updatedAt: new Date().toISOString(),
     components: [], repositories: [],
     decisions: [], highlights: [], challenges: [], stack: [],
-    depthMarkers: null, architecture: null, resumeBullets: [], tags: [],
+    depthMarkers: null, architecture: null, tags: [],
     ...overrides,
   }
 }
@@ -51,5 +51,12 @@ describe('PublicCaseStudy', () => {
     expect(screen.queryByText('Highlights')).toBeNull()
     expect(screen.queryByText('Challenges')).toBeNull()
     expect(screen.queryByText('Key decisions')).toBeNull()
+  })
+})
+
+describe('PublicCaseStudy — resume bullets are dashboard-only', () => {
+  it('never renders a resume-bullets section on the public page', () => {
+    render(<PublicCaseStudy data={makeData()} />)
+    expect(screen.queryByText(/resume bullets/i)).toBeNull()
   })
 })

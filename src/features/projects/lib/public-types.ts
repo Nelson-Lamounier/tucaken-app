@@ -13,7 +13,6 @@ import type {
   ProjectShape,
   ProjectStatus,
   ProjectType,
-  ResumeAngle,
   StackCategory,
   TestCoverageSignal,
 } from './types'
@@ -79,11 +78,6 @@ export interface PublicArchitecture {
   edges:          JsonValue
 }
 
-export interface PublicResumeBullets {
-  angle:   ResumeAngle
-  bullets: string[]
-}
-
 export interface PublicCaseStudy {
   username:       string
   slug:           string
@@ -106,6 +100,7 @@ export interface PublicCaseStudy {
   stack:          PublicStackItem[]
   depthMarkers:   PublicDepthMarkers | null
   architecture:   PublicArchitecture | null
-  resumeBullets:  PublicResumeBullets[]
+  // resumeBullets are deliberately absent: dashboard-only CV material,
+  // trimmed from the public-api payload (data minimisation).
   tags:           string[]
 }

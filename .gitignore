@@ -55,3 +55,4 @@ __pycache__/
 
 # git worktrees (see .worktrees/ convention in sibling repos)
 .worktrees/
+.worktrees/
