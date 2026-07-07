@@ -132,6 +132,15 @@ export interface AdminApiConfig {
    */
   readonly assetsBucketName: string | undefined;
 
+  /**
+   * Dedicated public article-media bucket (ESO: admin-api-article-assets).
+   *
+   * Optional — populated once the dedicated article-assets bucket is
+   * provisioned and its name published to SSM. Until then this field is
+   * undefined; consume only via {@link isAssetsBucketConfigured}.
+   */
+  readonly articleAssetsBucketName: string | undefined;
+
   /** Cognito User Pool ID — used for JWKS URL construction. */
   readonly cognitoUserPoolId: string;
 
@@ -329,6 +338,13 @@ export function loadConfig(): AdminApiConfig {
   // S3 write paths instead of a CrashLoop on pod boot.
   const assetsBucketName = process.env['ASSETS_BUCKET_NAME'];
 
+  // ARTICLE_ASSETS_BUCKET_NAME is the dedicated public bucket for article
+  // hero/inline media (images/articles/…, videos/articles/…). Same
+  // optional idiom as assetsBucketName — routes consume via
+  // isAssetsBucketConfigured() and return 503 instead of signing a URL
+  // against an undefined bucket.
+  const articleAssetsBucketName = process.env['ARTICLE_ASSETS_BUCKET_NAME'];
+
   // Job-image URIs are NOT loaded at startup — see header docblock.
   // Routes call getJobImage(name) which reads from /etc/admin-api/images/{name}
   // (kubelet-synced from the admin-api-job-images ESO Secret) with a 30s cache.
@@ -367,6 +383,7 @@ export function loadConfig(): AdminApiConfig {
 
   return {
     assetsBucketName:     assetsBucketName && assetsBucketName.length > 0 ? assetsBucketName : undefined,
+    articleAssetsBucketName: articleAssetsBucketName && articleAssetsBucketName.length > 0 ? articleAssetsBucketName : undefined,
     githubAppId:          githubAppId && githubAppId.length > 0 ? githubAppId : undefined,
     githubPrivateKey:     githubPrivateKey && githubPrivateKey.length > 0 ? githubPrivateKey : undefined,
     githubWebhookSecret:  githubWebhookSecret && githubWebhookSecret.length > 0 ? githubWebhookSecret : undefined,

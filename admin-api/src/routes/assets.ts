@@ -15,6 +15,17 @@
  *   memory pressure and upload latency.
  *
  *   URL expiry: 5 minutes — sufficient for a direct upload.
+ *
+ * Bucket + key contract:
+ *   Both routes sign/operate against the dedicated public article-assets
+ *   bucket (`config.articleAssetsBucketName`), never the general
+ *   `assetsBucketName`. Keys must already be in the canonical shape the
+ *   article pipeline and public-api serving path expect —
+ *   `images/articles/<slug>.<ext>` or `videos/articles/<slug>.<ext>` —
+ *   and are used verbatim; this route no longer prepends an `articles/`
+ *   prefix. Legacy `articles/`-prefixed (or any other non-canonical) keys
+ *   are rejected with 400, so nothing gets uploaded to a key nothing
+ *   serves.
  */
 
 import { S3Client, DeleteObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
@@ -42,6 +53,9 @@ const ALLOWED_CONTENT_TYPES = new Set([
 
 /** Maximum upload size via pre-signed URL (50 MB). */
 const MAX_CONTENT_LENGTH = 50 * 1024 * 1024;
+
+/** Canonical article-media keys only — must mirror public-api's serving allowlist. */
+const KEY_RE = /^(images|videos)\/articles\/[a-z0-9][a-z0-9-]*\.(jpeg|jpg|png|webp|gif|mp4|webm)$/;
 
 /**
  * Create the assets admin router.
@@ -91,30 +105,35 @@ export function createAssetsRouter(config: AdminApiConfig): Hono {
       );
     }
 
-    // assetsBucketName is populated by the admin-api-bedrock ESO Secret
-    // when ai-content-stack ships /bedrock-dev/assets-bucket-name to SSM.
-    // Until then, refuse uploads with 503 instead of producing a signed
-    // URL that points at an undefined bucket.
-    if (!isAssetsBucketConfigured(config.assetsBucketName)) {
+    // Canonical key shape only — images/articles/<slug>.<ext> or
+    // videos/articles/<slug>.<ext>. No prefixing, no traversal, no
+    // uppercase, no unlisted extensions. This mirrors public-api's
+    // serving allowlist so a signed upload always lands somewhere served.
+    if (!KEY_RE.test(key)) {
+      return ctx.json({ error: `Key must match ${KEY_RE.source}` }, 400);
+    }
+
+    // articleAssetsBucketName is the dedicated public article-media
+    // bucket. Until it is provisioned and published to SSM, refuse
+    // uploads with 503 instead of producing a signed URL that points at
+    // an undefined bucket.
+    if (!isAssetsBucketConfigured(config.articleAssetsBucketName)) {
       return ctx.json(
-        { error: 'Asset uploads unavailable — S3 bucket not configured (Bedrock content stack not deployed yet)' },
+        { error: 'Asset uploads unavailable — article-assets S3 bucket not configured' },
         503,
       );
     }
 
-    // Scope uploads to articles/ prefix to prevent path traversal attacks
-    const safeKey = `articles/${key.replace(/^\/+/, '').replace(/\.\./g, '')}`;
-
     const command = new PutObjectCommand({
-      Bucket: config.assetsBucketName,
-      Key: safeKey,
+      Bucket: config.articleAssetsBucketName,
+      Key: key,
       ContentType: contentType,
       ContentLength: contentLength,
     });
 
     const url = await getSignedUrl(s3, command, { expiresIn: 300 }); // 5 minutes
 
-    return ctx.json({ url, key: safeKey, expiresIn: 300 });
+    return ctx.json({ url, key, expiresIn: 300 });
   });
 
   // -----------------------------------------------------------------------
@@ -126,21 +145,21 @@ export function createAssetsRouter(config: AdminApiConfig): Hono {
     const rawKey = ctx.req.param('key');
     const key = decodeURIComponent(rawKey);
 
-    // Scope safety: only allow deletion within articles/ prefix
-    if (!key.startsWith('articles/')) {
-      return ctx.json({ error: 'Asset key must be within articles/ prefix' }, 403);
+    // Canonical key shape only — same allowlist as presign.
+    if (!KEY_RE.test(key)) {
+      return ctx.json({ error: `Key must match ${KEY_RE.source}` }, 400);
     }
 
-    if (!isAssetsBucketConfigured(config.assetsBucketName)) {
+    if (!isAssetsBucketConfigured(config.articleAssetsBucketName)) {
       return ctx.json(
-        { error: 'Asset deletion unavailable — S3 bucket not configured (Bedrock content stack not deployed yet)' },
+        { error: 'Asset deletion unavailable — article-assets S3 bucket not configured' },
         503,
       );
     }
 
     await s3.send(
       new DeleteObjectCommand({
-        Bucket: config.assetsBucketName,
+        Bucket: config.articleAssetsBucketName,
         Key: key,
       }),
     );
