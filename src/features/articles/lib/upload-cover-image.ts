@@ -1,26 +1,15 @@
-import { presignMediaUploadFn } from '@/server/upload'
+import { uploadArticleImage } from './upload-article-image'
 
 /**
- * Upload a cover image: presign via a metadata-only server fn, then PUT the
- * binary straight from the browser to S3. Returns the absolute CDN URL.
+ * Upload a cover image: delegates to {@link uploadArticleImage} against the
+ * shot-list id `<slug>-cover`, so the cover follows the same content-address
+ * convention (and stale-extension cleanup) as every other article image.
  *
- * The file must not travel through the server fn — AWS WAF on the ALB 403s
+ * The file must not travel through a server fn — AWS WAF on the ALB 403s
  * large request bodies before they reach the pod. The S3 bucket allows CORS
  * PUT from the app origin, and CSP `connect-src` allows `*.amazonaws.com`.
  */
-export async function uploadCoverImage(file: File): Promise<string> {
-  const presign = await presignMediaUploadFn({
-    data: { fileName: file.name, contentType: file.type, contentLength: file.size },
-  })
-
-  const res = await fetch(presign.url, {
-    method: 'PUT',
-    headers: { 'Content-Type': file.type },
-    body: file,
-  })
-  if (!res.ok) {
-    throw new Error(`S3 direct upload failed [${res.status}]`)
-  }
-
-  return presign.publicUrl
+export async function uploadCoverImage(file: File, slug: string): Promise<string> {
+  const { url } = await uploadArticleImage(file, `${slug}-cover`)
+  return url
 }

@@ -42,15 +42,22 @@ beforeEach(() => {
 
 describe('CoverImageField', () => {
   it('shows the upload prompt and no Remove button when value is null', () => {
-    render(<CoverImageField value={null} onChange={vi.fn()} />)
+    render(<CoverImageField value={null} onChange={vi.fn()} slug="my-article" />)
     expect(screen.getByText(/click to upload an image/i)).toBeTruthy()
     expect(screen.queryByRole('button', { name: /remove/i })).toBeNull()
+  })
+
+  it('disables the upload input and shows a hint when the slug is empty', () => {
+    render(<CoverImageField value={null} onChange={vi.fn()} slug="" />)
+    expect(screen.getByText(/complete the article details above/i)).toBeTruthy()
+    const input = screen.getByLabelText(/complete the article details above/i) as HTMLInputElement
+    expect(input.disabled).toBe(true)
   })
 
   it('uploads the selected file and calls onChange with the returned url', async () => {
     mockUploadCoverImage.mockResolvedValue('https://nelsonlamounier.com/images/articles/cover.png')
     const onChange = vi.fn()
-    render(<CoverImageField value={null} onChange={onChange} />)
+    render(<CoverImageField value={null} onChange={onChange} slug="my-article" />)
 
     const input = screen.getByLabelText(/click to upload an image/i)
     await act(async () => {
@@ -69,6 +76,7 @@ describe('CoverImageField', () => {
       <CoverImageField
         value="https://nelsonlamounier.com/images/articles/cover.png"
         onChange={onChange}
+        slug="my-article"
       />,
     )
 
@@ -80,7 +88,7 @@ describe('CoverImageField', () => {
   it('shows a toast and does not call onChange when the upload fails', async () => {
     mockUploadCoverImage.mockRejectedValue(new Error('boom'))
     const onChange = vi.fn()
-    render(<CoverImageField value={null} onChange={onChange} />)
+    render(<CoverImageField value={null} onChange={onChange} slug="my-article" />)
 
     const input = screen.getByLabelText(/click to upload an image/i)
     await act(async () => {

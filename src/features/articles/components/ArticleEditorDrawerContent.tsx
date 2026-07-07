@@ -195,6 +195,7 @@ export function ArticleEditorDrawerContent({
             <CoverImageField
               value={coverImage}
               onChange={setCoverImage}
+              slug={slug}
               onUploadingChange={setUploadingCover}
               disabled={isSaving}
             />

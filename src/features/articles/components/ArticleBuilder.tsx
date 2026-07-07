@@ -401,13 +401,19 @@ export function ArticleBuilder() {
         <p className="mt-1 text-sm/6 text-zinc-500 dark:text-zinc-400">
           Optional cover image displayed at the top of the article.
         </p>
-        <form.Field
-          name="coverImage"
-          children={(field) => (
-            <CoverImageField
-              value={field.state.value || null}
-              onChange={(url) => field.handleChange(url ?? '')}
-              onUploadingChange={setUploadingCover}
+        <form.Subscribe
+          selector={(state) => state.values.slug}
+          children={(slug) => (
+            <form.Field
+              name="coverImage"
+              children={(field) => (
+                <CoverImageField
+                  value={field.state.value || null}
+                  onChange={(url) => field.handleChange(url ?? '')}
+                  onUploadingChange={setUploadingCover}
+                  slug={slug}
+                />
+              )}
             />
           )}
         />

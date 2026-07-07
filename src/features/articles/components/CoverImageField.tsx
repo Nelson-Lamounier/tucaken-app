@@ -7,6 +7,12 @@ interface CoverImageFieldProps {
   readonly value: string | null
   /** Called with the new URL after upload, or null when the image is removed. */
   readonly onChange: (url: string | null) => void
+  /**
+   * Article slug — the cover uploads under the shot-list id `<slug>-cover`.
+   * When empty (e.g. a create form before the slug is set), uploads are
+   * disabled rather than presigning against an invalid id.
+   */
+  readonly slug: string
   /** Disables the control (e.g. while a parent save is in flight). */
   readonly disabled?: boolean
   /** Notifies the parent while an upload is in progress (to gate Save buttons). */
@@ -14,7 +20,8 @@ interface CoverImageFieldProps {
 }
 
 /** Label text for the dropzone — kept as sequential returns to avoid nested ternaries (S3358). */
-function uploadLabel(uploading: boolean, hasImage: boolean): string {
+function uploadLabel(uploading: boolean, hasImage: boolean, hasSlug: boolean): string {
+  if (!hasSlug) return 'Complete the article details above to enable the cover image upload'
   if (uploading) return 'Uploading…'
   if (hasImage) return 'Click to replace the image (PNG, JPG, WebP)'
   return 'Click to upload an image (PNG, JPG, WebP)'
@@ -28,6 +35,7 @@ function uploadLabel(uploading: boolean, hasImage: boolean): string {
 export function CoverImageField({
   value,
   onChange,
+  slug,
   disabled = false,
   onUploadingChange,
 }: CoverImageFieldProps) {
@@ -36,11 +44,17 @@ export function CoverImageField({
   const [uploading, setUploading] = useState(false)
 
   const previewSrc = localPreview ?? value
+  const hasSlug = slug.trim().length > 0
+  const uploadDisabled = disabled || uploading || !hasSlug
 
   const handleFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0]
       if (!file) return
+      // Guard: never presign against an empty/invalid id — the input is
+      // disabled in this state, but a defensive check avoids a crash if a
+      // change event still slips through mid-render.
+      if (!hasSlug) return
 
       const objectUrl = URL.createObjectURL(file)
       setLocalPreview(objectUrl)
@@ -48,7 +62,7 @@ export function CoverImageField({
       onUploadingChange?.(true)
 
       try {
-        const url = await uploadCoverImage(file)
+        const url = await uploadCoverImage(file, slug)
         onChange(url)
       } catch {
         addToast('error', 'Cover image upload failed. Please try again.')
@@ -59,7 +73,7 @@ export function CoverImageField({
         onUploadingChange?.(false)
       }
     },
-    [onChange, addToast, onUploadingChange],
+    [onChange, addToast, onUploadingChange, slug, hasSlug],
   )
 
   const handleRemove = useCallback(() => {
@@ -79,13 +93,13 @@ export function CoverImageField({
       )}
       <div className="flex items-center gap-3">
         <label className="flex flex-1 cursor-pointer items-center justify-center rounded-md border border-dashed border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800/50 p-6 text-sm text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
-          {uploadLabel(uploading, Boolean(previewSrc))}
+          {uploadLabel(uploading, Boolean(previewSrc), hasSlug)}
           <input
             type="file"
             accept="image/*"
             className="sr-only"
             onChange={handleFileChange}
-            disabled={disabled || uploading}
+            disabled={uploadDisabled}
           />
         </label>
         {previewSrc && (
