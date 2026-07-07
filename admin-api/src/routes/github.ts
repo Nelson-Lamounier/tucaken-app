@@ -50,7 +50,7 @@ import type { V1EnvVar, V1Job } from '@kubernetes/client-node';
 import { getBatchApi, getCoreApi } from '../lib/k8s.js';
 import { dispatchRollupRefresh } from '../lib/dispatch-rollup.js';
 import { traceParentEnv, observabilityEnv, MODEL_JOB_BACKOFF_LIMIT } from '../lib/k8s-job-builder.js';
-import { buildIngestionJobSpec, buildIngestionTokenSecret, ingestionTokenSecretName, buildRollupJobSpec } from '../lib/ingestion-job.js';
+import { buildIngestionJobSpec, buildIngestionTokenSecret, ingestionTokenSecretName } from '../lib/ingestion-job.js';
 import { getPool } from '../lib/pg.js';
 import { bomFromEvidenceRows } from '../lib/sbom.js';
 import { croissantFromAggregate, type CroissantAggregateRow } from '../lib/croissant.js';
