@@ -8,6 +8,7 @@ import {
 import { useToastStore } from '@/lib/stores/toast-store'
 import { MarkdownEditor } from './MarkdownEditor'
 import { CoverImageField } from './CoverImageField'
+import { ArticleImagesPanel } from './ArticleImagesPanel'
 
 interface ArticleEditorDrawerContentProps {
   /** The article slug to load content for */
@@ -195,9 +196,11 @@ export function ArticleEditorDrawerContent({
             <CoverImageField
               value={coverImage}
               onChange={setCoverImage}
+              slug={slug}
               onUploadingChange={setUploadingCover}
               disabled={isSaving}
             />
+            <ArticleImagesPanel contentMd={content} disabled={isSaving} />
           </div>
 
           <MarkdownEditor value={content} onChange={setContent} />

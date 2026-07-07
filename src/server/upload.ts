@@ -73,6 +73,11 @@ const presignInputSchema = z.object({
   id: z.string().min(1).max(120).optional(),
 })
 
+/** Canonical article-media key shape only — mirrors admin-api's delete allowlist. */
+const deleteKeySchema = z.object({
+  key: z.string().regex(/^(images|videos)\/articles\/[a-z0-9][a-z0-9-]*\.[a-z0-9]+$/, 'Invalid media key'),
+})
+
 // =============================================================================
 // Server Function
 // =============================================================================
@@ -130,4 +135,16 @@ export const presignMediaUploadFn = createServerFn({ method: 'POST' })
       publicUrl: `${PRODUCTION_DOMAIN}/${presignResponse.key}`,
       expiresIn: presignResponse.expiresIn,
     }
+  })
+
+/** Deletes an article media object (admin only). Used to clear stale sibling extensions on replace. */
+export const deleteMediaFn = createServerFn({ method: 'POST' })
+  .inputValidator(deleteKeySchema)
+  .handler(async ({ data }) => {
+    await requireAdmin()
+    await apiFetch<{ deleted: boolean }>(`/assets/${encodeURIComponent(data.key)}`, {
+      method: 'DELETE',
+      pathTemplate: '/assets/:key',
+    })
+    return { deleted: true }
   })

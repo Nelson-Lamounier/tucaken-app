@@ -24,6 +24,7 @@ const { createAssetsRouter } = await import('../../src/routes/assets.js');
 
 const testConfig = {
   assetsBucketName: 'test-assets-bucket',
+  articleAssetsBucketName: 'test-article-assets-bucket',
   cognitoUserPoolId: 'eu-west-1_TestPool',
   cognitoClientId: 'testClient',
   cognitoIssuerUrl: 'https://cognito-idp.eu-west-1.amazonaws.com/eu-west-1_TestPool',
@@ -57,7 +58,7 @@ describe('asset routes', () => {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({
-        key:           'cover.png',
+        key:           'images/articles/cover.png',
         contentType:   'image/png',
         contentLength: 1024,
       }),
@@ -72,7 +73,7 @@ describe('asset routes', () => {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({
-        key:           'diagram.svg',
+        key:           'images/articles/diagram.svg',
         contentType:   'image/svg+xml',
         contentLength: 1024,
       }),
@@ -82,7 +83,7 @@ describe('asset routes', () => {
     expect(getSignedUrlMock).not.toHaveBeenCalled();
   });
 
-  it('allows admin users to create upload URLs for safe image types', async () => {
+  it('rejects a non-canonical key even for admin users', async () => {
     const res = await buildApp(['admin']).request('/presign', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -92,10 +93,25 @@ describe('asset routes', () => {
         contentLength: 1024,
       }),
     });
+
+    expect(res.status).toBe(400);
+    expect(getSignedUrlMock).not.toHaveBeenCalled();
+  });
+
+  it('allows admin users to create upload URLs for safe image types at a canonical key', async () => {
+    const res = await buildApp(['admin']).request('/presign', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        key:           'images/articles/cover.png',
+        contentType:   'image/png',
+        contentLength: 1024,
+      }),
+    });
     const body = await res.json() as { url: string; key: string };
 
     expect(res.status).toBe(200);
     expect(body.url).toBe('https://s3.example/upload');
-    expect(body.key).toBe('articles/cover.png');
+    expect(body.key).toBe('images/articles/cover.png');
   });
 });

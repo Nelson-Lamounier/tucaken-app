@@ -6,55 +6,59 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // pod). Only the small JSON presign request may cross the ALB; the file goes
 // browser -> S3 with the presigned URL.
 const presignMediaUpload = vi.fn()
+const deleteMedia = vi.fn()
 vi.mock('@/server/upload', () => ({
   presignMediaUploadFn: (...a: unknown[]) => presignMediaUpload(...a),
+  deleteMediaFn: (...a: unknown[]) => deleteMedia(...a),
 }))
 
 describe('uploadCoverImage', () => {
   beforeEach(() => {
     presignMediaUpload.mockReset()
+    deleteMedia.mockReset()
+    deleteMedia.mockResolvedValue({ deleted: true })
     vi.unstubAllGlobals()
   })
 
-  it('presigns via JSON metadata and PUTs the file straight to S3', async () => {
+  it('presigns under the <slug>-cover id and PUTs the file straight to S3', async () => {
     presignMediaUpload.mockResolvedValue({
-      url: 'https://assets-bucket.s3.eu-west-1.amazonaws.com/articles/images/articles/cover.png?X-Amz-Signature=abc',
-      key: 'articles/images/articles/cover.png',
-      publicUrl: 'https://nelsonlamounier.com/articles/images/articles/cover.png',
+      url: 'https://assets-bucket.s3.eu-west-1.amazonaws.com/images/articles/my-slug-cover.png?X-Amz-Signature=abc',
+      key: 'images/articles/my-slug-cover.png',
+      publicUrl: 'https://nelsonlamounier.com/images/articles/my-slug-cover.png',
     })
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 })
     vi.stubGlobal('fetch', fetchMock)
 
     const { uploadCoverImage } = await import('@/features/articles/lib/upload-cover-image')
     const file = new File([new Uint8Array([1, 2, 3])], 'cover.png', { type: 'image/png' })
-    const out = await uploadCoverImage(file)
+    const out = await uploadCoverImage(file, 'my-slug')
 
-    // Presign carries metadata only — never the file body.
+    // Presigns under the shot-list id, not the local filename.
     expect(presignMediaUpload).toHaveBeenCalledWith({
-      data: { fileName: 'cover.png', contentType: 'image/png', contentLength: 3 },
+      data: expect.objectContaining({ id: 'my-slug-cover', contentType: 'image/png' }),
     })
     // The binary goes directly to the presigned S3 URL from the browser.
     expect(fetchMock).toHaveBeenCalledWith(
-      'https://assets-bucket.s3.eu-west-1.amazonaws.com/articles/images/articles/cover.png?X-Amz-Signature=abc',
+      'https://assets-bucket.s3.eu-west-1.amazonaws.com/images/articles/my-slug-cover.png?X-Amz-Signature=abc',
       expect.objectContaining({
         method: 'PUT',
         headers: { 'Content-Type': 'image/png' },
         body: file,
       }),
     )
-    expect(out).toBe('https://nelsonlamounier.com/articles/images/articles/cover.png')
+    expect(out).toBe('https://nelsonlamounier.com/images/articles/my-slug-cover.png')
   })
 
   it('throws when the S3 PUT is rejected', async () => {
     presignMediaUpload.mockResolvedValue({
-      url: 'https://assets-bucket.s3.eu-west-1.amazonaws.com/k?sig',
-      key: 'k',
-      publicUrl: 'https://nelsonlamounier.com/k',
+      url: 'https://assets-bucket.s3.eu-west-1.amazonaws.com/images/articles/x-cover.png?sig',
+      key: 'images/articles/x-cover.png',
+      publicUrl: 'https://nelsonlamounier.com/images/articles/x-cover.png',
     })
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 403 }))
 
     const { uploadCoverImage } = await import('@/features/articles/lib/upload-cover-image')
     const file = new File([new Uint8Array([1])], 'x.png', { type: 'image/png' })
-    await expect(uploadCoverImage(file)).rejects.toThrow('S3 direct upload failed [403]')
+    await expect(uploadCoverImage(file, 'x')).rejects.toThrow('S3 direct upload failed [403]')
   })
 })
