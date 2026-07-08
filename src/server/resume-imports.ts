@@ -257,6 +257,19 @@ export const updateCareerEntryFn = createServerFn({ method: 'POST' })
     )
   })
 
+export const deleteCareerEntryFn = createServerFn({ method: 'POST' })
+  .inputValidator(z.object({ id: z.string().uuid() }))
+  .handler(async ({ data }) => {
+    await requireAuth()
+    return apiFetch<{ deleted: boolean }>(
+      `/resume-imports/career-entries/${data.id}`,
+      {
+        method:       'DELETE',
+        pathTemplate: '/resume-imports/career-entries/:id',
+      },
+    )
+  })
+
 /**
  * List all past resume imports for the authenticated user.
  */

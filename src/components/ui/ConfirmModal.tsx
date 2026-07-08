@@ -14,8 +14,8 @@ interface ConfirmModalProps {
   readonly busy?: boolean
 }
 
-/** Confirmation dialog for offer decision actions (accept / counter / decline /
- *  request more time). Focus-trapped via headlessui. */
+/** Generic confirmation dialog (destructive actions get a red confirm button).
+ *  Focus-trapped via headlessui. */
 export function ConfirmModal({ open, onClose, onConfirm, title, body, confirmLabel, destructive, busy }: ConfirmModalProps) {
   return (
     <Dialog open={open} onClose={onClose} className="relative z-30">

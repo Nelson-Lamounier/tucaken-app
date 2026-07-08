@@ -16,6 +16,7 @@ import { getResumesFn } from '@/server/resumes'
 import { listResumeImportsFn } from '@/server/resume-imports'
 import { adminKeys } from '@/lib/api/query-keys'
 import { Button } from '@/components/ui/Button'
+import { CareerEntriesModal } from '@/features/career-data/components/CareerEntriesModal'
 
 type Tab = 'repositories' | 'resumes'
 
@@ -34,6 +35,7 @@ function DatabaseSettingsPage() {
 
   const [addingResume, setAddingResume] = useState(false)
   const [resumeImportId, setResumeImportId] = useState<string | undefined>(undefined)
+  const [viewingImport, setViewingImport] = useState<{ entryIds: string[]; title: string } | null>(null)
 
   const { data: installation, isLoading: isLoadingInstallation } = useGitHubInstallation()
   const { data: accessibleRepos, isLoading: isLoadingRepos }     = useGitHubAccessibleRepos(Boolean(installation))
@@ -163,6 +165,17 @@ function DatabaseSettingsPage() {
                                 )}
                               </p>
                             </div>
+                            <button
+                              type="button"
+                              disabled={imp.careerEntriesCreated.length === 0}
+                              onClick={() => setViewingImport({
+                                entryIds: imp.careerEntriesCreated,
+                                title: imp.originalFilename,
+                              })}
+                              className="shrink-0 text-xs text-teal-400 transition-colors hover:text-teal-300 disabled:cursor-not-allowed disabled:text-zinc-600"
+                            >
+                              View data
+                            </button>
                             <span className={[
                               'rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset',
                               isOk      ? 'bg-emerald-500/15 text-emerald-300 ring-emerald-400/25'
@@ -189,6 +202,13 @@ function DatabaseSettingsPage() {
                     </div>
                   )}
                 </div>
+
+                <CareerEntriesModal
+                  open={viewingImport !== null}
+                  onClose={() => setViewingImport(null)}
+                  entryIds={viewingImport?.entryIds}
+                  title={viewingImport?.title}
+                />
 
                 {/* ── Resume templates (used for applications) ── */}
                 {resumes && resumes.length > 0 && (

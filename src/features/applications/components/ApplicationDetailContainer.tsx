@@ -26,7 +26,7 @@ import { enabledStagesFor, canAdvanceStages, type StageViewer } from '../stages/
 import DropDownOptions from '@/components/ui/DropDownOptions'
 import { ApplicationActionsMenu } from './ApplicationActionsMenu'
 import { triggerCoachFn } from '@/server/pipelines'
-import { ConfirmModal } from '../stages/components/ConfirmModal'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { notifyError } from '@/lib/errors/notify'
 
 import {

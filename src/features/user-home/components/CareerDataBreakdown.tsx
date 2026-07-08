@@ -1,9 +1,11 @@
 'use client'
 
+import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { motion } from 'motion/react'
 import { BookOpen, CheckCircle2, Loader2, AlertCircle } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
+import { CareerEntriesModal } from '@/features/career-data/components/CareerEntriesModal'
 import type { CareerEntry, ResumeImportRecord } from '@/server/resume-imports'
 
 const ENTRY_LABELS: Record<string, string> = {
@@ -26,18 +28,12 @@ interface CareerDataBreakdownProps {
   readonly isLoading: boolean
 }
 
-function PanelShell({ children }: { readonly children: React.ReactNode }) {
+function PanelShell({ actions, children }: { readonly actions?: React.ReactNode; readonly children: React.ReactNode }) {
   return (
     <Card as="section" className="flex h-full max-h-64 flex-col overflow-hidden">
       <div className="flex items-center justify-between gap-3 border-b border-zinc-200 px-6 py-4 dark:border-white/5">
         <h3 className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">Career Data</h3>
-        <Link
-          to="/settings/github"
-          search={{ tab: 'resumes' }}
-          className="text-xs text-accent transition-opacity hover:opacity-80"
-        >
-          View imports →
-        </Link>
+        <div className="flex items-center gap-3">{actions}</div>
       </div>
       {children}
     </Card>
@@ -65,6 +61,7 @@ function CountRow({ label, count, max }: { readonly label: string; readonly coun
 }
 
 export function CareerDataBreakdown({ entries, latestImport, isLoading }: CareerDataBreakdownProps) {
+  const [modalOpen, setModalOpen] = useState(false)
   const countsByType = entries.reduce<Record<string, number>>((acc, e) => {
     acc[e.entryType] = (acc[e.entryType] ?? 0) + 1
     return acc
@@ -81,9 +78,19 @@ export function CareerDataBreakdown({ entries, latestImport, isLoading }: Career
   const isFailed  = latestImport?.status === 'failed'
   const isPending = latestImport !== undefined && !isOk && !isFailed
 
+  const viewImportsLink = (
+    <Link
+      to="/settings/github"
+      search={{ tab: 'resumes' }}
+      className="text-xs text-accent transition-opacity hover:opacity-80"
+    >
+      View imports →
+    </Link>
+  )
+
   if (isLoading) {
     return (
-      <PanelShell>
+      <PanelShell actions={viewImportsLink}>
         <p className="px-6 py-8 text-center text-xs text-zinc-500 dark:text-zinc-600">Loading career data…</p>
       </PanelShell>
     )
@@ -91,7 +98,7 @@ export function CareerDataBreakdown({ entries, latestImport, isLoading }: Career
 
   if (entries.length === 0) {
     return (
-      <PanelShell>
+      <PanelShell actions={viewImportsLink}>
         <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center">
           <BookOpen className="mb-2 size-7 text-zinc-400 dark:text-zinc-700" />
           <p className="text-sm text-zinc-500">No career data extracted yet</p>
@@ -108,7 +115,20 @@ export function CareerDataBreakdown({ entries, latestImport, isLoading }: Career
   }
 
   return (
-    <PanelShell>
+    <PanelShell
+      actions={
+        <>
+          <button
+            type="button"
+            onClick={() => setModalOpen(true)}
+            className="text-xs text-accent transition-opacity hover:opacity-80"
+          >
+            View data
+          </button>
+          {viewImportsLink}
+        </>
+      }
+    >
       <dl className="no-scrollbar flex min-h-0 flex-1 flex-col divide-y divide-zinc-200 overflow-y-auto dark:divide-white/5">
         {rows.map(row => (
           <CountRow key={row.type} label={row.label} count={row.count} max={max} />
@@ -128,6 +148,8 @@ export function CareerDataBreakdown({ entries, latestImport, isLoading }: Career
           )}
         </div>
       )}
+
+      <CareerEntriesModal open={modalOpen} onClose={() => setModalOpen(false)} />
     </PanelShell>
   )
 }
