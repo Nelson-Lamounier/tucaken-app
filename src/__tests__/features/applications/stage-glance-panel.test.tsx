@@ -90,4 +90,12 @@ describe('StageGlancePanel — applied stage split row', () => {
     // No duplicate JD row below.
     expect(container.querySelectorAll('[class*="col-span-3"]').length).toBe(0)
   })
+
+  it('renders the assessment tile compact in the right stack', () => {
+    const { container } = render(<StageGlancePanel detail={makeDetail()} stage="applied" />)
+    // Compact level meter: reduced minimum height.
+    expect(container.querySelector('[class*="col-span-1"] .min-h-10')).not.toBeNull()
+    // Compact card padding.
+    expect(container.querySelector('[class*="col-span-1"] .p-4')).not.toBeNull()
+  })
 })

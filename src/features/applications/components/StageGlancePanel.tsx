@@ -15,9 +15,11 @@ import { FitScorePanel } from '../stages/components/FitScorePanel'
 import { ScheduleCard } from '../stages/components/ScheduleCard'
 import { useStageDraftContext } from '../stages/hooks/stage-draft-context'
 
+const SURFACE_BASE =
+  'rounded-md bg-white ring-1 ring-zinc-200 shadow-sm dark:bg-white/2 dark:ring-0 dark:inset-ring dark:inset-ring-white/10 dark:shadow-none'
+
 /** Shared card surface — rounded-md per the project radius convention. */
-const SURFACE =
-  'rounded-md bg-white p-5 ring-1 ring-zinc-200 shadow-sm dark:bg-white/2 dark:ring-0 dark:inset-ring dark:inset-ring-white/10 dark:shadow-none'
+const SURFACE = `${SURFACE_BASE} p-5`
 
 const GRID = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } } as const
 const TILE = { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } } as const
@@ -41,12 +43,13 @@ interface LevelMeterProps {
   readonly max: number
   readonly tone: Tone
   readonly reduce: boolean
+  readonly compact?: boolean
 }
 
 /** A thin equalizer-style meter: `BAR_COUNT` bars whose heights ramp left→right,
  *  filled up to the `level / max` share in the tone colour, each rising from the
  *  baseline on mount. Fills its container in both axes. */
-function LevelMeter({ level, max, tone, reduce }: LevelMeterProps) {
+function LevelMeter({ level, max, tone, reduce, compact = false }: LevelMeterProps) {
   const filledCount = Math.round((level / max) * BAR_COUNT)
   const bars = Array.from({ length: BAR_COUNT }, (_, i) => ({
     heightPct: 28 + (i * 72) / (BAR_COUNT - 1),
@@ -55,7 +58,7 @@ function LevelMeter({ level, max, tone, reduce }: LevelMeterProps) {
   }))
 
   return (
-    <div className="flex h-full min-h-16 items-end gap-0.5" aria-hidden>
+    <div className={`flex h-full items-end gap-0.5 ${compact ? 'min-h-10' : 'min-h-16'}`} aria-hidden>
       {bars.map(bar => (
         <motion.span
           key={bar.heightPct}
@@ -121,9 +124,10 @@ const HERO_VALUE = 'font-semibold leading-none tracking-tight tabular-nums text-
 
 /** Body of a tile — one of three shapes: level meter (ordinal), count-up + share
  *  bar (proportional count), or a plain hero value. if/else avoids nested ternaries. */
-function TileBody({ tile, reduce }: { readonly tile: GlanceTileData; readonly reduce: boolean }) {
+function TileBody({ tile, reduce, compact }: { readonly tile: GlanceTileData; readonly reduce: boolean; readonly compact: boolean }) {
   const isNumeric = !Number.isNaN(Number(tile.value))
-  const valueSize = isNumeric ? 'text-4xl' : 'text-3xl'
+  let valueSize = isNumeric ? 'text-4xl' : 'text-3xl'
+  if (compact) valueSize = isNumeric ? 'text-2xl' : 'text-xl'
   const nameBlock = (
     <div>
       <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{tile.name}</p>
@@ -135,9 +139,9 @@ function TileBody({ tile, reduce }: { readonly tile: GlanceTileData; readonly re
     return (
       <>
         <div className="flex-1 pt-1">
-          <LevelMeter level={tile.meter.level} max={tile.meter.max} tone={tile.tone} reduce={reduce} />
+          <LevelMeter level={tile.meter.level} max={tile.meter.max} tone={tile.tone} reduce={reduce} compact={compact} />
         </div>
-        <p className={`text-lg font-semibold leading-tight ${TONE[tile.tone].text}`}>{tile.value}</p>
+        <p className={`${compact ? 'text-base' : 'text-lg'} font-semibold leading-tight ${TONE[tile.tone].text}`}>{tile.value}</p>
       </>
     )
   }
@@ -161,12 +165,12 @@ function TileBody({ tile, reduce }: { readonly tile: GlanceTileData; readonly re
 }
 
 /** A single at-a-glance KPI tile — icon + label, then its body (value / meter / share). */
-function GlanceTile({ tile }: { readonly tile: GlanceTileData }) {
+function GlanceTile({ tile, compact = false }: { readonly tile: GlanceTileData; readonly compact?: boolean }) {
   const reduce = useReducedMotion()
   const Icon = tile.icon
 
   return (
-    <div className={`flex h-full flex-col gap-3 ${SURFACE}`}>
+    <div className={`flex h-full flex-col ${SURFACE_BASE} ${compact ? 'gap-2 p-4' : 'gap-3 p-5'}`}>
       <div className="flex items-center gap-2">
         <Icon className={`size-5 ${TONE[tile.tone].dot}`} />
         <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
@@ -174,7 +178,7 @@ function GlanceTile({ tile }: { readonly tile: GlanceTileData }) {
         </span>
       </div>
 
-      <TileBody tile={tile} reduce={Boolean(reduce)} />
+      <TileBody tile={tile} reduce={Boolean(reduce)} compact={compact} />
     </div>
   )
 }
@@ -708,7 +712,7 @@ function ResearchGlance({ detail, stage }: StageGlancePanelProps) {
         {/* Slim right stack: Assessment above Skill coverage; the coverage card
             takes the remaining height so the stack matches the wide slot. */}
         <motion.div variants={TILE} style={{ willChange: 'transform' }} className="flex flex-col gap-4 @2xl:col-span-1">
-          {fit && <GlanceTile tile={fit} />}
+          {fit && <GlanceTile tile={fit} compact />}
           <div className="min-h-0 flex-1">
             {showFreeFit && evidenceFit ? <FitScorePanel fit={evidenceFit} /> : <ResearchCompareGraphic detail={detail} />}
           </div>
