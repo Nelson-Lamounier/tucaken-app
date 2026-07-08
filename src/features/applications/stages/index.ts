@@ -15,7 +15,7 @@ export { SectionHeading } from './components/SectionHeading'
 export { TradeoffBadge } from './components/TradeoffBadge'
 export { CollapsibleSection } from './components/CollapsibleSection'
 export { StoryForm } from './components/StoryForm'
-export { ConfirmModal } from './components/ConfirmModal'
+export { ConfirmModal } from '@/components/ui/ConfirmModal'
 
 export { TechnicalWorkspace } from './workspaces/TechnicalWorkspace'
 export { PhoneScreenWorkspace } from './workspaces/PhoneScreenWorkspace'
