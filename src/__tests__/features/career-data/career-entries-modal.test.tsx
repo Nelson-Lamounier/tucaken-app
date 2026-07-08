@@ -1,6 +1,6 @@
 /** @vitest-environment happy-dom */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { CareerEntry } from '@/server/resume-imports'
 
@@ -76,5 +76,43 @@ describe('CareerEntriesModal — view mode', () => {
   it('shows the embeddings caveat in the footer', async () => {
     renderModal()
     expect(await screen.findByText(/knowledge-base embeddings created at import are unchanged/)).toBeTruthy()
+  })
+})
+
+describe('CareerEntriesModal — edit and delete', () => {
+  it('saves an edited experience with merged rawData and exits edit mode', async () => {
+    updateMock.mockResolvedValue({ entry: ENTRIES[0] })
+    renderModal()
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Senior DevOps Engineer' }))
+
+    const titleInput = screen.getByLabelText('Title') as HTMLInputElement
+    fireEvent.change(titleInput, { target: { value: 'Staff Engineer' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1))
+    const payload = updateMock.mock.calls[0][0] as { data: { id: string; rawData: Record<string, unknown> } }
+    expect(payload.data.id).toBe('exp-1')
+    expect(payload.data.rawData['title']).toBe('Staff Engineer')
+    expect(payload.data.rawData['highlights']).toEqual(['Led EKS migration']) // unmanaged-by-this-edit list preserved
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Save changes' })).toBeNull())
+  })
+
+  it('cancel leaves the entry unchanged and calls no mutation', async () => {
+    renderModal()
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Senior DevOps Engineer' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(updateMock).not.toHaveBeenCalled()
+    expect(screen.getByText('Senior DevOps Engineer')).toBeTruthy()
+  })
+
+  it('deletes an entry only after confirmation', async () => {
+    deleteMock.mockResolvedValue({ deleted: true })
+    renderModal()
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete BSc Computer Science' }))
+    expect(deleteMock).not.toHaveBeenCalled() // confirm gate
+    fireEvent.click(screen.getByRole('button', { name: 'Delete entry' }))
+    await waitFor(() => expect(deleteMock).toHaveBeenCalledTimes(1))
+    const payload = deleteMock.mock.calls[0][0] as { data: { id: string } }
+    expect(payload.data.id).toBe('edu-1')
   })
 })

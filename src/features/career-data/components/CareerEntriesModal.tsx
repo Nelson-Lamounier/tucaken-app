@@ -1,13 +1,16 @@
 'use client'
 
+import { useState } from 'react'
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react'
-import { useQuery } from '@tanstack/react-query'
-import { Briefcase, GraduationCap, Wrench, Award, Info } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Briefcase, GraduationCap, Wrench, Award, Info, Pencil, Trash2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { adminKeys } from '@/lib/api/query-keys'
-import { listCareerEntriesFn } from '@/server/resume-imports'
+import { listCareerEntriesFn, updateCareerEntryFn, deleteCareerEntryFn } from '@/server/resume-imports'
 import type { CareerEntry, CareerEntryType } from '@/server/resume-imports'
 import { entryFields, getList, getText, entryTitle } from '../lib/entry-fields'
+import { EntryEditForm } from './EntryEditForm'
 
 const GROUP_ORDER: readonly CareerEntryType[] = [
   'experience', 'education', 'skill', 'certification', 'project', 'achievement',
@@ -93,6 +96,30 @@ export function CareerEntriesModal({ open, onClose, entryIds, title }: CareerEnt
     enabled:  open,
   })
 
+  const queryClient = useQueryClient()
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<CareerEntry | null>(null)
+
+  const invalidateEntries = () =>
+    queryClient.invalidateQueries({ queryKey: adminKeys.resumeImports.all })
+
+  const updateMutation = useMutation({
+    mutationFn: (input: { id: string; rawData: Record<string, unknown> }) =>
+      updateCareerEntryFn({ data: input }),
+    onSuccess: async () => {
+      setEditingId(null)
+      await invalidateEntries()
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteCareerEntryFn({ data: { id } }),
+    onSuccess: async () => {
+      setDeleting(null)
+      await invalidateEntries()
+    },
+  })
+
   const idSet = entryIds ? new Set(entryIds) : null
   const scoped = idSet ? entries.filter(e => idSet.has(e.id)) : entries
   const groups = GROUP_ORDER
@@ -134,11 +161,43 @@ export function CareerEntriesModal({ open, onClose, entryIds, title }: CareerEnt
                   <span className="tabular-nums text-zinc-300 dark:text-zinc-600">· {group.items.length}</span>
                 </h3>
                 <ul className="mt-2 divide-y divide-zinc-200 rounded-md border border-zinc-200 dark:divide-white/10 dark:border-white/10">
-                  {group.items.map(entry => (
-                    <li key={entry.id} data-entry-id={entry.id} className="flex items-start gap-3 px-4 py-3">
-                      <EntryView entry={entry} />
-                    </li>
-                  ))}
+                  {group.items.map(entry => {
+                    const isEditing = editingId === entry.id
+                    return (
+                      <li key={entry.id} data-entry-id={entry.id} className="flex items-start gap-3 px-4 py-3">
+                        {isEditing ? (
+                          <EntryEditForm
+                            entry={entry}
+                            busy={updateMutation.isPending}
+                            onCancel={() => setEditingId(null)}
+                            onSave={(rawData) => updateMutation.mutate({ id: entry.id, rawData })}
+                          />
+                        ) : (
+                          <>
+                            <EntryView entry={entry} />
+                            <div className="flex shrink-0 items-center gap-1">
+                              <button
+                                type="button"
+                                aria-label={`Edit ${entryTitle(entry)}`}
+                                onClick={() => setEditingId(entry.id)}
+                                className="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-white/5 dark:hover:text-zinc-200"
+                              >
+                                <Pencil className="size-3.5" aria-hidden />
+                              </button>
+                              <button
+                                type="button"
+                                aria-label={`Delete ${entryTitle(entry)}`}
+                                onClick={() => setDeleting(entry)}
+                                className="rounded-md p-1.5 text-zinc-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+                              >
+                                <Trash2 className="size-3.5" aria-hidden />
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </li>
+                    )
+                  })}
                 </ul>
               </section>
             ))}
@@ -150,6 +209,17 @@ export function CareerEntriesModal({ open, onClose, entryIds, title }: CareerEnt
           </p>
         </DialogPanel>
       </div>
+
+      <ConfirmModal
+        open={deleting !== null}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => { if (deleting) deleteMutation.mutate(deleting.id) }}
+        title="Delete this entry?"
+        body={`"${deleting ? entryTitle(deleting) : ''}" and its knowledge-base embeddings will be removed. This cannot be undone.`}
+        confirmLabel="Delete entry"
+        destructive
+        busy={deleteMutation.isPending}
+      />
     </Dialog>
   )
 }
