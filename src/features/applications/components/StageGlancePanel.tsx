@@ -270,10 +270,11 @@ function ArcSegment({ len, offset, stroke, delay, reduce }: ArcSegmentProps) {
 
 /**
  * Skill-coverage donut correlating Verified / Partial / Gaps as shares of the
- * total assessed skills, with a counted, percentaged legend. The taller left
- * panel of the glance dashboard.
+ * total assessed skills, with a counted, percentaged legend. `compact` shrinks
+ * the donut and tightens the legend for the slim right stack of the Applied
+ * glance row — same surface, tones, and animations at a smaller scale.
  */
-function ResearchCompareGraphic({ detail }: { readonly detail: ApplicationDetail }) {
+function ResearchCompareGraphic({ detail, compact = false }: { readonly detail: ApplicationDetail; readonly compact?: boolean }) {
   const reduce = useReducedMotion()
   const research = detail.research
   const rows: CompareRow[] = [
@@ -285,7 +286,7 @@ function ResearchCompareGraphic({ detail }: { readonly detail: ApplicationDetail
   const arcs = buildArcs(rows, total)
 
   return (
-    <div className={`flex h-full flex-col ${SURFACE}`}>
+    <div className={`flex h-full flex-col ${SURFACE_BASE} ${compact ? 'p-4' : 'p-5'}`}>
       <div className="flex items-center gap-2">
         <PieChart className="size-5 text-accent" />
         <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
@@ -293,8 +294,13 @@ function ResearchCompareGraphic({ detail }: { readonly detail: ApplicationDetail
         </span>
       </div>
 
-      <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-6">
-        <svg viewBox={`0 0 ${DONUT_SIZE} ${DONUT_SIZE}`} className="aspect-square w-full max-w-44 shrink-0" role="img" aria-label="Skill coverage breakdown">
+      <div className={`flex flex-1 flex-col items-center justify-center ${compact ? 'mt-3 gap-3' : 'mt-4 gap-6'}`}>
+        <svg
+          viewBox={`0 0 ${DONUT_SIZE} ${DONUT_SIZE}`}
+          className={`aspect-square w-full shrink-0 ${compact ? 'max-w-28' : 'max-w-44'}`}
+          role="img"
+          aria-label="Skill coverage breakdown"
+        >
           <circle
             cx={DONUT_MID}
             cy={DONUT_MID}
@@ -335,11 +341,11 @@ function ResearchCompareGraphic({ detail }: { readonly detail: ApplicationDetail
           </text>
         </svg>
 
-        <ul className="w-full space-y-3">
+        <ul className={`w-full ${compact ? 'space-y-1.5' : 'space-y-3'}`}>
           {rows.map(row => {
             const pct = total > 0 ? Math.round((row.count / total) * 100) : 0
             return (
-              <li key={row.key} className="flex items-center gap-2.5 text-sm">
+              <li key={row.key} className={`flex items-center gap-2.5 ${compact ? 'text-xs' : 'text-sm'}`}>
                 <span className={`size-2.5 shrink-0 rounded-full ${row.dot}`} aria-hidden />
                 <span className="flex-1 truncate text-zinc-600 dark:text-zinc-300">{row.name}</span>
                 <span className="font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">{row.count}</span>
@@ -714,7 +720,7 @@ function ResearchGlance({ detail, stage }: StageGlancePanelProps) {
         <motion.div variants={TILE} style={{ willChange: 'transform' }} className="flex flex-col gap-4 @2xl:col-span-1">
           {fit && <GlanceTile tile={fit} compact />}
           <div className="min-h-0 flex-1">
-            {showFreeFit && evidenceFit ? <FitScorePanel fit={evidenceFit} /> : <ResearchCompareGraphic detail={detail} />}
+            {showFreeFit && evidenceFit ? <FitScorePanel fit={evidenceFit} /> : <ResearchCompareGraphic detail={detail} compact />}
           </div>
         </motion.div>
 

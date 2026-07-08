@@ -98,4 +98,13 @@ describe('StageGlancePanel — applied stage split row', () => {
     // Compact card padding.
     expect(container.querySelector('[class*="col-span-1"] .p-4')).not.toBeNull()
   })
+
+  it('renders the skill-coverage donut compact in the right stack', () => {
+    const { container } = render(<StageGlancePanel detail={makeDetail()} stage="applied" />)
+    const donut = container.querySelector('svg[aria-label="Skill coverage breakdown"]')
+    expect(donut).not.toBeNull()
+    expect(donut?.getAttribute('class') ?? '').toContain('max-w-28')
+    const legend = container.querySelector('[class*="col-span-1"] ul')
+    expect(legend?.className ?? '').toContain('space-y-1.5')
+  })
 })
