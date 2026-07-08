@@ -682,7 +682,7 @@ function BehaviouralGlance({ detail }: { readonly detail: ApplicationDetail }) {
  * the tailored resume (the densest, most actionable block); until ATS data
  * exists the JD panel keeps the wide slot so the row stays balanced. Slim right
  * slot: the Assessment fit tile stacked above the skill-coverage donut, the
- * donut stretching so the stack matches the wide slot's height.
+ * stack capped at the wide panel's height (it never grows the row).
  */
 function ResearchGlance({ detail, stage }: StageGlancePanelProps) {
   const fit = stageGlanceTiles(stage, detail).find(tile => tile.key === 'fit')
@@ -715,12 +715,16 @@ function ResearchGlance({ detail, stage }: StageGlancePanelProps) {
           </motion.div>
         )}
 
-        {/* Slim right stack: Assessment above Skill coverage; the coverage card
-            takes the remaining height so the stack matches the wide slot. */}
-        <motion.div variants={TILE} style={{ willChange: 'transform' }} className="flex flex-col gap-4 @2xl:col-span-1">
-          {fit && <GlanceTile tile={fit} compact />}
-          <div className="min-h-0 flex-1">
-            {showFreeFit && evidenceFit ? <FitScorePanel fit={evidenceFit} /> : <ResearchCompareGraphic detail={detail} compact />}
+        {/* Slim right stack: Assessment above Skill coverage. At @2xl the stack
+            is an absolute overlay inside its grid cell so it never sets the row
+            height — the wide slot alone does — and the stack is capped at (and
+            shrinks to) the wide panel's height. Normal flow when stacked. */}
+        <motion.div variants={TILE} style={{ willChange: 'transform' }} className="relative @2xl:col-span-1">
+          <div className={`flex flex-col gap-4 ${wideSlot ? '@2xl:absolute @2xl:inset-0' : ''}`}>
+            {fit && <GlanceTile tile={fit} compact />}
+            <div className="min-h-0 flex-1 overflow-hidden">
+              {showFreeFit && evidenceFit ? <FitScorePanel fit={evidenceFit} /> : <ResearchCompareGraphic detail={detail} compact />}
+            </div>
           </div>
         </motion.div>
 

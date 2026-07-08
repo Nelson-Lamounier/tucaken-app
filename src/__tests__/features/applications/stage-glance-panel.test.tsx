@@ -107,4 +107,22 @@ describe('StageGlancePanel — applied stage split row', () => {
     const legend = container.querySelector('[class*="col-span-1"] ul')
     expect(legend?.className ?? '').toContain('space-y-1.5')
   })
+
+  it('caps the right stack at the wide slot height via an absolute overlay', () => {
+    const { container } = render(<StageGlancePanel detail={makeDetail()} stage="applied" />)
+    // The stack is absolutely positioned inside its cell at @2xl so it never
+    // sets the grid row height — only the ATS panel does.
+    const overlay = container.querySelector('[class*="col-span-1"] [class*="@2xl:absolute"]')
+    expect(overlay).not.toBeNull()
+    expect(overlay?.className ?? '').toContain('@2xl:inset-0')
+  })
+
+  it('keeps the stack in normal flow when nothing occupies the wide slot', () => {
+    const detail = makeDetail({ analysis: { atsCheck: null, jdExtraction: null } })
+    const { container } = render(<StageGlancePanel detail={detail} stage="applied" />)
+    // With no wide panel to define the row height, an absolute overlay would
+    // collapse to zero height — the cap class must be absent.
+    expect(container.querySelector('[class*="@2xl:absolute"]')).toBeNull()
+    expect(container.querySelector('[class*="col-span-1"]')?.textContent).toContain('Assessment')
+  })
 })
