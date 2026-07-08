@@ -169,8 +169,11 @@ function GlanceTile({ tile, compact = false }: { readonly tile: GlanceTileData; 
   const reduce = useReducedMotion()
   const Icon = tile.icon
 
+  // Compact drops h-full: in the capped right stack the tile must hug its
+  // content so the coverage card below can absorb the remaining height;
+  // full-size tiles keep h-full for equal-height grid rows in other stages.
   return (
-    <div className={`flex h-full flex-col ${SURFACE_BASE} ${compact ? 'gap-2 p-4' : 'gap-3 p-5'}`}>
+    <div className={`flex flex-col ${SURFACE_BASE} ${compact ? 'shrink-0 gap-2 p-4' : 'h-full gap-3 p-5'}`}>
       <div className="flex items-center gap-2">
         <Icon className={`size-5 ${TONE[tile.tone].dot}`} />
         <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">

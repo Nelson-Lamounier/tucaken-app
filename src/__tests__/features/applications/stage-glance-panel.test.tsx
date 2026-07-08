@@ -97,6 +97,11 @@ describe('StageGlancePanel — applied stage split row', () => {
     expect(container.querySelector('[class*="col-span-1"] .min-h-10')).not.toBeNull()
     // Compact card padding.
     expect(container.querySelector('[class*="col-span-1"] .p-4')).not.toBeNull()
+    // The compact tile hugs its content (no h-full) so the coverage card
+    // below can absorb the stack's remaining height.
+    const tile = container.querySelector('.min-h-10')?.closest('[class*="p-4"]')
+    expect(tile?.className ?? '').toContain('shrink-0')
+    expect(tile?.className ?? '').not.toContain('h-full')
   })
 
   it('renders the skill-coverage donut compact in the right stack', () => {
