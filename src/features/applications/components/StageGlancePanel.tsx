@@ -668,10 +668,11 @@ function BehaviouralGlance({ detail }: { readonly detail: ApplicationDetail }) {
 }
 
 /**
- * Research glance — the default/Applied stage. Left: the skill-coverage donut
- * (verified / partial / gaps). Right: "What we understood from the JD" beside
- * the Fit tile. The old per-count "Research" tiles were dropped — they merely
- * restated the donut's verified/partial/gaps numbers (duplication).
+ * Research glance — the default/Applied stage. Wide left slot: the ATS check of
+ * the tailored resume (the densest, most actionable block); until ATS data
+ * exists the JD panel keeps the wide slot so the row stays balanced. Slim right
+ * slot: the Assessment fit tile stacked above the skill-coverage donut, the
+ * donut stretching so the stack matches the wide slot's height.
  */
 function ResearchGlance({ detail, stage }: StageGlancePanelProps) {
   const fit = stageGlanceTiles(stage, detail).find(tile => tile.key === 'fit')
@@ -687,24 +688,38 @@ function ResearchGlance({ detail, stage }: StageGlancePanelProps) {
     (detail.research?.partialMatches?.length ?? 0) +
     (detail.research?.gaps?.length ?? 0)
   const showFreeFit = Boolean(evidenceFit) && matcherVerdicts === 0
+
+  let wideSlot: ReactNode = null
+  if (atsCheck) wideSlot = <AtsPanel ats={atsCheck} />
+  else if (jd) wideSlot = <JdUnderstandingPanel jd={jd} />
+
   // @container so the columns respond to the panel's own width (the dashboard has
   // a sidebar), not the viewport — cards go side by side as soon as there is room
   // and stack when narrow.
   return (
     <div className="@container">
       <motion.div key={stage} className="grid gap-4 @2xl:grid-cols-3" variants={GRID} initial="hidden" animate="show">
-        {/* Left column (slim): Assessment tile, then either the free-tier evidence-fit
-            panel (no matcher verdicts) or the paid skill-coverage donut. */}
+        {wideSlot && (
+          <motion.div variants={TILE} style={{ willChange: 'transform' }} className="flex flex-col @2xl:col-span-2">
+            {wideSlot}
+          </motion.div>
+        )}
+
+        {/* Slim right stack: Assessment above Skill coverage; the coverage card
+            takes the remaining height so the stack matches the wide slot. */}
         <motion.div variants={TILE} style={{ willChange: 'transform' }} className="flex flex-col gap-4 @2xl:col-span-1">
           {fit && <GlanceTile tile={fit} />}
-          {showFreeFit && evidenceFit ? <FitScorePanel fit={evidenceFit} /> : <ResearchCompareGraphic detail={detail} />}
+          <div className="min-h-0 flex-1">
+            {showFreeFit && evidenceFit ? <FitScorePanel fit={evidenceFit} /> : <ResearchCompareGraphic detail={detail} />}
+          </div>
         </motion.div>
 
-        {/* Right column (wide): ATS check on top of "What we understood from the JD" */}
-        <motion.div variants={TILE} style={{ willChange: 'transform' }} className="flex flex-col gap-4 @2xl:col-span-2">
-          {atsCheck && <AtsPanel ats={atsCheck} />}
-          {jd && <JdUnderstandingPanel jd={jd} />}
-        </motion.div>
+        {/* Full width: JD understanding drops below only once the ATS check owns the wide slot. */}
+        {atsCheck && jd && (
+          <motion.div variants={TILE} style={{ willChange: 'transform' }} className="@2xl:col-span-3">
+            <JdUnderstandingPanel jd={jd} />
+          </motion.div>
+        )}
 
         {/* Full width: role emphasis (JD dimension weighting) */}
         {mix && (
