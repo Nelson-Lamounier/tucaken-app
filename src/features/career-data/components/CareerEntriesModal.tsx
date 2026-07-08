@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Briefcase, GraduationCap, Wrench, Award, Info, Pencil, Trash2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { notifyError } from '@/lib/errors/notify'
 import { adminKeys } from '@/lib/api/query-keys'
 import { listCareerEntriesFn, updateCareerEntryFn, deleteCareerEntryFn } from '@/server/resume-imports'
 import type { CareerEntry, CareerEntryType } from '@/server/resume-imports'
@@ -110,6 +111,7 @@ export function CareerEntriesModal({ open, onClose, entryIds, title }: CareerEnt
       setEditingId(null)
       await invalidateEntries()
     },
+    onError: (err) => notifyError(err, 'save'),
   })
 
   const deleteMutation = useMutation({
@@ -118,7 +120,23 @@ export function CareerEntriesModal({ open, onClose, entryIds, title }: CareerEnt
       setDeleting(null)
       await invalidateEntries()
     },
+    onError: (err) => notifyError(err, 'delete'),
   })
+
+  const handleClose = () => {
+    setEditingId(null)
+    setDeleting(null)
+    onClose()
+  }
+
+  // Reset in-progress edit/delete state whenever the modal closes (regardless
+  // of trigger) so reopening never resumes an abandoned draft or confirm dialog.
+  useEffect(() => {
+    if (!open) {
+      setEditingId(null)
+      setDeleting(null)
+    }
+  }, [open])
 
   const idSet = entryIds ? new Set(entryIds) : null
   const scoped = idSet ? entries.filter(e => idSet.has(e.id)) : entries
@@ -127,7 +145,7 @@ export function CareerEntriesModal({ open, onClose, entryIds, title }: CareerEnt
     .filter(group => group.items.length > 0)
 
   return (
-    <Dialog open={open} onClose={onClose} className="relative z-30">
+    <Dialog open={open} onClose={handleClose} className="relative z-30">
       <div className="fixed inset-0 bg-black/40" aria-hidden />
       <div className="fixed inset-0 flex items-stretch justify-center p-0 sm:items-center sm:p-4">
         <DialogPanel className="flex w-full flex-col overflow-hidden bg-white dark:bg-zinc-900 sm:max-h-[85vh] sm:max-w-2xl sm:rounded-md sm:border sm:border-zinc-200 sm:shadow-xl dark:sm:border-white/10">
@@ -140,7 +158,7 @@ export function CareerEntriesModal({ open, onClose, entryIds, title }: CareerEnt
             </div>
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="rounded-md px-2 py-1 text-sm text-zinc-500 hover:bg-zinc-100 dark:hover:bg-white/5"
             >
               Close

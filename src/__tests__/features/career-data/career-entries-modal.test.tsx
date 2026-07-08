@@ -7,11 +7,16 @@ import type { CareerEntry } from '@/server/resume-imports'
 const listMock   = vi.fn()
 const updateMock = vi.fn()
 const deleteMock = vi.fn()
+const notifyErrorMock = vi.fn()
 
 vi.mock('@/server/resume-imports', () => ({
   listCareerEntriesFn:  (...args: unknown[]) => listMock(...args),
   updateCareerEntryFn:  (...args: unknown[]) => updateMock(...args),
   deleteCareerEntryFn:  (...args: unknown[]) => deleteMock(...args),
+}))
+
+vi.mock('@/lib/errors/notify', () => ({
+  notifyError: (...args: unknown[]) => notifyErrorMock(...args),
 }))
 
 import { CareerEntriesModal } from '@/features/career-data/components/CareerEntriesModal'
@@ -114,5 +119,43 @@ describe('CareerEntriesModal — edit and delete', () => {
     await waitFor(() => expect(deleteMock).toHaveBeenCalledTimes(1))
     const payload = deleteMock.mock.calls[0][0] as { data: { id: string } }
     expect(payload.data.id).toBe('edu-1')
+  })
+
+  it('keeps the edit form open and surfaces an error toast when save fails', async () => {
+    updateMock.mockRejectedValue(new Error('boom'))
+    renderModal()
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Senior DevOps Engineer' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(notifyErrorMock).toHaveBeenCalledWith(expect.any(Error), 'save'))
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeTruthy()
+  })
+
+  it('resets an in-progress edit when the modal closes and reopens', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const { rerender } = render(
+      <QueryClientProvider client={client}>
+        <CareerEntriesModal open onClose={() => {}} />
+      </QueryClientProvider>,
+    )
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Senior DevOps Engineer' }))
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeTruthy()
+
+    rerender(
+      <QueryClientProvider client={client}>
+        <CareerEntriesModal open={false} onClose={() => {}} />
+      </QueryClientProvider>,
+    )
+    await waitFor(() => expect(screen.queryByText('Senior DevOps Engineer')).toBeNull())
+
+    rerender(
+      <QueryClientProvider client={client}>
+        <CareerEntriesModal open onClose={() => {}} />
+      </QueryClientProvider>,
+    )
+
+    await screen.findByText('Senior DevOps Engineer')
+    expect(screen.queryByRole('button', { name: 'Save changes' })).toBeNull()
   })
 })
