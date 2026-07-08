@@ -631,6 +631,8 @@ export interface AtsCheckResult {
   readonly status: 'passed' | 'issues' | 'unverified'
   readonly passed: boolean
   readonly issues: readonly string[]
+  /** Weighted JD-keyword coverage (0.7 required / 0.3 rest); absent on legacy checks. */
+  readonly coverageScore?: number
 }
 
 /**

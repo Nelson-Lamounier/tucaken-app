@@ -67,10 +67,20 @@ export function AtsPanel({ ats }: { readonly ats: AtsCheckResult }) {
           <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">ATS check</h3>
           <span className="text-xs text-zinc-500 dark:text-zinc-400">Tailored resume</span>
         </div>
-        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${meta.chip}`}>
-          <meta.Icon className="size-3.5" />
-          {meta.label}
-        </span>
+        <div className="flex items-center gap-2">
+          {typeof ats.coverageScore === 'number' && (
+            <span
+              className="rounded-full border border-zinc-200 bg-white px-2.5 py-0.5 text-xs font-medium text-zinc-600 dark:border-white/10 dark:bg-white/5 dark:text-zinc-300"
+              title="Weighted JD-keyword coverage: required skills 70%, remaining terms 30%"
+            >
+              Coverage {Math.round(ats.coverageScore * 100)}%
+            </span>
+          )}
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${meta.chip}`}>
+            <meta.Icon className="size-3.5" />
+            {meta.label}
+          </span>
+        </div>
       </div>
 
       {/* Machine-readability + contact extraction */}
