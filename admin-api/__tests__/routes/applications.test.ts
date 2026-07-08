@@ -281,6 +281,7 @@ describe('GET /:slug — application detail', () => {
       yearsGap:          null,
       recruiterSnapshot: null,
       evidenceFit:       null,
+      gapMitigations:    null,
     });
     // research: pipeline field names normalised to UI ResearchOutput shape.
     expect(body.application['research']).toEqual({

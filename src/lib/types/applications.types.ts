@@ -524,6 +524,15 @@ export interface CoverLetter {
 }
 
 /** Applications Agent output — part of ApplicationDetail */
+/** Phase-3 gap defence extracted from the strategist analysis. */
+export interface GapMitigation {
+  readonly gap: string
+  readonly honestFraming: string
+  readonly bridgeNarrative: string
+  readonly proactiveAction: string
+  readonly goNoGo: string
+}
+
 export interface AnalysisOutput {
   /** Full XML analysis document */
   readonly analysisXml: string
@@ -545,6 +554,8 @@ export interface AnalysisOutput {
   readonly recruiterSnapshot?: RecruiterSnapshot | null
   /** Free-tier deterministic evidence-fit score (candidate-side JD coverage). */
   readonly evidenceFit?: EvidenceFit | null
+  /** Phase-3 gap defences (honest framing per flagged gap). Null on legacy runs. */
+  readonly gapMitigations?: GapMitigation[] | null
 }
 
 /**
