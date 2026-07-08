@@ -493,6 +493,8 @@ export function createApplicationsRouter(config: AdminApiConfig): Hono<AdminApiB
         // Free-tier evidence-fit score (metadata.analysis.evidenceFit) — deterministic
         // candidate-side JD coverage. Null on the paid path (it has the matcher ledger).
         evidenceFit:       rawAnalysis['evidenceFit'] ?? null,
+        // Phase-3 gap defences (metadata.analysis.gapMitigations) — rendered on the Skills gaps card.
+        gapMitigations:    rawAnalysis['gapMitigations'] ?? null,
       } : null;
 
       // Map research agent output → ResearchOutput shape.

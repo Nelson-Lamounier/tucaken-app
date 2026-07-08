@@ -4,6 +4,7 @@ import type {
   ApplicationDetail,
   PartialMatch,
   SkillGap,
+  GapMitigation,
   ExperienceSignal,
 } from '@/lib/types/applications.types'
 import { Card } from '@/components/ui/Card'
@@ -182,7 +183,12 @@ function SeverityMeter({ level, tone }: { readonly level: number; readonly tone:
   )
 }
 
-function GapRow({ gap }: { readonly gap: SkillGap }) {
+/** gapType is REQUIREMENT STRENGTH from the research contract (hard = blocking,
+ *  soft = nice-to-have) — rendering it as "{type} skill" mislabelled Podman as
+ *  a 'soft skill'. */
+const GAP_TYPE_LABEL: Record<string, string> = { hard: 'core requirement', soft: 'nice-to-have' }
+
+function GapRow({ gap, mitigation }: { readonly gap: SkillGap; readonly mitigation?: GapMitigation }) {
   const level = severityLevel(gap.severity)
   const tone = severityTone(level, gap.isDisqualifying)
   return (
@@ -197,19 +203,44 @@ function GapRow({ gap }: { readonly gap: SkillGap }) {
               </span>
             )}
           </div>
-          <span className="text-xs capitalize text-zinc-500 dark:text-zinc-400">{gap.gapType} skill</span>
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">{GAP_TYPE_LABEL[gap.gapType] ?? gap.gapType}</span>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <SeverityMeter level={level} tone={tone} />
           <span className={`text-[11px] font-medium capitalize ${SEVERITY_TEXT[tone]}`}>{gap.severity}</span>
         </div>
       </div>
+      {mitigation && (
+        <div className="mt-2 rounded border border-teal-200/60 bg-teal-50/50 px-2.5 py-2 dark:border-teal-400/20 dark:bg-teal-400/5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-teal-700 dark:text-teal-300">Your honest defence</span>
+            <span className="rounded bg-teal-100 px-1 py-px text-[10px] font-medium capitalize text-teal-700 dark:bg-teal-400/15 dark:text-teal-300">{mitigation.goNoGo.replace('_', ' ')}</span>
+          </div>
+          <p className="mt-1 text-xs text-zinc-700 dark:text-zinc-300">{mitigation.honestFraming}</p>
+          {mitigation.bridgeNarrative && (
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{mitigation.bridgeNarrative}</p>
+          )}
+        </div>
+      )}
     </li>
   )
 }
 
-/** Skills gaps — a fixed panel (no collapse, no drawer) with a per-gap severity meter. */
-function SkillsGapsPanel({ gaps }: { readonly gaps: readonly SkillGap[] }) {
+/** Loose skill↔mitigation match: 'HPC / simulation' covers both 'HPC' and 'simulation'. */
+function mitigationFor(skill: string, mitigations: readonly GapMitigation[]): GapMitigation | undefined {
+  const s = skill.trim().toLowerCase()
+  return mitigations.find(m => {
+    const g = m.gap.trim().toLowerCase()
+    return g.includes(s) || s.includes(g)
+  })
+}
+
+/** Skills gaps — a fixed panel with a per-gap severity meter and, when the
+ *  analysis produced one, the honest defence for each gap (exported for tests). */
+export function SkillsGapsPanel({ gaps, mitigations = [] }: {
+  readonly gaps: readonly SkillGap[]
+  readonly mitigations?: readonly GapMitigation[]
+}) {
   return (
     <section className="space-y-3 rounded-md border border-zinc-200 bg-zinc-50/50 p-4 dark:border-white/10 dark:bg-white/2">
       <div className="flex items-center gap-2">
@@ -221,7 +252,7 @@ function SkillsGapsPanel({ gaps }: { readonly gaps: readonly SkillGap[] }) {
       <p className="text-xs text-zinc-500 dark:text-zinc-400">Where the role asks for more than the evidence shows.</p>
       <ul className="space-y-2">
         {gaps.map(gap => (
-          <GapRow key={gap.skill} gap={gap} />
+          <GapRow key={gap.skill} gap={gap} mitigation={mitigationFor(gap.skill, mitigations)} />
         ))}
       </ul>
     </section>
@@ -237,6 +268,7 @@ function SkillsGapsPanel({ gaps }: { readonly gaps: readonly SkillGap[] }) {
 export function AppliedWorkspace({ detail }: AppliedWorkspaceProps) {
   const partialMatches = detail.research?.partialMatches ?? []
   const gaps = detail.research?.gaps ?? []
+  const gapMitigations = detail.analysis?.gapMitigations ?? []
   const resumeSummary = detail.analysis?.resumeSuggestions?.summary
   const yearsGap = detail.analysis?.yearsGap
   const recruiterSnapshot = detail.analysis?.recruiterSnapshot
@@ -272,7 +304,7 @@ export function AppliedWorkspace({ detail }: AppliedWorkspaceProps) {
       {(partialMatches.length > 0 || gaps.length > 0) && (
         <div className="grid items-start gap-6 lg:grid-cols-2">
           {partialMatches.length > 0 && <PartialMatchesGroup matches={partialMatches} />}
-          {gaps.length > 0 && <SkillsGapsPanel gaps={gaps} />}
+          {gaps.length > 0 && <SkillsGapsPanel gaps={gaps} mitigations={gapMitigations} />}
         </div>
       )}
     </>
