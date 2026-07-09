@@ -442,12 +442,16 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
           // pod at run-pipeline.ts; absent ⇒ pure-vector retrieval (fail-open).
           // Forwarded from the admin-api env so the ephemeral Job inherits the flag.
           { name: 'RETRIEVAL_PREFILTER', value: process.env['RETRIEVAL_PREFILTER'] ?? 'off' },
-          // Writer extended-thinking budget. The strategist pod falls back to
-          // 8192 when unset — but thinking tokens generate SERIALLY before the
-          // output and the writer is >50% of pipeline wall-clock; halving the
-          // budget previously cut ~2min with no measured quality drop (see
-          // strategist-agent.ts). Overridable via the admin-api env.
-          { name: 'THINKING_BUDGET_TOKENS', value: process.env['STRATEGIST_THINKING_BUDGET'] ?? '4096' },
+          // Writer extended-thinking budget. 8192 is MEASURED, not arbitrary:
+          // Sonnet 4.6 treats budget_tokens as a soft anchor, and HALVING it to
+          // 4096 (2026-07-07, cfb4183) made adaptive thinking explode — Loki
+          // history splits cleanly at that deploy: 19 runs at 8192 emitted
+          // 16-36K writer output tokens (4.9-10.6 min); the 4096 era emitted
+          // 14-56K (median ~14 min, worst 21.8). The old "halving cut ~2min"
+          // precedent was 16384->8192 on an earlier setup — budget halvings do
+          // NOT extrapolate across model behaviour. Do not lower this without
+          // an A/B against prompt_invocations. Overridable via the admin-api env.
+          { name: 'THINKING_BUDGET_TOKENS', value: process.env['STRATEGIST_THINKING_BUDGET'] ?? '8192' },
           { name: 'AWS_REGION',         value: config.awsRegion },
           // Assets bucket for the pipeline's ATS step: it renders the resume to a
           // text-selectable PDF and uploads it to S3 (persisting pdf_s3_key). The
