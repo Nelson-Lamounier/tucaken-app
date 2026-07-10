@@ -61,7 +61,7 @@ export function AtsPanel({ ats }: { readonly ats: AtsCheckResult }) {
   const total = ats.jdKeywordCoverage.length
 
   return (
-    <section className={`space-y-4 ${SURFACE}`}>
+    <section className={`h-full space-y-4 ${SURFACE}`}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">ATS check</h3>

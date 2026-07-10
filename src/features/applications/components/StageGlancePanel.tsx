@@ -15,9 +15,11 @@ import { FitScorePanel } from '../stages/components/FitScorePanel'
 import { ScheduleCard } from '../stages/components/ScheduleCard'
 import { useStageDraftContext } from '../stages/hooks/stage-draft-context'
 
+const SURFACE_BASE =
+  'rounded-md bg-white ring-1 ring-zinc-200 shadow-sm dark:bg-white/2 dark:ring-0 dark:inset-ring dark:inset-ring-white/10 dark:shadow-none'
+
 /** Shared card surface — rounded-md per the project radius convention. */
-const SURFACE =
-  'rounded-md bg-white p-5 ring-1 ring-zinc-200 shadow-sm dark:bg-white/2 dark:ring-0 dark:inset-ring dark:inset-ring-white/10 dark:shadow-none'
+const SURFACE = `${SURFACE_BASE} p-5`
 
 const GRID = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } } as const
 const TILE = { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } } as const
@@ -41,12 +43,13 @@ interface LevelMeterProps {
   readonly max: number
   readonly tone: Tone
   readonly reduce: boolean
+  readonly compact?: boolean
 }
 
 /** A thin equalizer-style meter: `BAR_COUNT` bars whose heights ramp left→right,
  *  filled up to the `level / max` share in the tone colour, each rising from the
  *  baseline on mount. Fills its container in both axes. */
-function LevelMeter({ level, max, tone, reduce }: LevelMeterProps) {
+function LevelMeter({ level, max, tone, reduce, compact = false }: LevelMeterProps) {
   const filledCount = Math.round((level / max) * BAR_COUNT)
   const bars = Array.from({ length: BAR_COUNT }, (_, i) => ({
     heightPct: 28 + (i * 72) / (BAR_COUNT - 1),
@@ -55,7 +58,7 @@ function LevelMeter({ level, max, tone, reduce }: LevelMeterProps) {
   }))
 
   return (
-    <div className="flex h-full min-h-16 items-end gap-0.5" aria-hidden>
+    <div className={`flex h-full items-end gap-0.5 ${compact ? 'min-h-10' : 'min-h-16'}`} aria-hidden>
       {bars.map(bar => (
         <motion.span
           key={bar.heightPct}
@@ -121,9 +124,10 @@ const HERO_VALUE = 'font-semibold leading-none tracking-tight tabular-nums text-
 
 /** Body of a tile — one of three shapes: level meter (ordinal), count-up + share
  *  bar (proportional count), or a plain hero value. if/else avoids nested ternaries. */
-function TileBody({ tile, reduce }: { readonly tile: GlanceTileData; readonly reduce: boolean }) {
+function TileBody({ tile, reduce, compact }: { readonly tile: GlanceTileData; readonly reduce: boolean; readonly compact: boolean }) {
   const isNumeric = !Number.isNaN(Number(tile.value))
-  const valueSize = isNumeric ? 'text-4xl' : 'text-3xl'
+  let valueSize = isNumeric ? 'text-4xl' : 'text-3xl'
+  if (compact) valueSize = isNumeric ? 'text-2xl' : 'text-xl'
   const nameBlock = (
     <div>
       <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{tile.name}</p>
@@ -135,9 +139,9 @@ function TileBody({ tile, reduce }: { readonly tile: GlanceTileData; readonly re
     return (
       <>
         <div className="flex-1 pt-1">
-          <LevelMeter level={tile.meter.level} max={tile.meter.max} tone={tile.tone} reduce={reduce} />
+          <LevelMeter level={tile.meter.level} max={tile.meter.max} tone={tile.tone} reduce={reduce} compact={compact} />
         </div>
-        <p className={`text-lg font-semibold leading-tight ${TONE[tile.tone].text}`}>{tile.value}</p>
+        <p className={`${compact ? 'text-base' : 'text-lg'} font-semibold leading-tight ${TONE[tile.tone].text}`}>{tile.value}</p>
       </>
     )
   }
@@ -161,12 +165,15 @@ function TileBody({ tile, reduce }: { readonly tile: GlanceTileData; readonly re
 }
 
 /** A single at-a-glance KPI tile — icon + label, then its body (value / meter / share). */
-function GlanceTile({ tile }: { readonly tile: GlanceTileData }) {
+function GlanceTile({ tile, compact = false }: { readonly tile: GlanceTileData; readonly compact?: boolean }) {
   const reduce = useReducedMotion()
   const Icon = tile.icon
 
+  // Compact drops h-full: in the capped right stack the tile must hug its
+  // content so the coverage card below can absorb the remaining height;
+  // full-size tiles keep h-full for equal-height grid rows in other stages.
   return (
-    <div className={`flex h-full flex-col gap-3 ${SURFACE}`}>
+    <div className={`flex flex-col ${SURFACE_BASE} ${compact ? 'shrink-0 gap-2 p-4' : 'h-full gap-3 p-5'}`}>
       <div className="flex items-center gap-2">
         <Icon className={`size-5 ${TONE[tile.tone].dot}`} />
         <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
@@ -174,7 +181,7 @@ function GlanceTile({ tile }: { readonly tile: GlanceTileData }) {
         </span>
       </div>
 
-      <TileBody tile={tile} reduce={Boolean(reduce)} />
+      <TileBody tile={tile} reduce={Boolean(reduce)} compact={compact} />
     </div>
   )
 }
@@ -266,10 +273,11 @@ function ArcSegment({ len, offset, stroke, delay, reduce }: ArcSegmentProps) {
 
 /**
  * Skill-coverage donut correlating Verified / Partial / Gaps as shares of the
- * total assessed skills, with a counted, percentaged legend. The taller left
- * panel of the glance dashboard.
+ * total assessed skills, with a counted, percentaged legend. `compact` shrinks
+ * the donut and tightens the legend for the slim right stack of the Applied
+ * glance row — same surface, tones, and animations at a smaller scale.
  */
-function ResearchCompareGraphic({ detail }: { readonly detail: ApplicationDetail }) {
+function ResearchCompareGraphic({ detail, compact = false }: { readonly detail: ApplicationDetail; readonly compact?: boolean }) {
   const reduce = useReducedMotion()
   const research = detail.research
   const rows: CompareRow[] = [
@@ -281,7 +289,7 @@ function ResearchCompareGraphic({ detail }: { readonly detail: ApplicationDetail
   const arcs = buildArcs(rows, total)
 
   return (
-    <div className={`flex h-full flex-col ${SURFACE}`}>
+    <div className={`flex h-full flex-col ${SURFACE_BASE} ${compact ? 'p-4' : 'p-5'}`}>
       <div className="flex items-center gap-2">
         <PieChart className="size-5 text-accent" />
         <span className="text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
@@ -289,8 +297,13 @@ function ResearchCompareGraphic({ detail }: { readonly detail: ApplicationDetail
         </span>
       </div>
 
-      <div className="mt-4 flex flex-1 flex-col items-center justify-center gap-6">
-        <svg viewBox={`0 0 ${DONUT_SIZE} ${DONUT_SIZE}`} className="aspect-square w-full max-w-44 shrink-0" role="img" aria-label="Skill coverage breakdown">
+      <div className={`flex flex-1 flex-col items-center justify-center ${compact ? 'mt-3 gap-3' : 'mt-4 gap-6'}`}>
+        <svg
+          viewBox={`0 0 ${DONUT_SIZE} ${DONUT_SIZE}`}
+          className={`aspect-square w-full shrink-0 ${compact ? 'max-w-28' : 'max-w-44'}`}
+          role="img"
+          aria-label="Skill coverage breakdown"
+        >
           <circle
             cx={DONUT_MID}
             cy={DONUT_MID}
@@ -331,11 +344,11 @@ function ResearchCompareGraphic({ detail }: { readonly detail: ApplicationDetail
           </text>
         </svg>
 
-        <ul className="w-full space-y-3">
+        <ul className={`w-full ${compact ? 'space-y-1.5' : 'space-y-3'}`}>
           {rows.map(row => {
             const pct = total > 0 ? Math.round((row.count / total) * 100) : 0
             return (
-              <li key={row.key} className="flex items-center gap-2.5 text-sm">
+              <li key={row.key} className={`flex items-center gap-2.5 ${compact ? 'text-xs' : 'text-sm'}`}>
                 <span className={`size-2.5 shrink-0 rounded-full ${row.dot}`} aria-hidden />
                 <span className="flex-1 truncate text-zinc-600 dark:text-zinc-300">{row.name}</span>
                 <span className="font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">{row.count}</span>
@@ -668,10 +681,11 @@ function BehaviouralGlance({ detail }: { readonly detail: ApplicationDetail }) {
 }
 
 /**
- * Research glance — the default/Applied stage. Left: the skill-coverage donut
- * (verified / partial / gaps). Right: "What we understood from the JD" beside
- * the Fit tile. The old per-count "Research" tiles were dropped — they merely
- * restated the donut's verified/partial/gaps numbers (duplication).
+ * Research glance — the default/Applied stage. Wide left slot: the ATS check of
+ * the tailored resume (the densest, most actionable block); until ATS data
+ * exists the JD panel keeps the wide slot so the row stays balanced. Slim right
+ * slot: the Assessment fit tile stacked above the skill-coverage donut, the
+ * stack capped at the wide panel's height (it never grows the row).
  */
 function ResearchGlance({ detail, stage }: StageGlancePanelProps) {
   const fit = stageGlanceTiles(stage, detail).find(tile => tile.key === 'fit')
@@ -687,24 +701,42 @@ function ResearchGlance({ detail, stage }: StageGlancePanelProps) {
     (detail.research?.partialMatches?.length ?? 0) +
     (detail.research?.gaps?.length ?? 0)
   const showFreeFit = Boolean(evidenceFit) && matcherVerdicts === 0
+
+  let wideSlot: ReactNode = null
+  if (atsCheck) wideSlot = <AtsPanel ats={atsCheck} />
+  else if (jd) wideSlot = <JdUnderstandingPanel jd={jd} />
+
   // @container so the columns respond to the panel's own width (the dashboard has
   // a sidebar), not the viewport — cards go side by side as soon as there is room
   // and stack when narrow.
   return (
     <div className="@container">
       <motion.div key={stage} className="grid gap-4 @2xl:grid-cols-3" variants={GRID} initial="hidden" animate="show">
-        {/* Left column (slim): Assessment tile, then either the free-tier evidence-fit
-            panel (no matcher verdicts) or the paid skill-coverage donut. */}
-        <motion.div variants={TILE} style={{ willChange: 'transform' }} className="flex flex-col gap-4 @2xl:col-span-1">
-          {fit && <GlanceTile tile={fit} />}
-          {showFreeFit && evidenceFit ? <FitScorePanel fit={evidenceFit} /> : <ResearchCompareGraphic detail={detail} />}
+        {wideSlot && (
+          <motion.div variants={TILE} style={{ willChange: 'transform' }} className="flex flex-col @2xl:col-span-2">
+            {wideSlot}
+          </motion.div>
+        )}
+
+        {/* Slim right stack: Assessment above Skill coverage. At @2xl the stack
+            is an absolute overlay inside its grid cell so it never sets the row
+            height — the wide slot alone does — and the stack is capped at (and
+            shrinks to) the wide panel's height. Normal flow when stacked. */}
+        <motion.div variants={TILE} style={{ willChange: 'transform' }} className="relative @2xl:col-span-1">
+          <div className={`flex flex-col gap-4 ${wideSlot ? '@2xl:absolute @2xl:inset-0' : ''}`}>
+            {fit && <GlanceTile tile={fit} compact />}
+            <div className="min-h-0 flex-1 overflow-hidden">
+              {showFreeFit && evidenceFit ? <FitScorePanel fit={evidenceFit} /> : <ResearchCompareGraphic detail={detail} compact />}
+            </div>
+          </div>
         </motion.div>
 
-        {/* Right column (wide): ATS check on top of "What we understood from the JD" */}
-        <motion.div variants={TILE} style={{ willChange: 'transform' }} className="flex flex-col gap-4 @2xl:col-span-2">
-          {atsCheck && <AtsPanel ats={atsCheck} />}
-          {jd && <JdUnderstandingPanel jd={jd} />}
-        </motion.div>
+        {/* Full width: JD understanding drops below only once the ATS check owns the wide slot. */}
+        {atsCheck && jd && (
+          <motion.div variants={TILE} style={{ willChange: 'transform' }} className="@2xl:col-span-3">
+            <JdUnderstandingPanel jd={jd} />
+          </motion.div>
+        )}
 
         {/* Full width: role emphasis (JD dimension weighting) */}
         {mix && (
