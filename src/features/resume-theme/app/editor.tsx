@@ -345,6 +345,13 @@ export function ProjectsEditor({ items }: { items: ProjectEntry[] }) {
             <Field label="Stack" value={e.stack} onChange={(v) => update(e.id, { stack: v })} />
             <Field label="URL / Repo" value={e.url} onChange={(v) => update(e.id, { url: v })} />
           </div>
+          <TextArea
+            label="Description"
+            value={e.description}
+            rows={2}
+            placeholder="One or two lines on what the project is and your role."
+            onChange={(v) => update(e.id, { description: v })}
+          />
           <BulletList
             bullets={e.bullets}
             onChange={(b) => update(e.id, { bullets: b })}
