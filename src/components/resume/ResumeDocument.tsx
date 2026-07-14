@@ -148,6 +148,18 @@ export function ResumeDocument({ data }: ResumeDocumentProps) {
                     <p className="mt-1 text-[9.5px] leading-[1.6] text-zinc-700">
                       {proj.description}
                     </p>
+                    {proj.highlights && proj.highlights.length > 0 && (
+                      <ul className="mt-1.5 space-y-1 list-disc pl-4">
+                        {proj.highlights.map((h, i) => (
+                          <li
+                            key={i}
+                            className="text-[9.5px] leading-[1.5] text-zinc-700"
+                          >
+                            {h}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 ))}
               </div>

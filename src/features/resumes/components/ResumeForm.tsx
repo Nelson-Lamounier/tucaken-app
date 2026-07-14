@@ -51,6 +51,7 @@ export interface ResumeProject {
   name: string
   description: string
   github: string
+  highlights: string[]
 }
 
 export interface ResumeAchievement {
@@ -85,7 +86,7 @@ const defaultProfile: ResumeProfile = { name: '', title: '', location: '', email
 const defaultExperience: ResumeExperience = { company: '', title: '', period: '', highlights: [''] }
 const defaultSkillGroup: ResumeSkillGroup = { category: '', skills: [''] }
 const defaultEducation: ResumeEducation = { degree: '', institution: '', period: '' }
-const defaultProject: ResumeProject = { name: '', description: '', github: '' }
+const defaultProject: ResumeProject = { name: '', description: '', github: '', highlights: [] }
 const defaultCertification: ResumeCertification = { name: '', issuer: '', year: '' }
 const defaultAchievement: ResumeAchievement = { achievement: '' }
 
@@ -132,7 +133,8 @@ const resumeSchema = z.object({
     projects: z.array(z.object({
       name: z.string(),
       description: z.string(),
-      github: z.string()
+      github: z.string(),
+      highlights: z.array(z.string())
     })),
   })
 })
@@ -164,7 +166,10 @@ export function ResumeForm({
         certifications: initialData?.certifications ?? [{ ...defaultCertification }],
         skills: initialData?.skills ?? [{ ...defaultSkillGroup, skills: [''] }],
         education: initialData?.education ?? [{ ...defaultEducation }],
-        projects: initialData?.projects ?? [{ ...defaultProject }],
+        // Normalise legacy rows stored before project highlights existed.
+        projects: (initialData?.projects ?? [{ ...defaultProject }]).map(p => ({
+          ...p, highlights: p.highlights ?? []
+        })),
       }
     } as FormValues,
     validators: {
@@ -186,7 +191,9 @@ export function ResumeForm({
           ...s, skills: s.skills.filter(sk => sk.trim())
         })),
         education: value.data.education.filter(e => e.degree.trim()),
-        projects: value.data.projects.filter(p => p.name.trim())
+        projects: value.data.projects.filter(p => p.name.trim()).map(p => ({
+          ...p, highlights: p.highlights.filter(h => h.trim())
+        }))
       }
 
       try {
@@ -486,10 +493,42 @@ export function ResumeForm({
                         <div className="col-span-full">
                           <form.Field name={`data.projects[${index}].description`} children={(f) => <FormTextarea label="Description" rows={2} field={f} />} />
                         </div>
+
+                        <div className="col-span-full">
+                          <label className={labelClasses}>Highlights</label>
+                          <form.Field
+                            name={`data.projects[${index}].highlights`}
+                            mode="array"
+                            children={(highlightsField) => (
+                              <div className="space-y-3">
+                                {highlightsField.state.value.map((_, hIndex) => (
+                                  <div key={hIndex} className="flex items-start gap-4">
+                                    <form.Field
+                                      name={`data.projects[${index}].highlights[${hIndex}]`}
+                                      children={(hField) => (
+                                        <div className="flex-1">
+                                          <textarea
+                                            value={hField.state.value}
+                                            onChange={e => hField.handleChange(e.target.value)}
+                                            onBlur={hField.handleBlur}
+                                            rows={2}
+                                            className={inputClasses}
+                                          />
+                                        </div>
+                                      )}
+                                    />
+                                    <RemoveSubItemButton onClick={() => highlightsField.removeValue(hIndex)} />
+                                  </div>
+                                ))}
+                                <AddSubItemButton onClick={() => highlightsField.pushValue('')}>Add Highlight</AddSubItemButton>
+                              </div>
+                            )}
+                          />
+                        </div>
                       </div>
                     </div>
                   ))}
-                  <AddButton onClick={() => field.pushValue({ ...defaultProject })}>Add Project</AddButton>
+                  <AddButton onClick={() => field.pushValue({ ...defaultProject, highlights: [] })}>Add Project</AddButton>
                 </>
               )}
             />

@@ -78,7 +78,7 @@ export function mapApplicationToBuilderState(
       stack: '',
       url: proj.github ?? '',
       description: proj.description ?? '',
-      bullets: [],
+      bullets: Array.isArray(proj.highlights) ? proj.highlights : [],
     })),
     skills: (appResume.skills ?? []).map((s) => ({
       id: uid(),
@@ -186,6 +186,7 @@ export function builderStateToResumeData(state: AppState): AppResumeData {
       name: p.name,
       github: p.url,
       description: p.description,
+      highlights: p.bullets,
     })) as AppResumeData['projects'],
     sectionOrder: r.sectionOrder,
   }
