@@ -12,6 +12,7 @@ or the root [README](../README.md) for the product and architecture.
 ## Concepts
 
 - [Networking architecture — tucaken-app and admin-api](concepts/networking-architecture.md) — pod-to-pod BFF calls over service DNS, trust tiers, CORS/CSP, and every egress path.
+- [Request lifecycle — browser to pod](concepts/request-lifecycle-browser-to-pod.md) — the edge path: ExternalDNS, shared ALB, WAFv2 exemptions, ACM SNI, IP-mode target groups, blue-green services.
 - [API-dispatched Kubernetes Jobs](concepts/api-dispatched-k8s-jobs.md) — routes build a Job spec and submit it; workers run the Bedrock pipelines.
 - [Distributed tracing from API request to worker pod](concepts/distributed-tracing-api-to-worker.md) — `TRACEPARENT` propagation across the async boundary.
 - [Four-pillar observability](concepts/four-pillars-observability.md) — OTel, Prometheus, Loki, Pyroscope, plus browser RUM.
@@ -57,6 +58,7 @@ or the root [README](../README.md) for the product and architecture.
 
 ## Troubleshooting
 
+- [CORS error in production](troubleshooting/cors-error-in-production.md) — why a browser-side CORS failure means a misrouted call, not a config problem.
 - [Duplicate ingestion Jobs for the same repo](troubleshooting/duplicate-ingestion-jobs.md)
 - [Pipeline run shown as failed when it stalled or succeeded](troubleshooting/pipeline-stall-timeout.md)
 - [ATS check missing when ats_check_json is null](troubleshooting/ats-check-metadata-fallback.md)
