@@ -31,7 +31,7 @@
 import { Pushgateway, Registry, Counter, Gauge } from 'prom-client';
 import { Pool } from 'pg';
 
-import { listAppInstallations, deleteInstallation } from '../lib/github-app.js';
+import { listAppInstallations, deleteInstallation } from '../lib/github/github-app.js';
 
 const APPLY       = process.argv.includes('--apply') || process.env['RECONCILE_APPLY'] === 'true';
 const GRACE_HOURS = Number(process.env['RECONCILE_GRACE_HOURS'] ?? '1');

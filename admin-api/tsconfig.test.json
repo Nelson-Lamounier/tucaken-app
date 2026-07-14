@@ -1,4 +1,7 @@
 {
   "extends": "./tsconfig.json",
-  "include": ["src/**/*", "__tests__/**/*"]
+  "include": ["src/**/*", "__tests__/**/*"],
+  // Re-include tests here: the base project excludes them so they are not
+  // built into dist/, but ts-jest compiles them through this project.
+  "exclude": ["node_modules", "dist"]
 }

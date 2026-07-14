@@ -9,5 +9,9 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  // Tests are excluded from the build/typecheck project: they are executed
+  // (and transpiled) by ts-jest via tsconfig.test.json, must not be emitted
+  // into dist/, and the suites migrated from __tests__/routes were never
+  // part of this strict project.
+  "exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/**/__tests__/**"]
 }
