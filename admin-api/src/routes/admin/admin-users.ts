@@ -32,7 +32,7 @@ import { revokeGitHubInstallationForUser } from '../../lib/github/github-uninsta
 import { logger } from '../../lib/observability/logger.js';
 import { getPool } from '../../lib/pg.js';
 import { purgeUser } from '../../lib/account/purge-user.js';
-import { deleteConnection } from '../github/github.js';
+import { deleteConnection } from '../../lib/github/connection.js';
 import {
   adminUpdateUser,
   getAdminUserById,
