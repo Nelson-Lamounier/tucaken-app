@@ -26,7 +26,7 @@
 
 import { Pool } from 'pg';
 
-import { purgeUser } from '../lib/purge-user.js';
+import { purgeUser } from '../lib/account/purge-user.js';
 import { findUsersForHardDelete } from '../lib/repositories/users.js';
 
 const GRACE_DAYS = Number(process.env['GRACE_DAYS'] ?? '30');

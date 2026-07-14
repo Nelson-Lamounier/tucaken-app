@@ -36,10 +36,10 @@
 import { Pool } from 'pg';
 
 import { loadConfig, getJobImage, isImageConfigured } from '../lib/config.js';
-import { getBatchApi } from '../lib/k8s.js';
-import { buildReenrichJobSpec } from '../lib/ingestion-job.js';
-import { entitlementsFromConfig } from '../lib/entitlements.js';
-import { getCachedTierConfig } from '../lib/tier-config-cache.js';
+import { getBatchApi } from '../lib/jobs/k8s.js';
+import { buildReenrichJobSpec } from '../lib/jobs/ingestion-job.js';
+import { entitlementsFromConfig } from '../lib/billing/entitlements.js';
+import { getCachedTierConfig } from '../lib/billing/tier-config-cache.js';
 import { getUserPlanStatus } from '../lib/repositories/users.js';
 
 const DRY_RUN        = process.argv.includes('--dry-run');

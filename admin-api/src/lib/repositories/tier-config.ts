@@ -1,5 +1,5 @@
 import type { Pool } from 'pg'
-import { TierConfigSchema, type TierConfig } from '../tier-config-shape.js'
+import { TierConfigSchema, type TierConfig } from '../billing/tier-config-shape.js'
 
 type Queryable = Pick<Pool, 'query'>
 
