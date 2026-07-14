@@ -11,6 +11,8 @@ export interface ResumeProfile {
   title: string
   location: string
   email: string
+  /** Optional: profiles stored before the builder exposed a phone field have none. */
+  phone?: string
   linkedin: string
   github: string
   website: string
@@ -20,6 +22,8 @@ export interface ResumeExperience {
   company: string
   title: string
   period: string
+  /** Optional: builder-editable; rows stored before the field existed have none. */
+  location?: string
   highlights: string[]
 }
 
@@ -33,6 +37,8 @@ export interface ResumeEducation {
   degree: string
   institution: string
   period: string
+  /** Optional: builder-editable; rows stored before the field existed have none. */
+  location?: string
   details?: string
 }
 
@@ -45,11 +51,29 @@ export interface ResumeProject {
   name: string
   description: string
   github: string
+  /** Optional: builder-editable tech-stack line (e.g. "TypeScript, EKS, Bedrock"). */
+  stack?: string
   /**
    * Strategist-generated (or user-edited) bullet points for the project.
    * Optional: resumes stored before this field existed have none.
    */
   highlights?: string[]
+}
+
+export interface ResumeLanguage {
+  name: string
+  level: string
+}
+
+export interface ResumeCustomSectionEntry {
+  heading: string
+  subheading: string
+  body: string
+}
+
+export interface ResumeCustomSection {
+  title: string
+  entries: ResumeCustomSectionEntry[]
 }
 
 export interface ResumeAchievement {
@@ -65,6 +89,10 @@ export interface ResumeData {
   skills: ResumeSkillGroup[]
   education: ResumeEducation[]
   projects: ResumeProject[]
+  /** Optional: builder-editable; persisted so drawer edits round-trip. */
+  languages?: ResumeLanguage[]
+  /** Optional: builder-editable free-form sections; persisted so drawer edits round-trip. */
+  customSections?: ResumeCustomSection[]
   /** Strategist-decided section render order. Empty/absent → canonical fallback. */
   sectionOrder?: string[]
 }

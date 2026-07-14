@@ -42,6 +42,12 @@ export function ResumeDocument({ data }: ResumeDocumentProps) {
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-x-2 text-[10px] text-zinc-600">
             <span>{profile.location}</span>
+            {profile.phone && (
+              <>
+                <span className="text-zinc-300">|</span>
+                <span>{profile.phone}</span>
+              </>
+            )}
             <span className="text-zinc-300">|</span>
             <a href={toHref(profile.email)} target="_blank" rel="noopener noreferrer" className="hover:underline">{profile.email}</a>
             <span className="text-zinc-300">|</span>
