@@ -21,9 +21,7 @@ jest.unstable_mockModule('../../../lib/account/cognito-admin.js', () => ({
 }))
 jest.unstable_mockModule('../../../lib/account/purge-user.js', () => ({ purgeUser }))
 jest.unstable_mockModule('../../../lib/github/github-uninstall.js', () => ({ revokeGitHubInstallationForUser: jest.fn() }))
-jest.unstable_mockModule('../../github/github.js', () => ({
-  deleteConnection: jest.fn(), createGithubRouter: jest.fn(),
-}))
+jest.unstable_mockModule('../../../lib/github/connection.js', () => ({ deleteConnection: jest.fn() }))
 jest.unstable_mockModule('../../../lib/pg.js', () => ({ getPool }))
 
 const { createAdminUsersRouter } = await import('../../admin/admin-users.js')

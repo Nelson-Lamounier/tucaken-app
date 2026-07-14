@@ -13,7 +13,7 @@ const connectMock = jest.fn(async () => ({
 }));
 jest.unstable_mockModule('../../../lib/pg.js', () => ({ getPool: () => ({ connect: connectMock }) }));
 jest.unstable_mockModule('../../../lib/github/github-uninstall.js', () => ({ revokeGitHubInstallationForUser: jest.fn() }));
-jest.unstable_mockModule('../../github/github.js', () => ({ deleteConnection: jest.fn(), createGithubRouter: jest.fn() }));
+jest.unstable_mockModule('../../../lib/github/connection.js', () => ({ deleteConnection: jest.fn() }));
 
 const { createAdminUsersRouter } = await import('../admin-users.js');
 const CONFIG = {} as never;

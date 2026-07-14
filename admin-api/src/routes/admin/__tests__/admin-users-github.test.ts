@@ -8,7 +8,7 @@ const getAdminUserById = jest.fn<() => Promise<{ role: string } | null>>()
 const getPool = jest.fn(() => ({ query: jest.fn(async () => ({ rows: [] })) }))
 
 jest.unstable_mockModule('../../../lib/github/github-uninstall.js', () => ({ revokeGitHubInstallationForUser: revoke }))
-jest.unstable_mockModule('../../github/github.js', () => ({ deleteConnection, createGithubRouter: jest.fn() }))
+jest.unstable_mockModule('../../../lib/github/connection.js', () => ({ deleteConnection }))
 jest.unstable_mockModule('../../../lib/repositories/users.js', () => ({
   getAdminUserById, softDeleteUser: jest.fn(), listUsers: jest.fn(),
   adminUpdateUser: jest.fn(), restoreSoftDeletedUser: jest.fn(),
