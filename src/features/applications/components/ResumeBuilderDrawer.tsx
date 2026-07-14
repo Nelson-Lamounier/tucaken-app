@@ -16,6 +16,7 @@ import {
   mapApplicationToBuilderState,
   builderStateToResumeData,
   builderStateToCoverLetter,
+  serialiseBuilderSnapshot,
 } from '../utils/resume-adapters'
 import {
   updateApplicationCoverLetterFn,
@@ -51,6 +52,9 @@ export function ResumeBuilderDrawer({
   const { addToast } = useToastStore()
   const [builderKey, setBuilderKey] = useState(0)
   const prevStateRef = useRef<AppState | null>(null)
+  // Snapshot of the editable content taken when the drawer loads; used to
+  // detect unsaved edits on close. Null = nothing loaded / already saved.
+  const loadedSnapshotRef = useRef<string | null>(null)
 
   // Load builder state when the drawer opens.
   useEffect(() => {
@@ -63,6 +67,7 @@ export function ResumeBuilderDrawer({
     }
     setState(() => mapApplicationToBuilderState(resume, coverLetter, company, role))
     setView(initialView)
+    loadedSnapshotRef.current = serialiseBuilderSnapshot(getState())
     setBuilderKey((k) => k + 1)
   }, [isOpen, resume, coverLetter, company, role, initialView])
 
@@ -78,7 +83,17 @@ export function ResumeBuilderDrawer({
   // Restore state on unmount.
   useEffect(() => () => { restore() }, [restore])
 
+  // Closing the drawer discards builder state (restore()). Guard against the
+  // silent-discard trap: edits are only persisted by the explicit Save button,
+  // so an unconfirmed close would throw the user's changes away.
   const handleClose = useCallback(() => {
+    const snapshot = loadedSnapshotRef.current
+    const hasUnsavedEdits =
+      snapshot !== null && serialiseBuilderSnapshot(getState()) !== snapshot
+    if (hasUnsavedEdits && !window.confirm('Discard unsaved changes to this resume?')) {
+      return
+    }
+    loadedSnapshotRef.current = null
     restore()
     onClose()
   }, [restore, onClose])
@@ -86,8 +101,10 @@ export function ResumeBuilderDrawer({
   const saveMutation = useMutation({
     mutationFn: async () => {
       const state = getState()
-      const resume = builderStateToResumeData(state) as unknown as Record<string, unknown>
-      await updateApplicationResumeFn({ data: { slug, resume } })
+      // Pass the incoming resume so fields the builder does not own
+      // (keyAchievements) survive the save instead of being wiped.
+      const payload = builderStateToResumeData(state, resume) as unknown as Record<string, unknown>
+      await updateApplicationResumeFn({ data: { slug, resume: payload } })
       if (coverLetter) {
         const cl = builderStateToCoverLetter(state, coverLetter.signoff)
         await updateApplicationCoverLetterFn({
@@ -100,6 +117,8 @@ export function ResumeBuilderDrawer({
       void queryClient.invalidateQueries({ queryKey: adminKeys.applications.tailoredResumes })
       void queryClient.invalidateQueries({ queryKey: adminKeys.applications.detail(slug) })
       addToast('success', 'Saved.')
+      // Everything is persisted — mark clean so the close guard never prompts.
+      loadedSnapshotRef.current = null
       handleClose()
     },
     onError: (err: unknown) => {
