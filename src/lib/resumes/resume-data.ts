@@ -45,6 +45,11 @@ export interface ResumeProject {
   name: string
   description: string
   github: string
+  /**
+   * Strategist-generated (or user-edited) bullet points for the project.
+   * Optional: resumes stored before this field existed have none.
+   */
+  highlights?: string[]
 }
 
 export interface ResumeAchievement {

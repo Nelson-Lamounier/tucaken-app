@@ -209,6 +209,13 @@ export function buildResumeDomForPdf(data: ResumeData): HTMLDivElement {
           <span data-pdf-link="${toHref(proj.github)}" style="font-size: 9px; color: #71717a; flex-shrink: 0; margin-left: 16px;">${proj.github}</span>
         </div>
         <p style="font-size: 9.5px; line-height: 1.6; color: ${BODY_LIGHT}; margin: 4px 0 0 0;">${proj.description}</p>
+        ${
+          proj.highlights && proj.highlights.length > 0
+            ? `<ul style="margin: 6px 0 0 0; padding-left: 16px; list-style-type: disc;">
+        ${proj.highlights.map((h) => `<li style="font-size: 9.5px; line-height: 1.5; color: ${BODY_LIGHT}; margin-bottom: 4px;">${h}</li>`).join('')}
+      </ul>`
+            : ''
+        }
       </div>
     `
       )
