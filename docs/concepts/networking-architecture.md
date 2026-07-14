@@ -53,15 +53,19 @@ functional dependency
 
 ## tucaken-app: domains and edge behaviour
 
-The canonical origin is `https://tucaken.io`. Two edge redirects are
-documented in the CORS configuration comments: CloudFront 301-redirects
-`tucaken.com` to `tucaken.io` at the edge, and `www.tucaken.io` is also
-redirected at CloudFront, so browsers never send cross-origin requests
-from the secondary domains after the first hop
-([admin-api/src/index.ts](../../admin-api/src/index.ts#L96-L110)).
-The CDN and DNS resources themselves live in the infrastructure repos,
-not here; this repo's contract with the edge is the origin allowlist and
-the `x-request-id` header it may forward
+The canonical origin is `https://tucaken.io`, and the live edge is the
+shared internet-facing ALB — **not CloudFront**. The CloudFront + NLB +
+Traefik edge was retired (no distribution exists in the account,
+[verified via `aws cloudfront list-distributions` on 2026-07-14]); the
+comments in [admin-api/src/index.ts](../../admin-api/src/index.ts#L96-L110)
+describing CloudFront-edge 301 redirects predate that migration. Today
+all four hosts (`tucaken.io`, `www.tucaken.io`, `tucaken.com`,
+`www.tucaken.com`) route to the same tucaken-app target group with no
+canonical-host redirect — the redirect is a planned ALB-actions
+enhancement. Full edge path (DNS, ACM, WAF, listener rules):
+[request lifecycle — browser to pod](./request-lifecycle-browser-to-pod.md).
+This repo's contract with the edge is the origin allowlist and the
+`x-request-id` header it may forward
 ([src/server/_api-client.ts](../../src/server/_api-client.ts#L70-L74)).
 
 ## tucaken-app: BFF calls over Kubernetes service DNS
@@ -227,12 +231,12 @@ namespace when checked
   data reaches the browser without a second fetch.
 - [admin-api routes README](../../admin-api/src/routes/README.md) — the
   full mount table and auth-tier map.
-- (planned) docs/concepts/request-lifecycle-browser-to-pod.md — the full
-  edge path (DNS → CloudFront → ALB → pod); needs evidence from the
-  tucaken-infra and kubernetes-bootstrap repos, so it should be written
-  from there or with their manifests at hand.
-- (planned) docs/troubleshooting/cors-error-in-production.md — what a
-  production CORS failure actually indicates given the pod-to-pod model.
+- [Request lifecycle — browser to pod](./request-lifecycle-browser-to-pod.md)
+  — the full edge path: ExternalDNS, ALB, WAFv2, ACM SNI, IP-mode target
+  groups, blue-green active services.
+- [CORS error in production](../troubleshooting/cors-error-in-production.md)
+  — what a production CORS failure actually indicates given the
+  pod-to-pod model.
 
 <!--
 Evidence trail (auto-generated):
