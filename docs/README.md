@@ -11,6 +11,7 @@ or the root [README](../README.md) for the product and architecture.
 
 ## Concepts
 
+- [Networking architecture — tucaken-app and admin-api](concepts/networking-architecture.md) — pod-to-pod BFF calls over service DNS, trust tiers, CORS/CSP, and every egress path.
 - [API-dispatched Kubernetes Jobs](concepts/api-dispatched-k8s-jobs.md) — routes build a Job spec and submit it; workers run the Bedrock pipelines.
 - [Distributed tracing from API request to worker pod](concepts/distributed-tracing-api-to-worker.md) — `TRACEPARENT` propagation across the async boundary.
 - [Four-pillar observability](concepts/four-pillars-observability.md) — OTel, Prometheus, Loki, Pyroscope, plus browser RUM.
