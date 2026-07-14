@@ -49,7 +49,7 @@ export function mapApplicationToBuilderState(
       name: (p as AppResumeData['profile']).name ?? '',
       title: (p as AppResumeData['profile']).title ?? '',
       email: (p as AppResumeData['profile']).email ?? '',
-      phone: '',
+      phone: (p as AppResumeData['profile']).phone ?? '',
       location: (p as AppResumeData['profile']).location ?? '',
       linkedin: (p as AppResumeData['profile']).linkedin ?? '',
       github: (p as AppResumeData['profile']).github ?? '',
@@ -60,7 +60,7 @@ export function mapApplicationToBuilderState(
       id: uid(),
       title: e.title ?? '',
       company: e.company ?? '',
-      location: '',
+      location: e.location ?? '',
       period: e.period ?? '',
       bullets: Array.isArray(e.highlights) ? e.highlights : [],
     })),
@@ -68,14 +68,14 @@ export function mapApplicationToBuilderState(
       id: uid(),
       degree: e.degree ?? '',
       institution: e.institution ?? '',
-      location: '',
+      location: e.location ?? '',
       period: e.period ?? '',
       details: e.details ?? '',
     })),
     projects: (appResume.projects ?? []).map((proj) => ({
       id: uid(),
       name: proj.name ?? '',
-      stack: '',
+      stack: proj.stack ?? '',
       url: proj.github ?? '',
       description: proj.description ?? '',
       bullets: Array.isArray(proj.highlights) ? proj.highlights : [],
@@ -91,8 +91,21 @@ export function mapApplicationToBuilderState(
       issuer: c.issuer ?? '',
       year: c.year ?? '',
     })),
-    languages: [],
-    custom: [],
+    languages: (appResume.languages ?? []).map((l) => ({
+      id: uid(),
+      name: l.name ?? '',
+      level: l.level ?? '',
+    })),
+    custom: (appResume.customSections ?? []).map((s) => ({
+      id: uid(),
+      title: s.title ?? '',
+      entries: (s.entries ?? []).map((entry) => ({
+        id: uid(),
+        heading: entry.heading ?? '',
+        subheading: entry.subheading ?? '',
+        body: entry.body ?? '',
+      })),
+    })),
     sectionOrder: resolveSectionOrder(appResume.sectionOrder),
   }
 
@@ -147,7 +160,10 @@ function mapStructuredCoverLetter(
 }
 
 /** Builder AppState → application ResumeData (inverse of mapApplicationToBuilderState). */
-export function builderStateToResumeData(state: AppState): AppResumeData {
+export function builderStateToResumeData(
+  state: AppState,
+  original?: AppResumeData,
+): AppResumeData {
   const r = state.resume
   return {
     profile: {
@@ -155,16 +171,21 @@ export function builderStateToResumeData(state: AppState): AppResumeData {
       title: r.profile.title,
       location: r.profile.location,
       email: r.profile.email,
+      phone: r.profile.phone,
       linkedin: r.profile.linkedin,
       github: r.profile.github,
       website: r.profile.website,
     },
     summary: r.summary,
-    keyAchievements: [],
+    // The builder has no Key Achievements section (product decision), so the
+    // strategist-written value must pass through the save untouched — emitting
+    // [] here would silently wipe it from content_json.
+    keyAchievements: original?.keyAchievements ?? [],
     experience: r.experience.map((e) => ({
       title: e.title,
       company: e.company,
       period: e.period,
+      location: e.location,
       highlights: e.bullets,
     })) as AppResumeData['experience'],
     certifications: r.certifications.map((c) => ({
@@ -180,16 +201,40 @@ export function builderStateToResumeData(state: AppState): AppResumeData {
       degree: e.degree,
       institution: e.institution,
       period: e.period,
+      location: e.location,
       details: e.details,
     })) as AppResumeData['education'],
     projects: r.projects.map((p) => ({
       name: p.name,
       github: p.url,
       description: p.description,
+      stack: p.stack,
       highlights: p.bullets,
     })) as AppResumeData['projects'],
+    languages: r.languages.map((l) => ({
+      name: l.name,
+      level: l.level,
+    })),
+    customSections: r.custom.map((s) => ({
+      title: s.title,
+      entries: s.entries.map((entry) => ({
+        heading: entry.heading,
+        subheading: entry.subheading,
+        body: entry.body,
+      })),
+    })),
     sectionOrder: r.sectionOrder,
   }
+}
+
+/**
+ * Serialises the content the user can actually edit in the builder (resume +
+ * cover letter) for unsaved-changes detection. Cosmetic viewer state (view,
+ * theme, margins) is deliberately excluded — browsing must never register as
+ * a dirty edit.
+ */
+export function serialiseBuilderSnapshot(state: AppState): string {
+  return JSON.stringify({ resume: state.resume, cover: state.cover })
 }
 
 /**

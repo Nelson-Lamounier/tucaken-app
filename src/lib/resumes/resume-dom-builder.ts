@@ -106,6 +106,8 @@ export function buildResumeDomForPdf(data: ResumeData): HTMLDivElement {
       </p>
       <div style="margin-top: 12px; font-size: 10px; color: ${MUTED}; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
         <span>${data.profile.location}</span>
+        ${data.profile.phone ? `<span style="color: #d4d4d8;">|</span>
+        <span>${data.profile.phone}</span>` : ''}
         <span style="color: #d4d4d8;">|</span>
         <span data-pdf-link="${toHref(data.profile.email)}">${data.profile.email}</span>
         <span style="color: #d4d4d8;">|</span>
