@@ -35,8 +35,15 @@ const SESSION_COOKIE_MAX_AGE = 60 * 60
 /** Matches the pool client's refresh-token validity (30 days). */
 const REFRESH_COOKIE_MAX_AGE = 30 * 24 * 60 * 60
 
-const SECURE_COOKIES =
-  process.env.NODE_ENV === 'production' && getAppOrigin().startsWith('https')
+/**
+ * Evaluated lazily, NOT at module scope: this module is in the main SSR
+ * bundle (imported via session.ts by __root.tsx), and getAppOrigin() throws
+ * in production when APP_ORIGIN is unset — a module-scope call would take
+ * down every SSR request in environments like the Docker smoke test.
+ */
+function secureCookies(): boolean {
+  return process.env.NODE_ENV === 'production' && getAppOrigin().startsWith('https')
+}
 
 function cognitoClient(): { client: CognitoIdentityProviderClient; clientId: string } {
   const clientId = process.env['AUTH_COGNITO_ID'] ?? process.env['AUTH_COGNITO_CLIENT_ID']
@@ -52,9 +59,10 @@ function cognitoClient(): { client: CognitoIdentityProviderClient; clientId: str
  * REFRESH_TOKEN_AUTH responses unless rotation is configured.
  */
 export function setSessionCookies(idToken: string, refreshToken?: string): void {
+  const secure = secureCookies()
   setCookie(SESSION_COOKIE, idToken, {
     httpOnly: true,
-    secure: SECURE_COOKIES,
+    secure,
     sameSite: 'lax',
     maxAge: SESSION_COOKIE_MAX_AGE,
     path: '/',
@@ -62,7 +70,7 @@ export function setSessionCookies(idToken: string, refreshToken?: string): void 
   if (refreshToken) {
     setCookie(REFRESH_COOKIE, refreshToken, {
       httpOnly: true,
-      secure: SECURE_COOKIES,
+      secure,
       sameSite: 'lax',
       maxAge: REFRESH_COOKIE_MAX_AGE,
       path: '/',
