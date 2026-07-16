@@ -35,6 +35,24 @@ describe('resume preview/edit parity', () => {
     )
   })
 
+  it('falls back to the canonical order with skills after certifications when the backend emits none', () => {
+    const state = mapApplicationToBuilderState({ ...rawWithKeyAchievements, sectionOrder: [] }, null, 'Acme', 'SRE')
+    expect(state.resume.sectionOrder).toEqual([
+      'summary',
+      'experience',
+      'projects',
+      'education',
+      'certifications',
+      'skills',
+    ])
+  })
+
+  it('honours a backend-emitted order over the canonical fallback', () => {
+    const emitted = ['skills', 'summary', 'experience', 'projects', 'education', 'certifications']
+    const state = mapApplicationToBuilderState({ ...rawWithKeyAchievements, sectionOrder: emitted }, null, 'Acme', 'SRE')
+    expect(state.resume.sectionOrder).toEqual(emitted)
+  })
+
   it('renders no key-achievements block in the resume-theme document', () => {
     const state = mapApplicationToBuilderState(rawWithKeyAchievements, null, 'Acme', 'SRE')
     const blockIds = getResumeBlocks(state.resume).map((b) => b.id).join(' ')

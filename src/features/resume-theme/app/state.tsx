@@ -197,8 +197,8 @@ const DEFAULT_RESUME: ResumeData = {
     "experience",
     "projects",
     "education",
-    "skills",
     "certifications",
+    "skills",
     "languages",
   ],
 };

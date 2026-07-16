@@ -14,8 +14,8 @@ const CANONICAL_SECTION_ORDER = [
   'experience',
   'projects',
   'education',
-  'skills',
   'certifications',
+  'skills',
 ] as const
 
 const VALID_SECTION_KEYS = new Set<string>(CANONICAL_SECTION_ORDER)
