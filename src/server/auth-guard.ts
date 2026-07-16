@@ -7,9 +7,8 @@
  * functions should call this at the top of their handler.
  */
 
-import { getCookie } from '@tanstack/react-start/server'
-import { verifyCognitoJwt } from '@/lib/auth/tanstack-auth'
 import type { AuthUser } from './session'
+import { resolveSession } from './session-refresh'
 import { MOCK_AUTH, MOCK_USER } from './_dev-mock'
 
 // =============================================================================
@@ -57,22 +56,16 @@ export class AuthorizationError extends Error {
 export async function requireAuth(): Promise<AuthUser> {
   if (MOCK_AUTH) return MOCK_USER
 
-  const token = getCookie('__session')
-
-  if (!token) {
-    throw new AuthenticationError('No session cookie found')
+  // resolveSession() silently refreshes a near-expiry/expired id_token via
+  // the __refresh cookie, so active users never fail this guard at the
+  // 60-minute token boundary.
+  const payload = await resolveSession()
+  if (!payload) {
+    throw new AuthenticationError('No session cookie found — session expired or signed out')
   }
-
-  try {
-    const payload = await verifyCognitoJwt(token)
-    return {
-      id: payload.sub as string,
-      email: payload.email as string,
-    }
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err)
-    console.error('[auth-guard] JWT verification failed:', message)
-    throw new AuthenticationError('Session expired or invalid')
+  return {
+    id: payload.sub as string,
+    email: payload['email'] as string,
   }
 }
 
@@ -94,26 +87,16 @@ function hasAdminGroup(groups: unknown): boolean {
 export async function requireAdmin(): Promise<AuthUser> {
   if (MOCK_AUTH) return MOCK_USER
 
-  const token = getCookie('__session')
-
-  if (!token) {
-    throw new AuthenticationError('No session cookie found')
+  const payload = await resolveSession()
+  if (!payload) {
+    throw new AuthenticationError('No session cookie found — session expired or signed out')
   }
-
-  try {
-    const payload = await verifyCognitoJwt(token)
-    if (!hasAdminGroup(payload['cognito:groups'])) {
-      throw new AuthorizationError()
-    }
-    return {
-      id: payload.sub as string,
-      email: payload.email as string,
-    }
-  } catch (err: unknown) {
-    if (err instanceof AuthorizationError) throw err
-    const message = err instanceof Error ? err.message : String(err)
-    console.error('[auth-guard] admin JWT verification failed:', message)
-    throw new AuthenticationError('Session expired or invalid')
+  if (!hasAdminGroup(payload['cognito:groups'])) {
+    throw new AuthorizationError()
+  }
+  return {
+    id: payload.sub as string,
+    email: payload['email'] as string,
   }
 }
 
@@ -129,18 +112,10 @@ export async function requireAdmin(): Promise<AuthUser> {
 export async function tryAuth(): Promise<AuthUser | null> {
   if (MOCK_AUTH) return MOCK_USER
 
-  const token = getCookie('__session')
-  if (!token) return null
-
-  try {
-    const payload = await verifyCognitoJwt(token)
-    return {
-      id: payload.sub as string,
-      email: payload.email as string,
-    }
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err)
-    console.warn('[auth-guard] tryAuth: invalid session cookie ignored —', message)
-    return null
+  const payload = await resolveSession()
+  if (!payload) return null
+  return {
+    id: payload.sub as string,
+    email: payload['email'] as string,
   }
 }

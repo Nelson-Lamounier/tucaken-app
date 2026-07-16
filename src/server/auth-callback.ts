@@ -10,16 +10,13 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import { getCookie, setCookie, deleteCookie } from '@tanstack/react-start/server'
+import { getCookie, deleteCookie } from '@tanstack/react-start/server'
 import { z } from 'zod'
 import { getAppOrigin } from './app-origin'
+import { setSessionCookies } from './session-refresh'
 
 const ADMIN_API_URL =
   process.env['ADMIN_API_URL'] ?? 'http://admin-api.admin-api:3002'
-
-const SECURE_COOKIES =
-  process.env.NODE_ENV === 'production' &&
-  getAppOrigin().startsWith('https')
 
 const authCallbackSchema = z.object({
   code: z.string().min(1, 'Authorisation code is required'),
@@ -59,13 +56,7 @@ export const handleAuthCallbackFn = createServerFn({ method: 'POST' })
     const { exchangeCognitoCode } = await import('@/lib/auth/tanstack-auth')
     const tokenRes = await exchangeCognitoCode(code, codeVerifier, redirectUri)
 
-    setCookie('__session', tokenRes.id_token, {
-      httpOnly: true,
-      secure: SECURE_COOKIES,
-      sameSite: 'lax',
-      maxAge: 24 * 60 * 60,
-      path: '/',
-    })
+    setSessionCookies(tokenRes.id_token, tokenRes.refresh_token)
 
     deleteCookie('pkce_verifier', { path: '/' })
     deleteCookie('oauth_state', { path: '/' })

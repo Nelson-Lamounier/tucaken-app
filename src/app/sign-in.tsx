@@ -17,12 +17,14 @@ import { withFormTracking } from '@/lib/observability/with-form-tracking'
 export const Route = createFileRoute('/sign-in')({
   validateSearch: z.object({
     callbackUrl: z.string().optional(),
+    /** Set by the global auth-failure handler so the page can explain the redirect. */
+    reason: z.enum(['expired']).optional(),
   }),
   component: AuthPage,
 })
 
 function AuthPage() {
-  const { callbackUrl } = Route.useSearch()
+  const { callbackUrl, reason } = Route.useSearch()
 
   function navigateAfterAuth(isNewUser: boolean) {
     if (isNewUser) {
@@ -38,7 +40,16 @@ function AuthPage() {
   }
 
   return (
-    <EnergeticAuthShell
+    <>
+      {reason === 'expired' && (
+        <div
+          role="status"
+          className="fixed inset-x-0 top-0 z-50 bg-amber-50 px-4 py-2.5 text-center text-sm font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-200"
+        >
+          Your session expired. Sign in again to pick up where you left off.
+        </div>
+      )}
+      <EnergeticAuthShell
       onGoogle={() => goOAuth('Google')}
       onGithub={() => goOAuth('GitHub')}
       onSignIn={async (v) => {
@@ -72,6 +83,7 @@ function AuthPage() {
       onConfirmPassword={async (email, code, newPassword) => {
         await confirmForgotPasswordFn({ data: { email, code, newPassword } })
       }}
-    />
+      />
+    </>
   )
 }

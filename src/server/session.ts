@@ -10,8 +10,7 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import { getCookie, deleteCookie } from '@tanstack/react-start/server'
-import { verifyCognitoJwt } from '@/lib/auth/tanstack-auth'
+import { resolveSession } from './session-refresh'
 import { securityHeadersMiddleware } from './security-headers'
 import { MOCK_AUTH, MOCK_USER } from './_dev-mock'
 
@@ -44,20 +43,12 @@ export const getUserSessionFn = createServerFn({ method: 'GET' })
   .handler(async (): Promise<AuthUser | null> => {
     if (MOCK_AUTH) return MOCK_USER
 
-    const token = getCookie('__session')
-    if (!token) return null
-
-    try {
-      const payload = await verifyCognitoJwt(token)
-      return {
-        id: payload.sub as string,
-        email: payload.email as string,
-      }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err)
-      console.error('[auth] JWT verification failed:', message)
-      // Clear the stale cookie so the browser stops sending it on every request.
-      deleteCookie('__session', { path: '/' })
-      return null
+    // Silently refreshes near-expiry/expired id_tokens via the __refresh
+    // cookie; clears both cookies when no session can be recovered.
+    const payload = await resolveSession()
+    if (!payload) return null
+    return {
+      id: payload.sub as string,
+      email: payload['email'] as string,
     }
   })
