@@ -89,8 +89,23 @@ export async function apiFetch<T>(path: string, opts: ApiFetchOptions = {}): Pro
 
   let status = 0;
   try {
-    const res = await fetch(`${ADMIN_API_URL}${apiPrefix}${path}`, { ...init, headers });
+    let res = await fetch(`${ADMIN_API_URL}${apiPrefix}${path}`, { ...init, headers });
     status = res.status;
+
+    // 401 → the id_token expired mid-session. Silently refresh via the
+    // __refresh cookie and retry ONCE before surfacing the failure, so an
+    // active user's in-flight action survives the token boundary.
+    if (res.status === 401) {
+      const { REFRESH_COOKIE, refreshIdToken, setSessionCookies } = await import('./session-refresh');
+      const refreshToken = getCookie(REFRESH_COOKIE);
+      const renewed = refreshToken ? await refreshIdToken(refreshToken) : null;
+      if (renewed) {
+        setSessionCookies(renewed);
+        headers.Authorization = `Bearer ${renewed}`;
+        res = await fetch(`${ADMIN_API_URL}${apiPrefix}${path}`, { ...init, headers });
+        status = res.status;
+      }
+    }
 
     if (!res.ok) {
       let detail = '';

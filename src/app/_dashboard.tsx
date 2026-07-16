@@ -1,5 +1,6 @@
 import { createFileRoute, Outlet, redirect, useMatches } from '@tanstack/react-router'
 import AppLayout from '../components/layouts/AppLayout'
+import { SessionExpiryDialog } from '../features/auth/components/SessionExpiryDialog'
 import { getMeFn } from '../server/me'
 import type { MeResponse } from '../server/me'
 
@@ -82,6 +83,9 @@ function DashboardLayout() {
   return (
     <AppLayout me={me} isAdmin={isAdmin} disableMainWrapper={disableMainWrapper}>
       <Outlet />
+      {/* Idle-session guard: keepalive while active, countdown dialog before
+          idle sign-out. Mounted here so it covers every authenticated route. */}
+      <SessionExpiryDialog />
     </AppLayout>
   )
 }

@@ -26,6 +26,7 @@ import {
 import { MOCK_AUTH } from './_dev-mock'
 import { enforceAuthRateLimit } from './_rate-limit'
 import { getAppOrigin } from './app-origin'
+import { clearSessionCookies, revokeRefreshToken, setSessionCookies } from './session-refresh'
 
 // Re-export types from session.ts so existing import paths keep working.
 export type { AuthUser, AuthState } from './session'
@@ -207,13 +208,7 @@ export const signInWithPasswordFn = createServerFn({ method: 'POST' })
 
     if (res.AuthenticationResult?.IdToken) {
       const idToken = res.AuthenticationResult.IdToken
-      setCookie('__session', idToken, {
-        httpOnly: true,
-        secure: SECURE_COOKIES,
-        sameSite: 'lax',
-        maxAge: 24 * 60 * 60,
-        path: '/',
-      })
+      setSessionCookies(idToken, res.AuthenticationResult.RefreshToken)
       const isNewUser = await detectNewUser(idToken)
       logAuth('auth_signin_success', { isNewUser, method: 'password' })
       return { success: true, isNewUser }
@@ -277,13 +272,7 @@ export const respondToMfaChallengeFn = createServerFn({ method: 'POST' })
 
     if (!res.AuthenticationResult?.IdToken) throw new Error('MFA verification failed')
 
-    setCookie('__session', res.AuthenticationResult.IdToken, {
-      httpOnly: true,
-      secure: SECURE_COOKIES,
-      sameSite: 'lax',
-      maxAge: 24 * 60 * 60,
-      path: '/',
-    })
+    setSessionCookies(res.AuthenticationResult.IdToken, res.AuthenticationResult.RefreshToken)
 
     deleteCookie('mfa_session', { path: '/' })
     deleteCookie('mfa_username', { path: '/' })
@@ -420,13 +409,7 @@ export const confirmSignUpFn = createServerFn({ method: 'POST' })
     const idToken = res.AuthenticationResult?.IdToken
     if (!idToken) throw new Error('Authentication failed after email confirmation')
 
-    setCookie('__session', idToken, {
-      httpOnly: true,
-      secure: SECURE_COOKIES,
-      sameSite: 'lax',
-      maxAge: 24 * 60 * 60,
-      path: '/',
-    })
+    setSessionCookies(idToken, res.AuthenticationResult?.RefreshToken)
 
     // Provision the user in admin-api (creates the RDS row via userProvisionMiddleware).
     // Result is ignored for routing — a confirmed email is always a new user.
@@ -498,7 +481,10 @@ export const confirmForgotPasswordFn = createServerFn({ method: 'POST' })
 export const logoutFn = createServerFn({ method: 'POST' })
   .inputValidator(z.object({ appOrigin: z.string().optional() }))
   .handler(async () => {
-    deleteCookie('__session', { path: '/' })
+    // Revoke the refresh token first (best-effort) — with token revocation
+    // enabled on the pool this invalidates every token minted from it.
+    await revokeRefreshToken()
+    clearSessionCookies()
     deleteCookie('pkce_verifier', { path: '/' })
     deleteCookie('oauth_state', { path: '/' })
 
