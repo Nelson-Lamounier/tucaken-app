@@ -48,12 +48,13 @@ jest.unstable_mockModule('../../../lib/repositories/pipeline-runs.js', () => ({
 }));
 
 jest.unstable_mockModule('../../../lib/repositories/articles.js', () => ({
+  getArticleStatus: jest.fn<() => Promise<{ status: string; title: string; updatedAt: Date | null } | null>>().mockResolvedValue({ status: 'draft', title: 't', updatedAt: null }),
   upsertArticle: upsertArticleMock,
 }));
 
 // Mock applications repo - upsertApplication should succeed without hitting pg.
 jest.unstable_mockModule('../../../lib/repositories/applications.js', () => ({
-  getApplicationStatus: jest.fn<() => Promise<string | null>>().mockResolvedValue('analysing'),
+  getApplicationStatus: jest.fn<() => Promise<{ status: string; hasQueuedStage: boolean; updatedAt: Date | null } | null>>().mockResolvedValue({ status: 'analysing', hasQueuedStage: false, updatedAt: null }),
   upsertApplication:       upsertApplicationMock,
   listApplications:        jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
   getApplication:          jest.fn<() => Promise<unknown>>().mockResolvedValue(null),

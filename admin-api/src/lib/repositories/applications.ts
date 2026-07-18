@@ -71,18 +71,43 @@ export async function upsertApplication(pool: Queryable, application: Applicatio
     );
 }
 
+export interface ApplicationStatusProbe {
+    status: string;
+    /** True while any interview stage is prep_status='queued' (coach in flight). */
+    hasQueuedStage: boolean;
+    /** Watermark for client stall detection. */
+    updatedAt: Date | null;
+}
+
 /**
- * Lightweight status probe — kanban_status only, one indexed PK lookup.
- * Serves the notification watchers, which previously polled the full
- * detail endpoint (9 queries) and saturated the pool when many watchers
- * mounted at once.
+ * Lightweight status probe — one indexed lookup plus an EXISTS on the
+ * unique (job_application_id, stage_type) index. Serves the notification
+ * watchers AND the detail page's live-follow polling, which previously
+ * polled the full detail endpoint (9 queries) and saturated the pool when
+ * many pollers mounted at once.
  */
-export const getApplicationStatus = async (pool: Queryable, id: string): Promise<string | null> => {
+export const getApplicationStatus = async (
+    pool: Queryable,
+    id: string,
+): Promise<ApplicationStatusProbe | null> => {
     const result = await pool.query(
-        `SELECT kanban_status FROM job_applications WHERE id = $1`,
+        `SELECT kanban_status, updated_at,
+                EXISTS (
+                  SELECT 1 FROM interview_stages
+                   WHERE job_application_id = $1 AND prep_status = 'queued'
+                ) AS has_queued_stage
+           FROM job_applications WHERE id = $1`,
         [id],
     );
-    return (result.rows[0] as { kanban_status?: string } | undefined)?.kanban_status ?? null;
+    const row = result.rows[0] as
+        | { kanban_status: string; updated_at: Date | null; has_queued_stage: boolean }
+        | undefined;
+    if (!row) return null;
+    return {
+        status:         row.kanban_status,
+        hasQueuedStage: row.has_queued_stage,
+        updatedAt:      row.updated_at,
+    };
 };
 
 export async function getApplication(pool: Queryable, id: string): Promise<Application | null> {

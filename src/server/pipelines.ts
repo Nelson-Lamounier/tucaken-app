@@ -121,18 +121,17 @@ export const getPipelineStatusFn = createServerFn({ method: 'GET' })
     await requireAuth()
 
     try {
-      const body = await apiFetch<{
-        article: {
-          status?: string
-          title?: string
-          updatedAt?: string
-        }
+      // Status probe, NOT the full article — content_md can be tens of KB
+      // and this fn is polled every 5 s during a pipeline run.
+      const article = await apiFetch<{
+        slug: string
+        status?: string
+        title?: string
+        updatedAt?: string
       }>(
-        `/articles/${encodeURIComponent(slug)}`,
-        { pathTemplate: '/articles/:slug' },
+        `/articles/${encodeURIComponent(slug)}/status`,
+        { pathTemplate: '/articles/:slug/status' },
       )
-
-      const article = body.article
       const dynamoStatus = article.status
 
       // Derive pipeline state from article status

@@ -108,6 +108,8 @@ export const adminKeys = {
     accessibleRepos: () => ['admin', 'github', 'accessible-repos'] as const,
     /** Repos connected (indexed) to the KB */
     connectedRepos: () => ['admin', 'github', 'connected-repos'] as const,
+    /** Lightweight sync-status probe (polling loop) */
+    connectedRepoSyncStatus: () => ['admin', 'github', 'connected-repos', 'sync-status'] as const,
   },
 
   /** Live Stripe billing reads (payment method, invoices, customer details) */

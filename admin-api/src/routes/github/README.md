@@ -38,7 +38,8 @@ flowchart LR
 |---|---|---|
 | GET/POST/DELETE | `/installation` | Check / store / disconnect the GitHub App installation |
 | GET | `/repos` | List repos reachable via the installation token |
-| GET | `/connected-repos` | List Knowledge Base repos + sync status (reconciles stuck repos) |
+| GET | `/connected-repos` | List Knowledge Base repos + sync status (reconciles stuck repos — page load only) |
+| GET | `/connected-repos/sync-status` | Lightweight polling probe: statuses only, no K8s reconcile |
 | POST | `/connected-repos` | Connect repo → default project → dispatch ingestion Job |
 | POST | `/connected-repos/sync` | Re-sync all connected repos |
 | POST | `/connected-repos/mark-timed-out` | Operator repair for stuck syncs |

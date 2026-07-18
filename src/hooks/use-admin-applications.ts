@@ -127,43 +127,10 @@ export function useApplicationDetail(slug: string) {
       return getApplicationDetailFn({ data: slug }) as Promise<ApplicationDetail>
     },
     enabled: Boolean(slug),
-    refetchInterval: (queryResult) => {
-      if (timedOut) return false
-
-      const detail = queryResult.state.data
-      const status = detail?.status
-      if (!status) return false
-
-      const isActive = ACTIVE_PIPELINE_STATUSES.has(status)
-
-      // Also poll while any stage has prep_status === 'queued'
-      const hasQueuedStage =
-        detail?.stages != null &&
-        Object.values(detail.stages).some((s) => s.prep_status === 'queued')
-
-      if (!isActive && !hasQueuedStage) return false
-
-      // Progress reset: whenever the run advances (its updatedAt changes), restart
-      // the stall timer — so a long-but-active run is never mistaken for stalled.
-      if (detail?.updatedAt && lastUpdatedRef.current !== detail.updatedAt) {
-        lastUpdatedRef.current = detail.updatedAt
-        pollStartRef.current = Date.now()
-      }
-
-      // Start the stall timer on the first active poll.
-      if (!pollStartRef.current) {
-        pollStartRef.current = Date.now()
-      }
-
-      // Give up only after POLL_TIMEOUT_MS with no progress.
-      const elapsed = Date.now() - pollStartRef.current
-      if (elapsed > POLL_TIMEOUT_MS) {
-        setTimedOut(true)
-        return false
-      }
-
-      return PIPELINE_POLL_INTERVAL
-    },
+    // NEVER self-poll: the full detail is a 9-query transaction. Live-follow
+    // happens through the lightweight status probe below, which invalidates
+    // this query only when something actually changed (see the
+    // pool-saturation incident, docs/troubleshooting/).
   })
 
   // Reset timeout state when status changes to non-active and no queued stages
@@ -180,6 +147,66 @@ export function useApplicationDetail(slug: string) {
       setTimedOut(false)
     }
   }, [query.data])
+
+  // ── Live-follow via the lightweight status probe ──────────────────────────
+  // While the application is in an active pipeline state (or a coach run is
+  // queued), poll the one-query probe and invalidate the heavy detail query
+  // only when the probe reports a change. Stall detection: if the probe
+  // watermark stops advancing for POLL_TIMEOUT_MS, latch timedOut (same
+  // contract the old self-polling exposed to ProgressBars).
+  const queryClient = useQueryClient()
+  const detailStatus = query.data?.status
+  const detailHasQueuedStage =
+    query.data?.stages != null &&
+    Object.values(query.data.stages).some((s) => s.prep_status === 'queued')
+  const followActive =
+    !timedOut &&
+    Boolean(slug) &&
+    !slug.startsWith('mock-') &&
+    Boolean(detailStatus) &&
+    (ACTIVE_PIPELINE_STATUSES.has(detailStatus as ApplicationStatus) || detailHasQueuedStage)
+
+  const probe = useQuery<ApplicationStatusProbe>({
+    queryKey: adminKeys.applications.statusProbe(slug),
+    queryFn: () => getApplicationStatusFn({ data: slug }) as Promise<ApplicationStatusProbe>,
+    enabled: followActive,
+    refetchInterval: () => {
+      if (timedOut) return false
+      if (!pollStartRef.current) pollStartRef.current = Date.now()
+      if (Date.now() - pollStartRef.current > POLL_TIMEOUT_MS) {
+        setTimedOut(true)
+        return false
+      }
+      return PIPELINE_POLL_INTERVAL
+    },
+  })
+
+  useEffect(() => {
+    const p = probe.data
+    if (!p || !followActive) return
+
+    // Any watermark advance = progress → reset the stall timer.
+    const watermark = `${p.status}|${String(p.hasQueuedStage)}|${p.updatedAt ?? ''}`
+    if (lastUpdatedRef.current !== watermark) {
+      lastUpdatedRef.current = watermark
+      pollStartRef.current = Date.now()
+    }
+
+    // Refetch the heavy detail only when the probe disagrees with it.
+    const statusChanged = p.status !== detailStatus
+    const queuedCleared = detailHasQueuedStage && !p.hasQueuedStage
+    if (statusChanged || queuedCleared) {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.applications.detail(slug) })
+    }
+  }, [probe.data, followActive, detailStatus, detailHasQueuedStage, queryClient, slug])
+
+  // Leaving the active state clears the stall latch for the next run.
+  useEffect(() => {
+    if (!followActive && !timedOut) {
+      pollStartRef.current = null
+      lastUpdatedRef.current = null
+    }
+  }, [followActive, timedOut])
 
   return { ...query, timedOut }
 }
@@ -254,14 +281,21 @@ const WATCHER_TERMINAL_STATUSES: ReadonlySet<string> = new Set([
  * page load, and the heavy variant saturated the API's 5-connection pool
  * (5 s connect-timeout failures, 2026-07-18 incident).
  */
+export interface ApplicationStatusProbe {
+  slug: string
+  status: string
+  hasQueuedStage: boolean
+  updatedAt: string | null
+}
+
 export const useApplicationStatusProbe = (slug: string) =>
-  useQuery<{ slug: string; status: string }>({
+  useQuery<ApplicationStatusProbe>({
     queryKey: adminKeys.applications.statusProbe(slug),
-    queryFn: () => getApplicationStatusFn({ data: slug }),
+    queryFn: () => getApplicationStatusFn({ data: slug }) as Promise<ApplicationStatusProbe>,
     enabled: Boolean(slug),
     refetchInterval: (queryResult) => {
-      const status = queryResult.state.data?.status
-      if (status && WATCHER_TERMINAL_STATUSES.has(status)) return false
+      const probe = queryResult.state.data
+      if (probe && WATCHER_TERMINAL_STATUSES.has(probe.status) && !probe.hasQueuedStage) return false
       return PIPELINE_POLL_INTERVAL
     },
   })

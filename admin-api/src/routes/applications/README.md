@@ -38,6 +38,7 @@ flowchart LR
 |---|---|---|---|
 | GET | `/` | core | List applications (optional `?status=`) |
 | GET | `/:slug` | core | Full detail: analysis, stages, coaching, tailored resume |
+| GET | `/:slug/status` | core | Lightweight probe (status + queued-stage flag) — the ONLY endpoint pollers may hit |
 | GET | `/:slug/resume.pdf` | core | Presigned URL for the canonical ATS text PDF (300 s expiry) |
 | DELETE | `/:slug` | core | Delete application |
 | PATCH | `/:slug/annotations` | core | Replace user annotations |

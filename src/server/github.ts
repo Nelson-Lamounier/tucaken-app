@@ -107,6 +107,20 @@ export const queueConnectedRepoFn = createServerFn({ method: 'POST' })
   })
 
 // Dispatch ingestion jobs for every 'pending' repo of the caller.
+/**
+ * Lightweight sync-status probe for the connected-repos polling loop — one
+ * query server-side and NO stuck-repo reconciliation (the full list GET
+ * calls the Kubernetes API inline, which belongs on page load, not on a
+ * 5-second interval).
+ */
+export const getConnectedRepoSyncStatusFn = createServerFn({ method: 'GET' }).handler(async () => {
+  await requireAuth()
+  return apiFetch<{ repos: { repoFullName: string; syncStatus: string }[] }>(
+    '/github/connected-repos/sync-status',
+    { pathTemplate: '/github/connected-repos/sync-status' },
+  )
+})
+
 export const startConnectedReposSyncFn = createServerFn({ method: 'POST' }).handler(async () => {
   await requireAuth()
   return apiFetch<{ started: number }>('/github/connected-repos/sync', {

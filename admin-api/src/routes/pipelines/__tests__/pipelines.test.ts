@@ -43,6 +43,7 @@ jest.unstable_mockModule('../../../lib/repositories/pipeline-runs.js', () => ({
 }));
 
 jest.unstable_mockModule('../../../lib/repositories/articles.js', () => ({
+  getArticleStatus: jest.fn<() => Promise<{ status: string; title: string; updatedAt: Date | null } | null>>().mockResolvedValue({ status: 'draft', title: 't', updatedAt: null }),
   upsertArticle: upsertArticleMock,
 }));
 

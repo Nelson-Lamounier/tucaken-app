@@ -218,9 +218,14 @@ export function createApplicationsCoreRouter(config: AdminApiConfig): Hono<Admin
 
     const slug = ctx.req.param('slug');
     return withUser(getPool(config), userId, async (db) => {
-      const status = await getApplicationStatus(db, slug);
-      if (status === null) return ctx.json({ error: `Application not found: ${slug}` }, 404);
-      return ctx.json({ slug, status });
+      const probe = await getApplicationStatus(db, slug);
+      if (probe === null) return ctx.json({ error: `Application not found: ${slug}` }, 404);
+      return ctx.json({
+        slug,
+        status:         probe.status,
+        hasQueuedStage: probe.hasQueuedStage,
+        updatedAt:      probe.updatedAt,
+      });
     });
   });
 

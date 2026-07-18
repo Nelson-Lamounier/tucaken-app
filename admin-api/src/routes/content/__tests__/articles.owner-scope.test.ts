@@ -15,6 +15,7 @@ const upsertArticleMock = jest.fn<() => Promise<void>>();
 const deleteArticleMock = jest.fn<() => Promise<void>>();
 
 jest.unstable_mockModule('../../../lib/repositories/articles.js', () => ({
+  getArticleStatus: jest.fn<() => Promise<{ status: string; title: string; updatedAt: Date | null } | null>>().mockResolvedValue({ status: 'draft', title: 't', updatedAt: null }),
   listAllArticles: listAllArticlesMock,
   listArticlesByStatus: listArticlesByStatusMock,
   getArticleBySlugForAuthor: getArticleBySlugForAuthorMock,
