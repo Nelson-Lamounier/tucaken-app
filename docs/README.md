@@ -26,6 +26,7 @@ or the root [README](../README.md) for the product and architecture.
 
 ## Patterns
 
+- [Hono API composition](patterns/hono-api-composition.md) — router factories as DI, typed context, middleware tiers as the security model, uniform validation + error boundaries.
 - [Repository layer with database-enforced row-level security](patterns/repository-layer-rls.md) — `withUser` + Postgres RLS.
 - [Single shared Job spec for multi-path dispatch](patterns/shared-ingestion-job-spec.md) — one `buildIngestionJobSpec` for both triggers.
 - [Redis cache invalidation](patterns/redis-cache.md) — fail-open project-cache invalidator.
@@ -43,6 +44,7 @@ or the root [README](../README.md) for the product and architecture.
 - [0008 — Polling over SSE](decisions/0008-polling-over-sse.md)
 - [0009 — Run the strategist matcher on Sonnet](decisions/0009-sonnet-strategist-matcher.md)
 - [0010 — Stamp the dispatched Job image onto pipeline runs](decisions/0010-pipeline-image-sha-stamping.md)
+- [0011 — Keep apiFetch over Hono RPC](decisions/0011-no-hono-rpc-keep-apifetch.md)
 
 ## Tools
 

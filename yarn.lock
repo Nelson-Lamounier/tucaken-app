@@ -2500,6 +2500,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@hono/zod-validator@npm:^0.9.0":
+  version: 0.9.0
+  resolution: "@hono/zod-validator@npm:0.9.0"
+  peerDependencies:
+    hono: ">=4.11.2"
+    zod: ^3.25.0 || ^4.0.0
+  checksum: 10c0/74502187fb18113c2f4254050501e6da84f86b44b7a598675379ec2e8f4a3db571bc1a17d48da3a75c01dcbf251c1a7c8cc12cef4e53523aade0f793b64586e3
+  languageName: node
+  linkType: hard
+
 "@humanfs/core@npm:^0.19.2":
   version: 0.19.2
   resolution: "@humanfs/core@npm:0.19.2"
@@ -4696,6 +4706,7 @@ __metadata:
     "@aws-sdk/client-s3": "npm:^3.0.0"
     "@aws-sdk/s3-request-presigner": "npm:^3.0.0"
     "@hono/node-server": "npm:^1.13.7"
+    "@hono/zod-validator": "npm:^0.9.0"
     "@kubernetes/client-node": "npm:^1.4.0"
     "@opentelemetry/api": "npm:^1.9.0"
     "@opentelemetry/auto-instrumentations-node": "npm:^0.75.0"

@@ -34,6 +34,7 @@ import {
 } from '../../lib/repositories/projects.js';
 import { getUserPlanStatus } from '../../lib/repositories/users.js';
 import { AdminApiBindings, requireUserId } from '../../lib/types.js';
+import { domainErrorBoundary } from '../../lib/route-error-boundary.js';
 import {
     SLUG_REGEX,
     VALID_ROLES,
@@ -50,11 +51,7 @@ import {
 export function createProjectsCoreRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
     const router = new Hono<AdminApiBindings>();
 
-    router.onError((err, ctx) => {
-        const status = (err as { status?: number }).status ?? 500;
-        console.error(`[projects] ${ctx.req.method} ${ctx.req.path}`, err.message);
-        return ctx.json({ error: err.message }, status as 400 | 401 | 403 | 404 | 500);
-    });
+    router.onError(domainErrorBoundary('projects'));
 
     // ────────────────────────────────────────────────────────────────────
     // GET /                                — list projects

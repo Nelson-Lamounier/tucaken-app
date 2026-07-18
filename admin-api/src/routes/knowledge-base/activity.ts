@@ -17,6 +17,7 @@ import type { AdminApiConfig } from '../../lib/config.js';
 import { getPool } from '../../lib/pg.js';
 import { getDailyActivity, getUserRepositories, summariseKbHealth } from '../../lib/repositories/user-rag.js';
 import { AdminApiBindings, requireUserId } from '../../lib/types.js';
+import { domainErrorBoundary } from '../../lib/route-error-boundary.js';
 
 const DaysQuery = z.object({
     days: z.coerce.number().int().min(1).max(90).default(30),
@@ -25,11 +26,7 @@ const DaysQuery = z.object({
 export function createActivityRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
     const router = new Hono<AdminApiBindings>();
 
-    router.onError((err, ctx) => {
-        const status = (err as { status?: number }).status ?? 500;
-        console.error(`[activity] ${ctx.req.method} ${ctx.req.path}`, err.message);
-        return ctx.json({ error: err.message }, status as 400 | 401 | 403 | 404 | 500 | 502 | 503);
-    });
+    router.onError(domainErrorBoundary('activity'));
 
     // -------------------------------------------------------------------------
     // GET /daily — per-day application + resume counts for the caller

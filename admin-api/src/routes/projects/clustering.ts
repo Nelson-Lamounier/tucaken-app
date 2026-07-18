@@ -20,15 +20,12 @@ import { getPool, withUser } from '../../lib/pg.js';
 import { insertPipelineRun } from '../../lib/repositories/pipeline-runs.js';
 import { listProjects } from '../../lib/repositories/projects.js';
 import { AdminApiBindings, requireUserId } from '../../lib/types.js';
+import { domainErrorBoundary } from '../../lib/route-error-boundary.js';
 
 export function createProjectsClusteringRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
     const router = new Hono<AdminApiBindings>();
 
-    router.onError((err, ctx) => {
-        const status = (err as { status?: number }).status ?? 500;
-        console.error(`[projects] ${ctx.req.method} ${ctx.req.path}`, err.message);
-        return ctx.json({ error: err.message }, status as 400 | 401 | 403 | 404 | 500);
-    });
+    router.onError(domainErrorBoundary('projects'));
 
     // ────────────────────────────────────────────────────────────────────
     // GET /clustering/proposals             — unconfirmed AI proposals
