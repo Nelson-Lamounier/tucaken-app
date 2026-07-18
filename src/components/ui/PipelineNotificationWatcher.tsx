@@ -14,7 +14,7 @@
 import { useEffect } from 'react'
 import { usePipelineNotificationsStore } from '@/lib/stores/pipeline-notifications-store'
 import { usePipelineStatus } from '@/features/ai-agent/hooks/use-pipeline-status'
-import { useApplicationDetail, usePipelineRunStatus } from '@/hooks/use-admin-applications'
+import { useApplicationStatusProbe, usePipelineRunStatus } from '@/hooks/use-admin-applications'
 
 // ── Article watcher ───────────────────────────────────────────────────────────
 
@@ -51,10 +51,12 @@ function ArticleNotificationWatcher({ slug }: { slug: string }) {
  */
 function ApplicationNotificationWatcher({ slug }: { slug: string }) {
   const updateNotification = usePipelineNotificationsStore((s) => s.updateNotification)
-  const detail = useApplicationDetail(slug)
+  // Status probe, NOT the full detail query: many watchers mount at once and
+  // the detail endpoint's 9-query transaction saturated the API pool.
+  const probe = useApplicationStatusProbe(slug)
 
   useEffect(() => {
-    const status = detail.data?.status
+    const status = probe.data?.status
     if (!status) return
 
     // Terminal non-active states
@@ -64,7 +66,7 @@ function ApplicationNotificationWatcher({ slug }: { slug: string }) {
       updateNotification(slug, 'failed')
     }
     // 'analysing' / 'coaching' keep status as 'running'
-  }, [detail.data?.status, slug, updateNotification])
+  }, [probe.data?.status, slug, updateNotification])
 
   return null
 }

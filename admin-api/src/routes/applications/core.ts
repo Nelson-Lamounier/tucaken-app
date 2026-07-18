@@ -24,6 +24,7 @@ import { getPool, withUser } from '../../lib/pg.js';
 import {
   listApplications,
   getApplication,
+  getApplicationStatus,
   updateApplicationStatus as pgUpdateStatus,
   updateInterviewStage,
   deleteApplication as pgDeleteApplication,
@@ -208,6 +209,21 @@ export function createApplicationsCoreRouter(config: AdminApiConfig): Hono<Admin
    *  - coaching_content rows (one per stage)
    *  - latest resumes row (tailored resume content_json)
    */
+  // ── GET /:slug/status — lightweight pipeline-status probe ────────────────
+  // One indexed lookup. Notification watchers poll THIS, never the full
+  // detail assembly below (see the pool-saturation incident, 2026-07-18).
+  app.get('/:slug/status', async (ctx) => {
+    const userId = ctx.get('userId');
+    if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
+
+    const slug = ctx.req.param('slug');
+    return withUser(getPool(config), userId, async (db) => {
+      const status = await getApplicationStatus(db, slug);
+      if (status === null) return ctx.json({ error: `Application not found: ${slug}` }, 404);
+      return ctx.json({ slug, status });
+    });
+  });
+
   app.get('/:slug', async (ctx) => {
     const userId = ctx.get('userId');
     if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
@@ -218,7 +234,12 @@ export function createApplicationsCoreRouter(config: AdminApiConfig): Hono<Admin
       const application = await getApplication(db, slug);
       if (!application) return ctx.json({ error: `Application not found: ${slug}` }, 404);
 
-      const analysisResult = await db.query<{
+      // All eight reads below are mutually independent. They share the single
+      // RLS-scoped client, so node-pg executes them serially server-side —
+      // Promise.all pipelines the submissions (no per-await event-loop gap)
+      // WITHOUT taking extra pool slots, which is exactly the trade we want
+      // after the pool-saturation incident.
+      const analysisPromise = db.query<{
         id:         string;
         metadata:   Record<string, unknown> | null;
         created_at: Date;
@@ -230,9 +251,8 @@ export function createApplicationsCoreRouter(config: AdminApiConfig): Hono<Admin
           LIMIT 1`,
         [slug],
       );
-      const latestAnalysis = analysisResult.rows[0] ?? null;
 
-      const coachingResult = await db.query<{
+      const coachingPromise = db.query<{
         stage_type:          string;
         topics_to_study:     unknown;
         expected_questions:  unknown;
@@ -243,7 +263,7 @@ export function createApplicationsCoreRouter(config: AdminApiConfig): Hono<Admin
         [slug],
       );
 
-      const resumeResult = await db.query<{
+      const resumePromise = db.query<{
         id:             string;
         content_json:   unknown;
         ats_check_json: unknown;
@@ -258,7 +278,7 @@ export function createApplicationsCoreRouter(config: AdminApiConfig): Hono<Admin
       // Resolve technicalRoundType from company_interview_profiles.
       // company_key is: lowercase + strip non-alphanumeric (mirrors normalizeCompanyKey).
       const companyKey = normalizeCompanyKey(application.company);
-      const profileResult = await db.query<{
+      const profilePromise = db.query<{
         process_shape: unknown[] | null;
       }>(
         `SELECT process_shape
@@ -267,29 +287,15 @@ export function createApplicationsCoreRouter(config: AdminApiConfig): Hono<Admin
           LIMIT 1`,
         [companyKey],
       );
-      const processShape = profileResult.rows[0]?.process_shape ?? null;
-      // Find the first stage element whose `stage` starts with 'technical'.
-      const technicalStage = Array.isArray(processShape)
-        ? (processShape as Record<string, unknown>[]).find(
-            (s) => typeof s['stage'] === 'string' && s['stage'].startsWith('technical'),
-          )
-        : null;
-      const rawRoundType = technicalStage?.['round_type'];
-      const technicalRoundType: TechnicalRoundType =
-        typeof rawRoundType === 'string' && VALID_ROUND_TYPES.has(rawRoundType as TechnicalRoundType)
-          ? (rawRoundType as TechnicalRoundType)
-          : 'dsa';
-
-      const rawAnalysis  = latestAnalysis?.metadata?.['analysis']  as Record<string, unknown> | null | undefined;
 
       // Real-work DSA evidence (RLS — user's own rows, all repos). Fail-open.
-      let dsaRealWork: Array<{
+      const dsaPromise = (async (): Promise<Array<{
         canonicalName: string;
         matchCount: number;
         topConfidence: number;
         signals: string[];
         samples: { repo: string; file: string; line: number }[];
-      }> | undefined;
+      }> | undefined> => {
       try {
         // Reuse the outer RLS-scoped client `db` (withUser already SET LOCAL app.current_user_id) —
         // no second pool checkout. dsa_evidence is RLS-protected; the WHERE is belt-and-braces.
@@ -311,7 +317,7 @@ export function createApplicationsCoreRouter(config: AdminApiConfig): Hono<Admin
             WHERE user_id = current_setting('app.current_user_id')::uuid
             GROUP BY dsa_topic`,
         );
-        dsaRealWork = rows.map((r) => ({
+        return rows.map((r) => ({
           canonicalName: r.dsa_topic,
           matchCount:    Number(r.match_count),
           topConfidence: r.top_confidence,
@@ -319,10 +325,127 @@ export function createApplicationsCoreRouter(config: AdminApiConfig): Hono<Admin
           samples:       r.samples ?? [],
         }));
       } catch (err) {
-        console.error('[dsa] real-work aggregation failed (non-fatal)', (err as Error).message);
+        (ctx.get('logger') ?? logger).warn({ err }, '[dsa] real-work aggregation failed (non-fatal)');
+        return undefined;
       }
+      })();
+
+      // DevOps real-work evidence: technology_evidence ⋈ technology_ontology ⋈ devops_topic_mappings.
+      // Reuses the outer withUser-scoped db client (RLS). Prose-suppressed. Fail-open.
+      const devopsPromise = (async (): Promise<Array<{
+        canonicalTopicName: string;
+        displayName:        string;
+        topicGroup:         string;
+        artifactCount:      number;
+        samples:            { repo: string; file: string; line: number; rawName: string }[];
+      }> | undefined> => {
+      try {
+        const { rows: devopsRows } = await db.query<{
+          canonical_topic_name: string;
+          display_name:         string;
+          topic_group:          string;
+          artifact_count:       number;
+          samples:              { repo: string; file: string; line: number; rawName: string }[];
+        }>(
+          `SELECT m.canonical_topic_name, m.display_name, m.topic_group,
+                  COUNT(*)::int AS artifact_count,
+                  (ARRAY_AGG(json_build_object('repo', e.repo_full_name, 'file', e.file_path,
+                                               'line', e.line_start, 'rawName', e.raw_name)
+                             ORDER BY e.confidence DESC NULLS LAST))[1:3] AS samples
+             FROM technology_evidence e
+             JOIN technology_ontology o ON o.id = e.technology_id
+             JOIN devops_topic_mappings m
+               ON o.category = ANY (SELECT jsonb_array_elements_text(m.mapped_ontology_categories))
+               OR o.canonical_name = ANY (SELECT jsonb_array_elements_text(m.mapped_canonicals))
+            WHERE e.user_id = current_setting('app.current_user_id')::uuid
+              AND e.source_layer NOT IN ('readme','code-prose')
+              AND e.file_path !~* '\\.(md|markdown)$'
+            GROUP BY m.canonical_topic_name, m.display_name, m.topic_group
+            ORDER BY m.topic_group, m.canonical_topic_name`,
+        );
+        return devopsRows.map((r) => ({
+          canonicalTopicName: r.canonical_topic_name,
+          displayName:        r.display_name,
+          topicGroup:         r.topic_group,
+          artifactCount:      Number(r.artifact_count),
+          samples:            r.samples ?? [],
+        }));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        logger.warn({ err }, `[devops] evidence aggregation failed (non-fatal): ${msg}`);
+        return undefined;
+      }
+      })();
+
+      // System tours (per-project architecture walkthroughs). RLS-scoped via the
+      // outer withUser db client — a user only sees their own tours. Cap 3, newest
+      // first. Each row.content is a SystemTour. Fail-open (query error → omit).
+      const toursPromise = (async (): Promise<unknown[] | undefined> => {
+      try {
+        const { rows: tourRows } = await db.query<{ content: unknown }>(
+          `SELECT content
+             FROM project_system_tours
+            WHERE user_id = current_setting('app.current_user_id')::uuid
+            ORDER BY generated_at DESC
+            LIMIT 3`,
+        );
+        return tourRows.map((r) => r.content);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        logger.warn({ err }, `[system-tour] serve failed (non-fatal): ${msg}`);
+        return undefined;
+      }
+      })();
+
+      const [analysisResult, coachingResult, resumeResult, profileResult, dsaRealWork, devopsEvidence, systemTours, stages] =
+        await Promise.all([
+          analysisPromise,
+          coachingPromise,
+          resumePromise,
+          profilePromise,
+          dsaPromise,
+          devopsPromise,
+          toursPromise,
+          getStagesForApp(db, application.id),
+        ]);
+      const latestAnalysis = analysisResult.rows[0] ?? null;
+      const rawAnalysis  = latestAnalysis?.metadata?.['analysis']  as Record<string, unknown> | null | undefined;
       const rawResearch  = latestAnalysis?.metadata?.['research']  as Record<string, unknown> | null | undefined;
       const persistedResume = resumeResult.rows[0]?.content_json ?? null;
+
+      // Map research agent output → ResearchOutput shape.
+      // Field names differ between the pipeline contract (@bedrock/shared) and
+      // the UI types (applications.types.ts), so we normalise here.
+      const research = rawResearch ? normaliseResearch(rawResearch) : null;
+
+      // Rank the user's documented projects against the stage topics (verified /
+      // partial / gap skills) so the UI can deep-link project references per topic.
+      // Deterministic + RLS-scoped + fail-open — empty map on any issue.
+      if (research) {
+        try {
+          const skills = collectResearchSkills(research);
+          if (skills.length > 0) {
+            const refIndex = await loadProjectRefIndex(db);
+            const refs = rankProjectsForSkills(refIndex, skills);
+            if (Object.keys(refs).length > 0) research['topicProjectRefs'] = refs;
+          }
+        } catch (err) {
+          console.error('[applications/detail] project-reference ranking failed (non-fatal)', err);
+        }
+      }
+
+      const processShape = profileResult.rows[0]?.process_shape ?? null;
+      // Find the first stage element whose `stage` starts with 'technical'.
+      const technicalStage = Array.isArray(processShape)
+        ? (processShape as Record<string, unknown>[]).find(
+            (s) => typeof s['stage'] === 'string' && s['stage'].startsWith('technical'),
+          )
+        : null;
+      const rawRoundType = technicalStage?.['round_type'];
+      const technicalRoundType: TechnicalRoundType =
+        typeof rawRoundType === 'string' && VALID_ROUND_TYPES.has(rawRoundType as TechnicalRoundType)
+          ? (rawRoundType as TechnicalRoundType)
+          : 'dsa';
 
       // Map strategist output → AnalysisOutput shape expected by the UI.
       // tailoredResume prefers the persisted resumes row (validated JSON) over
@@ -350,91 +473,7 @@ export function createApplicationsCoreRouter(config: AdminApiConfig): Hono<Admin
         gapMitigations:    rawAnalysis['gapMitigations'] ?? null,
       } : null;
 
-      // Map research agent output → ResearchOutput shape.
-      // Field names differ between the pipeline contract (@bedrock/shared) and
-      // the UI types (applications.types.ts), so we normalise here.
-      const research = rawResearch ? normaliseResearch(rawResearch) : null;
 
-      // Rank the user's documented projects against the stage topics (verified /
-      // partial / gap skills) so the UI can deep-link project references per topic.
-      // Deterministic + RLS-scoped + fail-open — empty map on any issue.
-      if (research) {
-        try {
-          const skills = collectResearchSkills(research);
-          if (skills.length > 0) {
-            const refIndex = await loadProjectRefIndex(db);
-            const refs = rankProjectsForSkills(refIndex, skills);
-            if (Object.keys(refs).length > 0) research['topicProjectRefs'] = refs;
-          }
-        } catch (err) {
-          console.error('[applications/detail] project-reference ranking failed (non-fatal)', err);
-        }
-      }
-
-      // DevOps real-work evidence: technology_evidence ⋈ technology_ontology ⋈ devops_topic_mappings.
-      // Reuses the outer withUser-scoped db client (RLS). Prose-suppressed. Fail-open.
-      let devopsEvidence: Array<{
-        canonicalTopicName: string;
-        displayName:        string;
-        topicGroup:         string;
-        artifactCount:      number;
-        samples:            { repo: string; file: string; line: number; rawName: string }[];
-      }> | undefined;
-      try {
-        const { rows: devopsRows } = await db.query<{
-          canonical_topic_name: string;
-          display_name:         string;
-          topic_group:          string;
-          artifact_count:       number;
-          samples:              { repo: string; file: string; line: number; rawName: string }[];
-        }>(
-          `SELECT m.canonical_topic_name, m.display_name, m.topic_group,
-                  COUNT(*)::int AS artifact_count,
-                  (ARRAY_AGG(json_build_object('repo', e.repo_full_name, 'file', e.file_path,
-                                               'line', e.line_start, 'rawName', e.raw_name)
-                             ORDER BY e.confidence DESC NULLS LAST))[1:3] AS samples
-             FROM technology_evidence e
-             JOIN technology_ontology o ON o.id = e.technology_id
-             JOIN devops_topic_mappings m
-               ON o.category = ANY (SELECT jsonb_array_elements_text(m.mapped_ontology_categories))
-               OR o.canonical_name = ANY (SELECT jsonb_array_elements_text(m.mapped_canonicals))
-            WHERE e.user_id = current_setting('app.current_user_id')::uuid
-              AND e.source_layer NOT IN ('readme','code-prose')
-              AND e.file_path !~* '\\.(md|markdown)$'
-            GROUP BY m.canonical_topic_name, m.display_name, m.topic_group
-            ORDER BY m.topic_group, m.canonical_topic_name`,
-        );
-        devopsEvidence = devopsRows.map((r) => ({
-          canonicalTopicName: r.canonical_topic_name,
-          displayName:        r.display_name,
-          topicGroup:         r.topic_group,
-          artifactCount:      Number(r.artifact_count),
-          samples:            r.samples ?? [],
-        }));
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        logger.warn({ err }, `[devops] evidence aggregation failed (non-fatal): ${msg}`);
-      }
-
-      // System tours (per-project architecture walkthroughs). RLS-scoped via the
-      // outer withUser db client — a user only sees their own tours. Cap 3, newest
-      // first. Each row.content is a SystemTour. Fail-open (query error → omit).
-      let systemTours: unknown[] | undefined;
-      try {
-        const { rows: tourRows } = await db.query<{ content: unknown }>(
-          `SELECT content
-             FROM project_system_tours
-            WHERE user_id = current_setting('app.current_user_id')::uuid
-            ORDER BY generated_at DESC
-            LIMIT 3`,
-        );
-        systemTours = tourRows.map((r) => r.content);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        logger.warn({ err }, `[system-tour] serve failed (non-fatal): ${msg}`);
-      }
-
-      const stages = await getStagesForApp(db, application.id);
 
       return ctx.json({
         application: {

@@ -27,7 +27,10 @@ const pgUpdateApplicationStatusMock = jest.fn<() => Promise<void>>().mockResolve
 const poolQueryMock = jest.fn() as jest.Mock<any>;
 poolQueryMock.mockResolvedValue({ rows: [] });
 
+const pgGetApplicationStatusMock = jest.fn<() => Promise<string | null>>().mockResolvedValue('analysing');
+
 jest.unstable_mockModule('../../../lib/repositories/applications.js', () => ({
+  getApplicationStatus: pgGetApplicationStatusMock,
   listApplications:        pgListApplicationsMock,
   getApplication:          pgGetApplicationMock,
   deleteApplication:       pgDeleteApplicationMock,
@@ -979,5 +982,20 @@ describe('GET /:slug/resume.pdf — canonical ATS PDF', () => {
     const res = await buildAppNoAuth().request('/app-1/resume.pdf');
     expect(res.status).toBe(503);
     expect(getSignedUrlMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /:slug/status — lightweight probe', () => {
+  it('returns only the kanban status for the notification watchers', async () => {
+    pgGetApplicationStatusMock.mockResolvedValueOnce('analysis-ready');
+    const res = await buildApp().request('/abc-123/status');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ slug: 'abc-123', status: 'analysis-ready' });
+  });
+
+  it('404s for an unknown application', async () => {
+    pgGetApplicationStatusMock.mockResolvedValueOnce(null);
+    const res = await buildApp().request('/nope/status');
+    expect(res.status).toBe(404);
   });
 });

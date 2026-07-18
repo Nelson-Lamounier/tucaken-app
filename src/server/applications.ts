@@ -84,6 +84,21 @@ export const getScheduledInterviewsFn = createServerFn({ method: 'GET' }).handle
  * @param data - The application slug
  * @returns Full application detail including analysis and interview data
  */
+/**
+ * Lightweight pipeline-status probe for notification watchers — one indexed
+ * lookup server-side, never the full detail assembly. Introduced after the
+ * watcher stampede saturated the API's connection pool (2026-07-18).
+ */
+export const getApplicationStatusFn = createServerFn({ method: 'GET' })
+  .inputValidator(slugSchema)
+  .handler(async ({ data: slug }) => {
+    await requireAuth()
+    return apiFetch<{ slug: string; status: string }>(
+      `/applications/${encodeURIComponent(slug)}/status`,
+      { pathTemplate: '/applications/:slug/status' },
+    )
+  })
+
 export const getApplicationDetailFn = createServerFn({ method: 'GET' })
   .inputValidator(slugSchema)
   .handler(async ({ data: slug }) => {

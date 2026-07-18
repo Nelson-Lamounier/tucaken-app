@@ -4,7 +4,7 @@ import { adminKeys } from '@/lib/api/query-keys'
 import { useToastStore } from '@/lib/stores/toast-store'
 import { notifyError } from '@/lib/errors/notify'
 import type { ApplicationStatus, ApplicationSummary, ApplicationDetail, InterviewStage } from '@/lib/types/applications.types'
-import { getApplicationsFn, deleteApplicationFn, getApplicationDetailFn, updateApplicationStatusFn } from '../server/applications'
+import { getApplicationsFn, deleteApplicationFn, getApplicationDetailFn, getApplicationStatusFn, updateApplicationStatusFn } from '../server/applications'
 import { getPipelineRunStatusFn } from '../server/pipelines'
 
 const PIPELINE_POLL_INTERVAL = 5_000
@@ -238,3 +238,30 @@ export function usePipelineRunStatus(runId: string | null, enabled: boolean) {
   return data ?? null
 }
 
+
+/** Terminal statuses at which the notification watchers stop polling. */
+const WATCHER_TERMINAL_STATUSES: ReadonlySet<string> = new Set([
+  'analysis-ready',
+  'failed',
+  'rejected',
+])
+
+/**
+ * Lightweight status probe for the pipeline notification watchers.
+ *
+ * Polls GET /applications/:slug/status (one indexed query) instead of the
+ * full detail endpoint (9 queries) — many watchers can mount at once after a
+ * page load, and the heavy variant saturated the API's 5-connection pool
+ * (5 s connect-timeout failures, 2026-07-18 incident).
+ */
+export const useApplicationStatusProbe = (slug: string) =>
+  useQuery<{ slug: string; status: string }>({
+    queryKey: adminKeys.applications.statusProbe(slug),
+    queryFn: () => getApplicationStatusFn({ data: slug }),
+    enabled: Boolean(slug),
+    refetchInterval: (queryResult) => {
+      const status = queryResult.state.data?.status
+      if (status && WATCHER_TERMINAL_STATUSES.has(status)) return false
+      return PIPELINE_POLL_INTERVAL
+    },
+  })

@@ -222,6 +222,24 @@ Project rule file: `.claude/rules/motion-react.md` (authoritative; this section 
   - Never read `MotionValue.get()` during render — only in effects/`useTransform` callbacks.
 - Radix integration: use `asChild` + `motion.<el>`; hoist `open`/`onOpenChange` state for exit anims; `forceMount` on Radix child of `<AnimatePresence>`.
 
+## Function style — arrow-function expressions (new/edited code)
+
+Prefer **`const fn = (...) => { ... }` arrow-function expressions** over
+`function` declarations for all NEW or substantially edited code — module
+helpers, repository functions, hooks, React components, route handlers.
+
+- **Why**: one consistent binding form (`const` — cannot be reassigned or
+  redeclared), no `this`/`arguments` surprises, and it matches how the
+  codebase already writes callbacks, handlers and hooks.
+- **Ordering caveat**: `const` bindings are NOT hoisted — define helpers
+  **above** their first use. If converting a declaration would force a large
+  reorder of an existing file, keep the declaration; do not churn.
+- **Keep `function` for**: generator functions (`function*`), code that
+  genuinely needs `this` (none in this codebase today), and existing files —
+  **do not mass-convert** untouched code; the rule applies going forward.
+- Exported arrows still get doc comments and explicit return types where the
+  repo already uses them (repositories, server fns).
+
 ## TypeScript code quality — SonarQube / SonarLint rules
 
 This repo is analysed by **SonarCloud Automatic Analysis** (runs per-PR; the

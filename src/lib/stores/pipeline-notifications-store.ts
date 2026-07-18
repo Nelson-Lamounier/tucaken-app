@@ -135,6 +135,25 @@ interface PipelineNotificationsActions {
  * })
  * ```
  */
+/**
+ * Running entries older than this can never legitimately complete — the
+ * client poll gives up after 20 minutes — so they are pruned on rehydrate.
+ * Regression guard for the notification-stampede incident where persisted
+ * stale 'running' entries each mounted a detail-polling watcher on every
+ * page load (~24 concurrent heavy requests → pool saturation → 5 s
+ * connect-timeout failures).
+ */
+export const STALE_RUNNING_MAX_AGE_MS = 25 * 60_000
+
+/** Drop running notifications older than the stale ceiling; terminal entries are kept. */
+export const pruneStaleRunning = (
+  notifications: PipelineNotification[],
+  nowMs: number,
+): PipelineNotification[] =>
+  notifications.filter(
+    (n) => n.status !== 'running' || nowMs - n.createdAt <= STALE_RUNNING_MAX_AGE_MS,
+  )
+
 export const usePipelineNotificationsStore = create<
   PipelineNotificationsState & PipelineNotificationsActions
 >()(
@@ -226,6 +245,12 @@ export const usePipelineNotificationsStore = create<
       // Persist only the entries — currentUserId is re-established from the
       // session on load, so notifications stay hidden until the owner is known.
       partialize: (state) => ({ notifications: state.notifications }),
+      // Prune stale 'running' entries as persisted state loads, so a watcher
+      // is never mounted for a pipeline that gave up long ago.
+      onRehydrateStorage: () => (state) => {
+        if (!state) return
+        state.notifications = pruneStaleRunning(state.notifications, Date.now())
+      },
     },
   ),
 )

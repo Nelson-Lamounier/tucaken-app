@@ -79,6 +79,9 @@ export const adminKeys = {
     /** Individual application detail */
     detail: (slug: string) =>
       ['admin', 'applications', 'detail', slug] as const,
+    /** Lightweight status probe (notification watchers) */
+    statusProbe: (slug: string) =>
+      ['admin', 'applications', 'status', slug] as const,
     /** All scheduled interviews (calendar) */
     scheduledInterviews: ['admin', 'applications', 'scheduled-interviews'] as const,
     /** Tailored resumes (+ cover letters) extracted from applications */
