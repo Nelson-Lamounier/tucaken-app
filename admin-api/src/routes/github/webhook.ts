@@ -21,7 +21,6 @@ import {
     checkAndIncrementQuota,
     decrementQuota,
     dispatchIngestionJob,
-    dispatchTechExtractJob,
     getPlanLimit,
     listConnectedRepos,
     lookupUserByInstallation,
@@ -244,12 +243,6 @@ export function createGitHubWebhookRouter(config: AdminApiConfig): Hono {
                 console.log(`[github/webhook] push re-index queued for ${repoFullName}: job=${jobName}`);
             } catch (err) {
                 console.error(`[github/webhook] push dispatch failed for ${repoFullName}`, (err as Error).message);
-            }
-
-            try {
-                await dispatchTechExtractJob(config, user.userId, repoFullName, token);
-            } catch (err) {
-                console.error('[tech-extractor] dispatch failed (non-fatal)', (err as Error).message);
             }
 
             return ctx.json({ ok: true });

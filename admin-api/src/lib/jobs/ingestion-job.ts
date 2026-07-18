@@ -167,6 +167,7 @@ export function buildIngestionJobSpec(
                 spec: {
                     restartPolicy:      'Never',
                     serviceAccountName: cfg.ingestionServiceAccount,
+                    volumes: [{ name: 'work', emptyDir: { sizeLimit: '2Gi' } }],
                     containers: [{
                         name:    'worker',
                         image,
@@ -176,6 +177,17 @@ export function buildIngestionJobSpec(
                             { name: 'USER_ID',        value: userId },
                             { name: 'REPO_FULL_NAME', value: repoFullName },
                             { name: 'FORCE_REINDEX',  value: String(forceReindex) },
+                            // P2 cutover: unified acquisition + in-job facts persistence
+                            // replaces the tech-extract shadow Job (retired this PR).
+                            // Deployment-env overridable; defaults on.
+                            { name: 'UNIFIED_INGESTION', value: process.env['UNIFIED_INGESTION'] ?? 'on' },
+                            // Scratch dir for tarball acquisition — backed by the 'work'
+                            // emptyDir volume so the pod's root filesystem never fills.
+                            { name: 'WORK_DIR', value: '/tmp/ingest-work' },
+                            // Opt-out flag: enables the worker's GitHub dependency-graph
+                            // SBOM cross-check lane (best-effort, capped, timeout-guarded) —
+                            // carried over from the retired tech-extract Job spec.
+                            { name: 'GITHUB_SBOM_ENABLED', value: cfg.githubSbomEnabled ? '1' : '0' },
                             // Surface the Job name to the worker via the downward API so the
                             // terminal `ingestion.complete` log can be correlated to its Job/pod
                             // in Loki (previously logged `job_name: "unknown"`). The pod carries
@@ -238,8 +250,11 @@ export function buildIngestionJobSpec(
                         ],
                         resources: {
                             requests: { memory: '512Mi', cpu: '250m' },
-                            limits:   { memory: '1Gi',   cpu: '500m' },
+                            // Bumped 1Gi -> 2Gi for the P2 cutover: unified acquisition
+                            // now buffers a repo tarball in-process alongside enrichment.
+                            limits:   { memory: '2Gi',   cpu: '500m' },
                         },
+                        volumeMounts: [{ name: 'work', mountPath: '/tmp/ingest-work' }],
                     }],
                 },
             },

@@ -72,8 +72,7 @@ flowchart LR
 ## Testing
 
 `__tests__/github.test.ts` (E2E through both routers),
-`connect-repo-creates-project.test.ts`, `ingestion.test.ts`,
-`tech-extractor.test.ts` (tech-extract Job spec).
+`connect-repo-creates-project.test.ts`, `ingestion.test.ts`.
 
 ## Related
 

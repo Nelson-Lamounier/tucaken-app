@@ -2,7 +2,7 @@
  * @format
  * admin-api — GitHub route-private shared helpers.
  *
- * DB row helpers, quota enforcement, ingestion/tech-extract Job dispatch and
+ * DB row helpers, quota enforcement, ingestion Job dispatch and
  * stuck-repo reconciliation shared by the installation, connected-repos and
  * webhook routers. Route-private: nothing outside src/routes/github should
  * import this module (deleteConnection lives in lib/github/connection.ts).
@@ -18,14 +18,9 @@ import type { Pool } from 'pg';
 
 import type { AdminApiConfig } from '../../lib/config.js';
 import { getJobImage, isImageConfigured } from '../../lib/config.js';
-import {
-
-    listInstallationRepos,
-    resolveHeadSha,
-} from '../../lib/github/github-app.js';
-import type { V1EnvVar, V1Job } from '@kubernetes/client-node';
+import { listInstallationRepos } from '../../lib/github/github-app.js';
+import type { V1Job } from '@kubernetes/client-node';
 import { getBatchApi, getCoreApi } from '../../lib/jobs/k8s.js';
-import { traceParentEnv, observabilityEnv, MODEL_JOB_BACKOFF_LIMIT } from '../../lib/jobs/k8s-job-builder.js';
 import { buildIngestionJobSpec, buildIngestionTokenSecret, ingestionTokenSecretName } from '../../lib/jobs/ingestion-job.js';
 import { getPool } from '../../lib/pg.js';
 import { ensureDefaultProject, cleanupOrphanedDefaultProjects, stampProjectIntent } from '../../lib/repositories/projects.js';
@@ -406,11 +401,6 @@ export async function autoDispatchRepos(
             // Roll back the quota slot — this repo never got an active job.
             await decrementQuota(pool, userId).catch(() => {});
         }
-        try {
-            await dispatchTechExtractJob(config, userId, repo.full_name, token, repo.default_branch ?? undefined);
-        } catch (err) {
-            console.error('[tech-extractor] dispatch failed (non-fatal)', (err as Error).message);
-        }
     }
 
     return queued;
@@ -509,144 +499,6 @@ export async function dispatchIngestionJob(
         throw err;
     }
     return { jobName };
-}
-
-/**
- * Dispatch a tech-extractor K8s Job alongside the ingestion Job (shadow-mode).
- * This is additive — it MUST NEVER throw in a way that blocks ingestion.
- * Returns null (no throw) if the image is unconfigured.
- */
-export async function buildTechExtractJobSpec(
-    config:        AdminApiConfig,
-    image:         string,
-    userId:        string,
-    repoFullName:  string,
-    timestamp:     number,
-    commitSha?:    string,
-    githubRepoId?: number | null,
-    forceReindex   = false,
-): Promise<V1Job> {
-    const { createHash } = await import('node:crypto');
-    const safeUser  = sanitizeLabel(userId);
-    const repoSlug  = sanitizeLabel(repoFullName.replace('/', '-'));
-    const suffix    = createHash('sha1').update(`${userId}:${repoFullName}:${timestamp}`).digest('hex').slice(0, 8);
-    // 'tech-extract-' (13) + suffix (8) + 1 hyphen = 22 fixed chars; 41 left for slug
-    const slugPart  = sanitizeLabel(`${safeUser}-${repoSlug}`).slice(0, 41);
-    const jobName   = `tech-extract-${slugPart}-${suffix}`.slice(0, MAX_NAME_LEN);
-
-    const env: V1EnvVar[] = [
-        ...observabilityEnv('tech-extractor', `${userId}:${repoFullName}:${timestamp}`),
-        { name: 'USER_ID',        value: userId },
-        { name: 'REPO_FULL_NAME', value: repoFullName },
-        { name: 'WORK_DIR',       value: '/work' },
-        { name: 'GITHUB_TOKEN',   value: '' }, // overwritten by caller; placeholder keeps shape
-        ...(() => { const tp = traceParentEnv(); return tp ? [tp] : []; })(),
-    ];
-    if (typeof githubRepoId === 'number' && Number.isFinite(githubRepoId)) {
-        // Immutable rename-safe key — parity with the ingestion Job so
-        // technology_evidence rows are written with github_repo_id, not just
-        // backfilled. Omitted when not yet resolved (the worker writes null).
-        env.push({ name: 'GITHUB_REPO_ID', value: String(githubRepoId) });
-    }
-    if (config.githubSbomEnabled) {
-        // Opt-out flag: enables the worker's GitHub dependency-graph SBOM
-        // cross-check lane (best-effort, capped, timeout-guarded).
-        env.push({ name: 'GITHUB_SBOM_ENABLED', value: '1' });
-    }
-    if (forceReindex) {
-        // Skip the worker's commit-SHA short-circuit so a re-sync re-extracts
-        // (lets new lanes backfill a commit already covered by older lanes).
-        env.push({ name: 'FORCE_REINDEX', value: '1' });
-    }
-    if (commitSha) {
-        env.push({ name: 'COMMIT_SHA', value: commitSha });
-    }
-
-    return {
-        apiVersion: 'batch/v1',
-        kind:       'Job',
-        metadata: {
-            name:      jobName,
-            namespace: config.techExtractorNamespace,
-            labels: {
-                app:      'tech-extractor',
-                userId:   safeUser,
-                repoSlug,
-            },
-            annotations: {
-                'argocd.argoproj.io/compare-options':      'IgnoreExtraneous',
-                'tech-extractor.tucaken.io/user-id':       userId,
-                'tech-extractor.tucaken.io/repo-full-name': repoFullName,
-            },
-        },
-        spec: {
-            ttlSecondsAfterFinished: 3600,
-            backoffLimit:            MODEL_JOB_BACKOFF_LIMIT,
-            activeDeadlineSeconds:   1800,
-            template: {
-                metadata: { labels: { app: 'tech-extractor', userId: safeUser, repoSlug } },
-                spec: {
-                    restartPolicy:      'Never',
-                    serviceAccountName: config.techExtractorServiceAccount,
-                    volumes: [{ name: 'work', emptyDir: { sizeLimit: '2Gi' } }],
-                    containers: [{
-                        name:    'worker',
-                        image,
-                        command: ['node', 'dist/run-tech-extract.js'],
-                        env,
-                        envFrom: [
-                            { secretRef: { name: 'platform-rds-credentials' } },
-                            { secretRef: { name: 'tech-extractor-secrets' } },
-                        ],
-                        volumeMounts: [{ name: 'work', mountPath: '/work' }],
-                    }],
-                },
-            },
-        },
-    };
-}
-
-export async function dispatchTechExtractJob(
-    config:        AdminApiConfig,
-    userId:        string,
-    repoFullName:  string,
-    githubToken:   string,
-    defaultBranch?: string,
-    forceReindex   = false,
-): Promise<{ jobName: string } | null> {
-    const image = getJobImage('tech-extractor');
-    if (!isImageConfigured(image)) {
-        console.warn('[tech-extractor] image not yet configured — skipping dispatch (non-fatal)');
-        return null;
-    }
-
-    const timestamp = Date.now();
-
-    // Resolve the HEAD commit sha so the Job can short-circuit on repeat runs.
-    // On failure: log and omit COMMIT_SHA (do not throw).
-    let commitSha: string | undefined;
-    try {
-        commitSha = await resolveHeadSha(githubToken, repoFullName, defaultBranch ?? 'HEAD');
-    } catch (err) {
-        console.warn('[tech-extractor] resolveHeadSha failed — omitting COMMIT_SHA', (err as Error).message);
-    }
-
-    // Resolve the immutable repo id so the worker writes github_repo_id (parity
-    // with ingestion). Best-effort — null when not yet backfilled.
-    const githubRepoId = await lookupGithubRepoId(config, userId, repoFullName);
-    const job = await buildTechExtractJobSpec(config, image, userId, repoFullName, timestamp, commitSha, githubRepoId, forceReindex);
-
-    // Stamp the real GITHUB_TOKEN into the env (buildTechExtractJobSpec uses a placeholder).
-    const container = job.spec!.template.spec!.containers[0]!;
-    const tokenIdx = container.env!.findIndex(e => e.name === 'GITHUB_TOKEN');
-    if (tokenIdx >= 0) {
-        container.env![tokenIdx]!.value = githubToken;
-    } else {
-        container.env!.push({ name: 'GITHUB_TOKEN', value: githubToken });
-    }
-
-    await getBatchApi().createNamespacedJob({ namespace: config.techExtractorNamespace, body: job });
-    return { jobName: job.metadata!.name! };
 }
 
 // =============================================================================
