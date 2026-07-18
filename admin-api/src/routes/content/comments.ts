@@ -26,6 +26,7 @@ import {
     deleteComment,
 } from '../../lib/repositories/comments.js';
 import type { AdminApiBindings } from '../../lib/types.js';
+import { jsonBody } from '../../lib/validate.js';
 
 /** Body for POST /:id/moderate — the frontend sends approve|reject. */
 const moderateSchema = z.object({
@@ -53,15 +54,11 @@ export function createCommentsRouter(config: AdminApiConfig): Hono<AdminApiBindi
     });
 
     // POST /api/admin/comments/:id/moderate — approve or reject
-    router.post('/:id/moderate', async (ctx) => {
+    router.post('/:id/moderate', jsonBody(moderateSchema), async (ctx) => {
         const id = ctx.req.param('id');
 
-        const parsed = moderateSchema.safeParse(await ctx.req.json().catch(() => null));
-        if (!parsed.success) {
-            return ctx.json({ error: 'Invalid body — expected { status: "approve" | "reject" }' }, 400);
-        }
-
-        const comment = await moderateComment(getPool(config), id, STATUS_MAP[parsed.data.status]);
+        const { status } = ctx.req.valid('json');
+        const comment = await moderateComment(getPool(config), id, STATUS_MAP[status]);
         if (!comment) return ctx.json({ error: 'Comment not found' }, 404);
 
         return ctx.json({ comment });

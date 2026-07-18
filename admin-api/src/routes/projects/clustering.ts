@@ -21,6 +21,7 @@ import { insertPipelineRun } from '../../lib/repositories/pipeline-runs.js';
 import { listProjects } from '../../lib/repositories/projects.js';
 import { AdminApiBindings, requireUserId } from '../../lib/types.js';
 import { domainErrorBoundary } from '../../lib/route-error-boundary.js';
+import { logger } from '../../lib/observability/logger.js';
 
 export function createProjectsClusteringRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
     const router = new Hono<AdminApiBindings>();
@@ -63,7 +64,7 @@ export function createProjectsClusteringRouter(config: AdminApiConfig): Hono<Adm
 
         const image = getJobImage('job-strategist');
         if (!isImageConfigured(image)) {
-            console.error('[projects/clustering] image URI unresolved');
+            (ctx.get('logger') ?? logger).error({ domain: 'projects/clustering' }, 'image URI unresolved');
             return ctx.json({ error: 'Strategist pipeline image not yet configured — wait ~60s for ESO/kubelet sync' }, 502);
         }
 
@@ -80,7 +81,7 @@ export function createProjectsClusteringRouter(config: AdminApiConfig): Hono<Adm
                 });
             });
         } catch (err) {
-            console.error('[projects/clustering] failed to insert pipeline_run', err);
+            (ctx.get('logger') ?? logger).error({ err, domain: 'projects/clustering' }, 'failed to insert pipeline_run');
             return ctx.json({ error: 'Failed to record pipeline run' }, 500);
         }
 
@@ -109,7 +110,7 @@ export function createProjectsClusteringRouter(config: AdminApiConfig): Hono<Adm
                 body:      job,
             });
         } catch (err) {
-            console.error('[projects/clustering] failed to create K8s Job', err);
+            (ctx.get('logger') ?? logger).error({ err, domain: 'projects/clustering' }, 'failed to create K8s Job');
             return ctx.json({ error: 'Failed to schedule clustering Job' }, 502);
         }
 

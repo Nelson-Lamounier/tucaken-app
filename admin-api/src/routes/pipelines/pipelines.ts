@@ -31,6 +31,7 @@ import { insertPipelineRun, getPipelineRun } from '../../lib/repositories/pipeli
 import { getUserPlanStatus, checkAndIncrementResumeQuota, decrementResumeQuota } from '../../lib/repositories/users.js';
 import { secondsUntilNextMonthUTC } from '../../lib/retry-after.js';
 import type { AdminApiBindings } from '../../lib/types.js';
+import { logger } from '../../lib/observability/logger.js';
 
 /**
  * Resolve the article-pipeline image URI, or `null` when the admin-api-job-images
@@ -40,7 +41,7 @@ import type { AdminApiBindings } from '../../lib/types.js';
 function resolveArticlePipelineImage(logTag: string): string | null {
   const image = getJobImage('article-pipeline');
   if (!isImageConfigured(image)) {
-    console.error(`[${logTag}] image URI unresolved — admin-api-job-images Secret not yet synced`, { value: image });
+    logger.error({ log_tag: logTag, value: image }, 'image URI unresolved — admin-api-job-images Secret not yet synced');
     return null;
   }
   return image;
@@ -55,7 +56,7 @@ async function createPipelineJob(namespace: string, job: V1Job, logTag: string):
     await getBatchApi().createNamespacedJob({ namespace, body: job });
     return true;
   } catch (err: unknown) {
-    console.error(`[${logTag}] failed to create K8s Job`, err);
+    logger.error({ err, log_tag: logTag }, 'failed to create K8s Job');
     return false;
   }
 }
@@ -129,7 +130,7 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
           metadata:      { s3Bucket, s3SourceKey, mode, dispatchedImage: articlePipelineImage },
         });
       } catch (err: unknown) {
-        console.error('[pipelines/article-job] failed to insert pipeline_run', err);
+        (ctx.get('logger') ?? logger).error({ err, domain: 'pipelines/article-job' }, 'failed to insert pipeline_run');
         return ctx.json({ error: 'Failed to record pipeline run' }, 500);
       }
 
@@ -152,7 +153,7 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
           destinations: ['portfolio'],
         });
       } catch (err: unknown) {
-        console.error('[pipelines/article-job] failed to upsert article placeholder', err);
+        (ctx.get('logger') ?? logger).error({ err, domain: 'pipelines/article-job' }, 'failed to upsert article placeholder');
         return ctx.json({ error: 'Failed to create article record' }, 500);
       }
 
@@ -203,7 +204,7 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
             [candidateId, userId, slug],
           );
         } catch (err: unknown) {
-          console.error('[pipelines/article-job] failed to mark candidate used', err);
+          (ctx.get('logger') ?? logger).error({ err, domain: 'pipelines/article-job' }, 'failed to mark candidate used');
         }
       }
 
@@ -242,7 +243,7 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
           metadata:      { dispatchedImage: articlePipelineImage },
         });
       } catch (err: unknown) {
-        console.error('[pipelines/article-eval-job] failed to insert pipeline_run', err);
+        (ctx.get('logger') ?? logger).error({ err, domain: 'pipelines/article-eval-job' }, 'failed to insert pipeline_run');
         return ctx.json({ error: 'Failed to record pipeline run' }, 500);
       }
 
@@ -310,7 +311,7 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
 
     const strategistPipelineImage = getJobImage('job-strategist');
     if (!isImageConfigured(strategistPipelineImage)) {
-      console.error('[pipelines/strategist-job] image URI unresolved — admin-api-job-images Secret not yet synced', { value: strategistPipelineImage });
+      (ctx.get('logger') ?? logger).error({ value: strategistPipelineImage, domain: 'pipelines/strategist-job' }, 'image URI unresolved — admin-api-job-images Secret not yet synced');
       return ctx.json({ error: 'Strategist pipeline image not yet configured — wait ~60s for ESO/kubelet sync' }, 502);
     }
 
@@ -374,7 +375,7 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
           coverLetterOverride: null,
         });
       } catch (err: unknown) {
-        console.error('[pipelines/strategist-job] failed to insert job_application', err);
+        (ctx.get('logger') ?? logger).error({ err, domain: 'pipelines/strategist-job' }, 'failed to insert job_application');
         await decrementResumeQuota(pool, userId).catch(() => {});
         return ctx.json({ error: 'Failed to create application record' }, 500);
       }
@@ -411,7 +412,7 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
           metadata:     { applicationSlug: applicationId, targetCompany, targetRole, mode, dispatchedImage: strategistPipelineImage },
         });
       } catch (err: unknown) {
-        console.error('[pipelines/strategist-job] failed to insert pipeline_run', err);
+        (ctx.get('logger') ?? logger).error({ err, domain: 'pipelines/strategist-job' }, 'failed to insert pipeline_run');
         await decrementResumeQuota(pool, userId).catch(() => {});
         return ctx.json({ error: 'Failed to record pipeline run' }, 500);
       }
@@ -468,7 +469,7 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
 
       try { await getBatchApi().createNamespacedJob({ namespace: config.strategistPipelineNamespace, body: job }); }
       catch (err: unknown) {
-        console.error('[pipelines/strategist-job] failed to create K8s Job', err);
+        (ctx.get('logger') ?? logger).error({ err, domain: 'pipelines/strategist-job' }, 'failed to create K8s Job');
         await decrementResumeQuota(pool, userId).catch(() => {});
         // Mark the just-inserted run failed so the in-flight guard does not lock
         // the user out of retrying (the row commits with this tx).
