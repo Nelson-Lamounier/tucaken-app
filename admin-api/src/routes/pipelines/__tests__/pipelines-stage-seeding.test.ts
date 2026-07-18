@@ -53,6 +53,7 @@ jest.unstable_mockModule('../../../lib/repositories/articles.js', () => ({
 
 // Mock applications repo - upsertApplication should succeed without hitting pg.
 jest.unstable_mockModule('../../../lib/repositories/applications.js', () => ({
+  getApplicationStatus: jest.fn<() => Promise<string | null>>().mockResolvedValue('analysing'),
   upsertApplication:       upsertApplicationMock,
   listApplications:        jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
   getApplication:          jest.fn<() => Promise<unknown>>().mockResolvedValue(null),

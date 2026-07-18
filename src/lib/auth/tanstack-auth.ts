@@ -1,6 +1,25 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose'
 
 /**
+ * Module-level JWKS cache. jose caches fetched keys PER createRemoteJWKSet
+ * instance — constructing a new instance per verification (the previous
+ * shape) forced an HTTPS fetch to Cognito's JWKS endpoint on every session
+ * check. One instance per URL keeps the keys warm for the pod's lifetime,
+ * mirroring admin-api's middleware/auth.ts.
+ */
+const jwksCache = new Map<string, ReturnType<typeof createRemoteJWKSet>>()
+
+const getJwks = (jwksUrl: URL): ReturnType<typeof createRemoteJWKSet> => {
+  const key = jwksUrl.href
+  let jwks = jwksCache.get(key)
+  if (!jwks) {
+    jwks = createRemoteJWKSet(jwksUrl)
+    jwksCache.set(key, jwks)
+  }
+  return jwks
+}
+
+/**
  * Generates a random crypto string for PKCE code_verifier or state
  */
 export function generateRandomString(length: number): string {
@@ -43,8 +62,7 @@ export async function verifyCognitoJwt(token: string) {
   // The JWKS endpoint is standard for Cognito
   const jwksUrl = new URL(`${issuer}/.well-known/jwks.json`)
 
-  // This caches the JWK internally using jose
-  const JWKS = createRemoteJWKSet(jwksUrl)
+  const JWKS = getJwks(jwksUrl)
 
   // Verify the JWT signature against the Cognito JWKS
   const { payload } = await jwtVerify(token, JWKS, {

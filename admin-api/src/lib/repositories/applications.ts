@@ -71,6 +71,20 @@ export async function upsertApplication(pool: Queryable, application: Applicatio
     );
 }
 
+/**
+ * Lightweight status probe — kanban_status only, one indexed PK lookup.
+ * Serves the notification watchers, which previously polled the full
+ * detail endpoint (9 queries) and saturated the pool when many watchers
+ * mounted at once.
+ */
+export const getApplicationStatus = async (pool: Queryable, id: string): Promise<string | null> => {
+    const result = await pool.query(
+        `SELECT kanban_status FROM job_applications WHERE id = $1`,
+        [id],
+    );
+    return (result.rows[0] as { kanban_status?: string } | undefined)?.kanban_status ?? null;
+};
+
 export async function getApplication(pool: Queryable, id: string): Promise<Application | null> {
     const result = await pool.query(
         `SELECT id, user_id, company, role, job_url, job_description,
