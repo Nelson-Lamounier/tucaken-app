@@ -60,6 +60,7 @@ or the root [README](../README.md) for the product and architecture.
 
 ## Troubleshooting
 
+- [Slow UI with 5-second API timeouts — notification-watcher stampede](troubleshooting/slow-ui-5s-api-timeouts-notification-stampede.md) — pool saturation traced with Loki + EXPLAIN ANALYZE; queries were 2 ms, the timeout constant was the tell.
 - [CORS error in production](troubleshooting/cors-error-in-production.md) — why a browser-side CORS failure means a misrouted call, not a config problem.
 - [Duplicate ingestion Jobs for the same repo](troubleshooting/duplicate-ingestion-jobs.md)
 - [Pipeline run shown as failed when it stalled or succeeded](troubleshooting/pipeline-stall-timeout.md)
