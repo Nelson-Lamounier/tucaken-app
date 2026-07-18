@@ -20,6 +20,7 @@ assets. Staff-gated except `drafts` (articles, comments and assets carry
 | GET | `/articles` | List articles |
 | POST | `/articles` | Create |
 | GET | `/articles/:slug` | Read |
+| GET | `/articles/:slug/status` | Lightweight pipeline probe (status/title/updatedAt, never content_md) |
 | PUT | `/articles/:slug` | Update |
 | DELETE | `/articles/:slug` | Delete |
 | POST | `/articles/:slug/publish` | Publish (sets status + destinations) |

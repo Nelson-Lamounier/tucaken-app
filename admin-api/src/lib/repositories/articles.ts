@@ -91,6 +91,28 @@ export async function upsertArticle(pool: Queryable, article: Article): Promise<
  * use getArticleBySlugForAuthor so one user cannot see or edit another's
  * article. See the articles router.
  */
+/**
+ * Lightweight status probe for pipeline polling — status/title/updated_at
+ * only, never content_md. The article watcher polls every 5 s during a
+ * pipeline run; fetching the full article per tick was the same
+ * heavy-poll anti-pattern as the applications detail stampede.
+ */
+export const getArticleStatus = async (
+    pool: Queryable,
+    slug: string,
+    authorId: string,
+): Promise<{ status: string; title: string; updatedAt: Date | null } | null> => {
+    const result = await pool.query(
+        `SELECT status, title, updated_at FROM articles WHERE slug = $1 AND author_id = $2`,
+        [slug, authorId],
+    );
+    const row = result.rows[0] as
+        | { status: string; title: string; updated_at: Date | null }
+        | undefined;
+    if (!row) return null;
+    return { status: row.status, title: row.title, updatedAt: row.updated_at };
+};
+
 export async function getArticleBySlug(pool: Queryable, slug: string): Promise<Article | null> {
     const result = await pool.query(
         `SELECT slug, title, excerpt, content_md, tags, status, ai_generated,

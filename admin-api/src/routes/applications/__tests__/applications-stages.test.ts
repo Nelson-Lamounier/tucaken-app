@@ -41,7 +41,7 @@ const updateApplicationStatusMock = jest.fn<() => Promise<void>>().mockResolvedV
 const updateInterviewStageMock    = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
 
 jest.unstable_mockModule('../../../lib/repositories/applications.js', () => ({
-  getApplicationStatus: jest.fn<() => Promise<string | null>>().mockResolvedValue('analysing'),
+  getApplicationStatus: jest.fn<() => Promise<{ status: string; hasQueuedStage: boolean; updatedAt: Date | null } | null>>().mockResolvedValue({ status: 'analysing', hasQueuedStage: false, updatedAt: null }),
   listApplications:        jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
   getApplication:          getApplicationMock,
   updateApplicationStatus: updateApplicationStatusMock,

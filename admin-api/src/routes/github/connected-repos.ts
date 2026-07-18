@@ -29,6 +29,7 @@ import { getCachedTierConfig } from '../../lib/billing/tier-config-cache.js';
 import { secondsUntilNextMonthUTC } from '../../lib/retry-after.js';
 import { AdminApiBindings, requireUserId } from '../../lib/types.js';
 import { domainErrorBoundary } from '../../lib/route-error-boundary.js';
+import { logger } from '../../lib/observability/logger.js';
 import {
     ACTIVE_SYNC_STATUSES,
     MSG_TIMED_OUT,
@@ -83,9 +84,9 @@ export function createConnectedReposRouter(config: AdminApiConfig): Hono<AdminAp
                 const transitioned = await reconcileStuckRepos(config, pool, uid, stuck);
                 if (transitioned.size > 0) rows = await listConnectedRepos(pool, uid);
             } catch (err) {
-                console.error(
-                    '[github/connected-repos] reconcile failed — serving un-reconciled list',
-                    err instanceof Error ? err.message : String(err),
+                (ctx.get('logger') ?? logger).warn(
+                    { err, domain: 'github/connected-repos' },
+                    'reconcile failed — serving un-reconciled list',
                 );
             }
         }
@@ -134,6 +135,24 @@ export function createConnectedReposRouter(config: AdminApiConfig): Hono<AdminAp
     // POST /connected-repos — add repo to KB + write pending + dispatch Job
     // Body: { repoFullName: string, defaultBranch?: string, forceReindex?: boolean }
     // -------------------------------------------------------------------------
+    // ── GET /connected-repos/sync-status — lightweight polling probe ─────────
+    // One query, NO stuck-repo reconciliation (that calls the K8s API and
+    // belongs on the initial page load, not on a 5 s polling loop — see the
+    // pool-saturation incident, docs/troubleshooting/).
+    router.get('/connected-repos/sync-status', async (ctx) => {
+        const pool = getPool(config);
+        const uid  = requireUserId(ctx);
+        if (!uid) return ctx.json({ error: 'Authenticated subject missing' }, 401);
+
+        const rows = await listConnectedRepos(pool, uid);
+        return ctx.json({
+            repos: rows.map((r) => ({
+                repoFullName: r.full_name,
+                syncStatus:   r.sync_status ?? r.index_status,
+            })),
+        });
+    });
+
     router.post('/connected-repos', async (ctx) => {
         const pool = getPool(config);
         const uid  = requireUserId(ctx);

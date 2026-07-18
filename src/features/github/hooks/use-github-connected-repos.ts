@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { adminKeys } from '@/lib/api/query-keys'
-import { getGitHubConnectedReposFn, markReposTimedOutFn } from '@/server/github'
+import { getConnectedRepoSyncStatusFn, getGitHubConnectedReposFn, markReposTimedOutFn } from '@/server/github'
 import type { ConnectedRepo } from '@/lib/types/github.types'
 
 const POLL_INTERVAL = 5_000
@@ -18,28 +18,47 @@ export function useGitHubConnectedRepos() {
   // Keep a ref to the latest data so the timeout effect doesn't close over stale data.
   const latestDataRef = useRef<ConnectedRepo[] | undefined>(undefined)
 
+  // The full list GET runs stuck-repo reconciliation (a Kubernetes API call)
+  // server-side — correct on page load, far too heavy for a 5 s polling loop
+  // (see docs/troubleshooting/slow-ui-5s-api-timeouts-notification-stampede.md).
+  // The list never self-polls; the lightweight sync-status probe below drives
+  // refetches only when a repo's status actually changes.
   const query = useQuery<ConnectedRepo[]>({
     queryKey: adminKeys.github.connectedRepos(),
     queryFn: () => getGitHubConnectedReposFn(),
-    refetchInterval: (queryResult) => {
+  })
+
+  const listData = query.data
+  const hasActive = Boolean(listData?.some((r) => ACTIVE_SYNC_STATUSES.has(r.syncStatus)))
+
+  const probe = useQuery({
+    queryKey: adminKeys.github.connectedRepoSyncStatus(),
+    queryFn: () => getConnectedRepoSyncStatusFn(),
+    enabled: hasActive && !timedOut,
+    refetchInterval: () => {
       if (timedOut) return false
-
-      const data = queryResult.state.data
-      if (!data) return false
-
-      const hasActive = data.some((r) => ACTIVE_SYNC_STATUSES.has(r.syncStatus))
-      if (!hasActive) return false
-
       if (!pollStartRef.current) pollStartRef.current = Date.now()
-
       if (Date.now() - pollStartRef.current > POLL_TIMEOUT_MS) {
         setTimedOut(true)
         return false
       }
-
       return POLL_INTERVAL
     },
   })
+
+  // Refetch the full (reconciling) list only when the probe reports a change.
+  useEffect(() => {
+    const probeRepos = probe.data?.repos
+    const current = latestDataRef.current
+    if (!probeRepos || !current) return
+    const changed = probeRepos.some((p) => {
+      const match = current.find((r) => r.repoFullName === p.repoFullName)
+      return match !== undefined && match.syncStatus !== p.syncStatus
+    })
+    if (changed) {
+      void queryClient.invalidateQueries({ queryKey: adminKeys.github.connectedRepos() })
+    }
+  }, [probe.data, queryClient])
 
   latestDataRef.current = query.data
 

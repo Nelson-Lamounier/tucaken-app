@@ -27,7 +27,7 @@ const pgUpdateApplicationStatusMock = jest.fn<() => Promise<void>>().mockResolve
 const poolQueryMock = jest.fn() as jest.Mock<any>;
 poolQueryMock.mockResolvedValue({ rows: [] });
 
-const pgGetApplicationStatusMock = jest.fn<() => Promise<string | null>>().mockResolvedValue('analysing');
+const pgGetApplicationStatusMock = jest.fn<() => Promise<{ status: string; hasQueuedStage: boolean; updatedAt: Date | null } | null>>().mockResolvedValue({ status: 'analysing', hasQueuedStage: false, updatedAt: null });
 
 jest.unstable_mockModule('../../../lib/repositories/applications.js', () => ({
   getApplicationStatus: pgGetApplicationStatusMock,
@@ -986,11 +986,15 @@ describe('GET /:slug/resume.pdf — canonical ATS PDF', () => {
 });
 
 describe('GET /:slug/status — lightweight probe', () => {
-  it('returns only the kanban status for the notification watchers', async () => {
-    pgGetApplicationStatusMock.mockResolvedValueOnce('analysis-ready');
+  it('returns the lightweight probe shape for watchers and live-follow polling', async () => {
+    pgGetApplicationStatusMock.mockResolvedValueOnce({
+      status: 'analysis-ready', hasQueuedStage: true, updatedAt: null,
+    });
     const res = await buildApp().request('/abc-123/status');
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ slug: 'abc-123', status: 'analysis-ready' });
+    expect(await res.json()).toEqual({
+      slug: 'abc-123', status: 'analysis-ready', hasQueuedStage: true, updatedAt: null,
+    });
   });
 
   it('404s for an unknown application', async () => {

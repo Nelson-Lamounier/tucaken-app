@@ -27,6 +27,7 @@ import { getPool, withUser } from '../../lib/pg.js';
 import { revalidatePortfolioArticle } from '../../lib/portfolio-revalidate.js';
 import { requireAdminGroup } from '../../middleware/auth.js';
 import {
+  getArticleStatus,
     upsertArticle,
     deleteArticle as pgDeleteArticle,
     getArticleBySlug,
@@ -224,6 +225,23 @@ export function createArticlesRouter(config: AdminApiConfig): Hono<AdminApiBindi
   // -----------------------------------------------------------------------
   // GET /api/admin/articles/:slug — owner-scoped
   // -----------------------------------------------------------------------
+  // ── GET /:slug/status — lightweight pipeline-status probe ────────────────
+  // The article pipeline watcher polls THIS every 5 s, never the full
+  // article (content_md can be tens of KB per tick).
+  router.get('/:slug/status', async (ctx) => {
+    const userId = ctx.get('userId');
+    if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
+
+    const probe = await getArticleStatus(getPool(config), ctx.req.param('slug'), userId);
+    if (!probe) return ctx.json({ error: 'Article not found' }, 404);
+    return ctx.json({
+      slug:      ctx.req.param('slug'),
+      status:    probe.status,
+      title:     probe.title,
+      updatedAt: probe.updatedAt,
+    });
+  });
+
   router.get('/:slug', async (ctx) => {
     const userId = ctx.get('userId');
     if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);

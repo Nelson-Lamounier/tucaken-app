@@ -21,6 +21,7 @@ const poolQueryMock = jest.fn() as jest.Mock<any>;
 poolQueryMock.mockResolvedValue({ rows: [] });
 
 jest.unstable_mockModule('../../../lib/repositories/articles.js', () => ({
+  getArticleStatus: jest.fn<() => Promise<{ status: string; title: string; updatedAt: Date | null } | null>>().mockResolvedValue({ status: 'draft', title: 't', updatedAt: null }),
     upsertArticle: pgUpsertMock,
     deleteArticle: pgDeleteArticleMock,
     getArticleBySlug: pgGetArticleBySlugMock,
