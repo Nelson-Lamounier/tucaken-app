@@ -85,19 +85,32 @@ Shipped in [PR #267](https://github.com/Nelson-Lamounier/tucaken-app/pull/267)
   one `Promise.all` on the single RLS-scoped client — batched submissions
   without extra pool checkouts.
 
-## Post-deploy verification (pending)
+## Post-deploy verification (verified 2026-07-18)
 
-The fix merged while `Deploy (Dev)` was in flight; blue-green promotion
-gates the active service. Once promoted, verify on the
-**Frontend & RUM — portfolio + tucaken** dashboard against the before
-baseline recorded above (7 d to 2026-07-18: 92 ms p50 / 3,547 ms p95, 7×5xx
-on applications pages):
+Both rollouts went Healthy on the fix image (`46dfd28`, PRs #267 + #269)
+at ~06:04 UTC; Faro `app_version` confirmed the browser picked up the new
+bundle at 06:11:57 UTC after a hard reload. The before/after boundary in
+the logs is razor-sharp:
 
-- applications-page fetch p95 should collapse toward the p50;
-- the 5,011-5,030 ms 500 cluster should disappear from
-  `{namespace="admin-api"} | json | duration_ms > 4900 | status="500"`;
-- `/applications/:slug` call volume should drop (watchers now hit
-  `/status`).
+- **Final old-bundle stampede, 06:10:50 UTC** (the tab's last act before
+  the reload): 127 `/applications/:slug` calls inside 30 minutes, with
+  requests measured at 5,643-5,818 ms — the strongest "before" reading of
+  the whole incident.
+- **After the reload (from 06:11:30 UTC)**: 9 API requests in the session
+  window — `/me` session checks at **3-5 ms** (the JWKS cache at work) and
+  a single application-detail load at **224 ms**. Zero `/applications/:slug`
+  polling, zero requests above 4.9 s, and the only 5xx in the window was a
+  `/readyz` 503 on a still-warming pod during rollout churn.
+- **Zero `/status` probe traffic is the expected steady state**: the store
+  prune deleted every stale `'running'` entry on rehydrate, so the watcher
+  herd is gone, not redirected — probes fire only during genuinely live
+  pipeline runs.
+
+The longer-horizon RUM comparison (LCP/TTFB trend on
+**Frontend & RUM — portfolio + tucaken**) accrues over the coming days
+against the recorded baseline (7 d to 2026-07-18: 92 ms p50 / 3,547 ms p95,
+7x5xx on applications pages); the structural signals above are already
+conclusive.
 
 ## Prevention
 
@@ -117,5 +130,5 @@ Evidence trail (auto-generated):
   datasource as role tucaken_app, run 2026-07-18.
 - Source: PipelineNotificationWatcher.tsx, pipeline-notifications-store.ts,
   tanstack-auth.ts, admin-api pg.ts + applications/core.ts (read 2026-07-18).
-- Fix: PR #267, merge 15d0059.
+- Fix: PR #267 (15d0059) + PR #269 (46dfd28); after-figures from Loki, post-promotion window 2026-07-18T06:11:30Z onward.
 -->
