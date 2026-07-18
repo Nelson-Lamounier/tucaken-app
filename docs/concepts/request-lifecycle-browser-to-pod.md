@@ -101,12 +101,14 @@ per-environment wiring in
 - Product hosts (`tucaken.io` family) are default-allow with a 2000
   requests / 5 min per-IP rate limit; only `admin.nelsonlamounier.com` and
   `ops.nelsonlamounier.com` remain IP-allowlisted.
-- `/api/github/webhook` is exempt from the IP allowlist and body-inspecting
-  managed rules — it authenticates itself via HMAC (codifies the 2026-07-02
-  live WAF fix; see the webhook tier in
-  [networking architecture](./networking-architecture.md)).
-- `/_serverfn/` on product hosts is exempt from the 8 KB
-  `SizeRestrictions_BODY` cap so TanStack server-function payloads pass.
+- `/api/github/webhook` is exempt from the IP allowlist, the body-inspecting
+  managed rules AND (since 2026-07-18) the re-applied 8 KB body cap — it
+  authenticates itself via HMAC, and multi-commit push deliveries exceed the
+  cap (they were being silently dropped; tucaken-infra PR #233).
+- The 8 KB `SizeRestrictions_BODY` cap is re-applied everywhere except three
+  self-authenticating surfaces: `/_serverfn/` on product hosts (TanStack
+  server-function payloads), `/faro/collect` on any host (RUM batches — the
+  403 storm fixed 2026-07-18), and the GitHub webhook above.
 
 The WAF ARN reaches the Ingress via a `waf-annotator` PostSync Job that
 reads SSM and patches `alb.ingress.kubernetes.io/wafv2-acl-arn`
