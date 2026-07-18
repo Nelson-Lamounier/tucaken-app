@@ -86,9 +86,10 @@ export function userProvisionMiddleware(pool: Pool): MiddlewareHandler<AdminApiB
     try {
       const { provider, providerUserId } = resolveProvider(payload as Record<string, unknown>);
 
-      // All users reaching admin-api have passed the 'admin' group check in cognitoJwtAuth.
-      // Reflect that in the DB role so queries and audit logs can use it without
-      // re-reading the JWT.
+      // cognitoJwtAuth verifies the token but does NOT check group membership —
+      // requireAdminGroup() gates the staff mounts separately. Mirror the
+      // Cognito group into the DB role so queries and audit logs can use it
+      // without re-reading the JWT.
       const groups = (payload['cognito:groups'] as string[] | undefined) ?? [];
       const role   = groups.includes('admin') ? 'admin' : 'user';
 

@@ -13,16 +13,13 @@ import { getPool, withUser } from '../../lib/pg.js';
 import { invalidateProject } from '../../lib/redis-cache.js';
 import { getProjectDetail, patchArchitecture } from '../../lib/repositories/projects.js';
 import { AdminApiBindings, requireUserId } from '../../lib/types.js';
+import { domainErrorBoundary } from '../../lib/route-error-boundary.js';
 import { isUuid } from './projects-shared.js';
 
 export function createProjectsArchitectureRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
     const router = new Hono<AdminApiBindings>();
 
-    router.onError((err, ctx) => {
-        const status = (err as { status?: number }).status ?? 500;
-        console.error(`[projects] ${ctx.req.method} ${ctx.req.path}`, err.message);
-        return ctx.json({ error: err.message }, status as 400 | 401 | 403 | 404 | 500);
-    });
+    router.onError(domainErrorBoundary('projects'));
 
     // ────────────────────────────────────────────────────────────────────
     // GET /:id/architecture                 — Mermaid source

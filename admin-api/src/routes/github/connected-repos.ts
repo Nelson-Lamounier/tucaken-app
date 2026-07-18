@@ -28,6 +28,7 @@ import { entitlementsFromConfig } from '../../lib/billing/entitlements.js';
 import { getCachedTierConfig } from '../../lib/billing/tier-config-cache.js';
 import { secondsUntilNextMonthUTC } from '../../lib/retry-after.js';
 import { AdminApiBindings, requireUserId } from '../../lib/types.js';
+import { domainErrorBoundary } from '../../lib/route-error-boundary.js';
 import {
     ACTIVE_SYNC_STATUSES,
     MSG_TIMED_OUT,
@@ -54,11 +55,7 @@ export function createConnectedReposRouter(config: AdminApiConfig): Hono<AdminAp
     const router = new Hono<AdminApiBindings>();
 
     // Error boundary — consistent JSON error shape (same as the other github routers)
-    router.onError((err, ctx) => {
-        const status = (err as { status?: number }).status ?? 500;
-        console.error(`[github] ${ctx.req.method} ${ctx.req.path}`, err.message);
-        return ctx.json({ error: err.message }, status as 400 | 401 | 403 | 404 | 500 | 502 | 503);
-    });
+    router.onError(domainErrorBoundary('github'));
 
     // -------------------------------------------------------------------------
     // GET /connected-repos — list repos added to KB with sync status

@@ -20,6 +20,7 @@
  */
 
 import { Hono } from 'hono';
+import { z } from 'zod';
 
 import type { AdminApiConfig } from '../../lib/config.js';
 import { getPool, withUser } from '../../lib/pg.js';
@@ -34,6 +35,7 @@ import {
     listAllArticles,
 } from '../../lib/repositories/articles.js';
 import type { AdminApiBindings } from '../../lib/types.js';
+import { jsonBody } from '../../lib/validate.js';
 
 /**
  * Create the articles admin router.
@@ -55,6 +57,40 @@ export function createArticlesRouter(config: AdminApiConfig): Hono<AdminApiBindi
 
   /** Destinations that may be written to the articles table. */
   const ALLOWED_DESTINATIONS = new Set(['portfolio', 'tucaken']);
+
+  // Body schemas — enforced by the jsonBody middleware so handlers receive a
+  // typed, pre-validated payload via ctx.req.valid('json'). Business
+  // allowlists (status set, destination filtering) stay in the handlers.
+  const CreateArticleBody = z.object({
+    slug: z.string().regex(SLUG_RE, 'Invalid slug'),
+    title: z.string().min(1),
+    contentMd: z.string().min(1),
+    excerpt: z.string().nullish(),
+    status: z.string().optional(),
+    // Arrays stay element-lenient: non-string / disallowed entries are
+    // FILTERED by the handlers, not rejected (contract locked by tests).
+    tags: z.array(z.unknown()).optional(),
+    coverImage: z.string().nullish(),
+    destinations: z.array(z.unknown()).optional(),
+  });
+
+  // PUT is a partial update: unknown keys are stripped by zod (replacing the
+  // old allowedFields filter); presence of a key drives the merge below.
+  const UpdateArticleBody = z.object({
+    title: z.string().optional(),
+    excerpt: z.string().nullable().optional(),
+    tags: z.array(z.unknown()).optional(),
+    status: z.string().optional(),
+    coverImage: z.string().nullable().optional(),
+    author: z.unknown().optional(),
+    category: z.unknown().optional(),
+    publishedAt: z.string().nullable().optional(),
+    seo: z.unknown().optional(),
+    contentMd: z.string().optional(),
+    aiGenerated: z.boolean().optional(),
+    aiModel: z.string().nullable().optional(),
+    destinations: z.array(z.unknown()).optional(),
+  });
 
   // -----------------------------------------------------------------------
   // GET /api/admin/articles/slug-available — registered before /:slug
@@ -124,20 +160,14 @@ export function createArticlesRouter(config: AdminApiConfig): Hono<AdminApiBindi
   // -----------------------------------------------------------------------
   // POST /api/admin/articles — create article
   // -----------------------------------------------------------------------
-  router.post('/', async (ctx) => {
+  router.post('/', jsonBody(CreateArticleBody), async (ctx) => {
     const userId = ctx.get('userId');
     if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
 
-    const body = await ctx.req.json<Record<string, unknown>>();
-    const slug = typeof body['slug'] === 'string' ? body['slug'] : '';
-    const title = typeof body['title'] === 'string' ? body['title'] : '';
-    const contentMd = typeof body['contentMd'] === 'string' ? body['contentMd'] : '';
+    const body = ctx.req.valid('json');
+    const { slug, title, contentMd } = body;
 
-    if (!SLUG_RE.test(slug)) return ctx.json({ error: 'Invalid slug' }, 400);
-    if (!title || !contentMd) return ctx.json({ error: 'title and contentMd are required' }, 400);
-
-    const rawDest = Array.isArray(body['destinations']) ? (body['destinations'] as unknown[]) : [];
-    const destinations = rawDest.filter(
+    const destinations = (body.destinations ?? []).filter(
       (d): d is string => typeof d === 'string' && ALLOWED_DESTINATIONS.has(d),
     );
     const finalDestinations = destinations.length > 0 ? destinations : ['portfolio'];
@@ -146,25 +176,22 @@ export function createArticlesRouter(config: AdminApiConfig): Hono<AdminApiBindi
     const existing = await getArticleBySlug(pool, slug);
     if (existing) return ctx.json({ error: 'An article with this slug already exists' }, 409);
 
-    const status = typeof body['status'] === 'string' ? body['status'] : 'draft';
+    const status = body.status ?? 'draft';
     if (status !== 'draft' && !ALL_STATUS_SET.has(status)) {
       return ctx.json({ error: 'Invalid status' }, 400);
     }
 
-
-    const rawTags = Array.isArray(body['tags']) ? (body['tags'] as unknown[]) : [];
-
     await upsertArticle(pool, {
       slug,
       title,
-      excerpt: typeof body['excerpt'] === 'string' ? body['excerpt'] : null,
+      excerpt: body.excerpt ?? null,
       contentMd,
-      tags: rawTags.filter((t): t is string => typeof t === 'string'),
+      tags: (body.tags ?? []).filter((t): t is string => typeof t === 'string'),
       status,
       aiGenerated: false,
       aiModel: null,
       publishedAt: status === 'published' ? new Date() : null,
-      coverImage: typeof body['coverImage'] === 'string' ? body['coverImage'] : null,
+      coverImage: body.coverImage ?? null,
       destinations: finalDestinations,
       authorId: userId,
     });
@@ -210,21 +237,14 @@ export function createArticlesRouter(config: AdminApiConfig): Hono<AdminApiBindi
   // -----------------------------------------------------------------------
   // PUT /api/admin/articles/:slug — PG-only upsert
   // -----------------------------------------------------------------------
-  router.put('/:slug', async (ctx) => {
+  router.put('/:slug', jsonBody(UpdateArticleBody), async (ctx) => {
     const userId = ctx.get('userId');
     if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
 
     const slug = ctx.req.param('slug');
-    const body = await ctx.req.json<Record<string, unknown>>();
-
-    const allowedFields = [
-      'title', 'excerpt', 'tags', 'status', 'coverImage',
-      'author', 'category', 'publishedAt', 'seo',
-      'contentMd', 'aiGenerated', 'aiModel', 'destinations',
-    ];
-    const updates = Object.fromEntries(
-      Object.entries(body).filter(([k]) => allowedFields.includes(k)),
-    );
+    // zod strips unknown keys, so `updates` holds only the updatable fields;
+    // key presence (not value) drives the merge with the stored article.
+    const updates: Record<string, unknown> = ctx.req.valid('json');
 
     if (Object.keys(updates).length === 0) {
       return ctx.json({ error: 'No valid fields to update' }, 400);

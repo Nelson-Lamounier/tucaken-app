@@ -24,6 +24,7 @@ import {
 import { getPool } from '../../lib/pg.js';
 import { getUserPlanStatus } from '../../lib/repositories/users.js';
 import { AdminApiBindings, requireUserId } from '../../lib/types.js';
+import { domainErrorBoundary } from '../../lib/route-error-boundary.js';
 import {
     autoDispatchRepos,
     buildRepoIdMap,
@@ -37,11 +38,7 @@ export function createInstallationRouter(config: AdminApiConfig): Hono<AdminApiB
     const router = new Hono<AdminApiBindings>();
 
     // Error boundary — consistent JSON error shape (same as the other github routers)
-    router.onError((err, ctx) => {
-        const status = (err as { status?: number }).status ?? 500;
-        console.error(`[github] ${ctx.req.method} ${ctx.req.path}`, err.message);
-        return ctx.json({ error: err.message }, status as 400 | 401 | 403 | 404 | 500 | 502 | 503);
-    });
+    router.onError(domainErrorBoundary('github'));
 
     // -------------------------------------------------------------------------
     // GET /installation — check connection status

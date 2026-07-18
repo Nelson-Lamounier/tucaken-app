@@ -15,6 +15,7 @@ import { Hono } from 'hono';
 import type { AdminApiConfig } from '../../lib/config.js';
 import { getPool } from '../../lib/pg.js';
 import { AdminApiBindings, requireUserId } from '../../lib/types.js';
+import { domainErrorBoundary } from '../../lib/route-error-boundary.js';
 
 export function createProfileRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
     const router = new Hono<AdminApiBindings>();
@@ -22,11 +23,7 @@ export function createProfileRouter(config: AdminApiConfig): Hono<AdminApiBindin
     // -------------------------------------------------------------------------
     // Error boundary — consistent JSON error shape
     // -------------------------------------------------------------------------
-    router.onError((err, ctx) => {
-        const status = (err as { status?: number }).status ?? 500;
-        console.error(`[profile] ${ctx.req.method} ${ctx.req.path}`, err.message);
-        return ctx.json({ error: err.message }, status as 400 | 401 | 403 | 404 | 500 | 502 | 503);
-    });
+    router.onError(domainErrorBoundary('profile'));
 
     // -------------------------------------------------------------------------
     // GET /summary — aggregated profile data

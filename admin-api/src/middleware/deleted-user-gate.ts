@@ -30,6 +30,15 @@ const CACHE_TTL_MS = 30_000;
 
 const ALLOWED_PATH_PREFIXES = ['/api/admin/me'];
 
+/**
+ * Exact segment match: `/api/admin/me` and `/api/admin/me/...` pass, but a
+ * future sibling like `/api/admin/metrics` must NOT — a bare startsWith on
+ * the prefix would silently exempt any route whose name begins with "me".
+ */
+function isAllowedPath(path: string): boolean {
+  return ALLOWED_PATH_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`));
+}
+
 export function deletedUserGate(pool: Pool): MiddlewareHandler<AdminApiBindings> {
   return async (
     ctx: Context<AdminApiBindings>,
@@ -44,7 +53,7 @@ export function deletedUserGate(pool: Pool): MiddlewareHandler<AdminApiBindings>
     }
 
     const path = ctx.req.path;
-    if (ALLOWED_PATH_PREFIXES.some((p) => path.startsWith(p))) {
+    if (isAllowedPath(path)) {
       await next();
       return;
     }

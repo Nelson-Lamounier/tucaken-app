@@ -47,6 +47,7 @@ import {
 } from '../../lib/repositories/user-rag.js';
 import type { AdminApiBindings } from '../../lib/types.js';
 import { requireUserId } from '../../lib/types.js';
+import { jsonBody } from '../../lib/validate.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -112,7 +113,7 @@ export function createAdminUsersRouter(
    *   404 — user not found.
    *   409 NoCognitoIdentity — hard delete but no cognito_sub row.
    */
-  router.delete('/:userId', async (ctx) => {
+  router.delete('/:userId', jsonBody(DeleteBody), async (ctx) => {
     const userId = ctx.req.param('userId');
     if (!UUID_RE.test(userId)) return ctx.json({ error: 'Invalid userId' }, 400);
 
@@ -120,18 +121,15 @@ export function createAdminUsersRouter(
     if (!callerId) return ctx.json({ error: 'Unauthenticated' }, 401);
     if (callerId === userId) return ctx.json({ error: 'CannotDeleteSelf' }, 403);
 
-    let raw: unknown;
-    try { raw = await ctx.req.json(); } catch { return ctx.json({ error: 'Invalid JSON body' }, 400); }
-    const parsed = DeleteBody.safeParse(raw);
-    if (!parsed.success) return ctx.json({ error: 'Validation failed', issues: parsed.error.issues }, 400);
+    const body = ctx.req.valid('json');
 
     const pool = getPool(config);
     const target = await getAdminUserById(pool, userId);
     if (!target) return ctx.json({ error: 'NotFound', userId }, 404);
     if (PRIVILEGED_ROLES.has(target.role)) return ctx.json({ error: 'CannotDeleteAdmin' }, 403);
 
-    if (parsed.data.mode === 'soft') {
-      return ctx.json(await handleSoftDelete(config, pool, userId, parsed.data.reason ?? null));
+    if (body.mode === 'soft') {
+      return ctx.json(await handleSoftDelete(config, pool, userId, body.reason ?? null));
     }
 
     const sub = await firstCognitoSub(pool, userId);
@@ -311,16 +309,11 @@ export function createAdminUsersRouter(
     message: 'At least one of role or plan is required',
   });
 
-  router.patch('/:userId', async (ctx) => {
+  router.patch('/:userId', jsonBody(UpdateBody), async (ctx) => {
     const userId = ctx.req.param('userId');
     if (!UUID_RE.test(userId)) return ctx.json({ error: 'Invalid userId' }, 400);
 
-    let raw: unknown;
-    try { raw = await ctx.req.json(); } catch { return ctx.json({ error: 'Invalid JSON body' }, 400); }
-    const parsed = UpdateBody.safeParse(raw);
-    if (!parsed.success) return ctx.json({ error: 'Validation failed', issues: parsed.error.issues }, 400);
-
-    const { role, plan } = parsed.data;
+    const { role, plan } = ctx.req.valid('json');
     const patch: { role?: 'user' | 'admin'; plan?: 'free' | 'pro' | 'premium' } = {};
     if (role !== undefined) patch.role = role;
     if (plan !== undefined) patch.plan = plan;
@@ -338,7 +331,7 @@ export function createAdminUsersRouter(
     } finally {
       client.release();
     }
-    logger.warn({ event: 'admin_user_updated', userId, patch: parsed.data, updated }, 'admin updated user');
+    logger.warn({ event: 'admin_user_updated', userId, patch, updated }, 'admin updated user');
     return ctx.json({ ok: true, updated });
   });
 
