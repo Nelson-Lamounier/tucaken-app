@@ -33,8 +33,7 @@ operator scripts.
 
 ## Testing
 
-`__tests__/`: `croissant.test.ts`, `sbom.test.ts`, `reconcile-repo-name.test.ts`;
-token-path coverage in `routes/github/__tests__/tech-extractor.test.ts`.
+`__tests__/`: `croissant.test.ts`, `sbom.test.ts`, `reconcile-repo-name.test.ts`.
 
 ## Related
 

@@ -13,6 +13,7 @@ const cfg = {
     directionModelId:        'm-direction',
     reconciliationModelId:   'm-reconcile',
     diagnosticModelId:       'm-diagnostic',
+    githubSbomEnabled:       true,
 } as unknown as AdminApiConfig;
 
 const USER = '1d4c645a-447e-4b5b-924d-19a3c75a84db';
@@ -109,6 +110,52 @@ describe('buildIngestionJobSpec', () => {
         expect(a).toBe(b);
         expect(a.startsWith('ingestion-')).toBe(true);
         expect(a.length).toBeLessThanOrEqual(63);
+    });
+
+    // -------------------------------------------------------------------------
+    // P2 cutover: UNIFIED_INGESTION dispatch env + work volume + memory bump
+    // (tucaken-app/docs/superpowers/plans/2026-07-18-p2-cutover-concepts.md, Task 7)
+    // -------------------------------------------------------------------------
+
+    it('emits UNIFIED_INGESTION=on by default, overridable via the deployment env', () => {
+        expect(envOf().get('UNIFIED_INGESTION')).toBe('on');
+
+        const prev = process.env['UNIFIED_INGESTION'];
+        process.env['UNIFIED_INGESTION'] = 'off';
+        try {
+            expect(envOf().get('UNIFIED_INGESTION')).toBe('off');
+        } finally {
+            if (prev === undefined) delete process.env['UNIFIED_INGESTION'];
+            else process.env['UNIFIED_INGESTION'] = prev;
+        }
+    });
+
+    it('emits WORK_DIR pointing at the mounted scratch volume', () => {
+        expect(envOf().get('WORK_DIR')).toBe('/tmp/ingest-work');
+    });
+
+    it('forwards GITHUB_SBOM_ENABLED from cfg.githubSbomEnabled', () => {
+        expect(envOf().get('GITHUB_SBOM_ENABLED')).toBe('1');
+        const disabled = { ...cfg, githubSbomEnabled: false } as unknown as AdminApiConfig;
+        const job = buildIngestionJobSpec(disabled, 'img:tag', USER, REPO, true, 1700000000000);
+        const env = new Map((job.spec?.template?.spec?.containers?.[0]?.env ?? []).map((e) => [e.name, e.value ?? '']));
+        expect(env.get('GITHUB_SBOM_ENABLED')).toBe('0');
+    });
+
+    it('mounts a work emptyDir volume at /tmp/ingest-work with a 2Gi size limit', () => {
+        const job = buildIngestionJobSpec(cfg, 'img:tag', USER, REPO, true, 1700000000000);
+        const podSpec = job.spec!.template!.spec!;
+        const volume = (podSpec.volumes ?? []).find((v) => v.name === 'work');
+        expect(volume?.emptyDir?.sizeLimit).toBe('2Gi');
+        const mount = (podSpec.containers[0]!.volumeMounts ?? []).find((m) => m.name === 'work');
+        expect(mount?.mountPath).toBe('/tmp/ingest-work');
+    });
+
+    it('bumps the container memory limit to 2Gi (requests unchanged)', () => {
+        const job = buildIngestionJobSpec(cfg, 'img:tag', USER, REPO, true, 1700000000000);
+        const resources = job.spec!.template!.spec!.containers[0]!.resources!;
+        expect(resources.limits?.['memory']).toBe('2Gi');
+        expect(resources.requests?.['memory']).toBe('512Mi');
     });
 });
 

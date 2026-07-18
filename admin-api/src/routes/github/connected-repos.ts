@@ -41,7 +41,6 @@ import {
     decrementQuota,
     deleteRepository,
     dispatchIngestionJob,
-    dispatchTechExtractJob,
     getConnection,
     getPlanLimit,
     listConnectedRepos,
@@ -283,12 +282,6 @@ export function createConnectedReposRouter(config: AdminApiConfig): Hono<AdminAp
 
             const { jobName } = await dispatchIngestionJob(config, uid, repoFullName, githubToken, forceReindex, effectivePlan, role);
 
-            try {
-                await dispatchTechExtractJob(config, uid, repoFullName, githubToken, defaultBranch);
-            } catch (err) {
-                console.error('[tech-extractor] dispatch failed (non-fatal)', (err as Error).message);
-            }
-
             return ctx.json({ status: 'queued', repoFullName, jobName }, 202);
         } catch (err) {
             await decrementQuota(pool, uid).catch(() => {});
@@ -378,7 +371,7 @@ export function createConnectedReposRouter(config: AdminApiConfig): Hono<AdminAp
     // Re-running after a crashed/timed-out ingestion does NOT consume a new
     // -------------------------------------------------------------------------
     // GET /connected-repos/:fullName/sbom — CycloneDX 1.6 SBOM for a repo, built
-    // from its deterministic technology_evidence (the tech-extractor lane).
+    // from its deterministic technology_evidence (unified ingestion's facts stage).
     // RLS-scoped via withUser; :fullName is URL-encoded "owner%2Frepo".
     // -------------------------------------------------------------------------
     interface EvidenceSbomRow { raw_name: string; ecosystem: string | null; version: string | null; commit_sha: string }
@@ -492,14 +485,6 @@ export function createConnectedReposRouter(config: AdminApiConfig): Hono<AdminAp
 
         const token = await generateInstallationToken(appId, key, conn.installation_id);
         const { jobName } = await dispatchIngestionJob(config, uid, repoFullName, token, true, retryEffectivePlan, retryRole);
-
-        try {
-            // A user-initiated retry/re-sync force-re-extracts (parity with the
-            // ingestion force above), so new lanes backfill the current commit.
-            await dispatchTechExtractJob(config, uid, repoFullName, token, undefined, true);
-        } catch (err) {
-            console.error('[tech-extractor] dispatch failed (non-fatal)', (err as Error).message);
-        }
 
         return ctx.json({ status: 'queued', repoFullName, jobName }, 202);
     });

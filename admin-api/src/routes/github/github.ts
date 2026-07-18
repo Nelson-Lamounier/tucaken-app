@@ -23,7 +23,7 @@ import { createInstallationRouter } from './installation.js';
 
 export { createGitHubWebhookRouter } from './webhook.js';
 export { deleteConnection } from '../../lib/github/connection.js';
-export { buildTechExtractJobSpec, connectRepoWithDefaultProject } from './github-shared.js';
+export { connectRepoWithDefaultProject } from './github-shared.js';
 
 export function createGitHubRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
     const router = new Hono<AdminApiBindings>();

@@ -50,8 +50,8 @@ export function createKbRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
       const totalFiles = rows.reduce((acc, r) => acc + r.files, 0);
 
       // Real technology signal lives in technology_evidence (deterministic
-      // tech-extractor pipeline), NOT document_embeddings.technologies (dead
-      // back-compat column). Surface the top technologies by evidence count.
+      // facts stage inside unified ingestion), NOT document_embeddings.technologies
+      // (dead back-compat column). Surface the top technologies by evidence count.
       const { rows: techRows } = await db.query<TechnologyRow>(
         `SELECT raw_name AS name, ecosystem, COUNT(*)::int AS occurrences
            FROM technology_evidence

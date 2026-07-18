@@ -52,7 +52,7 @@ export function isAssetsBucketConfigured(name: string | undefined): name is stri
 }
 
 /** The logical images admin-api may launch as Jobs. */
-export type JobImageName = 'ingestion' | 'article-pipeline' | 'job-strategist' | 'resume-import-processor' | 'tech-extractor';
+export type JobImageName = 'ingestion' | 'article-pipeline' | 'job-strategist' | 'resume-import-processor';
 
 /**
  * Mapping from logical image name to the env var that holds the URI in
@@ -65,7 +65,6 @@ const ENV_FALLBACK: Record<JobImageName, string> = {
     'article-pipeline':         'ARTICLE_PIPELINE_IMAGE',
     'job-strategist':           'STRATEGIST_PIPELINE_IMAGE',
     'resume-import-processor':  'RESUME_IMPORT_IMAGE',
-    'tech-extractor':           'TECH_EXTRACTOR_IMAGE',
 };
 
 /** TTL for the in-process cache of resolved URIs. */
@@ -245,12 +244,10 @@ export interface AdminApiConfig {
   /** ServiceAccount the resume-import-processor Job pod runs as. */
   readonly resumeImportServiceAccount: string;
 
-  /** Kubernetes namespace where tech-extractor Jobs are created. */
-  readonly techExtractorNamespace: string;
-
-  /** ServiceAccount the tech-extractor Job pod runs as. */
-  readonly techExtractorServiceAccount: string;
-  /** Enable the GitHub dependency-graph SBOM cross-check lane in tech-extract. */
+  /**
+   * Enable the GitHub dependency-graph SBOM cross-check lane in unified
+   * ingestion (carried over from the retired tech-extract Job's flag).
+   */
   readonly githubSbomEnabled: boolean;
 
   /**
@@ -410,8 +407,6 @@ export function loadConfig(): AdminApiConfig {
     strategistPipelineServiceAccount: process.env['STRATEGIST_PIPELINE_SERVICE_ACCOUNT'] ?? 'job-strategist-sa',
     resumeImportNamespace:           process.env['RESUME_IMPORT_NAMESPACE'] ?? 'resume-import',
     resumeImportServiceAccount:      process.env['RESUME_IMPORT_SERVICE_ACCOUNT'] ?? 'resume-import-sa',
-    techExtractorNamespace:          process.env['TECH_EXTRACTOR_NAMESPACE'] ?? 'tech-extractor',
-    techExtractorServiceAccount:     process.env['TECH_EXTRACTOR_SERVICE_ACCOUNT'] ?? 'tech-extractor-sa',
     // On by default (best-effort, capped, timeout-guarded lane); set
     // TECH_EXTRACT_GITHUB_SBOM_ENABLED=0 to disable without a code change.
     githubSbomEnabled:               process.env['TECH_EXTRACT_GITHUB_SBOM_ENABLED'] !== '0',

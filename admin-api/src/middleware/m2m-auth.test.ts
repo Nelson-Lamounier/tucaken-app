@@ -5,7 +5,7 @@ import { Hono } from 'hono';
 // ---------------------------------------------------------------------------
 // Stub `jose` so jwtVerify is fully controllable — no real JWKS fetch.
 // We use jest.unstable_mockModule (ESM-safe) to intercept the jose import
-// before m2m-auth.ts loads, mirroring the pattern used in tech-extractor.test.ts.
+// before m2m-auth.ts loads, the same pattern used elsewhere for jose-dependent modules.
 // ---------------------------------------------------------------------------
 
 let jwtVerifyImpl: (_token: string, _jwks: unknown, _opts: unknown) => Promise<{ payload: Record<string, unknown> }>;

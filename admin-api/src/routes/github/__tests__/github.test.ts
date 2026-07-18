@@ -632,7 +632,6 @@ describe('POST /connected-repos', () => {
         // does NOT go through poolQueryMock.
         seedQuery([]);                          // 6. markSyncTriggered
         seedQuery([{ github_repo_id: '555' }]); // 7. dispatchIngestionJob -> github_repo_id lookup
-        seedQuery([{ github_repo_id: '555' }]); // 8. dispatchTechExtractJob -> github_repo_id lookup
 
         const res  = await buildApp().request('/connected-repos', {
             method:  'POST',
@@ -649,16 +648,17 @@ describe('POST /connected-repos', () => {
 
         // getConnection (1) + isSyncInFlight (1) + getUserPlanStatus (1)
         // + repoAlreadyConnected SELECT (1) + tryClaimSyncSlot (1)
-        // + markSyncTriggered (1) + github_repo_id lookup x2 (ingestion +
-        // tech-extract dispatch). quota INSERT is skipped (pro=Infinity limit).
-        // The repo INSERT runs on the transaction client (pool.connect()), not poolQueryMock.
-        expect(poolQueryMock).toHaveBeenCalledTimes(8);
+        // + markSyncTriggered (1) + github_repo_id lookup (1, ingestion dispatch
+        // only — the tech-extract shadow dispatch is retired). quota INSERT is
+        // skipped (pro=Infinity limit). The repo INSERT runs on the transaction
+        // client (pool.connect()), not poolQueryMock.
+        expect(poolQueryMock).toHaveBeenCalledTimes(7);
 
         // Installation token generated for this user's installation
         expect(mockGenerateInstallationToken).toHaveBeenCalledWith('999999', testConfig.githubPrivateKey, '12345');
 
-        // K8s Jobs created: 1 ingestion + 1 tech-extract (shadow-mode, additive)
-        expect(createNamespacedJobMock).toHaveBeenCalledTimes(2);
+        // K8s Jobs created: 1 ingestion Job (unified — the tech-extract shadow Job is retired).
+        expect(createNamespacedJobMock).toHaveBeenCalledTimes(1);
 
         // Job spec must inject per-user GITHUB_TOKEN - via secretKeyRef, NEVER plaintext.
         const jobArg = (createNamespacedJobMock.mock.calls[0] as unknown as [{ body: { spec: { template: { spec: { containers: Array<{ env: Array<{ name: string; value?: string; valueFrom?: { secretKeyRef?: { name: string; key: string } } }> }> } } } } }])[0];
@@ -844,10 +844,8 @@ describe('POST /connected-repos/sync', () => {
         // quota INSERT SKIPPED for each repo - pro plan has Infinity limit
         seedQuery([]); seedQuery([]);  // 4-5 markPending/markTriggered repo 1 (repo INSERT is on the tx client)
         seedQuery([{ github_repo_id: '1' }]); // 6. dispatchIngestionJob repo 1 -> github_repo_id lookup
-        seedQuery([{ github_repo_id: '1' }]); // 7. dispatchTechExtractJob repo 1 -> github_repo_id lookup
-        seedQuery([]); seedQuery([]);  // 8-9 markPending/markTriggered repo 2 (repo INSERT is on the tx client)
-        seedQuery([{ github_repo_id: '2' }]); // 10. dispatchIngestionJob repo 2 -> github_repo_id lookup
-        seedQuery([{ github_repo_id: '2' }]); // 11. dispatchTechExtractJob repo 2 -> github_repo_id lookup
+        seedQuery([]); seedQuery([]);  // 7-8 markPending/markTriggered repo 2 (repo INSERT is on the tx client)
+        seedQuery([{ github_repo_id: '2' }]); // 9. dispatchIngestionJob repo 2 -> github_repo_id lookup
 
         const res  = await buildApp().request('/connected-repos/sync', { method: 'POST' });
         const body = await res.json() as { started: number };
@@ -856,8 +854,8 @@ describe('POST /connected-repos/sync', () => {
         expect(body).toEqual({ started: 2 });
 
         expect(mockGenerateInstallationToken).toHaveBeenCalledWith('999999', testConfig.githubPrivateKey, '12345');
-        // 2 ingestion Jobs + 2 tech-extract Jobs (shadow-mode, one per repo)
-        expect(createNamespacedJobMock).toHaveBeenCalledTimes(4);
+        // 2 ingestion Jobs, one per repo (unified — the tech-extract shadow Job is retired).
+        expect(createNamespacedJobMock).toHaveBeenCalledTimes(2);
 
         const pendingSelect = (poolQueryMock.mock.calls[1]![0] as string);
         expect(pendingSelect).toMatch(/sync_status\s*=\s*'pending'/);
@@ -896,7 +894,6 @@ describe('POST /connected-repos/:fullName/retry', () => {
         seedQuery([{ repo_full_name: 'octo/app' }]);     // 4. tryClaimSyncSlot -> claim won
         seedQuery([]);                                   // 5. markSyncTriggered
         seedQuery([{ github_repo_id: '555' }]);          // 6. dispatchIngestionJob -> github_repo_id lookup
-        seedQuery([{ github_repo_id: '555' }]);          // 7. dispatchTechExtractJob -> github_repo_id lookup
 
         const res  = await buildApp().request('/connected-repos/octo%2Fapp/retry', { method: 'POST' });
         const body = await res.json() as { status: string; repoFullName: string; jobName: string };
@@ -908,8 +905,8 @@ describe('POST /connected-repos/:fullName/retry', () => {
 
         // A fresh Job is dispatched with the per-user token.
         expect(mockGenerateInstallationToken).toHaveBeenCalledWith('999999', testConfig.githubPrivateKey, '12345');
-        // 1 ingestion Job + 1 tech-extract Job (shadow-mode, additive)
-        expect(createNamespacedJobMock).toHaveBeenCalledTimes(2);
+        // 1 ingestion Job (unified — the tech-extract shadow Job is retired).
+        expect(createNamespacedJobMock).toHaveBeenCalledTimes(1);
 
         // Crucially: quota is never read or incremented on retry.
         const sql = poolQueryMock.mock.calls.map(c => String(c[0]));
