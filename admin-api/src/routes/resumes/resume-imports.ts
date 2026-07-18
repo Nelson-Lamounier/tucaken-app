@@ -32,6 +32,7 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { V1Job } from '@kubernetes/client-node';
 import { Hono } from 'hono';
+import { z } from 'zod';
 
 import type { AdminApiConfig } from '../../lib/config.js';
 import { getJobImage, isImageConfigured, isAssetsBucketConfigured } from '../../lib/config.js';
@@ -57,6 +58,8 @@ import {
 import { getUserPlanStatus } from '../../lib/repositories/users.js';
 import { requireUserId } from '../../lib/types.js';
 import type { AdminApiBindings } from '../../lib/types.js';
+import { jsonBody } from '../../lib/validate.js';
+import { logger } from '../../lib/observability/logger.js';
 
 const s3 = new S3Client({
   region: process.env['AWS_REGION'] ?? process.env['AWS_DEFAULT_REGION'] ?? 'eu-west-1',
@@ -211,6 +214,10 @@ function buildEnrichmentJobSpec(
   };
 }
 
+
+/** PUT /career-entries body — rawData must be a plain object (z.record rejects arrays/null). */
+const CareerEntryBody = z.object({ rawData: z.record(z.string(), z.unknown()) });
+
 export function createResumeImportsRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
   const router = new Hono<AdminApiBindings>();
   const pool   = getPool(config);
@@ -307,7 +314,7 @@ export function createResumeImportsRouter(config: AdminApiConfig): Hono<AdminApi
 
     const image = getJobImage('resume-import-processor');
     if (!isImageConfigured(image)) {
-      console.error('[resume-imports] image URI unresolved — ESO not yet synced', { image });
+      (ctx.get('logger') ?? logger).error({ image, domain: 'resume-imports' }, 'image URI unresolved — ESO not yet synced');
       return ctx.json({ error: 'Resume import processor image not configured — wait ~60s for ESO/kubelet sync' }, 502);
     }
 
@@ -323,7 +330,7 @@ export function createResumeImportsRouter(config: AdminApiConfig): Hono<AdminApi
     try {
       await getBatchApi().createNamespacedJob({ namespace: config.resumeImportNamespace, body: job });
     } catch (err) {
-      console.error('[resume-imports] failed to create K8s Job', err);
+      (ctx.get('logger') ?? logger).error({ err, domain: 'resume-imports' }, 'failed to create K8s Job');
       return ctx.json({ error: 'Failed to schedule resume import job' }, 502);
     }
 
@@ -349,7 +356,7 @@ export function createResumeImportsRouter(config: AdminApiConfig): Hono<AdminApi
 
     const image = getJobImage('resume-import-processor');
     if (!isImageConfigured(image)) {
-      console.error('[resume-imports] confirm: image URI unresolved', { image });
+      (ctx.get('logger') ?? logger).error({ image, domain: 'resume-imports' }, 'confirm: image URI unresolved');
       return ctx.json({ error: 'Resume processor image not configured' }, 502);
     }
 
@@ -358,7 +365,7 @@ export function createResumeImportsRouter(config: AdminApiConfig): Hono<AdminApi
     try {
       await getBatchApi().createNamespacedJob({ namespace: config.resumeImportNamespace, body: job });
     } catch (err) {
-      console.error('[resume-imports] confirm: failed to create enrichment Job', err);
+      (ctx.get('logger') ?? logger).error({ err, domain: 'resume-imports' }, 'confirm: failed to create enrichment Job');
       // The row is already 'confirmed'. Surface the failure so the client can
       // retry; a janitor/monitor can also re-dispatch stuck 'confirmed' rows.
       return ctx.json({ error: 'Failed to schedule enrichment job' }, 502);
@@ -389,7 +396,7 @@ export function createResumeImportsRouter(config: AdminApiConfig): Hono<AdminApi
 
     const image = getJobImage('resume-import-processor');
     if (!isImageConfigured(image)) {
-      console.error('[resume-imports] retry: image URI unresolved', { image });
+      (ctx.get('logger') ?? logger).error({ image, domain: 'resume-imports' }, 'retry: image URI unresolved');
       return ctx.json({ error: 'Resume import processor image not configured' }, 502);
     }
 
@@ -405,7 +412,7 @@ export function createResumeImportsRouter(config: AdminApiConfig): Hono<AdminApi
     try {
       await getBatchApi().createNamespacedJob({ namespace: config.resumeImportNamespace, body: job });
     } catch (err) {
-      console.error('[resume-imports] retry: failed to create K8s Job', err);
+      (ctx.get('logger') ?? logger).error({ err, domain: 'resume-imports' }, 'retry: failed to create K8s Job');
       return ctx.json({ error: 'Failed to schedule resume import job' }, 502);
     }
 
@@ -449,22 +456,12 @@ export function createResumeImportsRouter(config: AdminApiConfig): Hono<AdminApi
   // User corrects extracted data (raw_data JSONB only — enriched_data is
   // written exclusively by the K8s Job).
   // ──────────────────────────────────────────────────────────────────────────
-  router.put('/career-entries/:eid', async (ctx) => {
+  router.put('/career-entries/:eid', jsonBody(CareerEntryBody), async (ctx) => {
     const userId = requireUserId(ctx);
     if (!userId) return ctx.json({ error: 'Authenticated user not provisioned' }, 401);
 
-    let body: { rawData?: Record<string, unknown> };
-    try {
-      body = await ctx.req.json();
-    } catch {
-      return ctx.json({ error: 'Body must be valid JSON' }, 400);
-    }
-
-    if (!body.rawData || typeof body.rawData !== 'object') {
-      return ctx.json({ error: '"rawData" object is required' }, 400);
-    }
-
-    const entry = await updateCareerEntry(pool, ctx.req.param('eid'), userId, body.rawData);
+    const { rawData } = ctx.req.valid('json');
+    const entry = await updateCareerEntry(pool, ctx.req.param('eid'), userId, rawData);
     if (!entry) return ctx.json({ error: 'Entry not found' }, 404);
     return ctx.json({ entry });
   });

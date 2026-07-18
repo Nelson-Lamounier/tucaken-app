@@ -22,6 +22,7 @@ import { upsertTierConfig } from '../../lib/repositories/tier-config.js';
 import { TierConfigSchema } from '../../lib/billing/tier-config-shape.js';
 import { requireAdminGroup } from '../../middleware/auth.js';
 import type { AdminApiBindings } from '../../lib/types.js';
+import { jsonBody } from '../../lib/validate.js';
 
 /**
  * Create the tier-config admin router.
@@ -43,16 +44,10 @@ export function createTierConfigRouter(config: AdminApiConfig): Hono<AdminApiBin
   // -------------------------------------------------------------------------
   // PUT / — admin-group only
   // -------------------------------------------------------------------------
-  router.put('/', requireAdminGroup(), async (ctx) => {
-    const body = await ctx.req.json<unknown>();
-    const parsed = TierConfigSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return ctx.json({ error: 'Invalid tier config', issues: parsed.error.issues }, 400);
-    }
-
+  router.put('/', requireAdminGroup(), jsonBody(TierConfigSchema, 'Invalid tier config'), async (ctx) => {
+    const parsed = ctx.req.valid('json');
     const userId = ctx.get('userId');
-    await upsertTierConfig(getPool(config), parsed.data, userId);
+    await upsertTierConfig(getPool(config), parsed, userId);
     bustTierConfigCache();
     return ctx.json({ updated: true });
   });

@@ -20,10 +20,16 @@
 import { zValidator } from '@hono/zod-validator';
 import type { ZodType } from 'zod';
 
-export function jsonBody<T extends ZodType>(schema: T) {
+export function jsonBody<T extends ZodType>(schema: T, errorLabel?: string) {
   return zValidator('json', schema, (result, ctx) => {
     if (!result.success) {
-      return ctx.json({ error: 'Validation failed', issues: result.error.issues }, 400);
+      // Custom labels are used verbatim (some clients/tests match exactly);
+      // the default names the first offending field so error strings stay
+      // actionable without parsing the issues array.
+      const issue = result.error.issues[0];
+      const detail = [issue?.path.join('.'), issue?.message].filter(Boolean).join(' — ');
+      const error = errorLabel ?? (detail ? `Validation failed: ${detail}` : 'Validation failed');
+      return ctx.json({ error, issues: result.error.issues }, 400);
     }
     return undefined;
   });

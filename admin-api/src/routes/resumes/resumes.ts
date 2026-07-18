@@ -22,6 +22,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { Hono } from 'hono';
+import { z } from 'zod';
 
 import type { AdminApiConfig } from '../../lib/config.js';
 import { getPool, withUser } from '../../lib/pg.js';
@@ -35,6 +36,7 @@ import {
 } from '../../lib/repositories/resumes.js';
 import type { AdminApiBindings } from '../../lib/types.js';
 import type { Resume } from '../../lib/repositories/resumes.js';
+import { jsonBody } from '../../lib/validate.js';
 
 function toDto(resume: Resume) {
     const iso = resume.generatedAt?.toISOString() ?? new Date(0).toISOString();
@@ -47,6 +49,20 @@ function toDto(resume: Resume) {
         data:      resume.contentJson,
     };
 }
+
+
+// Body schemas — z.record rejects arrays/null, matching the previous manual
+// "must be a plain object" guards.
+const CreateResumeBody = z.object({
+  label: z.string().trim().min(1, '"label" is required and must be a non-empty string'),
+  data: z.record(z.string(), z.unknown()),
+});
+const UpdateResumeBody = z.object({
+  label: z.string().trim().min(1).optional(),
+  data: z.record(z.string(), z.unknown()).optional(),
+}).refine((b) => b.label !== undefined || b.data !== undefined, {
+  message: 'At least one of "label" or "data" must be provided',
+});
 
 export function createResumesRouter(config: AdminApiConfig): Hono<AdminApiBindings> {
   const router = new Hono<AdminApiBindings>();
@@ -99,19 +115,11 @@ export function createResumesRouter(config: AdminApiConfig): Hono<AdminApiBindin
   // -------------------------------------------------------------------------
   // POST /api/admin/resumes — create a manual resume
   // -------------------------------------------------------------------------
-  router.post('/', async (ctx) => {
+  router.post('/', jsonBody(CreateResumeBody), async (ctx) => {
     const userId = ctx.get('userId');
     if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
 
-    const body = await ctx.req.json<{ label?: string; data?: Record<string, unknown> }>();
-
-    if (!body.label || typeof body.label !== 'string' || body.label.trim().length === 0) {
-      return ctx.json({ error: '"label" is required and must be a non-empty string' }, 400);
-    }
-    if (!body.data || typeof body.data !== 'object' || Array.isArray(body.data)) {
-      return ctx.json({ error: '"data" is required and must be an object' }, 400);
-    }
-
+    const body = ctx.req.valid('json');
     const resumeId = randomUUID();
 
     return withUser(getPool(config), userId, async (db) => {
@@ -132,16 +140,12 @@ export function createResumesRouter(config: AdminApiConfig): Hono<AdminApiBindin
   // -------------------------------------------------------------------------
   // PUT /api/admin/resumes/:id — update label and/or data
   // -------------------------------------------------------------------------
-  router.put('/:id', async (ctx) => {
+  router.put('/:id', jsonBody(UpdateResumeBody), async (ctx) => {
     const userId = ctx.get('userId');
     if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
 
     const id = ctx.req.param('id');
-    const body = await ctx.req.json<{ label?: string; data?: Record<string, unknown> }>();
-
-    if (!body.label && !body.data) {
-      return ctx.json({ error: 'At least one of "label" or "data" must be provided' }, 400);
-    }
+    const body = ctx.req.valid('json');
 
     return withUser(getPool(config), userId, async (db) => {
       const existing = await pgGetResume(db, id);
@@ -149,7 +153,7 @@ export function createResumesRouter(config: AdminApiConfig): Hono<AdminApiBindin
 
       await upsertResume(db, {
         ...existing,
-        label:       body.label?.trim() ?? existing.label,
+        label:       body.label ?? existing.label,
         contentJson: body.data          ?? existing.contentJson,
       });
       const updated = await pgGetResume(db, id);
