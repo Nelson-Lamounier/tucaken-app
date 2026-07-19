@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Loader2, GitBranch, Search } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { EnrichmentModal } from './EnrichmentModal'
 import { ProjectIntentModal } from './ProjectIntentModal'
 import type { ProjectIntentChoice } from './ProjectIntentModal'
 import { GitHubRepoChip } from './GitHubRepoChip'
@@ -33,14 +32,8 @@ export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos, m
   const queueIngestion = useGitHubQueueRepo()
   const ingestion = mode === 'queue' ? queueIngestion : syncIngestion
 
-  // Enrichment-tier toggle (free vs premium) for allowlisted test users, on the
-  // immediate-sync Add path. When enabled, the Add CTA opens the choice modal
-  // instead of dispatching straight away — so an add never silently runs paid
-  // enrichment. Non-allowlisted users keep the unchanged direct-add behaviour.
   const me = useQuery({ queryKey: adminKeys.me.detail(), queryFn: getMeFn })
-  const canToggle = (me.data?.enrichmentToggle ?? false) && mode === 'sync'
-  const [pendingAdd, setPendingAdd] = useState<{ repoFullName: string; defaultBranch: string } | null>(null)
-  const [pendingIntent, setPendingIntent] = useState<{ repoFullName: string; defaultBranch: string; enrichment?: 'premium' | 'free' } | null>(null)
+  const [pendingIntent, setPendingIntent] = useState<{ repoFullName: string; defaultBranch: string } | null>(null)
 
   // Confirmed projects for the link-to-existing picker in ProjectIntentModal.
   // is_user_confirmed === true is the same predicate used by isCurated in classify.ts.
@@ -84,7 +77,6 @@ export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos, m
   const doAdd = (
     fullName: string,
     defaultBranch: string,
-    enrichment?: 'premium' | 'free',
     intent?: { projectIntent: 'build' | 'link' | 'none'; targetProjectId?: string },
   ) => {
     setQueuingRepos((prev) => new Set(prev).add(fullName))
@@ -92,7 +84,6 @@ export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos, m
       {
         repoFullName: fullName,
         defaultBranch,
-        enrichment,
         projectIntent:   intent?.projectIntent,
         targetProjectId: intent?.targetProjectId,
       },
@@ -109,41 +100,23 @@ export function GitHubRepoPicker({ accessibleRepos, isLoading, connectedRepos, m
   }
 
   const handleAdd = (fullName: string, defaultBranch: string) => {
-    // Allowlisted test users choose the enrichment tier first; then both paths
-    // continue to ProjectIntentModal so intent is always captured on Add.
-    if (canToggle) {
-      setPendingAdd({ repoFullName: fullName, defaultBranch })
-    } else {
-      setPendingIntent({ repoFullName: fullName, defaultBranch })
-    }
-  }
-
-  const handleEnrichmentChoice = (choice: 'premium' | 'free') => {
-    if (!pendingAdd) return
-    const { repoFullName, defaultBranch } = pendingAdd
-    setPendingAdd(null)
-    // Carry the enrichment choice forward into the intent modal (shown next).
-    setPendingIntent({ repoFullName, defaultBranch, enrichment: choice })
+    // Continue straight to ProjectIntentModal so intent is always captured on Add.
+    setPendingIntent({ repoFullName: fullName, defaultBranch })
   }
 
   const handleIntentChoice = (choice: ProjectIntentChoice) => {
     if (!pendingIntent) return
-    const { repoFullName, defaultBranch, enrichment } = pendingIntent
+    const { repoFullName, defaultBranch } = pendingIntent
     setPendingIntent(null)
     if (choice.intent === 'link') {
-      doAdd(repoFullName, defaultBranch, enrichment, { projectIntent: 'link', targetProjectId: choice.targetProjectId })
+      doAdd(repoFullName, defaultBranch, { projectIntent: 'link', targetProjectId: choice.targetProjectId })
     } else {
-      doAdd(repoFullName, defaultBranch, enrichment, { projectIntent: choice.intent })
+      doAdd(repoFullName, defaultBranch, { projectIntent: choice.intent })
     }
   }
 
   return (
-    <div className="space-y-3" data-testid={canToggle ? 'add-enrichment-toggle-active' : undefined}>
-      <EnrichmentModal
-        open={pendingAdd !== null}
-        onChoose={handleEnrichmentChoice}
-        onClose={() => setPendingAdd(null)}
-      />
+    <div className="space-y-3">
       <ProjectIntentModal
         open={pendingIntent !== null}
         projects={confirmedProjects}

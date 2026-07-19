@@ -28,7 +28,7 @@ authenticated user id, never a client-supplied one.
   runs later via [`lib/account/purge-user.ts`](../../lib/account/README.md)
   (account-sweep script or an operator's "purge now" in `routes/admin`).
 - Feature gates read the email allowlists in `lib/billing/`
-  (`ab-free-tier.ts`, `enrichment-toggle.ts`) and Cognito/GitHub state via
+  (`ab-free-tier.ts`) and Cognito/GitHub state via
   `lib/account/cognito-admin.ts` + `lib/github/github-uninstall.ts`.
 
 ## Testing
