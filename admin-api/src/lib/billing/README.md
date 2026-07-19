@@ -12,7 +12,6 @@ ingestion, strategist dispatch, project creation, public pricing).
 | `tier-config-shape.ts` | Zod schema + defaults for the tier-config DB row; `nullToInfinity` semantics (`null` = unlimited) | `TierConfigSchema`, `DEFAULT_TIER_CONFIG`, `nullToInfinity` |
 | `tier-config-cache.ts` | In-process TTL cache over the tier-config row | `getCachedTierConfig`, `bustTierConfigCache` |
 | `ab-free-tier.ts` | A/B free-tier email allowlist (`AB_FREE_TIER_EMAILS`) | pure gate |
-| `enrichment-toggle.ts` | Enrichment-toggle email allowlist (`ENRICHMENT_TOGGLE_EMAILS`) | pure gate |
 
 ## How a quota check flows
 
@@ -43,8 +42,7 @@ ingestion, strategist dispatch, project creation, public pricing).
 ## Testing
 
 `__tests__/`: `entitlements.test.ts`, `tier-config-cache.test.ts`,
-`tier-config-public.test.ts`, `ab-free-tier.test.ts`,
-`enrichment-toggle.test.ts`.
+`tier-config-public.test.ts`, `ab-free-tier.test.ts`.
 
 ## Related
 

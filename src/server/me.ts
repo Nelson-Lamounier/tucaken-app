@@ -20,8 +20,6 @@ export interface MeResponse {
   isNew:     boolean
   /** A/B harness: true when this user may pick the free-tier resume pipeline. */
   abFreeTier: boolean
-  /** Test-user toggle: true when this user may choose enrichment tier per sync. */
-  enrichmentToggle: boolean
   plan: {
     plan:                 string
     effectivePlan:        'pro' | 'trial' | 'free'
