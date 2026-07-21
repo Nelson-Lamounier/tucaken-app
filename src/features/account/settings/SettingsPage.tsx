@@ -11,7 +11,6 @@ import {
   FileText,
   Globe,
   Layout,
-  Zap,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import type { PageNavSection, Settings, SettingsPageProps } from '../types'
@@ -21,7 +20,6 @@ import { LocaleSection } from './LocaleSection'
 import { ResumeDefaultsSection } from './ResumeDefaultsSection'
 import { WorkspaceSection } from './WorkspaceSection'
 import { TokensSection } from './TokensSection'
-import { WebhooksSection } from './WebhooksSection'
 import { DataSection } from './DataSection'
 import { DangerZoneSection } from './DangerZoneSection'
 import { adminKeys } from '@/lib/api/query-keys'
@@ -33,7 +31,6 @@ const SECTIONS: PageNavSection[] = [
   { id: 'resumes',    label: 'Resume defaults', icon: FileText       },
   { id: 'workspace',  label: 'Workspace',       icon: Building2      },
   { id: 'tokens',     label: 'API tokens',      icon: Cpu            },
-  { id: 'webhooks',   label: 'Webhooks',        icon: Zap            },
   { id: 'data',       label: 'Data & privacy',  icon: Archive        },
   { id: 'danger',     label: 'Danger zone',     icon: AlertTriangle  },
 ]
@@ -114,17 +111,6 @@ export function SettingsPage({ settings, onUpdateSettings }: SettingsPageProps) 
         <TokensSection
           tokens={settings.apiTokens}
           onChange={(next) => onUpdateSettings({ apiTokens: next })}
-        />
-      </PageSection>
-
-      <PageSection
-        id="webhooks"
-        label="Webhooks"
-        sub="POST events to your endpoint when resumes generate or repos sync."
-      >
-        <WebhooksSection
-          webhooks={settings.webhooks}
-          onChange={(next) => onUpdateSettings({ webhooks: next })}
         />
       </PageSection>
 

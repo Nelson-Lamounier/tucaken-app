@@ -124,21 +124,12 @@ export interface ApiToken {
   lastUsedAt: string | null
 }
 
-export interface Webhook {
-  id: string
-  url: string
-  events: string[]
-  active: boolean
-  lastDeliveryAt: string | null
-}
-
 export interface Settings {
   appearance: AppearanceSettings
   locale: LocaleSettings
   resumeDefaults: ResumeDefaults
   workspace: WorkspaceSettings
   apiTokens: ApiToken[]
-  webhooks: Webhook[]
   legal: {
     acceptedTermsAt: string
     acceptedPrivacyAt: string
