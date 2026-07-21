@@ -167,9 +167,14 @@ Stripe replays webhooks on 5xx. Two guards:
    subscription_status IS DISTINCT FROM $2` avoids overwriting newer state
    with an older event that arrives out of order.
 
-(The audit table is not yet implemented — webhook handler currently relies
-on conditional writes alone, which is sufficient for the events listed
-above. Audit table tracked as a follow-up.)
+The audit table is live: `markWebhookEventSeen`
+(`admin-api/src/lib/repositories/webhook-events.ts`) claims each event id via
+`POST /api/internal/billing/webhook-seen` with an atomic
+`INSERT ... ON CONFLICT (event_id) DO NOTHING RETURNING`; duplicates are
+acknowledged and skipped. The check fails open — if the dedupe call errors,
+the event is processed anyway and the conditional writes remain the safety
+net. Table created by migration `108_webhook_events_seen.sql`
+(platform-rds-bootstrap).
 
 ### Atomic provisioning (closed race window)
 

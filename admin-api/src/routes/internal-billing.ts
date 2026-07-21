@@ -26,6 +26,7 @@ import {
   updateSubscriptionFromStripe,
   upsertPendingSubscription,
 } from '../lib/repositories/users.js';
+import { markWebhookEventSeen } from '../lib/repositories/webhook-events.js';
 import type { AdminApiBindings } from '../lib/types.js';
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
@@ -46,6 +47,11 @@ const SubscriptionPatchInput = z.object({
   cancelAtPeriodEnd:    z.boolean().optional(),
   /** ISO-8601 timestamp from Stripe's `current_period_end`. */
   currentPeriodEnd:     z.string().datetime({ offset: true }).nullable().optional(),
+});
+
+const WebhookSeenInput = z.object({
+  eventId: z.string().startsWith('evt_'),
+  type:    z.string().min(1),
 });
 
 const PendingSubscriptionInput = z.object({
@@ -186,6 +192,20 @@ export function createInternalBillingRouter(
       'Pending subscription recorded for guest signup',
     );
     return ctx.json({ ok: true });
+  });
+
+  /**
+   * POST /api/internal/billing/webhook-seen
+   *
+   * Idempotency guard for the Stripe webhook. Claims an event id the first
+   * time it is seen; returns { alreadyProcessed: true } on a duplicate
+   * delivery so the caller can skip re-processing.
+   */
+  router.post('/webhook-seen', async (ctx) => {
+    const parsed = await parseBody(ctx, WebhookSeenInput);
+    if (parsed instanceof Response) return parsed;
+    const isNew = await markWebhookEventSeen(pool, parsed.eventId, parsed.type);
+    return ctx.json({ alreadyProcessed: !isNew });
   });
 
   return router;
