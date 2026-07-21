@@ -424,7 +424,13 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
         serviceAccountName:  config.strategistPipelineServiceAccount,
         nameStem:            `strategist-${sanitizeLabel(applicationId)}`,
         suffixInput,
-        labels:              { app: 'strategist-pipeline', userId, applicationSlug: sanitizeLabel(applicationId) },
+        // `pipeline-run-id` = the pipeline_runs PK, so platform-job-watcher can
+        // reconcile a terminally-failed strategist Job straight to its exact row
+        // (WHERE id = <label>) instead of waiting ~30 min for the stale sweep. An
+        // exact-id match (not applicationSlug/reference_id) avoids ever marking a
+        // concurrent re-run of the same application failed. See the watcher's
+        // jobLabelKey config entry for job-strategist.
+        labels:              { app: 'strategist-pipeline', userId, applicationSlug: sanitizeLabel(applicationId), 'pipeline-run-id': pipelineRunId },
         command:             ['node', 'dist/run-pipeline.js'],
         env: [
           { name: 'PIPELINE_RUN_ID',    value: pipelineRunId },
