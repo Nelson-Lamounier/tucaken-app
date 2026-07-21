@@ -392,7 +392,7 @@ export const THEME_CSS = `
 .resume-doc .summary-text { margin: 0; font-size: 10.5px; line-height: 1.6; color: #222; }
 
 .resume-doc .skill-row { display: flex; gap: 6px; font-size: 10.5px; margin-top: 3px; }
-.resume-doc .skill-cat { font-weight: 700; min-width: 96px; color: #111; }
+.resume-doc .skill-cat { font-weight: 700; color: #111; white-space: nowrap; }
 .resume-doc .skill-list { color: #222; flex: 1; }
 
 .resume-doc .cert-row { display: flex; justify-content: space-between; font-size: 10.5px; margin-top: 3px; }
@@ -446,7 +446,6 @@ export const THEME_CSS = `
 .resume-doc.theme-compact .bullets li { font-size: 10px; line-height: 1.4; margin-top: 1px; }
 .resume-doc.theme-compact .summary-text { font-size: 10px; line-height: 1.45; }
 .resume-doc.theme-compact .entry + .entry { margin-top: 6px; }
-.resume-doc.theme-compact .skill-cat { min-width: 80px; }
 
 /* Theme-aware compact header reorder */
 .resume-doc.theme-compact .theme-header { flex-direction: row; }
