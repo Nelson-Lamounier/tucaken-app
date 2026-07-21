@@ -32,8 +32,6 @@
  *   within the last PUSH_COOLDOWN_MS (30 minutes) or if a job is already running.
  */
 
-import { createHmac, timingSafeEqual } from 'node:crypto';
-
 import { Hono } from 'hono';
 import type { Pool } from 'pg';
 
@@ -51,6 +49,7 @@ import { getBatchApi } from '../lib/k8s.js';
 import { traceParentEnv, observabilityEnv, MODEL_JOB_BACKOFF_LIMIT } from '../lib/k8s-job-builder.js';
 import { buildIngestionJobSpec } from '../lib/ingestion-job.js';
 import { getPool } from '../lib/pg.js';
+import { verifyWebhookSignature } from '../lib/webhook-signature.js';
 import { ensureDefaultProject } from '../lib/repositories/projects.js';
 import { secondsUntilNextMonthUTC } from '../lib/retry-after.js';
 import { AdminApiBindings, requireUserId } from '../lib/types.js';
@@ -1183,21 +1182,13 @@ export function createGitHubWebhookRouter(config: AdminApiConfig): Hono {
         }
 
         // ── 2. Verify HMAC-SHA256 signature ───────────────────────────────────
-        // GitHub sends: X-Hub-Signature-256: sha256=<hex>
-        const sigHeader = ctx.req.header('X-Hub-Signature-256') ?? '';
+        // GitHub sends: X-Hub-Signature-256: sha256=<hex>. Verification lives in
+        // lib/webhook-signature.ts (hex-decoded digest, constant-time compare) —
+        // kept semantically identical to ai-applications' shared verifier.
+        const sigHeader = ctx.req.header('X-Hub-Signature-256');
         const rawBody   = await ctx.req.text();
 
-        const expected = 'sha256=' + createHmac('sha256', githubWebhookSecret)
-            .update(rawBody)
-            .digest('hex');
-
-        // Compare raw buffers — no padding. Length mismatch is itself a rejection signal.
-        const sigBuf = Buffer.from(sigHeader);
-        const expBuf = Buffer.from(expected);
-        const valid  = sigBuf.length === expBuf.length &&
-                       timingSafeEqual(sigBuf, expBuf);
-
-        if (!valid) {
+        if (!verifyWebhookSignature(rawBody, sigHeader, githubWebhookSecret)) {
             console.warn('[github/webhook] signature mismatch');
             return ctx.json({ error: 'Invalid signature' }, 401);
         }

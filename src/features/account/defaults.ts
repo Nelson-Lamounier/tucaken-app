@@ -61,7 +61,6 @@ export const DEFAULT_SETTINGS: Settings = {
     requireSso: false,
   },
   apiTokens: [],
-  webhooks: [],
   legal: {
     acceptedTermsAt: new Date().toISOString(),
     acceptedPrivacyAt: new Date().toISOString(),

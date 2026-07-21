@@ -44,7 +44,6 @@ No new dependencies.
 | `account/settings/ResumeDefaultsSection.tsx` | `src/features/account/settings/ResumeDefaultsSection.tsx` |
 | `account/settings/WorkspaceSection.tsx` | `src/features/account/settings/WorkspaceSection.tsx` |
 | `account/settings/TokensSection.tsx` | `src/features/account/settings/TokensSection.tsx` |
-| `account/settings/WebhooksSection.tsx` | `src/features/account/settings/WebhooksSection.tsx` |
 | `account/settings/DataSection.tsx` | `src/features/account/settings/DataSection.tsx` |
 
 ---
