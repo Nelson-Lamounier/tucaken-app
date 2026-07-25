@@ -339,6 +339,30 @@ export const requeueApplicationFn = createServerFn({ method: 'POST' })
     )
   })
 
+/**
+ * Re-runs the analysis pipeline for an EXISTING application from its stored
+ * job description — no JD re-entry, no duplicate application row.
+ *
+ * Sends only `{ applicationId }` to admin-api's strategist-job route, which
+ * loads company/role/JD from the RLS-scoped job_applications row and
+ * dispatches a fresh K8s Job against the SAME application. The new resume
+ * version and analysis land on the existing card.
+ *
+ * @see admin-api/src/routes/pipelines.ts — POST /api/admin/pipelines/strategist-job (reanalysis variant)
+ */
+export const reanalyseApplicationFn = createServerFn({ method: 'POST' })
+  .inputValidator(z.object({ applicationId: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    await requireAuth()
+    return apiFetch<TriggerResponse>(
+      '/pipelines/strategist-job',
+      {
+        method: 'POST',
+        body: JSON.stringify({ applicationId: data.applicationId }),
+      },
+    )
+  })
+
 export const triggerApplicationsAnalysisFn = createServerFn({ method: 'POST' })
   .inputValidator(analyseTriggerSchema)
   .handler(async ({ data }) => {

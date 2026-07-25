@@ -8,6 +8,7 @@ import {
   EnvelopeIcon,
   CheckIcon,
   ArrowDownTrayIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/20/solid'
 
 interface DropDownOptionsProps {
@@ -30,6 +31,10 @@ interface DropDownOptionsProps {
   readonly showPreviewCoverLetter?: boolean
   /** Single consolidated "Edit" action — opens the resume builder */
   readonly onEdit?: () => void
+  /** Re-run the analysis pipeline from the stored job description */
+  readonly onReanalyse?: () => void
+  /** Disables the re-run item while a dispatch is in flight */
+  readonly reanalysePending?: boolean
 }
 
 export default function DropDownOptions({
@@ -50,6 +55,8 @@ export default function DropDownOptions({
   onPreviewArticle,
   onEditArticle,
   onEdit,
+  onReanalyse,
+  reanalysePending,
   showPreviewResume = true,
   showPreviewCoverLetter = true,
 }: DropDownOptionsProps & { onPreviewArticle?: () => void; onEditArticle?: () => void; }) {
@@ -107,6 +114,26 @@ export default function DropDownOptions({
                   className="mr-3 size-5 text-zinc-400 dark:text-zinc-500 group-data-focus:text-zinc-600 dark:group-data-focus:text-white"
                 />
                 Edit
+              </button>
+            </MenuItem>
+          </div>
+        )}
+
+        {/* Re-run analysis — dispatches a fresh pipeline run from the stored JD */}
+        {onReanalyse && (
+          <div className="py-1">
+            <MenuItem>
+              <button
+                type="button"
+                onClick={onReanalyse}
+                disabled={reanalysePending}
+                className="group flex w-full items-center px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 data-focus:bg-zinc-50 dark:data-focus:bg-white/5 data-focus:text-zinc-900 dark:data-focus:text-white data-focus:outline-hidden disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ArrowPathIcon
+                  aria-hidden="true"
+                  className={`mr-3 size-5 text-zinc-400 dark:text-zinc-500 group-data-focus:text-zinc-600 dark:group-data-focus:text-white ${reanalysePending ? 'animate-spin' : ''}`}
+                />
+                {reanalysePending ? 'Starting…' : 'Re-run Analysis'}
               </button>
             </MenuItem>
           </div>
