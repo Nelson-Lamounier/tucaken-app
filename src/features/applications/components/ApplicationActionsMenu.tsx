@@ -12,6 +12,7 @@ import { createResumeFn, setActiveResumeFn } from '@/server/resumes'
 import { deleteApplicationFn } from '@/server/applications'
 import { buildResumeDomForPdf, buildCoverLetterDomForPdf } from '@/lib/resumes/resume-dom-builder'
 import { usePdfDownload } from '@/hooks/use-pdf-download'
+import { useApplicationReanalyse } from '../hooks/use-application-reanalyse'
 import type { ResumeData } from '@/lib/resumes/resume-data'
 import { ResumeBuilderApp } from '@/features/resume-theme/app/main'
 import {
@@ -155,7 +156,21 @@ export function ApplicationActionsMenu({
     onError: (err: Error) => addToast('error', err.message),
   })
 
+  const reanalyseMutation = useApplicationReanalyse()
+  const handleReanalyse = useCallback(() => {
+    reanalyseMutation.mutate(
+      { applicationId: detail.slug },
+      {
+        onSuccess: () => addToast('success', 'Analysis re-started — a fresh resume is on the way.'),
+        onError: (err: Error) => addToast('error', err.message),
+      },
+    )
+  }, [reanalyseMutation, detail.slug, addToast])
+
   const hasTailoredResume = Boolean(detail.analysis?.tailoredResume)
+  // Never offer a re-run while one is already in flight — the server also
+  // guards this (409), the gate here just keeps the menu honest.
+  const canReanalyse = detail.status !== 'analysing'
 
   return (
     <>
@@ -165,6 +180,8 @@ export function ApplicationActionsMenu({
         options={statusOptions}
         selectedValue={statusValue}
         onSelect={val => onStatusChange(val as ApplicationStatus)}
+        onReanalyse={canReanalyse ? handleReanalyse : undefined}
+        reanalysePending={reanalyseMutation.isPending}
         onDownloadResume={isApplied && hasTailoredResume ? handleDownloadResume : undefined}
         onDownloadCoverLetter={isApplied && detail.analysis?.coverLetter ? handleDownloadCoverLetter : undefined}
         onEdit={isApplied && hasTailoredResume ? handleOpenBuilder : undefined}

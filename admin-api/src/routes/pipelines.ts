@@ -15,6 +15,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { Hono } from 'hono';
+import type { PoolClient } from 'pg';
 
 import type { AdminApiConfig } from '../lib/config.js';
 import { getJobImage, isImageConfigured, isAssetsBucketConfigured } from '../lib/config.js';
@@ -25,6 +26,103 @@ import { upsertApplication } from '../lib/repositories/applications.js';
 import { upsertArticle } from '../lib/repositories/articles.js';
 import { insertPipelineRun, getPipelineRun } from '../lib/repositories/pipeline-runs.js';
 import type { AdminApiBindings } from '../lib/types.js';
+
+/** UUID shape guard — mirrors the projects router's local helper. */
+function isUuid(value: unknown): value is string {
+  return typeof value === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
+
+/** Guard against the K8s env-var 128KB limit — truncate at 100KB with a warning. */
+function truncateJobDescription(jobDescription: string): string {
+  const MAX_JD_BYTES = 100_000;
+  const jdBytes = Buffer.byteLength(jobDescription, 'utf8');
+  if (jdBytes <= MAX_JD_BYTES) return jobDescription;
+  console.warn('[pipelines/strategist-job] job description truncated', { originalBytes: jdBytes });
+  return jobDescription.substring(0, MAX_JD_BYTES);
+}
+
+type ReanalysisInputs =
+  | { targetCompany: string; targetRole: string; jobDescription: string }
+  | { error: string; status: 404 | 409 | 422 };
+
+/**
+ * Load the stored inputs for a re-analysis — RLS scopes the SELECT to the
+ * caller, so a foreign applicationId reads as not-found rather than leaking
+ * data. Flips kanban_status to 'analysing' on success so the card reflects
+ * the run immediately and a double-click cannot dispatch twice (the second
+ * call hits the 409 guard).
+ */
+async function loadReanalysisInputs(db: PoolClient, applicationId: string): Promise<ReanalysisInputs> {
+  const res = await db.query(
+    `SELECT company, role, job_description, kanban_status FROM job_applications WHERE id = $1`,
+    [applicationId],
+  );
+  if (res.rowCount === 0) return { error: 'Application not found', status: 404 };
+  const row = res.rows[0] as { company: string; role: string; job_description: string | null; kanban_status: string };
+  if (row.kanban_status === 'analysing') {
+    return { error: 'An analysis is already running for this application', status: 409 };
+  }
+  if (!row.job_description?.trim()) {
+    return { error: 'Application has no stored job description to re-analyse', status: 422 };
+  }
+  await db.query(`UPDATE job_applications SET kanban_status = 'analysing' WHERE id = $1`, [applicationId]);
+  return { targetCompany: row.company, targetRole: row.role, jobDescription: row.job_description.trim() };
+}
+
+/**
+ * New-analysis path: create the job_applications row before dispatching the
+ * K8s Job so the pipeline can UPDATE kanban_status as it progresses, then
+ * seed interview_stage + completed stage rows for any stages before the
+ * requested start stage.
+ */
+async function createApplicationWithStages(db: PoolClient, params: {
+  applicationId: string;
+  userId: string;
+  targetCompany: string;
+  targetRole: string;
+  jobDescription: string;
+  interviewStage: string | undefined;
+}): Promise<{ ok: boolean }> {
+  const { applicationId, userId, targetCompany, targetRole, jobDescription } = params;
+  try {
+    await upsertApplication(db, {
+      id:             applicationId,
+      userId,
+      company:        targetCompany,
+      role:           targetRole,
+      jobUrl:         null,
+      jobDescription,
+      kanbanStatus:   'analysing',
+      interviewStage: 'applied',
+      appliedAt:      null,
+    });
+  } catch (err: unknown) {
+    console.error('[pipelines/strategist-job] failed to insert job_application', err);
+    return { ok: false };
+  }
+
+  const stageOrder = ['applied', 'phone-screen', 'technical', 'system-design', 'behavioural', 'bar-raiser', 'final'];
+  const startStage = (params.interviewStage ?? 'applied').trim();
+  const foundIdx = stageOrder.indexOf(startStage);
+  const startIdx = Math.max(0, foundIdx);
+  await db.query(`UPDATE job_applications SET interview_stage = $1 WHERE id = $2`, [stageOrder[startIdx], applicationId]);
+  for (let i = 0; i < startIdx; i++) {
+    await db.query(
+      `INSERT INTO interview_stages (job_application_id, stage_type, stage_status)
+       VALUES ($1,$2,'completed') ON CONFLICT (job_application_id, stage_type) DO NOTHING`,
+      [applicationId, stageOrder[i]],
+    );
+  }
+  if (startIdx > 0) {
+    await db.query(
+      `INSERT INTO interview_stages (job_application_id, stage_type, stage_status)
+       VALUES ($1,$2,'current') ON CONFLICT (job_application_id, stage_type) DO UPDATE SET stage_status='current'`,
+      [applicationId, stageOrder[startIdx]],
+    );
+  }
+  return { ok: true };
+}
 
 /**
  * Create the pipelines admin router.
@@ -138,35 +236,41 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
   // -------------------------------------------------------------------------
   // POST /api/admin/pipelines/strategist-job
   // Phase 4: K8s-Job-based strategist pipeline trigger.
+  //
+  // Two body variants:
+  //   { targetCompany, targetRole, jobDescription, ... } — new analysis:
+  //     creates the job_applications row and seeds interview stages.
+  //   { applicationId } — RE-analysis of an existing application: company,
+  //     role, and job description are read from the stored row (RLS-scoped to
+  //     the caller), no new application row is created, stages are untouched,
+  //     and the fresh run lands on the SAME application card.
   // -------------------------------------------------------------------------
   router.post('/strategist-job', async (ctx) => {
     const userId = ctx.get('userId');
     if (!userId) return ctx.json({ error: 'User not provisioned — retry in a moment' }, 503);
 
-    let body: { targetCompany?: string; targetRole?: string; jobDescription?: string; mode?: string; resumeId?: string; interviewStage?: string };
+    let body: { targetCompany?: string; targetRole?: string; jobDescription?: string; mode?: string; resumeId?: string; interviewStage?: string; applicationId?: string };
     try { body = await ctx.req.json(); }
     catch { return ctx.json({ error: 'Body must be valid JSON' }, 400); }
 
-    const targetCompany  = body.targetCompany?.trim();
-    const targetRole     = body.targetRole?.trim();
-    const jobDescription = body.jobDescription?.trim();
+    const reanalyseId = body.applicationId?.trim();
+    const isReanalysis = Boolean(reanalyseId);
+    if (isReanalysis && !isUuid(reanalyseId)) {
+      return ctx.json({ error: '"applicationId" must be a UUID' }, 400);
+    }
 
-    for (const [k, v] of Object.entries({ targetCompany, targetRole, jobDescription })) {
-      if (!v) return ctx.json({ error: `"${k}" is required` }, 400);
+    let targetCompany  = body.targetCompany?.trim();
+    let targetRole     = body.targetRole?.trim();
+    let jobDescription = body.jobDescription?.trim();
+
+    if (!isReanalysis) {
+      for (const [k, v] of Object.entries({ targetCompany, targetRole, jobDescription })) {
+        if (!v) return ctx.json({ error: `"${k}" is required` }, 400);
+      }
     }
     const mode = body.mode?.trim() || 'standard';
 
     const resumeId = body.resumeId?.trim() || '';
-
-    // Guard against K8s env-var 128KB limit — truncate at 100KB with a warning.
-    const MAX_JD_BYTES = 100_000;
-    const jdBytes = Buffer.byteLength(jobDescription!, 'utf8');
-    const truncatedJd = jdBytes > MAX_JD_BYTES
-      ? (() => {
-          console.warn('[pipelines/strategist-job] job description truncated', { originalBytes: jdBytes });
-          return jobDescription!.substring(0, MAX_JD_BYTES);
-        })()
-      : jobDescription!;
 
     const strategistPipelineImage = getJobImage('job-strategist');
     if (!isImageConfigured(strategistPipelineImage)) {
@@ -174,48 +278,27 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
       return ctx.json({ error: 'Strategist pipeline image not yet configured — wait ~60s for ESO/kubelet sync' }, 502);
     }
 
-    const applicationId = randomUUID();
+    const applicationId = reanalyseId ?? randomUUID();
     const pipelineRunId = randomUUID();
 
     return withUser(getPool(config), userId, async (db) => {
-      // Create the job_applications row before dispatching the K8s Job so the
-      // pipeline can UPDATE kanban_status as it progresses.
-      try {
-        await upsertApplication(db, {
-          id:             applicationId,
-          userId,
-          company:        targetCompany!,
-          role:           targetRole!,
-          jobUrl:         null,
+      if (isReanalysis) {
+        const loaded = await loadReanalysisInputs(db, applicationId);
+        if ('error' in loaded) return ctx.json({ error: loaded.error }, loaded.status);
+        ({ targetCompany, targetRole, jobDescription } = loaded);
+      } else {
+        const created = await createApplicationWithStages(db, {
+          applicationId, userId,
+          targetCompany:  targetCompany!,
+          targetRole:     targetRole!,
           jobDescription: jobDescription!,
-          kanbanStatus:   'analysing',
-          interviewStage: 'applied',
-          appliedAt:      null,
+          interviewStage: body.interviewStage,
         });
-      } catch (err: unknown) {
-        console.error('[pipelines/strategist-job] failed to insert job_application', err);
-        return ctx.json({ error: 'Failed to create application record' }, 500);
+        if (!created.ok) return ctx.json({ error: 'Failed to create application record' }, 500);
       }
 
-      // Seed interview_stage + completed stage rows for any stages before startStage.
-      const stageOrder = ['applied', 'phone-screen', 'technical', 'system-design', 'behavioural', 'bar-raiser', 'final'];
-      const startStage = (body.interviewStage ?? 'applied').trim();
-      const startIdx = Math.max(0, stageOrder.indexOf(startStage) === -1 ? 0 : stageOrder.indexOf(startStage));
-      await db.query(`UPDATE job_applications SET interview_stage = $1 WHERE id = $2`, [stageOrder[startIdx], applicationId]);
-      for (let i = 0; i < startIdx; i++) {
-        await db.query(
-          `INSERT INTO interview_stages (job_application_id, stage_type, stage_status)
-           VALUES ($1,$2,'completed') ON CONFLICT (job_application_id, stage_type) DO NOTHING`,
-          [applicationId, stageOrder[i]],
-        );
-      }
-      if (startIdx > 0) {
-        await db.query(
-          `INSERT INTO interview_stages (job_application_id, stage_type, stage_status)
-           VALUES ($1,$2,'current') ON CONFLICT (job_application_id, stage_type) DO UPDATE SET stage_status='current'`,
-          [applicationId, stageOrder[startIdx]],
-        );
-      }
+      // Applied after the reanalysis branch so the stored-JD path is guarded too.
+      const truncatedJd = truncateJobDescription(jobDescription!);
 
       try {
         await insertPipelineRun(db, {
@@ -223,7 +306,7 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
           userId,
           pipelineType: 'strategist',
           referenceId:  applicationId,
-          metadata:     { applicationSlug: applicationId, targetCompany, targetRole, mode },
+          metadata:     { applicationSlug: applicationId, targetCompany, targetRole, mode, ...(isReanalysis ? { reanalysis: true } : {}) },
         });
       } catch (err: unknown) {
         console.error('[pipelines/strategist-job] failed to insert pipeline_run', err);
