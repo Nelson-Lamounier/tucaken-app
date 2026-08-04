@@ -15,7 +15,7 @@ import type { AdminApiConfig } from '../../lib/config.js';
 import { getJobImage, isImageConfigured } from '../../lib/config.js';
 import { REDIS_CACHE_ENV } from '../../lib/jobs/case-study-dispatch.js';
 import { buildPipelineJob, sanitizeLabel } from '../../lib/jobs/k8s-job-builder.js';
-import { getBatchApi } from '../../lib/jobs/k8s.js';
+import { dispatchJob } from '../../lib/jobs/dispatch.js';
 import { getPool, withUser } from '../../lib/pg.js';
 import { insertPipelineRun } from '../../lib/repositories/pipeline-runs.js';
 import { listProjects } from '../../lib/repositories/projects.js';
@@ -105,10 +105,7 @@ export function createProjectsClusteringRouter(config: AdminApiConfig): Hono<Adm
         });
 
         try {
-            await getBatchApi().createNamespacedJob({
-                namespace: config.strategistPipelineNamespace,
-                body:      job,
-            });
+            await dispatchJob(config.strategistPipelineNamespace, job);
         } catch (err) {
             (ctx.get('logger') ?? logger).error({ err, domain: 'projects/clustering' }, 'failed to create K8s Job');
             return ctx.json({ error: 'Failed to schedule clustering Job' }, 502);

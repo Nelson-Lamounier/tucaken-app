@@ -24,7 +24,7 @@ import { getJobImage, isImageConfigured, type AdminApiConfig } from '../config.j
 import { withUser } from '../pg.js';
 import { insertPipelineRun } from '../repositories/pipeline-runs.js';
 import { buildPipelineJob, sanitizeLabel } from './k8s-job-builder.js';
-import { getBatchApi } from './k8s.js';
+import { dispatchJob } from './dispatch.js';
 
 // Non-secret redis-cache connection env for the job-strategist Jobs
 // (case-study + clustering). The password is mounted separately via the
@@ -95,10 +95,7 @@ export async function dispatchCaseStudyJob(
     });
 
     try {
-        await getBatchApi().createNamespacedJob({
-            namespace: config.strategistPipelineNamespace,
-            body:      job,
-        });
+        await dispatchJob(config.strategistPipelineNamespace, job);
     } catch (err) {
         console.error('[projects/dispatch] failed to create K8s Job', err);
         return { ok: false, fatal: false, reason: 'k8s_create_failed' };

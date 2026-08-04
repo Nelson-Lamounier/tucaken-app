@@ -36,7 +36,7 @@ import { z } from 'zod';
 
 import type { AdminApiConfig } from '../../lib/config.js';
 import { getJobImage, isImageConfigured, isAssetsBucketConfigured } from '../../lib/config.js';
-import { getBatchApi } from '../../lib/jobs/k8s.js';
+import { dispatchJob } from '../../lib/jobs/dispatch.js';
 import { dispatchRollupRefresh } from '../../lib/jobs/dispatch-rollup.js';
 import { getPool } from '../../lib/pg.js';
 import { secondsUntilNextMonthUTC } from '../../lib/retry-after.js';
@@ -328,7 +328,7 @@ export function createResumeImportsRouter(config: AdminApiConfig): Hono<AdminApi
     );
 
     try {
-      await getBatchApi().createNamespacedJob({ namespace: config.resumeImportNamespace, body: job });
+      await dispatchJob(config.resumeImportNamespace, job);
     } catch (err) {
       (ctx.get('logger') ?? logger).error({ err, domain: 'resume-imports' }, 'failed to create K8s Job');
       return ctx.json({ error: 'Failed to schedule resume import job' }, 502);
@@ -363,7 +363,7 @@ export function createResumeImportsRouter(config: AdminApiConfig): Hono<AdminApi
     const job = buildEnrichmentJobSpec(config, image, importRecord.id, userId);
 
     try {
-      await getBatchApi().createNamespacedJob({ namespace: config.resumeImportNamespace, body: job });
+      await dispatchJob(config.resumeImportNamespace, job);
     } catch (err) {
       (ctx.get('logger') ?? logger).error({ err, domain: 'resume-imports' }, 'confirm: failed to create enrichment Job');
       // The row is already 'confirmed'. Surface the failure so the client can
@@ -410,7 +410,7 @@ export function createResumeImportsRouter(config: AdminApiConfig): Hono<AdminApi
     );
 
     try {
-      await getBatchApi().createNamespacedJob({ namespace: config.resumeImportNamespace, body: job });
+      await dispatchJob(config.resumeImportNamespace, job);
     } catch (err) {
       (ctx.get('logger') ?? logger).error({ err, domain: 'resume-imports' }, 'retry: failed to create K8s Job');
       return ctx.json({ error: 'Failed to schedule resume import job' }, 502);
