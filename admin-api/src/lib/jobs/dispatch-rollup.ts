@@ -15,7 +15,7 @@
 import type { AdminApiConfig } from '../config.js';
 import { getJobImage, isImageConfigured } from '../config.js';
 import { buildRollupJobSpec } from './ingestion-job.js';
-import { getBatchApi } from './k8s.js';
+import { dispatchJob } from './dispatch.js';
 
 export async function dispatchRollupRefresh(
     config: AdminApiConfig,
@@ -26,7 +26,7 @@ export async function dispatchRollupRefresh(
         const image = getJobImage('ingestion');
         if (!isImageConfigured(image)) return false;
         const job = buildRollupJobSpec(config, image, userId, Date.now());
-        await getBatchApi().createNamespacedJob({ namespace: config.ingestionNamespace, body: job });
+        await dispatchJob(config.ingestionNamespace, job);
         return true;
     } catch (err) {
         console.warn(`[rollup] refresh dispatch failed (${reason}, non-fatal)`, err);

@@ -21,6 +21,7 @@ import { getJobImage, isImageConfigured } from '../../lib/config.js';
 import { listInstallationRepos } from '../../lib/github/github-app.js';
 import type { V1Job } from '@kubernetes/client-node';
 import { getBatchApi, getCoreApi } from '../../lib/jobs/k8s.js';
+import { dispatchJob, deleteJob, listJobs, jobBackend } from '../../lib/jobs/dispatch.js';
 import { buildIngestionJobSpec, buildIngestionTokenSecret, ingestionTokenSecretName } from '../../lib/jobs/ingestion-job.js';
 import { getPool } from '../../lib/pg.js';
 import { ensureDefaultProject, cleanupOrphanedDefaultProjects, stampProjectIntent } from '../../lib/repositories/projects.js';
@@ -475,6 +476,13 @@ export async function dispatchIngestionJob(
     });
     const jobName = job.metadata?.name ?? '';
 
+    // Docker backend: no Secret objects exist — the token crosses only the
+    // in-host HTTP hop to job-runner as a direct env value.
+    if (jobBackend() === 'docker') {
+        await dispatchJob(config.ingestionNamespace, job, { secretEnv: { GITHUB_TOKEN: githubToken } });
+        return { jobName };
+    }
+
     // Create the Job first, then its token Secret owned by the Job (for GC). The
     // pod can't start until the secret exists, but image pull (seconds) outlasts
     // the secret create (ms), so there's no real start delay. If the secret fails,
@@ -493,8 +501,7 @@ export async function dispatchIngestionJob(
             }),
         });
     } catch (err) {
-        await getBatchApi()
-            .deleteNamespacedJob({ namespace: config.ingestionNamespace, name: jobName, propagationPolicy: 'Background' })
+        await deleteJob(config.ingestionNamespace, jobName)
             .catch(() => { /* best-effort cleanup */ });
         throw err;
     }
@@ -561,11 +568,7 @@ export async function reconcileStuckRepos(
     let jobs: V1Job[];
     try {
         const safeUser = sanitizeLabel(userId);
-        const res = await getBatchApi().listNamespacedJob({
-            namespace:     config.ingestionNamespace,
-            labelSelector: `app=ingestion-worker,userId=${safeUser}`,
-        });
-        jobs = res.items ?? [];
+        jobs = await listJobs(config.ingestionNamespace, `app=ingestion-worker,userId=${safeUser}`);
     } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error('[github/reconcile] listNamespacedJob failed — deferring to sweep', msg);

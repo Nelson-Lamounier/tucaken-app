@@ -23,7 +23,7 @@ import { analysisModeFor, entitlementsFromConfig } from '../../lib/billing/entit
 import { claimStrategistDispatch } from '../../lib/jobs/strategist-dispatch-gate.js';
 import { getCachedTierConfig } from '../../lib/billing/tier-config-cache.js';
 import { buildPipelineJob, sanitizeLabel } from '../../lib/jobs/k8s-job-builder.js';
-import { getBatchApi } from '../../lib/jobs/k8s.js';
+import { dispatchJob } from '../../lib/jobs/dispatch.js';
 import { getPool, withUser } from '../../lib/pg.js';
 import { upsertApplication } from '../../lib/repositories/applications.js';
 import { upsertArticle } from '../../lib/repositories/articles.js';
@@ -53,7 +53,7 @@ function resolveArticlePipelineImage(logTag: string): string | null {
  */
 async function createPipelineJob(namespace: string, job: V1Job, logTag: string): Promise<boolean> {
   try {
-    await getBatchApi().createNamespacedJob({ namespace, body: job });
+    await dispatchJob(namespace, job);
     return true;
   } catch (err: unknown) {
     logger.error({ err, log_tag: logTag }, 'failed to create K8s Job');
@@ -473,7 +473,7 @@ export function createPipelinesRouter(config: AdminApiConfig): Hono<AdminApiBind
         envFromSecretRefs: ['platform-rds-credentials'],
       });
 
-      try { await getBatchApi().createNamespacedJob({ namespace: config.strategistPipelineNamespace, body: job }); }
+      try { await dispatchJob(config.strategistPipelineNamespace, job); }
       catch (err: unknown) {
         (ctx.get('logger') ?? logger).error({ err, domain: 'pipelines/strategist-job' }, 'failed to create K8s Job');
         await decrementResumeQuota(pool, userId).catch(() => {});

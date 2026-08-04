@@ -22,7 +22,7 @@ import type { AdminApiConfig } from '../../lib/config.js';
 import { getJobImage, isImageConfigured } from '../../lib/config.js';
 import { getPool } from '../../lib/pg.js';
 import { tryClaimSyncSlot } from '../../lib/github/sync-state.js';
-import { getBatchApi } from '../../lib/jobs/k8s.js';
+import { dispatchJob } from '../../lib/jobs/dispatch.js';
 import { traceParentEnv, observabilityEnv, ingestionModelEnv, MODEL_JOB_BACKOFF_LIMIT } from '../../lib/jobs/k8s-job-builder.js';
 import { buildIngestionJobSpec } from '../../lib/jobs/ingestion-job.js';
 import { getCachedTierConfig } from '../../lib/billing/tier-config-cache.js';
@@ -137,7 +137,7 @@ export function createIngestionRouter(config: AdminApiConfig): Hono<AdminApiBind
 
         const job = buildRollupJobSpec(config, ingestionImage, userId, Date.now());
         try {
-            await getBatchApi().createNamespacedJob({ namespace: config.ingestionNamespace, body: job });
+            await dispatchJob(config.ingestionNamespace, job);
         } catch (err: unknown) {
             console.error('[rollup-refresh] failed to create K8s Job', err);
             return ctx.json({ error: 'Failed to schedule rollup-refresh Job' }, 502);
@@ -197,7 +197,7 @@ export function createIngestionRouter(config: AdminApiConfig): Hono<AdminApiBind
 
         try {
             // @kubernetes/client-node v1.x switched to options-object API.
-            await getBatchApi().createNamespacedJob({ namespace: config.ingestionNamespace, body: job });
+            await dispatchJob(config.ingestionNamespace, job);
         } catch (err: unknown) {
             console.error('[ingestion] failed to create K8s Job', err);
             // Release the claim so a failed dispatch doesn't leave a stuck

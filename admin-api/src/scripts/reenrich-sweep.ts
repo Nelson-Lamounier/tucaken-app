@@ -36,7 +36,7 @@
 import { Pool } from 'pg';
 
 import { loadConfig, getJobImage, isImageConfigured } from '../lib/config.js';
-import { getBatchApi } from '../lib/jobs/k8s.js';
+import { dispatchJob } from '../lib/jobs/dispatch.js';
 import { buildReenrichJobSpec } from '../lib/jobs/ingestion-job.js';
 import { entitlementsFromConfig } from '../lib/billing/entitlements.js';
 import { getCachedTierConfig } from '../lib/billing/tier-config-cache.js';
@@ -121,7 +121,7 @@ async function main(): Promise<SweepResult> {
       role:          plan.role,
       tierConfig,
     });
-    await getBatchApi().createNamespacedJob({ namespace: cfg.ingestionNamespace, body: spec });
+    await dispatchJob(cfg.ingestionNamespace, spec);
     result.dispatched.push(row.user_id);
     // eslint-disable-next-line no-console
     console.log('dispatched reenrich job', { userId: row.user_id, pending, job: spec.metadata?.name });

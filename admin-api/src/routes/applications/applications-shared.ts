@@ -8,7 +8,7 @@ import type { AdminApiConfig } from '../../lib/config.js';
 import { getJobImage } from '../../lib/config.js';
 import type { CoachJobEnv } from '../../lib/jobs/coach-dispatch.js';
 import { buildPipelineJob, sanitizeLabel } from '../../lib/jobs/k8s-job-builder.js';
-import { getBatchApi } from '../../lib/jobs/k8s.js';
+import { dispatchJob } from '../../lib/jobs/dispatch.js';
 import type { Queryable } from '../../lib/pg.js';
 import { insertPipelineRun } from '../../lib/repositories/pipeline-runs.js';
 
@@ -50,7 +50,7 @@ export function makeCoachAdapters(config: AdminApiConfig, slug: string) {
       ],
       envFromSecretRefs: ['platform-rds-credentials'],
     });
-    return getBatchApi().createNamespacedJob({ namespace: config.strategistPipelineNamespace, body: job }).then(() => undefined);
+    return dispatchJob(config.strategistPipelineNamespace, job).then(() => undefined);
   }
 
   function insertCoachRunAdapter(
