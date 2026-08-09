@@ -10306,7 +10306,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"dompurify@npm:*, dompurify@npm:^3.4.3":
+"dompurify@npm:*":
   version: 3.4.3
   resolution: "dompurify@npm:3.4.3"
   dependencies:
@@ -10327,6 +10327,18 @@ __metadata:
     "@types/trusted-types":
       optional: true
   checksum: 10c0/440a4246020cb54b82ef2cb66381e4d310a0c470f9994655e61b6122811f0eaa00a2f9665d2bed30ca3f58932ba7bb0d5e26fdfce61c8daf35d21a3f5a799e48
+  languageName: node
+  linkType: hard
+
+"dompurify@npm:^3.4.13":
+  version: 3.4.13
+  resolution: "dompurify@npm:3.4.13"
+  dependencies:
+    "@types/trusted-types": "npm:^2.0.7"
+  dependenciesMeta:
+    "@types/trusted-types":
+      optional: true
+  checksum: 10c0/9c2a1a71e1a1d8b77953db7a39ffc935ef4ed4f10fe40770232128c2cbfd4c3dc677d3d7bae51eb24cc52d9ff3548612dc540ecb4343e89b26e809d2be2e0cfe
   languageName: node
   linkType: hard
 
@@ -17528,7 +17540,7 @@ __metadata:
     "@visx/shape": "npm:^4.0.0"
     "@visx/tooltip": "npm:^4.0.0"
     "@vitejs/plugin-react": "npm:^5.1.4"
-    dompurify: "npm:^3.4.3"
+    dompurify: "npm:^3.4.13"
     esbuild: "npm:^0.28.1"
     eslint: "npm:^9.28.0"
     happy-dom: "npm:^20.9.0"
