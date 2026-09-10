@@ -108,6 +108,6 @@
     "vinxi": "^0.5.11",
     "vite": "^8.0.16",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.11"
   }
 }
